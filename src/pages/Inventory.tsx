@@ -1,0 +1,738 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import {
+  Plus, Package, Trash2, Pencil, Search, Tag, Database,
+  X, FileText, ClipboardPaste, Copy, AlertCircle, AlertTriangle
+} from 'lucide-react';
+import { useBusinessStore } from '@/lib/useBusinessStore';
+import { formatCurrency } from '@/lib/utils';
+import type { InventoryItem } from '@/lib/types';
+import ConfirmDialog from '@/components/ConfirmDialog';
+
+// ─── Tiny UI primitives (no shadcn dependency) ─────────────────────────────
+
+const Input = ({ className = '', ...props }: React.InputHTMLAttributes<HTMLInputElement>) => (
+  <input
+    className={`w-full px-3 py-2 bg-accent border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${className}`}
+    {...props}
+  />
+);
+
+const Label = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
+  <label className={`text-xs font-bold uppercase tracking-wider text-muted-foreground ${className}`}>
+    {children}
+  </label>
+);
+
+function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  wide = false,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+  wide?: boolean;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className={`relative glass-card rounded-3xl shadow-2xl flex flex-col max-h-[90vh] ${
+          wide ? 'w-full max-w-4xl' : 'w-full max-w-lg'
+        }`}
+      >
+        <div className="flex items-center justify-between p-6 border-b border-border shrink-0">
+          <h2 className="font-black text-xl">{title}</h2>
+          <button onClick={onClose} className="p-2 hover:bg-accent rounded-xl transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="overflow-y-auto flex-1 p-6">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+interface MatrixRow {
+  sub: string;
+  size: string;
+  price: string;
+  costPrice: string;
+  stock: string;
+}
+
+interface BulkRow {
+  name: string;
+  price: string;
+  costPrice: string;
+  stock: string;
+  category: string;
+  subcategory: string;
+  size: string;
+}
+
+const emptyForm = {
+  name: '', price: '', costPrice: '', sku: '', category: '',
+  subcategory: '', size: '', description: '', stock: '',
+};
+
+const emptyBulkRow = (): BulkRow => ({
+  name: '', price: '', costPrice: '', stock: '', category: '', subcategory: '', size: '',
+});
+
+// ─── Main Component ─────────────────────────────────────────────────────────
+
+export default function Inventory() {
+  const { 
+    inventory, 
+    addInventoryItem, 
+    updateInventoryItem, 
+    deleteInventoryItem, 
+    clearInventory,
+    inventorySearchTerm,
+    setInventorySearchTerm
+  } = useBusinessStore();
+
+  const [search, setSearch] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [editForm, setEditForm] = useState(emptyForm);
+  const [variantMatrix, setVariantMatrix] = useState<MatrixRow[]>([]);
+  const [bulkRows, setBulkRows] = useState<BulkRow[]>(Array(5).fill(null).map(emptyBulkRow));
+  const [toast, setToast] = useState('');
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 3000);
+  };
+
+  // ── Autocomplete data ──
+  const uniqueCategories = useMemo(
+    () => Array.from(new Set(inventory.map((i) => i.category))).filter(Boolean),
+    [inventory]
+  );
+
+  // ── Variant matrix sync ──
+  useEffect(() => {
+    const sizes = form.size.includes(',')
+      ? form.size.split(',').map((s) => s.trim()).filter(Boolean)
+      : [form.size.trim()].filter(Boolean);
+    const subs = form.subcategory.includes(',')
+      ? form.subcategory.split(',').map((s) => s.trim()).filter(Boolean)
+      : [form.subcategory.trim()].filter(Boolean);
+
+    if (sizes.length > 1 || subs.length > 1) {
+      const newMatrix: MatrixRow[] = [];
+      const finalSubs = subs.length > 0 ? subs : [''];
+      const finalSizes = sizes.length > 0 ? sizes : [''];
+      for (const sub of finalSubs) {
+        for (const size of finalSizes) {
+          const existing = variantMatrix.find((m) => m.sub === sub && m.size === size);
+          newMatrix.push({
+            sub, size,
+            price: existing?.price || form.price || '0',
+            costPrice: existing?.costPrice || form.costPrice || '0',
+            stock: existing?.stock || form.stock || '0',
+          });
+        }
+      }
+      setVariantMatrix(newMatrix);
+    } else {
+      setVariantMatrix([]);
+    }
+  }, [form.size, form.subcategory, form.price, form.costPrice, form.stock, addOpen]);
+
+  // ── Sync search from dashboard ──
+  useEffect(() => {
+    if (inventorySearchTerm) {
+      setSearch(inventorySearchTerm);
+      // Optional: clear the global term so it doesn't persist on next visit
+      setInventorySearchTerm('');
+    }
+  }, [inventorySearchTerm, setInventorySearchTerm]);
+
+  // ── Filtered list ──
+  const filtered = useMemo(() =>
+    inventory.filter((item) =>
+      item.name.toLowerCase().includes(search.toLowerCase()) ||
+      item.category.toLowerCase().includes(search.toLowerCase()) ||
+      (item.subcategory?.toLowerCase() ?? '').includes(search.toLowerCase()) ||
+      (item.size?.toLowerCase() ?? '').includes(search.toLowerCase()) ||
+      (item.sku?.toLowerCase() ?? '').includes(search.toLowerCase())
+    ),
+    [inventory, search]
+  );
+
+  // ── Stats ──
+  const stats = useMemo(() => ({
+    totalItems: inventory.length,
+    totalStock: inventory.reduce((s, i) => s + (i.stock || 0), 0),
+    inventoryValue: inventory.reduce((s, i) => s + i.price * (i.stock || 0), 0),
+    potentialProfit: inventory.reduce((s, i) => {
+      if (i.costPrice && i.stock) return s + (i.price - i.costPrice) * i.stock;
+      return s;
+    }, 0),
+    lowStock: inventory.filter((i) => i.stock !== undefined && i.stock <= 5).length,
+  }), [inventory]);
+
+  // ── Add (single / variant) ──
+  const handleAdd = async () => {
+    if (!form.name || !form.price) { showToast('Name and price are required'); return; }
+    try {
+      if (variantMatrix.length > 0) {
+        let count = 0;
+        for (const row of variantMatrix) {
+          const itemData: InventoryItem = {
+            id: `item-${Date.now()}-${count}`,
+            name: form.name,
+            price: parseFloat(row.price) || 0,
+            costPrice: row.costPrice ? parseFloat(row.costPrice) : undefined,
+            sku: form.sku ? `${form.sku}-${row.sub || ''}-${row.size || ''}`.replace(/--/g, '-') : undefined,
+            category: form.category || 'General',
+            subcategory: row.sub || undefined,
+            size: row.size || undefined,
+            description: form.description || undefined,
+            stock: row.stock ? parseInt(row.stock) : undefined,
+            createdAt: new Date().toISOString(),
+          };
+          await addInventoryItem(itemData);
+          count++;
+        }
+        showToast(`Added ${count} variations!`);
+      } else {
+        const itemData: InventoryItem = {
+          id: `item-${Date.now()}`,
+          name: form.name,
+          price: parseFloat(form.price) || 0,
+          costPrice: form.costPrice ? parseFloat(form.costPrice) : undefined,
+          sku: form.sku || undefined,
+          category: form.category || 'General',
+          subcategory: form.subcategory || undefined,
+          size: form.size || undefined,
+          description: form.description || undefined,
+          stock: form.stock ? parseInt(form.stock) : undefined,
+          createdAt: new Date().toISOString(),
+        };
+        await addInventoryItem(itemData);
+        showToast('Item added to inventory!');
+      }
+      setAddOpen(false);
+      setForm(emptyForm);
+      setVariantMatrix([]);
+    } catch {
+      showToast('Failed to add items');
+    }
+  };
+
+  // ── Update ──
+  const handleUpdate = async () => {
+    if (!editingItem || !editForm.name || !editForm.price) return;
+    await updateInventoryItem({
+      ...editingItem,
+      name: editForm.name,
+      price: parseFloat(editForm.price) || 0,
+      costPrice: editForm.costPrice ? parseFloat(editForm.costPrice) : undefined,
+      sku: editForm.sku || undefined,
+      category: editForm.category || 'General',
+      subcategory: editForm.subcategory || undefined,
+      size: editForm.size || undefined,
+      description: editForm.description || undefined,
+      stock: editForm.stock ? parseInt(editForm.stock) : undefined,
+    });
+    setEditingItem(null);
+    showToast('Item updated!');
+  };
+
+  // ── Duplicate ──
+  const handleDuplicate = (item: InventoryItem) => {
+    setForm({
+      name: item.name, price: String(item.price), costPrice: item.costPrice ? String(item.costPrice) : '',
+      sku: '', category: item.category, subcategory: item.subcategory || '', size: '', description: item.description || '', stock: '',
+    });
+    setAddOpen(true);
+    showToast(`Copied ${item.name}. Enter the new size!`);
+  };
+
+  // ── Bulk ──
+  const handleBulkAdd = async () => {
+    const validRows = bulkRows.filter((r) => r.name && r.price && !isNaN(parseFloat(r.price)));
+    if (validRows.length === 0) { showToast('No valid items to import'); return; }
+    let count = 0;
+
+    for (const row of validRows) {
+      // If SIZE has commas → auto-expand into separate items per size
+      const sizes = row.size.includes(',')
+        ? row.size.split(',').map((s) => s.trim()).filter(Boolean)
+        : [row.size.trim() || ''];
+
+      for (const size of sizes) {
+        await addInventoryItem({
+          id: `item-${Date.now()}-${count}`,
+          name: row.name,
+          price: parseFloat(row.price),
+          costPrice: row.costPrice && !isNaN(parseFloat(row.costPrice)) ? parseFloat(row.costPrice) : undefined,
+          stock: row.stock && !isNaN(parseInt(row.stock)) ? parseInt(row.stock) : undefined,
+          category: row.category || 'General',
+          subcategory: row.subcategory || undefined,
+          size: size || undefined,
+          createdAt: new Date().toISOString(),
+        });
+        count++;
+      }
+    }
+
+    setBulkRows(Array(5).fill(null).map(emptyBulkRow));
+    setBulkOpen(false);
+    showToast(`Imported ${count} products! (variants auto-expanded)`);
+  };
+
+  const smartPaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text) return;
+      const lines = text.split('\n').filter((l) => l.trim());
+      const newRows: BulkRow[] = lines.map((line) => {
+        let parts = line.split('\t');
+        if (parts.length < 2) parts = line.split(',');
+        if (parts.length < 2) parts = line.split(';');
+        return {
+          name: parts[0] || '', price: parts[1] || '', costPrice: parts[2] || '',
+          stock: parts[3] || '', category: parts[4] || '', subcategory: parts[5] || '', size: parts[6] || '',
+        };
+      });
+      setBulkRows([...newRows, emptyBulkRow()]);
+      showToast(`Parsed ${newRows.length} items!`);
+    } catch {
+      showToast('Failed to read clipboard');
+    }
+  };
+
+  const handleRowChange = (idx: number, field: keyof BulkRow, value: string) => {
+    const newRows = [...bulkRows];
+    newRows[idx] = { ...newRows[idx], [field]: value };
+    if (idx === bulkRows.length - 1 && value !== '') newRows.push(emptyBulkRow());
+    setBulkRows(newRows);
+  };
+
+  return (
+    <div className="space-y-10 pb-20">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-border/50">
+        <div>
+          <h1 className="text-3xl md:text-5xl font-black tracking-tighter leading-none mb-2">Shop Inventory</h1>
+          <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest opacity-70">{inventory.length} Products in Catalog</p>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {/* Wipe button */}
+          <button
+            onClick={() => setConfirmClear(true)}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-2xl text-destructive border border-destructive/20 hover:bg-destructive/10 transition-all"
+          >
+            <Trash2 className="h-4 w-4" /> Wipe Stock
+          </button>
+          <button
+            onClick={() => setBulkOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-2xl border border-border hover:bg-accent transition-all"
+          >
+            <FileText className="h-4 w-4" /> Bulk Add
+          </button>
+          <button
+            onClick={() => setAddOpen(true)}
+            className="flex items-center gap-2 premium-gradient text-white px-5 py-2.5 text-sm font-bold rounded-2xl hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
+          >
+            <Plus className="h-4 w-4" /> Add Product
+          </button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Inventory Value', value: formatCurrency(stats.inventoryValue), color: 'text-primary' },
+          { label: 'Potential Profit', value: formatCurrency(stats.potentialProfit), color: 'text-green-400' },
+          { label: 'Distinct Products', value: String(stats.totalItems), color: '' },
+          { label: 'Total Stock Units', value: String(stats.totalStock), color: '' },
+        ].map((s) => (
+          <div key={s.label} className="glass-card p-5 rounded-2xl">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">{s.label}</p>
+            <p className={`text-2xl font-black mt-1 ${s.color}`}>{s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {stats.lowStock > 0 && (
+        <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-sm font-semibold text-red-400">
+          <AlertTriangle className="h-5 w-5 shrink-0" />
+          {stats.lowStock} item{stats.lowStock !== 1 ? 's' : ''} running low on stock! Go to the Overview tab to see which ones.
+        </div>
+      )}
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <input
+          type="text"
+          placeholder="Search by name, category, SKU, size..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full pl-11 pr-4 py-3 bg-card border border-border rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+        />
+      </div>
+
+      {/* Product Grid */}
+      {filtered.length === 0 ? (
+        <div className="text-center py-20 text-muted-foreground opacity-40">
+          <Package className="h-16 w-16 mx-auto mb-4" />
+          <p className="font-bold">{search ? 'No products match your search' : 'Your inventory is empty. Add your first product!'}</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filtered.map((item) => {
+            const isLow = item.stock !== undefined && item.stock <= 5;
+            const margin = item.costPrice ? item.price - item.costPrice : null;
+            return (
+              <div
+                key={item.id}
+                className={`glass-card group rounded-2xl p-5 hover:shadow-xl transition-all duration-300 border ${
+                  isLow ? 'border-red-500/20' : 'border-border/30'
+                }`}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                    <Package className="h-5 w-5 text-primary" />
+                  </div>
+                  {/* Action buttons - visible on hover */}
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => handleDuplicate(item)}
+                      className="p-1.5 hover:bg-accent rounded-lg transition-colors"
+                      title="Add Another Variant"
+                    >
+                      <Copy className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingItem(item);
+                        setEditForm({
+                          name: item.name, price: String(item.price),
+                          costPrice: item.costPrice ? String(item.costPrice) : '',
+                          sku: item.sku || '', category: item.category,
+                          subcategory: item.subcategory || '', size: item.size || '',
+                          description: item.description || '',
+                          stock: item.stock !== undefined ? String(item.stock) : '',
+                        });
+                      }}
+                      className="p-1.5 hover:bg-accent rounded-lg transition-colors"
+                    >
+                      <Pencil className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" />
+                    </button>
+                    <button
+                      onClick={() => deleteInventoryItem(item.id).then(() => showToast('Item deleted'))}
+                      className="p-1.5 hover:bg-red-500/10 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                    </button>
+                  </div>
+                </div>
+
+                <p className="font-bold text-sm truncate">{item.name}</p>
+                <div className="flex items-center gap-1.5 flex-wrap mt-1 mb-3">
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Tag className="h-2.5 w-2.5" /> {item.category}
+                    {item.subcategory && <> / <span className="text-primary/70 font-semibold">{item.subcategory}</span></>}
+                  </span>
+                  {item.size && (
+                    <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-md font-black uppercase">{item.size}</span>
+                  )}
+                  {item.sku && (
+                    <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground font-mono">{item.sku}</span>
+                  )}
+                </div>
+
+                <div className="flex justify-between items-end">
+                  <div>
+                    <p className="text-2xl font-black text-primary leading-none">{formatCurrency(item.price)}</p>
+                    {margin !== null && (
+                      <p className="text-[10px] text-green-400 font-bold mt-0.5">+{formatCurrency(margin)} margin</p>
+                    )}
+                  </div>
+                </div>
+
+                {item.stock !== undefined && (
+                  <div className="mt-3 space-y-3">
+                    <div className="flex justify-between items-center bg-accent/30 p-2 rounded-xl border border-border/50">
+                      <button 
+                        onClick={() => updateStock(item.id, -1)}
+                        className="h-8 w-8 rounded-lg bg-background flex items-center justify-center hover:bg-red-500/10 hover:text-red-500 transition-all shadow-sm"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
+                      <div className="text-center">
+                        <p className="text-[10px] font-black text-muted-foreground uppercase opacity-60">In Stock</p>
+                        <p className={`text-sm font-black ${isLow ? 'text-destructive' : 'text-foreground'}`}>{item.stock}</p>
+                      </div>
+                      <button 
+                        onClick={() => updateStock(item.id, 1)}
+                        className="h-8 w-8 rounded-lg bg-background flex items-center justify-center hover:bg-primary/20 hover:text-primary transition-all shadow-sm"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            item.stock > 10 ? 'bg-green-500' : item.stock > 0 ? 'bg-orange-500' : 'bg-destructive'
+                          }`}
+                          style={{ width: `${Math.min((item.stock / 50) * 100, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Add Product Modal ── */}
+      <Modal open={addOpen} onClose={() => { setAddOpen(false); setForm(emptyForm); setVariantMatrix([]); }} title="Add New Product">
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Product Name *</Label>
+              <Input placeholder="e.g. Wireless Mouse" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>SKU / Barcode</Label>
+              <Input placeholder="Optional" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <Input placeholder="Category" value={form.category} list="hub-cats"
+                onChange={(e) => setForm({ ...form, category: e.target.value })} />
+              <datalist id="hub-cats">{uniqueCategories.map((c) => <option key={c} value={c} />)}</datalist>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Sub-category</Label>
+              <Input placeholder="Sub-category" value={form.subcategory}
+                onChange={(e) => setForm({ ...form, subcategory: e.target.value })} />
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-3">
+            <div className="space-y-1.5">
+              <Label>Sell Price (₹) *</Label>
+              <Input type="number" placeholder="0.00" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Cost Price (₹)</Label>
+              <Input type="number" placeholder="0.00" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Stock</Label>
+              <Input type="number" placeholder="∞" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Size / Variant</Label>
+              <Input placeholder="S,M,L…" value={form.size} onChange={(e) => setForm({ ...form, size: e.target.value })} />
+              <p className="text-[9px] text-muted-foreground italic">Comma-separated for multiple</p>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Description</Label>
+            <Input placeholder="Optional details..." value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          </div>
+
+          {/* Variant Matrix */}
+          {variantMatrix.length > 0 && (
+            <div className="space-y-3 p-4 bg-primary/5 rounded-2xl border border-primary/10">
+              <p className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                <Database className="h-3 w-3" /> Variation Pricing & Stock
+              </p>
+              <div className="overflow-x-auto rounded-xl border border-border/50">
+                <table className="w-full text-xs">
+                  <thead className="bg-accent/50">
+                    <tr>
+                      {['Variation', 'Sell Price', 'Cost Price', 'Stock'].map((h) => (
+                        <th key={h} className="px-3 py-2 text-left font-bold text-muted-foreground">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {variantMatrix.map((row, idx) => (
+                      <tr key={idx} className="border-t border-border/30">
+                        <td className="px-3 py-1.5 font-semibold">
+                          {row.sub && row.size ? `${row.sub} / ${row.size}` : row.sub || row.size || 'Default'}
+                        </td>
+                        {(['price', 'costPrice', 'stock'] as const).map((field) => (
+                          <td key={field} className="px-1 py-1">
+                            <input
+                              type="number"
+                              value={row[field]}
+                              className="w-full px-2 py-1 bg-background border border-border rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-primary/30"
+                              onChange={(e) => {
+                                const nm = [...variantMatrix];
+                                nm[idx] = { ...nm[idx], [field]: e.target.value };
+                                setVariantMatrix(nm);
+                              }}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={handleAdd}
+            className="w-full premium-gradient text-white py-3 rounded-2xl font-bold text-sm hover:shadow-xl transition-all"
+          >
+            {variantMatrix.length > 1 ? `Save ${variantMatrix.length} Variations` : 'Save Product'}
+          </button>
+        </div>
+      </Modal>
+
+      {/* ── Edit Product Modal ── */}
+      <Modal open={!!editingItem} onClose={() => setEditingItem(null)} title="Edit Product">
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5"><Label>Product Name</Label><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label>SKU</Label><Input value={editForm.sku} onChange={(e) => setEditForm({ ...editForm, sku: e.target.value })} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5"><Label>Category</Label><Input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label>Sub-category</Label><Input value={editForm.subcategory} onChange={(e) => setEditForm({ ...editForm, subcategory: e.target.value })} /></div>
+          </div>
+          <div className="grid grid-cols-4 gap-3">
+            <div className="space-y-1.5"><Label>Sell Price</Label><Input type="number" value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label>Cost Price</Label><Input type="number" value={editForm.costPrice} onChange={(e) => setEditForm({ ...editForm, costPrice: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label>Stock</Label><Input type="number" value={editForm.stock} onChange={(e) => setEditForm({ ...editForm, stock: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label>Size</Label><Input value={editForm.size} onChange={(e) => setEditForm({ ...editForm, size: e.target.value })} /></div>
+          </div>
+          <div className="space-y-1.5"><Label>Description</Label><Input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} /></div>
+          <div className="flex gap-3">
+            <button onClick={() => setEditingItem(null)} className="flex-1 py-3 rounded-2xl font-bold text-sm border border-border hover:bg-accent transition-all">Cancel</button>
+            <button onClick={handleUpdate} className="flex-1 premium-gradient text-white py-3 rounded-2xl font-bold text-sm hover:shadow-xl transition-all">Save Changes</button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Bulk Add Modal ── */}
+      <Modal open={bulkOpen} onClose={() => setBulkOpen(false)} title="Bulk Inventory Entry" wide>
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <button onClick={smartPaste}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-all">
+              <ClipboardPaste className="h-4 w-4" /> Smart Paste
+            </button>
+            <button onClick={() => setBulkRows(Array(5).fill(null).map(emptyBulkRow))}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl border border-border hover:bg-accent transition-all">
+              <Trash2 className="h-4 w-4" /> Clear
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">Tip: Copy rows from Excel/Sheets and click Smart Paste!</p>
+          <div className="overflow-x-auto rounded-2xl border border-border">
+            <table className="w-full text-xs">
+              <thead className="bg-accent/50 sticky top-0">
+                <tr>
+                  {['#', 'Product Name *', 'Category', 'Sub-cat', 'Size (comma = variants)', 'Sell Price *', 'Cost Price', 'Stock', ''].map((h, i) => (
+                    <th key={i} className="px-3 py-3 text-left font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {bulkRows.map((row, idx) => (
+                  <tr key={idx} className="group border-t border-border/50 hover:bg-accent/10 transition-colors">
+                    <td className="px-3 py-1 text-muted-foreground font-mono text-center">{idx + 1}</td>
+                    {(['name', 'category', 'subcategory', 'size', 'price', 'costPrice', 'stock'] as const).map((field) => (
+                      <td key={field} className="p-1">
+                        {field === 'size' ? (
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={row[field]}
+                              placeholder="e.g. S,M,L or 11,12,32"
+                              onChange={(e) => handleRowChange(idx, field, e.target.value)}
+                              className="w-full h-8 px-2 bg-transparent border-transparent focus:border-primary/30 focus:bg-background border rounded-lg text-[11px] focus:outline-none transition-all min-w-[100px]"
+                            />
+                            {row[field].includes(',') && (
+                              <span className="absolute -top-2.5 right-0 text-[9px] font-black uppercase bg-primary text-white px-1.5 py-0.5 rounded-full leading-none">
+                                ×{row[field].split(',').filter(s => s.trim()).length} variants
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <input
+                            type={['price', 'costPrice', 'stock'].includes(field) ? 'number' : 'text'}
+                            value={row[field]}
+                            placeholder={field === 'name' ? 'Product Name' : field === 'price' ? '0.00' : field === 'stock' ? '∞' : ''}
+                            onChange={(e) => handleRowChange(idx, field, e.target.value)}
+                            className="w-full h-8 px-2 bg-transparent border-transparent focus:border-primary/30 focus:bg-background border rounded-lg text-[11px] focus:outline-none transition-all min-w-[80px]"
+                          />
+                        )}
+                      </td>
+                    ))}
+                    <td className="p-1">
+                      <button
+                        onClick={() => {
+                          const newRows = bulkRows.filter((_, i) => i !== idx);
+                          setBulkRows(newRows.length ? newRows : Array(5).fill(null).map(emptyBulkRow));
+                        }}
+                        className="p-1 opacity-0 group-hover:opacity-100 hover:text-destructive transition-all"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex justify-between items-center pt-2">
+            <p className="text-xs text-muted-foreground">* Required fields</p>
+            <div className="flex gap-3">
+              <button onClick={() => setBulkOpen(false)} className="px-5 py-2.5 rounded-2xl font-bold text-sm border border-border hover:bg-accent transition-all">Cancel</button>
+              <button
+                onClick={handleBulkAdd}
+                disabled={!bulkRows.some((r) => r.name && r.price)}
+                className="premium-gradient text-white px-6 py-2.5 rounded-2xl font-bold text-sm hover:shadow-xl transition-all disabled:opacity-50"
+              >
+                Process & Save All
+              </button>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Confirm Clear Dialog ── */}
+      <ConfirmDialog
+        open={confirmClear}
+        onClose={() => setConfirmClear(false)}
+        onConfirm={async () => {
+          await clearInventory();
+          showToast('Inventory wiped!');
+        }}
+        title="Wipe Entire Stock?"
+        description={`You are about to permanently delete all ${inventory.length} items. This action cannot be reversed.`}
+        confirmText="Yes, Wipe All"
+        variant="danger"
+      />
+    </div>
+  );
+}

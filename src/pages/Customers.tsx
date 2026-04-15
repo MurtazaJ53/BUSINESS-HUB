@@ -1,0 +1,374 @@
+import React, { useState } from 'react';
+import { 
+  Users, 
+  Search, 
+  UserPlus, 
+  Phone, 
+  Mail, 
+  IndianRupee, 
+  Clock, 
+  TrendingUp, 
+  ArrowUpRight,
+  Trash2,
+  CheckCircle2,
+  AlertCircle,
+  History,
+  X
+} from 'lucide-react';
+import { useBusinessStore } from '@/lib/useBusinessStore';
+import { formatCurrency } from '@/lib/utils';
+import type { Customer } from '@/lib/types';
+import ConfirmDialog from '@/components/ConfirmDialog';
+
+export default function Customers() {
+  const { customers, upsertCustomer, deleteCustomer, addCustomerPayment, sales } = useBusinessStore();
+  const [search, setSearch] = useState('');
+  const [isAdding, setIsAdding] = useState(false);
+  const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [paymentCustomerId, setPaymentCustomerId] = useState<string | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  
+  const [formData, setFormData] = useState({
+    name: '',
+    phone: '',
+    email: ''
+  });
+
+  const filtered = customers.filter(c => 
+    c.name.toLowerCase().includes(search.toLowerCase()) || 
+    c.phone.includes(search)
+  ).sort((a, b) => b.balance - a.balance);
+
+  const getCustomerHistory = (customerId: string) => {
+    return sales.filter(s => s.customerId === customerId)
+               .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  };
+
+  const stats = {
+    total: customers.length,
+    activeCredits: customers.filter(c => c.balance > 0).length,
+    totalCreditAmount: customers.reduce((sum, c) => sum + c.balance, 0)
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newCustomer: Customer = {
+      id: `cust-${Date.now()}`,
+      name: formData.name,
+      phone: formData.phone,
+      email: formData.email,
+      totalSpent: 0,
+      balance: 0,
+      createdAt: new Date().toISOString()
+    };
+    upsertCustomer(newCustomer);
+    setIsAdding(false);
+    setFormData({ name: '', phone: '', email: '' });
+  };
+
+  const handlePayment = (id: string, amount: number) => {
+    if (!amount || amount <= 0) return;
+    addCustomerPayment(id, amount);
+  };
+
+  return (
+    <div className="space-y-10 pb-10">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-border/50">
+        <div>
+          <h1 className="text-3xl md:text-5xl font-black tracking-tighter leading-none mb-2">Customer Ledger</h1>
+          <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest opacity-70">Udhaar & Loyalty Management</p>
+        </div>
+        <button 
+          onClick={() => setIsAdding(true)}
+          className="premium-gradient text-white px-6 py-3 rounded-2xl font-black text-sm flex items-center gap-2 shadow-lg shadow-primary/20 hover:shadow-xl hover:-translate-y-0.5 transition-all uppercase tracking-widest"
+        >
+          <UserPlus className="h-4 w-4" /> Add New Customer
+        </button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="glass-card p-6 rounded-3xl relative overflow-hidden group">
+          <Users className="absolute -right-2 -bottom-2 h-24 w-24 text-primary/5 -rotate-12 group-hover:rotate-0 transition-transform duration-500" />
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Total Network</p>
+          <div className="flex items-end gap-2">
+            <span className="text-3xl font-black italic">{stats.total}</span>
+            <span className="text-xs text-primary font-bold mb-1">Verified</span>
+          </div>
+        </div>
+
+        <div className="glass-card p-6 rounded-3xl relative overflow-hidden group border-red-500/10">
+          <AlertCircle className="absolute -right-2 -bottom-2 h-24 w-24 text-red-500/5 -rotate-12 group-hover:rotate-0 transition-transform duration-500" />
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Active Udhaar</p>
+          <div className="flex items-end gap-2">
+            <span className="text-3xl font-black italic text-red-500">{stats.activeCredits}</span>
+            <span className="text-xs text-muted-foreground font-bold mb-1">Customers</span>
+          </div>
+        </div>
+
+        <div className="glass-card p-6 rounded-3xl relative overflow-hidden group border-primary/20 bg-primary/5">
+          <IndianRupee className="absolute -right-2 -bottom-2 h-24 w-24 text-primary/10 -rotate-12 group-hover:rotate-0 transition-transform duration-500" />
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Total Credit Out</p>
+          <div className="flex items-end gap-2">
+            <span className="text-3xl font-black italic text-primary">{formatCurrency(stats.totalCreditAmount)}</span>
+            <TrendingUp className="h-4 w-4 text-primary mb-2" />
+          </div>
+        </div>
+      </div>
+
+      {/* Main List Section */}
+      <div className="glass-card rounded-3xl flex flex-col min-h-[500px] overflow-hidden">
+        <div className="p-6 border-b border-border/50 flex flex-col md:flex-row gap-4 items-center">
+          <div className="relative flex-1 group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+            <input 
+              type="text" 
+              placeholder="Search by name or phone number..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-accent/50 border border-border rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-accent/30">
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Customer Detail</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-center">Credit Balance</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-right">Total Revenue</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/50">
+              {filtered.map(customer => {
+                const hasCredit = customer.balance > 0;
+                return (
+                  <tr key={customer.id} className="group hover:bg-primary/5 transition-colors">
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-xl premium-gradient flex items-center justify-center text-white font-black text-sm shadow-md">
+                          {customer.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm tracking-tight">{customer.name}</p>
+                          <div className="flex items-center gap-3 text-[10px] text-muted-foreground font-semibold mt-0.5 uppercase tracking-tighter">
+                            <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {customer.phone}</span>
+                            {customer.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> {customer.email}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5 text-center">
+                      <div className={cn(
+                        "inline-flex items-center px-4 py-1.5 rounded-full font-black text-xs transition-all",
+                        hasCredit ? "bg-red-500/10 text-red-500 border border-red-500/20" : "bg-green-500/10 text-green-500 border border-green-500/20"
+                      )}>
+                        {hasCredit ? formatCurrency(customer.balance) : <><CheckCircle2 className="h-3 w-3 mr-1.5" /> PAID</>}
+                      </div>
+                    </td>
+                    <td className="px-6 py-5 text-right font-black tabular-nums text-sm">
+                      {formatCurrency(customer.totalSpent)}
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="flex items-center justify-end gap-2">
+                        {hasCredit && (
+                          <button 
+                            onClick={() => {
+                              setPaymentCustomerId(customer.id);
+                              setPaymentAmount('');
+                            }}
+                            className="bg-primary/10 text-primary hover:bg-primary hover:text-white px-3 py-1.5 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all border border-primary/20"
+                          >
+                            Pay Off
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => setHistoryCustomer(customer)}
+                          className="p-2 hover:bg-primary/10 hover:text-primary rounded-xl transition-all"
+                          title="View History"
+                        >
+                          <History className="h-4 w-4" />
+                        </button>
+                        <button 
+                          onClick={() => setDeleteConfirmId(customer.id)}
+                          className="p-2 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-xl transition-all"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {filtered.length === 0 && (
+            <div className="text-center py-20 text-muted-foreground italic">
+              No customers found in the system.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Add Modal */}
+      {isAdding && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setIsAdding(false)} />
+          <div className="relative z-10 w-full max-w-md glass-card rounded-3xl p-8 border-primary/20">
+            <h2 className="text-2xl font-black mb-6 tracking-tight">Onboard Customer</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Full Name</label>
+                <input 
+                  autoFocus
+                  required
+                  type="text" 
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g. John Doe"
+                  className="w-full bg-accent border border-border rounded-2xl py-3 px-4 text-sm focus:ring-2 focus:ring-primary/20 outline-none font-bold"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Mobile Number</label>
+                <input 
+                  required
+                  type="tel" 
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="e.g. 9876543210"
+                  className="w-full bg-accent border border-border rounded-2xl py-3 px-4 text-sm focus:ring-2 focus:ring-primary/20 outline-none font-bold"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Email ID (Optional)</label>
+                <input 
+                  type="email" 
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="e.g. john@example.com"
+                  className="w-full bg-accent border border-border rounded-2xl py-3 px-4 text-sm focus:ring-2 focus:ring-primary/20 outline-none font-bold"
+                />
+              </div>
+              <div className="pt-4 grid grid-cols-2 gap-3">
+                <button 
+                  type="button" 
+                  onClick={() => setIsAdding(false)}
+                  className="py-3 px-4 rounded-2xl font-bold text-sm border border-border hover:bg-accent transition-all uppercase tracking-widest text-muted-foreground"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="py-3 px-4 rounded-2xl font-black text-sm premium-gradient text-white hover:shadow-xl hover:-translate-y-0.5 transition-all uppercase tracking-widest"
+                >
+                  Create Account
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* History Slide-over/Modal */}
+      {historyCustomer && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-end">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setHistoryCustomer(null)} />
+          <div className="relative z-10 w-full max-w-lg h-full glass-card border-l border-border shadow-2xl animate-in p-8 flex flex-col">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-2xl font-black">Transaction History</h2>
+                <p className="text-sm font-bold text-primary uppercase tracking-widest">{historyCustomer.name}</p>
+              </div>
+              <button onClick={() => setHistoryCustomer(null)} className="p-2 hover:bg-accent rounded-xl transition-all">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              {getCustomerHistory(historyCustomer.id).length === 0 ? (
+                <div className="text-center py-20 opacity-30">
+                  <Clock className="h-12 w-12 mx-auto mb-3" />
+                  <p className="text-sm font-bold uppercase tracking-widest">No history found</p>
+                </div>
+              ) : (
+                getCustomerHistory(historyCustomer.id).map(sale => (
+                  <div key={sale.id} className="p-4 bg-accent/30 rounded-2xl border border-border/50 group hover:border-primary/30 transition-all">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-tighter opacity-60">INV-{sale.id.toUpperCase()}</p>
+                        <p className="text-xs font-bold">{new Date(sale.createdAt).toLocaleDateString()}</p>
+                      </div>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${sale.paymentMode === 'CREDIT' ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
+                        {sale.paymentMode}
+                      </span>
+                    </div>
+                    <div className="space-y-1 my-3">
+                      {sale.items.map((item, i) => (
+                        <div key={i} className="flex justify-between text-[11px] font-medium">
+                          <span className="opacity-70">{item.name} × {item.quantity}</span>
+                          <span>{formatCurrency(item.price * item.quantity)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex justify-between items-center pt-2 border-t border-border/30">
+                      <span className="text-xs font-black uppercase tracking-widest opacity-50">Total Paid</span>
+                      <span className="text-sm font-black text-primary">{formatCurrency(sale.total)}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirm */}
+      {deleteConfirmId && (
+        <ConfirmDialog
+          open={!!deleteConfirmId}
+          title="Delete Customer Account"
+          description="Are you sure you want to remove this customer? This will NOT delete their past sales, but they will no longer be linked to an account."
+          onConfirm={async () => {
+            await deleteCustomer(deleteConfirmId);
+            setDeleteConfirmId(null);
+          }}
+          onCancel={() => setDeleteConfirmId(null)}
+          variant="danger"
+        />
+      )}
+
+      {/* Payment Dialog */}
+      {paymentCustomerId && (
+        <ConfirmDialog
+          open={!!paymentCustomerId}
+          title="Receive Payment"
+          description={`Enter the amount paid by the customer to reduce their Udhaar balance.`}
+          inputValue={paymentAmount}
+          onInputChange={setPaymentAmount}
+          confirmText="Record Payment"
+          icon={<IndianRupee className="h-8 w-8 text-primary" />}
+          onConfirm={() => {
+            if (paymentAmount) {
+              handlePayment(paymentCustomerId, parseFloat(paymentAmount));
+              setPaymentCustomerId(null);
+              setPaymentAmount('');
+            }
+          }}
+          onCancel={() => {
+            setPaymentCustomerId(null);
+            setPaymentAmount('');
+          }}
+          variant="primary"
+        />
+      )}
+    </div>
+  );
+}
+
+function cn(...classes: any[]) {
+  return classes.filter(Boolean).join(' ');
+}
