@@ -5,6 +5,7 @@ import type { InventoryItem, Sale, Customer, ShopMetadata } from './types';
 const LS_INVENTORY = 'biz_inventory';
 const LS_SALES = 'biz_sales';
 const LS_CUSTOMERS = 'biz_customers';
+const LS_EXPENSES = 'biz_expenses';
 const LS_SHOP = 'biz_shop_settings';
 const LS_THEME = 'biz_theme';
 
@@ -39,6 +40,7 @@ interface BusinessState {
   inventory: InventoryItem[];
   sales: Sale[];
   customers: Customer[];
+  expenses: Expense[];
   shop: ShopMetadata;
   theme: 'dark' | 'light';
   activeTab: string;
@@ -69,14 +71,25 @@ interface BusinessState {
   deleteCustomer: (id: string) => Promise<void>;
   addCustomerPayment: (customerId: string, amount: number) => Promise<void>;
 
+  // Expenses
+  addExpense: (expense: Expense) => Promise<void>;
+  deleteExpense: (id: string) => Promise<void>;
+
   // System
-  importData: (data: { inventory: InventoryItem[]; sales: Sale[]; customers: Customer[]; shop?: ShopMetadata }) => Promise<void>;
+  importData: (data: { 
+    inventory: InventoryItem[]; 
+    sales: Sale[]; 
+    customers: Customer[]; 
+    expenses?: Expense[];
+    shop?: ShopMetadata 
+  }) => Promise<void>;
 }
 
 export const useBusinessStore = create<BusinessState>((set, get) => ({
   inventory: loadFromLS<InventoryItem[]>(LS_INVENTORY, []),
   sales: loadFromLS<Sale[]>(LS_SALES, []),
   customers: loadFromLS<Customer[]>(LS_CUSTOMERS, []),
+  expenses: loadFromLS<Expense[]>(LS_EXPENSES, []),
   shop: loadFromLS<ShopMetadata>(LS_SHOP, SHOP_DEFAULTS),
   theme: loadFromLS<'dark' | 'light'>(LS_THEME, 'dark'),
   activeTab: 'dashboard',
@@ -191,39 +204,55 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
   },
 
   deleteSale: async (id) => {
-    const sale = get().sales.find((s) => s.id === id);
+    const state = get();
+    const sale = state.sales.find((s) => s.id === id);
     if (!sale) return;
 
-    const updatedInventory = [...get().inventory];
-    for (const item of sale.items) {
-      if (item.itemId.startsWith('custom-')) continue;
-      const invIdx = updatedInventory.findIndex((i) => i.id === item.itemId);
-      if (invIdx > -1) {
-        updatedInventory[invIdx] = {
-          ...updatedInventory[invIdx],
-          stock: (updatedInventory[invIdx].stock ?? 0) + item.quantity,
-        };
+    // 1. Inventory Restoration (Only for product sales)
+    const updatedInventory = [...state.inventory];
+    if (!id.startsWith('PAY-')) {
+      for (const item of sale.items) {
+        if (item.itemId.startsWith('custom-') || item.itemId === 'payment-received') continue;
+        const invIdx = updatedInventory.findIndex((i) => i.id === item.itemId);
+        if (invIdx > -1) {
+          updatedInventory[invIdx] = {
+            ...updatedInventory[invIdx],
+            stock: (updatedInventory[invIdx].stock ?? 0) + item.quantity,
+          };
+        }
       }
     }
 
-    const nextSales = get().sales.filter((s) => s.id !== id);
-    let nextCustomers = [...get().customers];
+    // 2. Customer Ledger Reversal
+    let nextCustomers = [...state.customers];
     if (sale.customerId) {
       nextCustomers = nextCustomers.map(c => {
         if (c.id === sale.customerId) {
-          return {
-            ...c,
-            totalSpent: Math.max(0, c.totalSpent - sale.total),
-            balance: sale.paymentMode === 'CREDIT' ? Math.max(0, c.balance - sale.total) : c.balance
-          };
+          if (id.startsWith('PAY-')) {
+            // Reversing a payment means the debt comes back
+            return {
+              ...c,
+              balance: c.balance + sale.total
+            };
+          } else {
+            // Reversing a sale means spending goes down, and debt goes down (if it was credit)
+            return {
+              ...c,
+              totalSpent: Math.max(0, c.totalSpent - sale.total),
+              balance: sale.paymentMode === 'CREDIT' ? Math.max(0, c.balance - sale.total) : c.balance
+            };
+          }
         }
         return c;
       });
-      saveToLS(LS_CUSTOMERS, nextCustomers);
     }
+
+    const nextSales = state.sales.filter((s) => s.id !== id);
 
     saveToLS(LS_INVENTORY, updatedInventory);
     saveToLS(LS_SALES, nextSales);
+    if (sale.customerId) saveToLS(LS_CUSTOMERS, nextCustomers);
+
     set({ inventory: updatedInventory, sales: nextSales, customers: nextCustomers });
   },
 
@@ -243,11 +272,49 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
   },
 
   addCustomerPayment: async (customerId, amount) => {
-    const next = get().customers.map(c => 
+    const state = get();
+    const customer = state.customers.find(c => c.id === customerId);
+    if (!customer) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    const newPaymentSale: Sale = {
+      id: `PAY-${Date.now()}`,
+      items: [{
+        itemId: 'payment-received',
+        name: `Udhaar Payment: ${customer.name}`,
+        quantity: 1,
+        price: amount
+      }],
+      total: amount,
+      discount: 0,
+      discountType: 'fixed',
+      paymentMode: 'CASH', // Defaulting to CASH for ledger, User can edit later if needed
+      customerId: customer.id,
+      customerName: customer.name,
+      date: today,
+      createdAt: new Date().toISOString()
+    };
+
+    const nextCustomers = state.customers.map(c => 
       c.id === customerId ? { ...c, balance: Math.max(0, c.balance - amount) } : c
     );
-    saveToLS(LS_CUSTOMERS, next);
-    set({ customers: next });
+    const nextSales = [...state.sales, newPaymentSale];
+
+    saveToLS(LS_CUSTOMERS, nextCustomers);
+    saveToLS(LS_SALES, nextSales);
+    set({ customers: nextCustomers, sales: nextSales });
+  },
+
+  addExpense: async (expense) => {
+    const next = [...get().expenses, expense];
+    saveToLS(LS_EXPENSES, next);
+    set({ expenses: next });
+  },
+
+  deleteExpense: async (id) => {
+    const next = get().expenses.filter((e) => e.id !== id);
+    saveToLS(LS_EXPENSES, next);
+    set({ expenses: next });
   },
 
   importData: async (data) => {
@@ -262,6 +329,10 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     if (data.customers) {
       saveToLS(LS_CUSTOMERS, data.customers);
       set({ customers: data.customers });
+    }
+    if (data.expenses) {
+      saveToLS(LS_EXPENSES, data.expenses);
+      set({ expenses: data.expenses });
     }
     if (data.shop) {
       saveToLS(LS_SHOP, data.shop);

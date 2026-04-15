@@ -5,7 +5,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { useBusinessStore } from '@/lib/useBusinessStore';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import ReceiptModal from '@/components/ReceiptModal';
 import type { Sale, SaleItem } from '@/lib/types';
 
@@ -197,16 +197,18 @@ export default function POS() {
           />
         </div>
 
-        <div className="flex gap-2 flex-wrap">
+        {/* Category Tabs */}
+        <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-none snap-x h-16 items-center">
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setCategory(cat)}
-              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
+              className={cn(
+                "px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all snap-start border shadow-sm",
                 category === cat
-                  ? 'premium-gradient text-white shadow-md'
-                  : 'bg-accent text-muted-foreground hover:text-foreground'
-              }`}
+                  ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-105'
+                  : 'bg-card text-muted-foreground border-border hover:border-primary/30 hover:text-foreground'
+              )}
             >
               {cat}
             </button>

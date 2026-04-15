@@ -11,7 +11,9 @@ import {
   Pencil,
   X,
   Check,
-  CreditCard
+  CreditCard,
+  IndianRupee,
+  ShieldCheck
 } from 'lucide-react';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -150,14 +152,21 @@ export default function History() {
                   <tr key={sale.id} className="group hover:bg-primary/[0.02] transition-colors">
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-primary/5 flex items-center justify-center text-primary shrink-0 group-hover:scale-110 transition-transform">
-                          {sale.date === today ? <Receipt className="h-5 w-5" /> : <Calendar className="h-5 w-5 opacity-60" />}
+                        <div className={cn(
+                          "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform",
+                          sale.id.startsWith('PAY-') ? "bg-green-500/10 text-green-600" : "bg-primary/5 text-primary"
+                        )}>
+                          {sale.id.startsWith('PAY-') ? (
+                            <IndianRupee className="h-5 w-5" />
+                          ) : (
+                            sale.date === today ? <Receipt className="h-5 w-5" /> : <Calendar className="h-5 w-5 opacity-60" />
+                          )}
                         </div>
                         <div>
                           <p className="text-sm font-black uppercase tracking-tighter">
-                            INV-{sale.id.replace('sale-', '').toUpperCase()}
+                            {sale.id.startsWith('PAY-') ? 'PAYMENT' : `INV-${sale.id.replace('sale-', '').toUpperCase()}`}
                           </p>
-                          <p className="text-[10px] font-bold text-primary flex items-center gap-1 mt-0.5">
+                          <p className="text-[10px] font-bold text-muted-foreground flex items-center gap-1 mt-0.5">
                             {sale.date}
                           </p>
                         </div>
@@ -182,10 +191,10 @@ export default function History() {
                       <div className="flex items-center gap-2">
                         <div className={cn(
                           "h-2 w-2 rounded-full",
-                          sale.paymentMode === 'CASH' ? "bg-green-500" : "bg-primary"
+                          sale.id.startsWith('PAY-') ? "bg-green-500 animate-pulse" : (sale.paymentMode === 'CASH' ? "bg-green-500" : "bg-primary")
                         )} />
                         <span className="text-[11px] font-black uppercase tracking-widest leading-none">
-                          {sale.paymentMode}
+                          {sale.id.startsWith('PAY-') ? 'CASH COLLECTION' : sale.paymentMode}
                         </span>
                       </div>
                     </td>

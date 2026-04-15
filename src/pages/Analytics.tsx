@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { TrendingUp, TrendingDown, BarChart3, Target, Calendar, ShoppingCart } from 'lucide-react';
+import { TrendingUp, TrendingDown, BarChart3, Target, Calendar, ShoppingCart, Wallet } from 'lucide-react';
 import { useBusinessStore } from '@/lib/useBusinessStore';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, LineChart, Line
@@ -54,19 +54,35 @@ export default function Analytics() {
   const currentRange = getDateRange();
   const chartData = currentRange.map((date) => {
     const daySales = filteredSalesData.filter((s) => s.date === date);
+    const dayRevenue = daySales.reduce((sum, s) => sum + s.total, 0);
+    const dayCost = daySales.reduce((sum, s) => {
+      return sum + s.items.reduce((itemSum, item) => itemSum + (item.costPrice || 0) * item.quantity, 0);
+    }, 0);
+
     return {
       day: new Date(date + 'T00:00:00').toLocaleDateString('en-IN', {
         weekday: period === 'week' ? 'short' : undefined,
         day: 'numeric',
         month: period === 'month' || period === 'custom' ? 'short' : undefined,
       }),
-      sales: daySales.reduce((sum, s) => sum + s.total, 0),
+      sales: dayRevenue,
+      profit: dayRevenue - dayCost,
       orders: daySales.length,
     };
   });
 
   // ── KPI Stats ─────────────────────────────────────────────────────────────
+  const { expenses } = useBusinessStore();
   const totalRevenue = sales.reduce((sum, s) => sum + s.total, 0);
+  const totalCost = sales.reduce((sum, s) => {
+    return sum + s.items.reduce((itemSum, item) => itemSum + (item.costPrice || 0) * item.quantity, 0);
+  }, 0);
+  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+  
+  const grossProfit = totalRevenue - totalCost;
+  const netProfit = grossProfit - totalExpenses;
+  const profitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+
   const totalOrders = sales.length;
   const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
@@ -92,6 +108,7 @@ export default function Analytics() {
   const productSales: Record<string, { name: string; qty: number; revenue: number }> = {};
   for (const sale of sales) {
     for (const item of sale.items) {
+      if (item.itemId === 'payment-received') continue;
       if (!productSales[item.name]) {
         productSales[item.name] = { name: item.name, qty: 0, revenue: 0 };
       }
@@ -166,15 +183,28 @@ export default function Analytics() {
             value: formatCurrency(totalRevenue),
             change: revChange,
             icon: TrendingUp,
+            sub: `${profitMargin.toFixed(1)}% Margin`
           },
-          { label: 'Total Orders', value: String(totalOrders), change: null, icon: ShoppingCart },
+          { 
+            label: 'Gross Profit', 
+            value: formatCurrency(grossProfit), 
+            change: null, 
+            icon: Target,
+            className: "border-green-500/10 text-green-500" 
+          },
+          { 
+            label: 'Net Profit (Take Home)', 
+            value: formatCurrency(netProfit), 
+            change: null, 
+            icon: Wallet,
+            className: netProfit < 0 ? "border-red-500/10 text-red-500" : "border-primary/10 text-primary"
+          },
           { label: 'Avg Order Value', value: formatCurrency(avgOrderValue), change: null, icon: Target },
-          { label: 'Best Day', value: bestDay.day ?? '—', sub: formatCurrency(bestDay.sales), icon: Calendar },
         ].map((stat, idx) => (
-          <div key={idx} className="glass-card p-5 rounded-2xl">
+          <div key={idx} className={cn("glass-card p-5 rounded-2xl border", stat.className)}>
             <div className="flex items-center gap-2 mb-3">
               <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center">
-                <stat.icon className="h-4 w-4 text-primary" />
+                <stat.icon className="h-4 w-4" />
               </div>
               {stat.change !== null && stat.change !== undefined && (
                 <span className={`text-xs font-bold flex items-center gap-0.5 ${stat.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -187,7 +217,7 @@ export default function Analytics() {
             </div>
             <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">{stat.label}</p>
             <p className="text-xl font-black mt-0.5">{stat.value}</p>
-            {stat.sub && <p className="text-xs text-muted-foreground mt-0.5">{stat.sub}</p>}
+            {stat.sub && <p className="text-[10px] font-black uppercase tracking-widest text-primary mt-1">{stat.sub}</p>}
           </div>
         ))}
       </div>

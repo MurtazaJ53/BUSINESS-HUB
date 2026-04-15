@@ -59,6 +59,8 @@ const NAV_ITEMS = [
   { id: 'pos', label: 'POS System', icon: ShoppingCart },
   { id: 'customers', label: 'Customers', icon: Users },
   { id: 'history', label: 'History', icon: Clock },
+  { id: 'expenses', label: 'Expenses', icon: TrendingUp },
+  { id: 'stock-alerts', label: 'Stock Alerts', icon: AlertTriangle },
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
 ];
 
@@ -67,6 +69,8 @@ const PAGE_TITLES: Record<string, string> = {
   inventory: 'Inventory',
   pos: 'POS System',
   customers: 'Customer Ledger',
+  expenses: 'Expense Ledger',
+  'stock-alerts': 'Stock Alerts',
   analytics: 'Analytics',
   history: 'History Log',
   settings: 'Control Center',
@@ -343,7 +347,7 @@ export default function AppLayout({ pages }: AppLayoutProps) {
 
         {/* Page content */}
         <div className="flex-1 overflow-y-auto no-print">
-          <div className="max-w-7xl mx-auto p-6 md:p-8 animate-in">
+          <div className="max-w-7xl mx-auto p-6 md:p-8">
             {pages[activeTab] ?? <div className="text-muted-foreground text-center py-20">Page not found</div>}
           </div>
         </div>

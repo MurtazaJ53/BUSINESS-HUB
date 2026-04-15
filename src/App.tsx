@@ -7,6 +7,8 @@ import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import History from './pages/History';
 import Customers from './pages/Customers';
+import Expenses from './pages/Expenses';
+import StockAlerts from './pages/StockAlerts';
 
 const PAGES: Record<string, React.ReactNode> = {
   dashboard: <Dashboard />,
@@ -15,6 +17,8 @@ const PAGES: Record<string, React.ReactNode> = {
   analytics: <Analytics />,
   history: <History />,
   customers: <Customers />,
+  expenses: <Expenses />,
+  'stock-alerts': <StockAlerts />,
   settings: <Settings />,
 };
 

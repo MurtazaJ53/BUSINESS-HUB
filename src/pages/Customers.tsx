@@ -336,7 +336,7 @@ export default function Customers() {
             await deleteCustomer(deleteConfirmId);
             setDeleteConfirmId(null);
           }}
-          onCancel={() => setDeleteConfirmId(null)}
+          onClose={() => setDeleteConfirmId(null)}
           variant="danger"
         />
       )}
@@ -358,7 +358,7 @@ export default function Customers() {
               setPaymentAmount('');
             }
           }}
-          onCancel={() => {
+          onClose={() => {
             setPaymentCustomerId(null);
             setPaymentAmount('');
           }}
