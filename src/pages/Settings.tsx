@@ -24,7 +24,8 @@ import {
   PlusCircle,
   RotateCcw,
   Building,
-  AlertCircle
+  AlertCircle,
+  Upload
 } from 'lucide-react';
 import { db, auth } from '@/lib/firebase';
 import { collection, addDoc, onSnapshot, query, setDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
@@ -36,14 +37,20 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import { loadShopSettings } from '@/lib/shopSettings';
 import { useAuthStore } from '@/lib/useAuthStore';
 import type { InventoryItem, ShopMetadata } from '@/lib/types';
+import { parseZobazeExcel, MigrationResult } from '@/lib/migrationEngine';
 
 export default function Settings() {
-  const { inventory, sales, customers, shop, updateShop, clearInventory, theme, setTheme, shopId } = useBusinessStore();
+  const { inventory, sales, customers, shop, updateShop, clearInventory, theme, setTheme, shopId, addInventoryItem } = useBusinessStore();
   const { role, user } = useAuthStore();
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
   const [toast, setToast] = useState('');
+  
+  // Migration State
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [migrationStatus, setMigrationStatus] = useState<string | null>(null);
+  const [migrationData, setMigrationData] = useState<MigrationResult | null>(null);
   const [invites, setInvites] = useState<{ id: string, code: string }[]>([]);
   const [generatingInvite, setGeneratingInvite] = useState(false);
 
@@ -91,6 +98,53 @@ export default function Settings() {
     setExporting('sales-csv');
     exportSalesReport(sales);
     setTimeout(() => setExporting(null), 1000);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setMigrationStatus('Scanning Excel Engine...');
+    const result = await parseZobazeExcel(file);
+    
+    if (!result.success || result.validItems.length === 0) {
+      showToast(`Import Failed: ${result.errors[0] || 'No valid products found'}`);
+      setMigrationStatus(null);
+    } else {
+      setMigrationData(result);
+      setMigrationStatus(null);
+    }
+    
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const executeMigration = async () => {
+    if (!migrationData) return;
+    setMigrationStatus('Injecting items into database...');
+    
+    let injected = 0;
+    try {
+      for (const item of migrationData.validItems) {
+        // Create an InventoryItem matching the Business Hub Schema
+        const newItem: InventoryItem = {
+          id: Math.random().toString(36).substring(2, 9),
+          name: item.name,
+          price: item.price,
+          costPrice: item.costPrice,
+          stock: item.stock,
+          category: item.category,
+          sku: item.sku,
+          createdAt: new Date().toISOString()
+        };
+        await addInventoryItem(newItem);
+        injected++;
+      }
+      showToast(`Perfect Installation: Added ${injected} Items`);
+    } catch (e: any) {
+      showToast(`Error during import: ${e.message}`);
+    }
+    setMigrationData(null);
+    setMigrationStatus(null);
   };
 
   return (
@@ -341,6 +395,32 @@ export default function Settings() {
               </div>
               <Download className="h-4 w-4 text-muted-foreground group-hover:text-blue-500 transition-colors" />
             </button>
+            
+            {/* Zobaze Migration Button */}
+            <div className="pt-4 border-t border-border/50">
+              <input 
+                type="file" 
+                ref={fileInputRef}
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={migrationStatus !== null || role !== 'admin'}
+                className="w-full flex items-center justify-between p-4 bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 rounded-2xl transition-all group border border-orange-500/20"
+              >
+                <div className="flex items-center gap-3">
+                  <Upload className="h-5 w-5 group-hover:-translate-y-1 transition-transform" />
+                  <div className="text-left">
+                    <p className="text-sm font-black">Migrate Old Data</p>
+                    <p className="text-[10px] uppercase font-bold opacity-80">
+                      {migrationStatus || 'Import Zobaze Excel'}
+                    </p>
+                  </div>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -480,6 +560,19 @@ export default function Settings() {
             setResetConfirmOpen(false);
           }}
           onClose={() => setResetConfirmOpen(false)}
+        />
+      )}
+
+      {/* Migration Confirmation Modal */}
+      {migrationData && (
+        <ConfirmDialog
+          open={!!migrationData}
+          title="Zobaze Data Analyzed"
+          description={`The neural engine successfully mapped ${migrationData.validItems.length} products from your Excel file. Do you want to inject them into the Business Hub immediately?`}
+          confirmText="Inject Data"
+          variant="danger"
+          onConfirm={executeMigration}
+          onClose={() => setMigrationData(null)}
         />
       )}
 
