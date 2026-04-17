@@ -101,6 +101,9 @@ export default function History() {
     }
   };
 
+  const totalSalesAmount = filteredSales.reduce((sum, s) => sum + s.total, 0);
+  const totalExpensesAmount = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+
   const dateFilters = ['All Time', 'Today', 'Yesterday', 'Last 7 Days'];
   const paymentModes = ['CASH', 'UPI', 'CARD', 'CREDIT', 'ONLINE', 'OTHERS'];
 
@@ -114,24 +117,36 @@ export default function History() {
             <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest opacity-70">Complete Ledger Activity</p>
           </div>
           
-          <div className="flex bg-accent/50 p-1 rounded-2xl border border-border/50 h-fit">
+          <div className="flex bg-accent/50 p-1.5 rounded-2xl border border-border/50 h-fit">
             <button 
               onClick={() => setTab('sales')}
               className={cn(
-                "px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                tab === 'sales' ? "bg-primary text-white shadow-lg" : "text-muted-foreground hover:text-foreground"
+                "px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
+                tab === 'sales' ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-muted-foreground hover:text-foreground"
               )}
             >
               Sales
+              <span className={cn(
+                "px-2 py-0.5 rounded-full text-[8px] font-bold",
+                tab === 'sales' ? "bg-white/20" : "bg-accent/50 text-muted-foreground"
+              )}>
+                {filteredSales.length}
+              </span>
             </button>
             <button 
               onClick={() => setTab('expenses')}
               className={cn(
-                "px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                tab === 'expenses' ? "bg-primary text-white shadow-lg" : "text-muted-foreground hover:text-foreground"
+                "px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
+                tab === 'expenses' ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-muted-foreground hover:text-foreground"
               )}
             >
               Expenses
+              <span className={cn(
+                "px-2 py-0.5 rounded-full text-[8px] font-bold",
+                tab === 'expenses' ? "bg-white/20" : "bg-accent/50 text-muted-foreground"
+              )}>
+                {filteredExpenses.length}
+              </span>
             </button>
           </div>
         </div>
@@ -164,6 +179,36 @@ export default function History() {
           onChange={(e) => setSearch(e.target.value)}
           className="w-full pl-11 pr-4 py-3 bg-card border border-border rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all shadow-sm"
         />
+      </div>
+      {/* Summary Header */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className={cn(
+          "glass-card p-6 rounded-[2rem] border-l-4 transition-all duration-500",
+          tab === 'sales' ? "border-l-primary scale-100 opacity-100" : "border-l-transparent scale-95 opacity-50 grayscale"
+        )}>
+          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Current Revenue</p>
+          <div className="flex items-center justify-between">
+            <h3 className="text-3xl font-black italic tracking-tighter">{formatCurrency(totalSalesAmount)}</h3>
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <IndianRupee className="h-5 w-5 text-primary" />
+            </div>
+          </div>
+          <p className="text-[10px] font-bold text-primary mt-1 uppercase tracking-widest">{filteredSales.length} Successful Orders</p>
+        </div>
+
+        <div className={cn(
+          "glass-card p-6 rounded-[2rem] border-l-4 transition-all duration-500",
+          tab === 'expenses' ? "border-l-red-500 scale-100 opacity-100" : "border-l-transparent scale-95 opacity-50 grayscale"
+        )}>
+          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Store Outflow</p>
+          <div className="flex items-center justify-between">
+            <h3 className="text-3xl font-black italic tracking-tighter text-red-500">{formatCurrency(totalExpensesAmount)}</h3>
+            <div className="h-10 w-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+              <TrendingUp className="h-5 w-5 text-red-500 rotate-180" />
+            </div>
+          </div>
+          <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-widest">{filteredExpenses.length} Overhead Records</p>
+        </div>
       </div>
 
       {/* Content Feed */}
@@ -455,9 +500,12 @@ export default function History() {
         open={!!deletingId}
         onClose={() => setDeletingId(null)}
         onConfirm={handleDelete}
-        title="Permanently Delete Sale?"
-        description="This action will remove the record and restore items back to your stock. This cannot be undone."
-        confirmText="Yes, Delete Sale"
+        title={tab === 'sales' ? "Permanently Delete Sale?" : "Delete Expense Record?"}
+        description={tab === 'sales' 
+          ? "This action will remove the record and restore items back to your stock. This cannot be undone."
+          : "This will permanently remove this expense from your overhead audit trail. This cannot be undone."
+        }
+        confirmText={tab === 'sales' ? "Yes, Delete Sale" : "Yes, Delete Expense"}
         variant="danger"
       />
     </div>
