@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Plus, Minus, Trash2, ShoppingCart, Search, Check,
   Printer, RotateCcw, Package, User, Phone, Percent, AlertCircle, AlertTriangle, Calendar,
-  ArrowRight, CheckCircle2, Sparkles
+  ArrowRight, CheckCircle2, Sparkles, PlusCircle
 } from 'lucide-react';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn, isValidIndianPhone, sanitizePhone } from '@/lib/utils';
