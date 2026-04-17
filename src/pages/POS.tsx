@@ -341,6 +341,81 @@ export default function POS() {
           />
         </div>
 
+        {/* RESTORED EXECUTIVE CART COMMAND: BELOW SEARCH TO AVOID JUMPING CONTROLS */}
+        {cart.length > 0 && !search && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-700">
+            <h3 className="text-[11px] font-black uppercase tracking-[0.25em] text-primary flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <ShoppingCart className="h-4 w-4" />
+                Latest Added
+              </div>
+              <span className="text-[10px] opacity-50">{cart.length} ITEMS TOTAL</span>
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              {cart.slice(0, 6).map(item => (
+                <div
+                  key={`${item.itemId}-${!!item.isReturn}`}
+                  className={`flex items-center gap-3 p-3 border rounded-3xl animate-in zoom-in-95 duration-300 shadow-sm ${
+                    item.isReturn ? 'bg-red-500/5 border-red-500/20' : 'bg-primary/5 border-primary/20'
+                  }`}
+                >
+                  <div className={`h-12 w-12 shrink-0 rounded-2xl flex items-center justify-center shadow-md ${item.isReturn ? 'bg-red-500' : 'premium-gradient'}`}>
+                    {item.isReturn ? <RotateCcw className="h-5 w-5 text-white" /> : <Package className="h-5 w-5 text-white" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <p className="text-[11px] font-black uppercase tracking-tight truncate">{item.name}</p>
+                      {item.isReturn && <span className="text-[7px] font-black uppercase bg-red-500 text-white px-1 rounded">Return</span>}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      {role === 'admin' && item.costPrice !== undefined && !item.isReturn && (
+                        <span className="text-[8px] font-black text-emerald-500/80 uppercase">
+                          +₹{((item.price - item.costPrice) * item.quantity).toFixed(0)} Profit
+                        </span>
+                      )}
+                      <div className="flex items-center gap-1">
+                        <span className={`text-[10px] font-black ${item.isReturn ? 'text-red-500' : 'text-primary'}`}>{item.isReturn ? '-' : ''}₹</span>
+                        <input 
+                          type="number"
+                          value={item.price}
+                          onChange={(e) => updatePrice(item.itemId, !!item.isReturn, parseFloat(e.target.value) || 0)}
+                          className={`bg-transparent border-none p-0 text-[10px] font-black w-14 focus:ring-0 ${item.isReturn ? 'text-red-500' : 'text-primary'}`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center bg-card rounded-2xl border border-border/50 p-1 gap-1">
+                    <button 
+                      onClick={() => updateQty(item.itemId, !!item.isReturn, -1)}
+                      className="p-1 hover:bg-accent rounded-lg transition-colors text-muted-foreground"
+                    >
+                      <Minus className="h-3 w-3" />
+                    </button>
+                    <span className="text-[10px] font-black min-w-[1rem] text-center">{item.quantity}</span>
+                    <button 
+                      onClick={() => updateQty(item.itemId, !!item.isReturn, 1)}
+                      className={`p-1 hover:bg-accent rounded-lg transition-colors ${item.isReturn ? 'text-red-500' : 'text-primary'}`}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </button>
+                    <div className="w-px h-3 bg-border/50 mx-0.5" />
+                    <button 
+                      onClick={() => removeFromCart(item.itemId, !!item.isReturn)}
+                      className="p-1 hover:bg-red-500/10 hover:text-red-500 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {cart.length > 6 && (
+              <p className="text-[9px] text-center text-muted-foreground font-bold uppercase tracking-widest opacity-50">+ {cart.length - 6} more in checkout sidebar</p>
+            )}
+            <div className="h-px bg-border/50 my-2" />
+          </div>
+        )}
+
         {/* Custom Actions Hub */}
         <div className="flex gap-2">
           <input
