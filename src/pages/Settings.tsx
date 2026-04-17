@@ -23,7 +23,8 @@ import {
   Trash2,
   PlusCircle,
   RotateCcw,
-  Building
+  Building,
+  AlertCircle
 } from 'lucide-react';
 import { db, auth } from '@/lib/firebase';
 import { collection, addDoc, onSnapshot, query, setDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
@@ -34,7 +35,7 @@ import { formatCurrency, cn, isValidIndianPhone, sanitizePhone } from '@/lib/uti
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { loadShopSettings } from '@/lib/shopSettings';
 import { useAuthStore } from '@/lib/useAuthStore';
-import type { InventoryItem, ShopSettings } from '@/lib/types';
+import type { InventoryItem, ShopMetadata } from '@/lib/types';
 
 export default function Settings() {
   const { inventory, sales, customers, shop, updateShop, clearInventory, theme, setTheme, shopId } = useBusinessStore();
