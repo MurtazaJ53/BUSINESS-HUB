@@ -194,11 +194,30 @@ export default function History() {
                       <div className="flex items-center gap-2">
                         <div className={cn(
                           "h-2 w-2 rounded-full",
-                          sale.id.startsWith('PAY-') ? "bg-green-500 animate-pulse" : (sale.paymentMode === 'CASH' ? "bg-green-500" : "bg-primary")
+                          sale.id.startsWith('PAY-') ? "bg-green-500 animate-pulse" : 
+                          (sale.payments && sale.payments.length > 1 ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : 
+                          (sale.paymentMode === 'CASH' ? "bg-green-500" : "bg-primary"))
                         )} />
                         <span className="text-[11px] font-black uppercase tracking-widest leading-none">
-                          {sale.id.startsWith('PAY-') ? 'CASH COLLECTION' : sale.paymentMode}
+                          {sale.id.startsWith('PAY-') 
+                            ? 'CASH COLLECTION' 
+                            : (sale.payments && sale.payments.length > 1 
+                                ? 'SPLIT' 
+                                : sale.paymentMode)}
                         </span>
+                        {sale.payments && sale.payments.length > 1 && (
+                          <div className="flex gap-1 ml-1">
+                            {sale.payments.map((p, pi) => (
+                              <div 
+                                key={pi} 
+                                className="h-4 px-1.5 rounded-md bg-accent/50 flex items-center justify-center border border-border/50"
+                                title={`${p.mode}: ${formatCurrency(p.amount)}`}
+                              >
+                                <span className="text-[7px] font-black text-foreground/60">{p.mode}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-5 text-right">

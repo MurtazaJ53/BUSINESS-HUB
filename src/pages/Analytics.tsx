@@ -123,8 +123,16 @@ export default function Analytics() {
 
   // ── Payment mode breakdown ────────────────────────────────────────────────
   const payModes: Record<string, number> = {};
-  for (const sale of sales) {
-    payModes[sale.paymentMode] = (payModes[sale.paymentMode] || 0) + sale.total;
+  for (const sale of filteredSalesData) {
+    if (sale.payments && sale.payments.length > 0) {
+      // Split payment logic: add each mode's amount separately
+      for (const p of sale.payments) {
+        payModes[p.mode] = (payModes[p.mode] || 0) + p.amount;
+      }
+    } else {
+      // Legacy fallback: count the whole total for the primary mode
+      payModes[sale.paymentMode] = (payModes[sale.paymentMode] || 0) + sale.total;
+    }
   }
   const payModeSorted = Object.entries(payModes).sort((a, b) => b[1] - a[1]);
 
