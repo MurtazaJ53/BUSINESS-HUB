@@ -415,27 +415,6 @@ export default function Inventory() {
           <h1 className="text-3xl md:text-5xl font-black tracking-tighter leading-none mb-2">Shop Inventory</h1>
           <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest opacity-70">{inventory.length} Products in Catalog</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          {/* Wipe button */}
-          <button
-            onClick={() => setConfirmClear(true)}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-2xl text-destructive border border-destructive/20 hover:bg-destructive/10 transition-all"
-          >
-            <Trash2 className="h-4 w-4" /> Wipe Stock
-          </button>
-          <button
-            onClick={() => setBulkOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-2xl border border-border hover:bg-accent transition-all"
-          >
-            <FileText className="h-4 w-4" /> Bulk Add
-          </button>
-          <button
-            onClick={() => setAddOpen(true)}
-            className="flex items-center gap-2 premium-gradient text-white px-5 py-2.5 text-sm font-bold rounded-2xl hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
-          >
-            <Plus className="h-4 w-4" /> Add Product
-          </button>
-        </div>
       </div>
 
       {/* Stats */}
@@ -490,6 +469,28 @@ export default function Inventory() {
             {uniqueSubcategories.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
+      </div>
+      
+      {/* Management Actions - Command Center */}
+      <div className="flex flex-wrap gap-3 p-4 bg-accent/20 border border-border/30 rounded-2xl">
+        <button
+          onClick={() => setConfirmClear(true)}
+          className="flex items-center gap-2 px-4 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl text-red-500 border border-red-500/20 hover:bg-red-500/10 transition-all"
+        >
+          <Trash2 className="h-4 w-4" /> Wipe Stock
+        </button>
+        <button
+          onClick={() => setBulkOpen(true)}
+          className="flex items-center gap-2 px-4 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl border border-border hover:bg-accent transition-all"
+        >
+          <FileText className="h-4 w-4" /> Bulk Add
+        </button>
+        <button
+          onClick={() => setAddOpen(true)}
+          className="flex-1 sm:flex-none flex items-center justify-center gap-2 premium-gradient text-white px-6 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
+        >
+          <Plus className="h-4 w-4" /> Add Product
+        </button>
       </div>
 
       {/* Product Grid - Variant Aware */}
