@@ -111,6 +111,21 @@ export default function AppLayout({ pages }: AppLayoutProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // SCROLL-LOCK ARMOR: Freeze background when sidebar is open
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    };
+  }, [sidebarOpen]);
+
   // Low stock notifications
   const lowStockItems = inventory.filter(p => p.stock !== undefined && p.stock <= 5);
 
@@ -166,7 +181,7 @@ export default function AppLayout({ pages }: AppLayoutProps) {
   };
 
   return (
-    <div className="flex min-h-screen bg-background selection:bg-primary/30">
+    <div className="flex h-[100dvh] w-full bg-background selection:bg-primary/30 overflow-hidden">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -177,9 +192,17 @@ export default function AppLayout({ pages }: AppLayoutProps) {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 md:z-auto no-print",
+        "fixed inset-y-0 left-0 z-[60] w-64 bg-card border-r border-border transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 md:z-auto no-print shadow-2xl md:shadow-none",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
+        {/* Mobile Close Button */}
+        <button 
+          onClick={() => setSidebarOpen(false)}
+          className="absolute right-4 top-4 p-2 bg-accent rounded-xl text-muted-foreground md:hidden flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-all z-[70]"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
         <div className="flex flex-col h-full p-4">
           {/* Logo */}
           <div className="flex items-center gap-3 px-2 mb-8 mt-2">
@@ -237,7 +260,7 @@ export default function AppLayout({ pages }: AppLayoutProps) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden">
+      <main className="flex-1 flex flex-col h-full min-w-0 overflow-hidden relative">
         {/* Topbar */}
         <header className="h-16 shrink-0 flex items-center justify-between px-6 border-b border-border bg-background/80 backdrop-blur-md z-30 no-print">
           <div className="flex items-center gap-2">
