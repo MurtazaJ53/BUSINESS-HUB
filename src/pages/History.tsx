@@ -13,6 +13,7 @@ import {
   Check,
   CreditCard,
   IndianRupee,
+  TrendingUp,
   ShieldCheck,
   Printer
 } from 'lucide-react';
