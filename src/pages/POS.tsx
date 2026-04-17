@@ -88,32 +88,12 @@ export default function POS() {
     return matchSearch && matchCat;
   });
 
-  // TURBO MODE: Get top selling items or first items if no sales
-  const topSellingItems = useMemo(() => {
-    const counts: Record<string, { id: string, name: string, count: number, item: typeof inventory[0] }> = {};
-    
-    // First, map inventory for quick access
-    const invMap = new Map(inventory.map(i => [i.id, i]));
-    
-    // If no sales, take first 8 from inventory
-    if (useBusinessStore.getState().sales.length === 0) {
-      return inventory.slice(0, 8);
-    }
-
-    // Otherwise, count sales
-    useBusinessStore.getState().sales.forEach(sale => {
-      sale.items.forEach(item => {
-        if (!counts[item.itemId] && invMap.has(item.itemId)) {
-          counts[item.itemId] = { id: item.itemId, name: item.name, count: 0, item: invMap.get(item.itemId)! };
-        }
-        if (counts[item.itemId]) counts[item.itemId].count += item.quantity;
-      });
-    });
-
-    return Object.values(counts)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 8)
-      .map(c => c.item);
+  // LATEST ARRIVALS ENGINE: Get most recently added items from inventory
+  const latestProducts = useMemo(() => {
+    return [...inventory]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 10); // Show top 10 newest arrivals
+  }, [inventory]);
   }, [inventory]);
   
   // CUSTOMER AUTOCOMPLETE ENGINE
@@ -328,43 +308,44 @@ export default function POS() {
           />
         </div>
 
-        {/* TURBO MODE GRID */}
-        {topSellingItems.length > 0 && !search && category === 'All' && (
-          <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-500">
-            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
+        {/* NEW ARRIVALS GRID: BIG SCREEN TREATMENT */}
+        {latestProducts.length > 0 && !search && category === 'All' && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-700">
+            <h3 className="text-[11px] font-black uppercase tracking-[0.25em] text-primary flex items-center gap-2.5">
+              <span className="relative flex h-2.5 w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
               </span>
-              Turbo Speed Dial
+              Recently Added Items
             </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {topSellingItems.map(item => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              {latestProducts.map(item => (
                 <button
                   key={item.id}
                   onClick={() => addToCart(item)}
-                  className="flex flex-col items-center justify-center p-3 min-h-[110px] bg-primary/5 border border-primary/20 rounded-2xl hover:bg-primary hover:text-white transition-all group relative overflow-hidden active:scale-95"
+                  className="flex items-center gap-4 p-4 bg-primary/5 border border-primary/20 rounded-3xl hover:bg-primary hover:text-white transition-all group relative overflow-hidden active:scale-95 shadow-sm"
                 >
-                  <div className="flex flex-col items-center text-center gap-1 z-10 w-full mb-1">
-                    <p className="text-[10px] font-black uppercase tracking-tight line-clamp-1">{item.name}</p>
-                    <div className="flex flex-wrap items-center justify-center gap-1">
-                      <span className="px-1.5 py-0.5 bg-primary/10 text-primary text-[8px] font-black uppercase rounded-lg border border-primary/20 group-hover:bg-white group-hover:text-primary">
+                  <div className="h-14 w-14 shrink-0 premium-gradient rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                    <Package className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="flex-1 text-left min-w-0">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <p className="text-sm font-black uppercase tracking-tight truncate">{item.name}</p>
+                      <span className="px-1.5 py-0.5 bg-green-500 text-white text-[8px] font-black uppercase rounded-lg shadow-sm">NEW</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span className="px-1.5 py-0.5 bg-primary/10 text-primary text-[9px] font-black uppercase rounded-lg border border-primary/20 group-hover:bg-white/20 group-hover:text-white group-hover:border-white/30">
                         {item.category}
                       </span>
-                      {item.subcategory && (
-                        <span className="px-1.5 py-0.5 bg-amber-500/10 text-amber-500 text-[8px] font-black uppercase rounded-lg border border-amber-500/20 group-hover:bg-white group-hover:text-amber-600">
-                          {item.subcategory}
-                        </span>
-                      )}
                       {item.size && (
-                        <span className="px-1.5 py-0.5 bg-purple-500/10 text-purple-500 text-[8px] font-black uppercase rounded-lg border border-purple-500/20 group-hover:bg-white group-hover:text-purple-600">
+                        <span className="px-1.5 py-0.5 bg-purple-500/10 text-purple-500 text-[9px] font-black uppercase rounded-lg border border-purple-500/20 group-hover:bg-white/20 group-hover:text-white group-hover:border-white/30">
                           {item.size}
                         </span>
                       )}
                     </div>
+                    <p className="text-sm font-black mt-1">{formatCurrency(item.price)}</p>
                   </div>
-                  <p className="text-[11px] font-black z-10">{formatCurrency(item.price)}</p>
-                  <Plus className="absolute -right-1 -bottom-1 h-8 w-8 opacity-5 group-hover:opacity-20 transition-opacity" />
+                  <PlusCircle className="absolute -right-2 -bottom-2 h-12 w-12 opacity-5 group-hover:opacity-20 transition-opacity" />
                 </button>
               ))}
             </div>
