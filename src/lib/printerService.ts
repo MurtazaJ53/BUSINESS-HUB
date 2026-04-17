@@ -6,8 +6,8 @@ import { formatCurrency } from './utils';
  * Optimized for Thermal Printers (58mm/80mm) via Android Print Spooler or RawBT.
  */
 export const printReceipt = (sale: Sale, shop: any) => {
-  const printWindow = window.open('', '_blank', 'width=400,height=600');
-  if (!printWindow) return;
+  const printWindow = window.open('', '_blank', 'width=400,height=600,scrollbars=yes');
+  if (!printWindow) return false;
 
   const receiptHtml = `
     <!DOCTYPE html>
@@ -145,4 +145,5 @@ export const printReceipt = (sale: Sale, shop: any) => {
 
   printWindow.document.write(receiptHtml);
   printWindow.document.close();
+  return true;
 };

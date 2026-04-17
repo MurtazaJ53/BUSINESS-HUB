@@ -1,5 +1,6 @@
-import React from 'react';
-import { X, Printer, Check, ShoppingBag, Calendar, Clock, Hash } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Printer, Check, Calendar, Clock, Hash, Info } from 'lucide-react';
+import ErrorModal from './ErrorModal';
 import type { Sale } from '@/lib/types';
 import { loadShopSettings } from '@/lib/shopSettings';
 import { printReceipt } from '@/lib/printerService';
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export default function ReceiptModal({ sale, onClose, onConfirm }: Props) {
+  const [errorModal, setErrorModal] = useState({ show: false, title: '', message: '' });
   const shop = loadShopSettings();
   const now = new Date();
   const invoiceNo = `INV-${sale.id.replace('sale-', '').slice(-8).toUpperCase()}`;
@@ -200,7 +202,11 @@ export default function ReceiptModal({ sale, onClose, onConfirm }: Props) {
               
               <div className="flex justify-center">
                 <button 
-                  onClick={() => alert("To skip this preview box automatically:\n1. Close Chrome\n2. Right-click Chrome Shortcut > Properties\n3. Add '--kiosk-printing' at the end of the Target field\n4. Restart!")}
+                  onClick={() => setErrorModal({
+                    show: true,
+                    title: 'Speed Tip',
+                    message: "To skip this preview box automatically:\n1. Close Chrome\n2. Right-click Chrome Shortcut > Properties\n3. Add '--kiosk-printing' at the end of the Target field\n4. Restart!"
+                  })}
                   className="text-[9px] font-black uppercase tracking-widest text-primary/60 hover:text-primary transition-colors underline decoration-dotted"
                 >
                   ⚡ Want to skip this preview box?
@@ -210,6 +216,12 @@ export default function ReceiptModal({ sale, onClose, onConfirm }: Props) {
           )}
         </div>
       </div>
+      <ErrorModal 
+        isOpen={errorModal.show}
+        title={errorModal.title}
+        message={errorModal.message}
+        onClose={() => setErrorModal({ ...errorModal, show: false })}
+      />
     </div>
   );
 }
