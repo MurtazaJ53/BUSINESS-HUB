@@ -143,8 +143,25 @@ export default function POS() {
     );
   };
 
+  const updatePrice = (itemId: string, isReturn: boolean, newPrice: number) => {
+    setCart((prev) =>
+      prev.map((c) => (c.itemId === itemId && !!c.isReturn === isReturn) ? { ...c, price: newPrice } : c)
+    );
+  };
+
   const removeFromCart = (itemId: string, isReturn: boolean) => {
     setCart((prev) => prev.filter((c) => !(c.itemId === itemId && !!c.isReturn === isReturn)));
+  };
+  
+  const addServiceCharge = (amount: number = 20) => {
+    const id = `custom-fee-${Date.now()}`;
+    setCart((prev) => [...prev, {
+      itemId: id,
+      name: "Replacement / Service Fee",
+      quantity: 1,
+      price: amount,
+    }]);
+    showToast(`Added ₹${amount} Service Fee`);
   };
 
   const subTotal = () => cart.reduce((sum, c) => {
@@ -325,9 +342,15 @@ export default function POS() {
                       <p className="text-xs font-black uppercase tracking-tight truncate">{item.name}</p>
                       {item.isReturn && <span className="text-[8px] font-black uppercase bg-red-500 text-white px-1 rounded">Return</span>}
                     </div>
-                    <p className={`text-[10px] font-bold ${item.isReturn ? 'text-red-500' : 'text-primary'}`}>
-                      {item.isReturn ? '-' : ''}{formatCurrency(item.price * item.quantity)}
-                    </p>
+                    <div className="flex items-center gap-1">
+                      <span className={`text-[10px] font-black ${item.isReturn ? 'text-red-500' : 'text-primary'}`}>{item.isReturn ? '-' : ''}₹</span>
+                      <input 
+                        type="number"
+                        value={item.price}
+                        onChange={(e) => updatePrice(item.itemId, !!item.isReturn, parseFloat(e.target.value) || 0)}
+                        className={`bg-transparent border-none p-0 text-[10px] font-black w-16 focus:ring-0 ${item.isReturn ? 'text-red-500' : 'text-primary'}`}
+                      />
+                    </div>
                   </div>
                   <div className="flex items-center bg-card rounded-2xl border border-border/50 p-1 gap-1">
                     <button 
@@ -392,8 +415,20 @@ export default function POS() {
             onKeyDown={(e) => e.key === 'Enter' && addCustom()}
             className="w-28 px-3 py-2 bg-card border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
-          <button onClick={addCustom} className="px-4 py-2 bg-accent border border-border rounded-xl font-bold text-sm hover:bg-accent/80 transition-all">
+          <button 
+            onClick={addCustom} 
+            className="px-4 py-2 bg-primary text-white rounded-xl font-bold text-sm hover:scale-105 active:scale-95 transition-all shadow-md"
+            title="Add Custom Item"
+          >
             <Plus className="h-4 w-4" />
+          </button>
+          <button 
+            onClick={() => addServiceCharge(20)}
+            className="px-4 py-2 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-xl font-black text-xs hover:bg-emerald-500 hover:text-white transition-all shadow-sm flex flex-col items-center justify-center min-w-[64px]"
+            title="Quick Replacement Fee (₹20)"
+          >
+            <span className="text-[8px] opacity-70 uppercase leading-none mb-0.5">FEE</span>
+            <span>+₹20</span>
           </button>
         </div>
 
