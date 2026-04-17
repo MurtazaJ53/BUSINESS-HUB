@@ -260,6 +260,7 @@ export default function POS() {
     setReceiptOpen(false);
     setLastReceipt(null);
     setFooterNote(shop.footer || '');
+    setTerminalStep('catalog');
   };
 
   return (
