@@ -35,7 +35,7 @@ export default function POS() {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [stockWarningItems, setStockWarningItems] = useState<{item: SaleItem, stock: number}[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [footerNote, setFooterNote] = useState('');
+  const [footerNote, setFooterNote] = useState(shop.footer || '');
   const [errorModal, setErrorModal] = useState({ show: false, title: '', message: '' });
 
   // Keyboard Shortcuts
@@ -69,6 +69,13 @@ export default function POS() {
       window.removeEventListener('mousedown', handleClickOutside);
     };
   }, [cart, isCharging]);
+  
+  // Pre-fill Footer Note when shop settings load from cloud
+  useEffect(() => {
+    if (shop.footer && !footerNote) {
+      setFooterNote(shop.footer);
+    }
+  }, [shop.footer]);
 
   const categories = ['All', ...Array.from(new Set(inventory.map((p) => p.category)))];
 
@@ -261,6 +268,7 @@ export default function POS() {
     setSelectedCustomerId(null);
     setReceiptOpen(false);
     setLastReceipt(null);
+    setFooterNote(shop.footer || '');
   };
 
   return (
@@ -588,7 +596,7 @@ export default function POS() {
                   <textarea 
                     value={footerNote}
                     onChange={(e) => setFooterNote(e.target.value)}
-                    placeholder={`Default: ${shop.footer || 'Thank you!'}`}
+                    placeholder="Type a special note for this receipt..."
                     className="w-full bg-accent/40 border border-border/50 rounded-xl p-3 text-[11px] font-semibold min-h-[60px] focus:ring-2 focus:ring-primary/20 outline-none transition-all resize-none"
                   />
                 </div>
