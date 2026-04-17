@@ -285,21 +285,25 @@ export default function Inventory() {
 
   // ── Update ──
   const handleUpdate = async () => {
-    if (!editingItem || !editForm.name || editForm.price === '') return;
+    if (!editingItem) return;
     
     setIsProcessing(true);
     try {
+      // Ensure we have at least a name
+      const finalName = editForm.name || editingItem.name || "Unnamed Product";
+      const finalPrice = parseFloat(String(editForm.price)) || 0;
+      
       await updateInventoryItem({
         ...editingItem,
-        name: editForm.name,
-        price: parseFloat(editForm.price) || 0,
-        costPrice: editForm.costPrice ? parseFloat(editForm.costPrice) : undefined,
-        sku: editForm.sku || undefined,
+        name: finalName,
+        price: finalPrice,
+        costPrice: editForm.costPrice ? parseFloat(String(editForm.costPrice)) : 0,
+        sku: editForm.sku || "",
         category: editForm.category || 'General',
-        subcategory: editForm.subcategory || undefined,
-        size: editForm.size || undefined,
-        description: editForm.description || undefined,
-        stock: editForm.stock ? parseInt(editForm.stock) : undefined,
+        subcategory: editForm.subcategory || "",
+        size: editForm.size || "",
+        description: editForm.description || "",
+        stock: editForm.stock ? parseInt(String(editForm.stock)) : 0,
       });
       setEditingItem(null);
       showToast('Item updated!');
