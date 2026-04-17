@@ -448,75 +448,71 @@ export default function Inventory() {
           <p className="font-bold">{search ? 'No products match your search' : 'Your inventory is empty. Add your first product!'}</p>
         </div>
       ) : (
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
           {filtered.map((item) => {
             const isLow = item.stock !== undefined && item.stock <= 5;
 
             return (
               <div
                 key={item.id}
-                className={`glass-card group rounded-xl p-3 hover:shadow-lg transition-all border ${
-                  isLow ? 'border-red-500/20' : 'border-border/30'
+                className={`glass-card group rounded-xl p-2.5 hover:shadow-lg transition-all border flex flex-col justify-between min-h-[140px] ${
+                  isLow ? 'border-red-500/20' : 'border-border/20'
                 }`}
               >
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <Package className="h-3.5 w-3.5 text-primary" />
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-1 overflow-hidden">
+                    <p className="font-extrabold text-[11px] uppercase tracking-tight truncate flex-1">{item.name}</p>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <button
+                        onClick={() => {
+                          setEditingItem(item);
+                          setEditForm({
+                            name: item.name, price: String(item.price),
+                            costPrice: item.costPrice ? String(item.costPrice) : '',
+                            sku: item.sku || '', category: item.category,
+                            subcategory: item.subcategory || '', size: item.size || '',
+                            description: item.description || '',
+                            stock: item.stock !== undefined ? String(item.stock) : '',
+                          });
+                        }}
+                        className="p-1 hover:bg-accent rounded-md transition-colors"
+                      >
+                        <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
+                      </button>
                     </div>
-                    <p className="font-bold text-sm truncate">{item.name}</p>
                   </div>
-                  <div className="flex items-center gap-0.5 shrink-0">
-                    <button
-                      onClick={() => {
-                        setEditingItem(item);
-                        setEditForm({
-                          name: item.name, price: String(item.price),
-                          costPrice: item.costPrice ? String(item.costPrice) : '',
-                          sku: item.sku || '', category: item.category,
-                          subcategory: item.subcategory || '', size: item.size || '',
-                          description: item.description || '',
-                          stock: item.stock !== undefined ? String(item.stock) : '',
-                        });
-                      }}
-                      className="p-1 hover:bg-accent rounded-md transition-colors"
-                    >
-                      <Pencil className="h-3 w-3 text-muted-foreground" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (window.confirm("Delete this item?")) {
-                          deleteInventoryItem(item.id).then(() => showToast("Item deleted"));
-                        }
-                      }}
-                      className="p-1 hover:bg-red-500/10 rounded-md transition-colors text-muted-foreground hover:text-red-500"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
+
+                  <div className="flex flex-wrap gap-1">
+                    <span className="px-1 py-0.5 bg-primary/5 text-primary text-[8px] font-black uppercase rounded-md border border-primary/10">
+                      {item.categoryShort || item.category.slice(0, 4)}
+                    </span>
+                    {item.size && (
+                      <span className="px-1 py-0.5 bg-purple-500/5 text-purple-500 text-[8px] font-black uppercase rounded-md border border-purple-500/10">
+                        {item.size}
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  <span className="px-1.5 py-0.5 bg-primary/5 text-primary text-[9px] font-black uppercase rounded-lg border border-primary/10">
-                    {item.category}
-                  </span>
-                  {item.subcategory && (
-                    <span className="px-1.5 py-0.5 bg-amber-500/5 text-amber-500 text-[9px] font-black uppercase rounded-lg border border-amber-500/10">
-                      {item.subcategory}
-                    </span>
-                  )}
-                  {item.size && (
-                    <span className="px-1.5 py-0.5 bg-purple-500/5 text-purple-500 text-[9px] font-black uppercase rounded-lg border border-purple-500/10">
-                      {item.size}
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex justify-between items-center text-xs">
-                  <p className="font-black text-foreground">{formatCurrency(item.price)}</p>
-                  <p className={`font-black ${isLow ? 'text-destructive' : 'text-primary'}`}>
-                    {item.stock || 0} <span className="text-[8px] uppercase font-normal opacity-60">STK</span>
-                  </p>
+                <div className="space-y-1 mt-auto pt-2 border-t border-border/10">
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[8px] font-black text-muted-foreground uppercase opacity-60">Sell</span>
+                      <p className="font-black text-[10px] text-foreground">{formatCurrency(item.price)}</p>
+                    </div>
+                    {item.costPrice > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-[8px] font-black text-amber-500 uppercase opacity-60">Cost</span>
+                        <p className="font-black text-[10px] text-amber-500">{formatCurrency(item.costPrice)}</p>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center border-t border-border/5 pt-0.5 mt-0.5">
+                      <span className="text-[8px] font-black text-muted-foreground uppercase opacity-60">Stk</span>
+                      <p className={`font-black text-[10px] ${isLow ? 'text-destructive' : 'text-primary'}`}>
+                        {item.stock || 0}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             );
