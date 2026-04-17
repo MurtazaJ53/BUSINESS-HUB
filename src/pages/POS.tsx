@@ -310,85 +310,8 @@ export default function POS() {
           <p className="text-muted-foreground mt-1 text-xs">High-speed elite terminal checkout</p>
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input
-            id="pos-search"
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Scan barcode or type product name..."
-            className="w-full bg-accent/30 border-border/50 text-foreground placeholder:text-muted-foreground/60 rounded-2xl py-3.5 pl-12 pr-4 focus:ring-2 focus:ring-primary/50 transition-all font-bold"
-          />
-        </div>
-
-        {/* EXECUTIVE CART COMMAND: BIG SCREEN TREATMENT */}
-        {cart.length > 0 && !search && (
-          <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-700">
-            <h3 className="text-[11px] font-black uppercase tracking-[0.25em] text-primary flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <ShoppingCart className="h-4 w-4" />
-                Current Order
-              </div>
-              <span className="text-[10px] opacity-50">{cart.length} ITEMS</span>
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-              {cart.map(item => (
-                <div
-                  key={`${item.itemId}-${!!item.isReturn}`}
-                  className={`flex items-center gap-3 p-3 border rounded-3xl animate-in zoom-in-95 duration-300 shadow-sm ${
-                    item.isReturn ? 'bg-red-500/5 border-red-500/20' : 'bg-primary/5 border-primary/20'
-                  }`}
-                >
-                  <div className={`h-12 w-12 shrink-0 rounded-2xl flex items-center justify-center shadow-md ${item.isReturn ? 'bg-red-500' : 'premium-gradient'}`}>
-                    {item.isReturn ? <RotateCcw className="h-5 w-5 text-white" /> : <Package className="h-5 w-5 text-white" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-xs font-black uppercase tracking-tight truncate">{item.name}</p>
-                      {item.isReturn && <span className="text-[8px] font-black uppercase bg-red-500 text-white px-1 rounded">Return</span>}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className={`text-[10px] font-black ${item.isReturn ? 'text-red-500' : 'text-primary'}`}>{item.isReturn ? '-' : ''}₹</span>
-                      <input 
-                        type="number"
-                        value={item.price}
-                        onChange={(e) => updatePrice(item.itemId, !!item.isReturn, parseFloat(e.target.value) || 0)}
-                        className={`bg-transparent border-none p-0 text-[10px] font-black w-16 focus:ring-0 ${item.isReturn ? 'text-red-500' : 'text-primary'}`}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center bg-card rounded-2xl border border-border/50 p-1 gap-1">
-                    <button 
-                      onClick={() => updateQty(item.itemId, !!item.isReturn, -1)}
-                      className="p-1.5 hover:bg-accent rounded-xl transition-colors text-muted-foreground"
-                    >
-                      <Minus className="h-3 w-3" />
-                    </button>
-                    <span className="text-[11px] font-black min-w-[1.5rem] text-center">{item.quantity}</span>
-                    <button 
-                      onClick={() => updateQty(item.itemId, !!item.isReturn, 1)}
-                      className={`p-1.5 hover:bg-accent rounded-xl transition-colors ${item.isReturn ? 'text-red-500' : 'text-primary'}`}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </button>
-                    <div className="w-px h-4 bg-border/50 mx-0.5" />
-                    <button 
-                      onClick={() => removeFromCart(item.itemId, !!item.isReturn)}
-                      className="p-1.5 hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-colors"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="h-px bg-border/50 my-2" />
-          </div>
-        )}
-
-        {/* Category Tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-none snap-x h-16 items-center">
+        {/* Category Tabs - NOW AT TOP */}
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none snap-x h-16 items-center">
           {categories.map((cat) => (
             <button
               key={cat}
@@ -405,6 +328,20 @@ export default function POS() {
           ))}
         </div>
 
+        {/* Search Bar - NOW BELOW CATEGORIES */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            id="pos-search"
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Scan barcode or type product name..."
+            className="w-full bg-accent/30 border-border/50 text-foreground placeholder:text-muted-foreground/60 rounded-2xl py-3.5 pl-12 pr-4 focus:ring-2 focus:ring-primary/50 transition-all font-bold"
+          />
+        </div>
+
+        {/* Custom Actions Hub */}
         <div className="flex gap-2">
           <input
             type="text"
