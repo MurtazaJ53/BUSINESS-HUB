@@ -236,8 +236,8 @@ export default function POS() {
     <div className="flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-8rem)]">
       <div className="flex-1 space-y-4 min-w-0">
         <div>
-          <h1 className="text-4xl font-black tracking-tighter">POS System</h1>
-          <p className="text-muted-foreground mt-1">High-speed point of sale checkout</p>
+          <h1 className="text-4xl font-black tracking-tighter">Sales Hub</h1>
+          <p className="text-muted-foreground mt-1">High-speed elite terminal checkout</p>
         </div>
 
         <div className="relative">

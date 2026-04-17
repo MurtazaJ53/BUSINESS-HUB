@@ -130,25 +130,28 @@ export default function Expenses() {
       </div>
 
       {/* Expense List */}
-      <div className="glass-card rounded-3xl overflow-hidden border border-border/50">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-accent/30">
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Category</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Description</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Date</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-right">Amount</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-center">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border/50">
-            {expenses.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-6 py-20 text-center">
-                  <PieChart className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">No expenses recorded</p>
-                </td>
+      <div className="glass-card rounded-3xl border border-border/50 overflow-hidden">
+        <div className="overflow-x-auto scrollbar-none">
+          <table className="w-full text-left border-collapse min-w-[650px]">
+            <thead>
+              <tr className="bg-accent/30">
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Category</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Description</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Date</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-right">Amount</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-center">Actions</th>
               </tr>
+            </thead>
+            <tbody className="divide-y divide-border/50">
+              {expenses.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-24 text-center">
+                    <div className="flex flex-col items-center justify-center opacity-30">
+                      <PieChart className="h-12 w-12 mb-3" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em]">No Expenses Recorded</p>
+                    </div>
+                  </td>
+                </tr>
             ) : (
               expenses
                 .sort((a, b) => b.date.localeCompare(a.date))
