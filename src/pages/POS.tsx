@@ -356,11 +356,6 @@ export default function POS() {
                       {item.isReturn && <span className="text-[7px] font-black uppercase bg-red-500 text-white px-1 rounded">Return</span>}
                     </div>
                     <div className="flex flex-col gap-1">
-                      {role === 'admin' && item.costPrice !== undefined && !item.isReturn && (
-                        <span className="text-[8px] font-black text-emerald-500/80 uppercase">
-                          +₹{((item.price - item.costPrice) * item.quantity).toFixed(0)} Profit
-                        </span>
-                      )}
                       <div className="flex items-center gap-1">
                         <span className={`text-[10px] font-black ${item.isReturn ? 'text-red-500' : 'text-primary'}`}>{item.isReturn ? '-' : ''}₹</span>
                         <input 
@@ -639,11 +634,6 @@ export default function POS() {
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <div className="flex items-center gap-1.5">
-                        {role === 'admin' && c.costPrice !== undefined && !c.isReturn && (
-                          <span className="text-[9px] font-black text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded-lg border border-emerald-500/20 animate-in fade-in zoom-in duration-500">
-                            +₹{((c.price - c.costPrice) * c.quantity).toFixed(0)} PROFIT
-                          </span>
-                        )}
                         <div className="flex items-center gap-1">
                           <span className={`text-sm font-black ${c.isReturn ? 'text-red-500' : 'text-foreground'}`}>{c.isReturn ? '-' : ''}₹</span>
                           <input 
