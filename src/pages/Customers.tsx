@@ -119,7 +119,14 @@ export default function Customers() {
 
       {/* Main List Section */}
       <div className="glass-card rounded-3xl flex flex-col min-h-[500px] overflow-hidden">
-        <div className="p-6 border-b border-border/50 flex flex-col md:flex-row gap-4 items-center">
+        <div className="p-6 border-b border-border/50 flex flex-col gap-4">
+          <button 
+            onClick={() => setIsAdding(true)}
+            className="w-full premium-gradient text-white px-6 py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:shadow-xl hover:-translate-y-0.5 transition-all uppercase tracking-widest whitespace-nowrap"
+          >
+            <UserPlus className="h-4 w-4" /> Add Customer
+          </button>
+
           <div className="relative flex-1 group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
             <input 
@@ -130,12 +137,6 @@ export default function Customers() {
               className="w-full bg-accent/50 border border-border rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
             />
           </div>
-          <button 
-            onClick={() => setIsAdding(true)}
-            className="w-full md:w-auto premium-gradient text-white px-6 py-3 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:shadow-xl hover:-translate-y-0.5 transition-all uppercase tracking-widest whitespace-nowrap"
-          >
-            <UserPlus className="h-4 w-4" /> Add Customer
-          </button>
         </div>
 
         <div className="flex-1 overflow-x-auto scrollbar-none">
