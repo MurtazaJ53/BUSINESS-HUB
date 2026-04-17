@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   ShoppingBag,
   Sparkles,
+  LogOut,
   Globe
 } from 'lucide-react';
 import { auth, db, googleProvider } from '@/lib/firebase';
