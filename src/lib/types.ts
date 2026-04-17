@@ -63,6 +63,7 @@ export interface Sale {
   paymentMode: 'CASH' | 'UPI' | 'CARD' | 'CREDIT' | 'ONLINE' | 'OTHERS'; // Keeping for backwards compatibility
   payments: { mode: string; amount: number }[]; // New Multi-payment support
   customerName?: string;
+  customerPhone?: string;
   customerId?: string;
   date: string;
   createdAt: string;

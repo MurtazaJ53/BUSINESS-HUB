@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Plus, Minus, Trash2, ShoppingCart, Search, Check,
-  Printer, RotateCcw, Package, User, Percent, AlertCircle, AlertTriangle, Calendar,
+  Printer, RotateCcw, Package, User, Phone, Percent, AlertCircle, AlertTriangle, Calendar,
   ArrowRight, CheckCircle2
 } from 'lucide-react';
 import { useBusinessStore } from '@/lib/useBusinessStore';
