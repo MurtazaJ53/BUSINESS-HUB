@@ -21,6 +21,7 @@ export default function POS() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
   const [discountValue, setDiscountValue] = useState('0');
@@ -50,10 +51,22 @@ export default function POS() {
       if (e.key === 'Escape') {
         setIsCharging(false);
         setReceiptOpen(false);
+        setIsSearchingCustomer(false);
       }
     };
+    
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('.customer-search-container')) {
+        setIsSearchingCustomer(false);
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('mousedown', handleClickOutside);
+    };
   }, [cart, isCharging]);
 
   const categories = ['All', ...Array.from(new Set(inventory.map((p) => p.category)))];
@@ -93,6 +106,15 @@ export default function POS() {
       .slice(0, 8)
       .map(c => c.item);
   }, [inventory]);
+  
+  // CUSTOMER AUTOCOMPLETE ENGINE
+  const filteredCustomers = useMemo(() => {
+    if (!customerName || selectedCustomerId) return [];
+    return customers.filter(c => 
+      c.name.toLowerCase().includes(customerName.toLowerCase()) ||
+      c.phone.includes(customerName)
+    ).slice(0, 5);
+  }, [customers, customerName, selectedCustomerId]);
 
   const addToCart = (product: typeof inventory[0]) => {
     setCart((prev) => {
@@ -146,6 +168,11 @@ export default function POS() {
   const hasMultiplePayments = payments.length > 1;
   // HARD FORCE: Allow 0.5 rupee tolerance to prevent decimal lock
   const isPaid = totalPayments >= (calcTotal() - 0.5);
+  
+  // CREDIT SECURITY: Mandatory Name + Phone for Udhaar
+  const hasCredit = payments.some(p => p.mode === 'CREDIT');
+  const creditDetailsValid = customerName.trim() && customerPhone.trim();
+  const canCharge = isPaid && (!hasCredit || creditDetailsValid);
 
   // Auto-update first payment if only one exists
   useEffect(() => {
@@ -188,7 +215,8 @@ export default function POS() {
       paymentMode: payments[0].mode as any,
       payments: [...payments],
       // SANITIZATION: Ensure NO undefined values ever reach Firestore
-      customerName: customerName || "",
+      customerName: customerName.trim() || "Cash Customer",
+      customerPhone: customerPhone.trim() || "",
       customerId: selectedCustomerId || "",
       date: saleDate,
       createdAt: new Date().toISOString(),
@@ -227,6 +255,7 @@ export default function POS() {
     setDiscountValue('');
     setPayments([{ mode: 'CASH', amount: 0 }]);
     setCustomerName('');
+    setCustomerPhone('');
     setSelectedCustomerId(null);
     setReceiptOpen(false);
     setLastReceipt(null);
@@ -365,15 +394,65 @@ export default function POS() {
             )}
           </div>
 
-          <div className="relative">
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Customer Name"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-accent border border-border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-bold"
-            />
+          <div className="space-y-2 relative customer-search-container">
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Customer Name"
+                value={customerName}
+                onChange={(e) => {
+                  setCustomerName(e.target.value);
+                  if (selectedCustomerId) setSelectedCustomerId(null);
+                }}
+                onFocus={() => setIsSearchingCustomer(true)}
+                className={cn(
+                  "w-full pl-9 pr-3 py-2 bg-accent border border-border rounded-xl text-xs focus:outline-none focus:ring-2 transition-all font-bold",
+                  hasCredit && !customerName ? "border-red-500/50 ring-red-500/20" : "focus:ring-primary/30"
+                )}
+              />
+              
+              {/* Autocomplete Dropdown */}
+              {isSearchingCustomer && filteredCustomers.length > 0 && (
+                <div className="absolute top-full left-0 right-0 z-[100] mt-1 bg-background border border-border rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2">
+                  {filteredCustomers.map(c => (
+                    <button
+                      key={c.id}
+                      onClick={() => {
+                        setCustomerName(c.name);
+                        setCustomerPhone(c.phone);
+                        setSelectedCustomerId(c.id);
+                        setIsSearchingCustomer(false);
+                      }}
+                      className="w-full px-4 py-2.5 text-left hover:bg-primary/5 border-b border-border/50 last:border-0 transition-colors group"
+                    >
+                      <p className="text-xs font-bold group-hover:text-primary">{c.name}</p>
+                      <p className="text-[10px] text-muted-foreground">{c.phone}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="relative">
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                type="tel"
+                placeholder={hasCredit ? "Phone Number (REDACTED)" : "Phone (Optional)"}
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                className={cn(
+                  "w-full pl-9 pr-3 py-2 bg-accent border border-border rounded-xl text-xs focus:outline-none focus:ring-2 transition-all font-bold",
+                  hasCredit && !customerPhone ? "border-red-500/50 ring-red-500/20" : "focus:ring-primary/30"
+                )}
+              />
+            </div>
+
+            {hasCredit && !creditDetailsValid && (
+              <p className="text-[9px] font-bold text-red-500 flex items-center gap-1 mt-1 animate-pulse">
+                <AlertCircle className="h-3 w-3" /> Name & Phone required for Credit
+              </p>
+            )}
           </div>
 
           {cart.length > 0 && (
@@ -491,9 +570,9 @@ export default function POS() {
 
               <button
                 onClick={() => handleCheckout(false)}
-                disabled={!isPaid || isProcessing}
+                disabled={!canCharge || isProcessing}
                 className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm transition-all flex items-center justify-center gap-3 ${
-                  isPaid && !isProcessing
+                  canCharge && !isProcessing
                     ? 'premium-gradient text-white shadow-xl hover:-translate-y-0.5 active:scale-95' 
                     : 'bg-accent text-muted-foreground cursor-not-allowed opacity-50'
                 }`}
