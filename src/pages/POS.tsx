@@ -38,6 +38,12 @@ export default function POS() {
   const [footerNote, setFooterNote] = useState(shop.footer || '');
   const [errorModal, setErrorModal] = useState({ show: false, title: '', message: '' });
   const [terminalStep, setTerminalStep] = useState<'catalog' | 'checkout'>('catalog');
+  const [toast, setToast] = useState('');
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 3000);
+  };
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -764,6 +770,19 @@ export default function POS() {
         </div>
       )}
 
+
+        />
+      )}
+
+      {/* TOAST SYSTEM - HIGH-SPEED FEEDBACK */}
+      {toast && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[1000] animate-in slide-in-from-bottom-5">
+          <div className="bg-zinc-900/90 backdrop-blur-md border border-white/10 px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3">
+            <Sparkles className="h-4 w-4 text-emerald-400" />
+            <span className="text-xs font-black uppercase tracking-widest text-white">{toast}</span>
+          </div>
+        </div>
+      )}
 
       <ErrorModal 
         isOpen={errorModal.show}
