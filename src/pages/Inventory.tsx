@@ -625,6 +625,7 @@ export default function Inventory() {
 
       {/* ── Edit Product Modal ── */}
       <Modal open={!!editingItem} onClose={() => setEditingItem(null)} title="Edit Product">
+        <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-muted-foreground">Product Name</Label><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
             <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-muted-foreground">SKU (Option)</Label><Input value={editForm.sku} onChange={(e) => setEditForm({ ...editForm, sku: e.target.value })} /></div>
