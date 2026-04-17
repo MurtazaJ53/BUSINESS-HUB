@@ -409,15 +409,16 @@ export default function POS() {
               return (
                 <div
                   key={product.id}
-                  className={`glass-card p-4 rounded-3xl text-left transition-all duration-300 group relative ${
-                    outOfStock ? 'opacity-70 grayscale-[0.5]' : 'hover:shadow-2xl hover:-translate-y-1'
+                  onClick={() => !outOfStock && addToCart(product)}
+                  className={`glass-card p-4 rounded-3xl text-left transition-all duration-300 group relative cursor-pointer active:scale-95 ${
+                    outOfStock ? 'opacity-70 grayscale-[0.5] cursor-not-allowed' : 'hover:shadow-2xl hover:-translate-y-1 hover:border-primary/30'
                   }`}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="h-10 w-10 premium-gradient rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
                       <Package className="h-5 w-5 text-white" />
                     </div>
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-1.5 grayscale group-hover:grayscale-0 transition-all">
                       <button
                         onClick={(e) => { e.stopPropagation(); addToCart(product, true); }}
                         className="h-8 w-8 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm"
@@ -426,13 +427,12 @@ export default function POS() {
                         <RotateCcw className="h-4 w-4" />
                       </button>
                       {!outOfStock && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); addToCart(product); }}
+                        <div
                           className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-all shadow-sm"
                           title="Add to Sale"
                         >
                           <Plus className="h-4 w-4" />
-                        </button>
+                        </div>
                       )}
                     </div>
                   </div>
