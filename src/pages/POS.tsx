@@ -306,10 +306,27 @@ export default function POS() {
                 <button
                   key={item.id}
                   onClick={() => addToCart(item)}
-                  className="flex flex-col items-center justify-center p-3 h-20 bg-primary/5 border border-primary/20 rounded-2xl hover:bg-primary hover:text-white transition-all group relative overflow-hidden active:scale-95"
+                  className="flex flex-col items-center justify-center p-3 min-h-[110px] bg-primary/5 border border-primary/20 rounded-2xl hover:bg-primary hover:text-white transition-all group relative overflow-hidden active:scale-95"
                 >
-                  <p className="text-[10px] font-black text-center line-clamp-2 uppercase tracking-tight z-10">{item.name}</p>
-                  <p className="text-[10px] font-bold opacity-60 z-10">{formatCurrency(item.price)}</p>
+                  <div className="flex flex-col items-center text-center gap-1 z-10 w-full mb-1">
+                    <p className="text-[10px] font-black uppercase tracking-tight line-clamp-1">{item.name}</p>
+                    <div className="flex flex-wrap items-center justify-center gap-1">
+                      <span className="px-1.5 py-0.5 bg-primary/10 text-primary text-[8px] font-black uppercase rounded-lg border border-primary/20 group-hover:bg-white group-hover:text-primary">
+                        {item.category}
+                      </span>
+                      {item.subcategory && (
+                        <span className="px-1.5 py-0.5 bg-amber-500/10 text-amber-500 text-[8px] font-black uppercase rounded-lg border border-amber-500/20 group-hover:bg-white group-hover:text-amber-600">
+                          {item.subcategory}
+                        </span>
+                      )}
+                      {item.size && (
+                        <span className="px-1.5 py-0.5 bg-purple-500/10 text-purple-500 text-[8px] font-black uppercase rounded-lg border border-purple-500/20 group-hover:bg-white group-hover:text-purple-600">
+                          {item.size}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-[11px] font-black z-10">{formatCurrency(item.price)}</p>
                   <Plus className="absolute -right-1 -bottom-1 h-8 w-8 opacity-5 group-hover:opacity-20 transition-opacity" />
                 </button>
               ))}
