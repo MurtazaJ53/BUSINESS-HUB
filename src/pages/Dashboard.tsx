@@ -131,83 +131,85 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Quick Actions Hub */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {/* Unified High-Density Command Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {/* ACTION: START NEW SALE */}
         <button 
           onClick={() => setActiveTab('sell')}
-          className="group relative flex items-center justify-between p-8 bg-primary rounded-[2.5rem] shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all overflow-hidden border border-white/10"
+          className="group relative flex flex-col items-center justify-center aspect-square p-4 bg-primary rounded-3xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all border border-white/10"
         >
-          <div className="absolute top-0 right-0 p-10 opacity-10 group-hover:scale-125 transition-transform">
-            <ShoppingCart className="h-24 w-24" />
+          <div className="h-12 w-12 rounded-xl bg-white/20 flex items-center justify-center mb-3 backdrop-blur-md">
+            <ShoppingCart className="h-6 w-6 text-white" />
           </div>
-          <div className="relative z-10 flex items-center gap-5">
-            <div className="h-14 w-14 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md">
-              <ShoppingCart className="h-7 w-7 text-white" />
-            </div>
-            <div className="text-left">
-              <p className="text-white font-black text-2xl tracking-tighter">Start New Sale</p>
-              <p className="text-white/60 text-[10px] font-black uppercase tracking-widest">Open Sales Hub</p>
-            </div>
-          </div>
-          <ArrowUpRight className="h-6 w-6 text-white/40 group-hover:text-white transition-colors" />
+          <p className="text-white font-black text-sm tracking-tighter leading-tight text-center">Start Sale</p>
+          <p className="text-white/60 text-[8px] font-black uppercase tracking-widest mt-1">POS Hub</p>
         </button>
 
+        {/* ACTION: INVENTORY */}
         <button 
           onClick={() => setActiveTab('inventory')}
-          className="group relative flex items-center justify-between p-8 glass-card border-white/5 rounded-[2.5rem] hover:bg-accent/40 hover:scale-[1.02] active:scale-95 transition-all overflow-hidden"
+          className="group relative flex flex-col items-center justify-center aspect-square p-4 glass-card border-white/5 rounded-3xl hover:bg-accent/40 hover:scale-[1.02] active:scale-95 transition-all"
         >
-          <div className="absolute top-0 right-0 p-10 opacity-[0.03] group-hover:scale-125 transition-transform">
-            <Package className="h-24 w-24" />
+          <div className="h-12 w-12 rounded-xl bg-accent flex items-center justify-center mb-3">
+            <Package className="h-6 w-6 text-primary transition-colors" />
           </div>
-          <div className="relative z-10 flex items-center gap-5">
-            <div className="h-14 w-14 rounded-2xl bg-accent flex items-center justify-center">
-              <Package className="h-7 w-7 text-muted-foreground group-hover:text-primary transition-colors" />
-            </div>
-            <div className="text-left">
-              <p className="font-black text-2xl tracking-tighter">Inventory Control</p>
-              <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest">Add or Update Stock</p>
-            </div>
-          </div>
-          <ArrowUpRight className="h-6 w-6 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+          <p className="font-black text-sm tracking-tighter leading-tight text-center text-foreground">Inventory</p>
+          <p className="text-muted-foreground text-[8px] font-black uppercase tracking-widest mt-1">Catalog</p>
         </button>
-      </div>
 
-
-      {/* KPI Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* METRICS START HERE */}
         {useBusinessStore.getState().role === 'admin' ? (
           <>
-            <KPICard
-              title="Total Sales Revenue"
-              value={formatCurrency(totalSalesRevenue)}
-              sub={`${totalSalesCount} transactions recorded`}
-              icon={TrendingUp}
-            />
-            <KPICard
-              title="Potential Revenue"
-              value={formatCurrency(potentialRevenue)}
-              sub={`If all stock sold today`}
-              icon={ShoppingBag}
-            />
-            <KPICard
-              title="Stock Room Value"
-              value={formatCurrency(totalStockValue)}
-              sub={`${inventory.length} distinct products`}
-              icon={Package}
-            />
+            <div className="glass-card flex flex-col items-center justify-center aspect-square p-4 rounded-3xl group transition-all duration-500">
+              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+                <TrendingUp className="h-5 w-5 text-primary" />
+              </div>
+              <p className="text-[8px] text-muted-foreground font-black uppercase tracking-[0.2em] opacity-80 text-center">Revenue</p>
+              <p className="text-lg font-black mt-0.5 text-primary tracking-tighter">{formatCurrency(totalSalesRevenue)}</p>
+              <p className="text-[8px] text-muted-foreground/60 mt-1 font-bold text-center">{totalSalesCount} Trans.</p>
+            </div>
+
+            <div className="glass-card flex flex-col items-center justify-center aspect-square p-4 rounded-3xl group transition-all duration-500">
+              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+                <ShoppingBag className="h-5 w-5 text-primary" />
+              </div>
+              <p className="text-[8px] text-muted-foreground font-black uppercase tracking-[0.2em] opacity-80 text-center">Potential</p>
+              <p className="text-lg font-black mt-0.5 text-primary tracking-tighter">{formatCurrency(potentialRevenue)}</p>
+              <p className="text-[8px] text-muted-foreground/60 mt-1 font-bold text-center">Full Stock</p>
+            </div>
+
+            <div className="glass-card flex flex-col items-center justify-center aspect-square p-4 rounded-3xl group transition-all duration-500">
+              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+                <Database className="h-5 w-5 text-primary" />
+              </div>
+              <p className="text-[8px] text-muted-foreground font-black uppercase tracking-[0.2em] opacity-80 text-center">Stock Val.</p>
+              <p className="text-lg font-black mt-0.5 text-primary tracking-tighter">{formatCurrency(totalStockValue)}</p>
+              <p className="text-[8px] text-muted-foreground/60 mt-1 font-bold text-center">{inventory.length} SKUs</p>
+            </div>
           </>
         ) : (
-          <div className="lg:col-span-3 glass-card p-6 rounded-3xl flex items-center justify-center bg-accent/20 border border-border/50 italic text-muted-foreground text-sm">
-            Administrative financial metrics are hidden for Staff role.
+          <div className="col-span-1 glass-center aspect-square flex items-center justify-center p-4 bg-accent/20 border border-border/50 rounded-3xl">
+             <p className="text-[8px] text-center font-black uppercase opacity-50">Staff Limit</p>
           </div>
         )}
-        <KPICard
-          title="Restock Alerts"
-          value={String(lowStockItems.length)}
-          sub="Items running critically low"
-          icon={AlertTriangle}
-          alert={lowStockItems.length > 0}
-        />
+
+        {/* ALERTS: RESTOCK */}
+        <div 
+          onClick={() => { if(lowStockItems.length > 0) setActiveTab('inventory') }}
+          className={cn(
+            "flex flex-col items-center justify-center aspect-square p-4 rounded-3xl border transition-all hover:scale-105 cursor-pointer",
+            lowStockItems.length > 0 ? "bg-red-500/10 border-red-500/30 shadow-red-500/10" : "glass-card"
+          )}
+        >
+          <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center mb-3", lowStockItems.length > 0 ? "bg-red-500/20" : "bg-primary/10")}>
+            <AlertTriangle className={cn("h-5 w-5", lowStockItems.length > 0 ? "text-red-500" : "text-primary")} />
+          </div>
+          <p className="text-[8px] text-muted-foreground font-black uppercase tracking-[0.2em] opacity-80 text-center">Alerts</p>
+          <p className={cn("text-2xl font-black mt-0.5", lowStockItems.length > 0 ? "text-red-500" : "text-primary")}>
+            {lowStockItems.length}
+          </p>
+          <p className="text-[8px] text-muted-foreground/60 mt-1 font-bold text-center">Stock Low</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
