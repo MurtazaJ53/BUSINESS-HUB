@@ -142,6 +142,10 @@ export default function POS() {
     );
   };
 
+  const removeFromCart = (itemId: string) => {
+    setCart((prev) => prev.filter((c) => c.itemId !== itemId));
+  };
+
   const subTotal = () => cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
   
   const calcTotal = () => {
@@ -307,14 +311,14 @@ export default function POS() {
                   </div>
                   <div className="flex items-center bg-card rounded-2xl border border-border/50 p-1 gap-1">
                     <button 
-                      onClick={() => updateQuantity(item.itemId, item.quantity - 1)}
+                      onClick={() => updateQty(item.itemId, -1)}
                       className="p-1.5 hover:bg-accent rounded-xl transition-colors text-muted-foreground"
                     >
                       <Minus className="h-3 w-3" />
                     </button>
                     <span className="text-[11px] font-black min-w-[1.5rem] text-center">{item.quantity}</span>
                     <button 
-                      onClick={() => updateQuantity(item.itemId, item.quantity + 1)}
+                      onClick={() => updateQty(item.itemId, 1)}
                       className="p-1.5 hover:bg-accent rounded-xl transition-colors text-primary"
                     >
                       <Plus className="h-3 w-3" />
