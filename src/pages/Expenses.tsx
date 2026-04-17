@@ -194,7 +194,8 @@ export default function Expenses() {
                 })
             )}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
 
       {/* Add Modal */}
