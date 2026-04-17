@@ -9,6 +9,7 @@ import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency } from '@/lib/utils';
 import type { InventoryItem } from '@/lib/types';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import { useAuthStore } from '@/lib/useAuthStore';
 
 // ─── Tiny UI primitives (no shadcn dependency) ─────────────────────────────
 

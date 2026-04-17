@@ -8,7 +8,7 @@ import {
 } from 'recharts';
 
 export default function Analytics() {
-  const { sales } = useBusinessStore();
+  const { sales, inventory } = useBusinessStore();
   const [period, setPeriod] = useState<'week' | 'month' | 'custom'>('week');
   
   const todayStr = new Date().toISOString().split('T')[0];
@@ -104,9 +104,9 @@ export default function Analytics() {
   const prevRev = prevPeriodSales.reduce((sum, s) => sum + s.total, 0);
   const revChange = prevRev > 0 ? ((currentRev - prevRev) / prevRev) * 100 : null;
 
-  // ── Top Products ─────────────────────────────────────────────────────────
+  // ── Top Products & Dead Stock ─────────────────────────────────────────────────────────
   const productSales: Record<string, { name: string; qty: number; revenue: number }> = {};
-  for (const sale of sales) {
+  for (const sale of filteredSalesData) {
     for (const item of sale.items) {
       if (item.itemId === 'payment-received') continue;
       if (!productSales[item.name]) {
@@ -116,9 +116,23 @@ export default function Analytics() {
       productSales[item.name].revenue += item.price * item.quantity;
     }
   }
-  const topProducts = Object.values(productSales)
+  
+  const allProducts = Object.values(productSales);
+  inventory.forEach(invItem => {
+    if (!productSales[invItem.name]) {
+      allProducts.push({ name: invItem.name, qty: 0, revenue: 0 });
+    }
+  });
+
+  const topProducts = [...allProducts]
     .sort((a, b) => b.revenue - a.revenue)
+    .filter(p => p.qty > 0)
     .slice(0, 5);
+    
+  const lowestProducts = [...allProducts]
+    .sort((a, b) => a.qty - b.qty || a.revenue - b.revenue)
+    .slice(0, 5);
+    
   const maxRevenue = Math.max(...topProducts.map((p) => p.revenue), 1);
 
   // ── Payment mode breakdown ────────────────────────────────────────────────
@@ -273,35 +287,68 @@ export default function Analytics() {
           )}
         </div>
 
-        {/* Top Products */}
-        <div className="lg:col-span-2 glass-card rounded-3xl p-6">
-          <h3 className="font-bold text-base mb-6">Top Products</h3>
-          {topProducts.length === 0 ? (
-            <div className="h-48 flex items-center justify-center text-muted-foreground opacity-30 text-sm font-bold">
-              No sales recorded yet
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {topProducts.map((product, idx) => (
-                <div key={idx} className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-black text-muted-foreground w-4 shrink-0">#{idx + 1}</span>
-                      <span className="text-sm font-semibold truncate">{product.name}</span>
+        {/* Performance Extremes */}
+        <div className="lg:col-span-2 glass-card rounded-3xl p-6 flex flex-col gap-8">
+          <div>
+            <h3 className="font-bold text-base mb-4 flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-green-500" />
+              Highest Sellers ({period})
+            </h3>
+            {topProducts.length === 0 ? (
+              <div className="h-20 flex items-center justify-center text-muted-foreground opacity-30 text-sm font-bold">
+                No sales in this period
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {topProducts.map((product, idx) => (
+                  <div key={idx} className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xs font-black text-muted-foreground w-4 shrink-0">#{idx + 1}</span>
+                        <span className="text-sm font-semibold truncate">{product.name}</span>
+                      </div>
+                      <span className="text-xs font-bold text-primary shrink-0 ml-2">{formatCurrency(product.revenue)}</span>
                     </div>
-                    <span className="text-xs font-bold text-primary shrink-0 ml-2">{formatCurrency(product.revenue)}</span>
+                    <div className="h-1.5 w-full bg-accent rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)] rounded-full transition-all duration-700"
+                        style={{ width: `${(product.revenue / maxRevenue) * 100}%` }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">{product.qty} units sold</p>
                   </div>
-                  <div className="h-1.5 w-full bg-accent rounded-full overflow-hidden">
-                    <div
-                      className="h-full premium-gradient rounded-full transition-all duration-700"
-                      style={{ width: `${(product.revenue / maxRevenue) * 100}%` }}
-                    />
+                ))}
+              </div>
+            )}
+          </div>
+          
+          <div className="pt-8 border-t border-border/50">
+            <h3 className="font-bold text-base mb-4 flex items-center gap-2">
+              <TrendingDown className="h-5 w-5 text-red-500" />
+              Lowest Sellers / Deadweight
+            </h3>
+            {lowestProducts.length === 0 ? (
+              <div className="h-20 flex items-center justify-center text-muted-foreground opacity-30 text-sm font-bold">
+                No inventory data
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {lowestProducts.map((product, idx) => (
+                  <div key={idx} className="space-y-1.5">
+                    <div className="flex items-center justify-between opacity-80">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xs font-black text-red-500/50 w-4 shrink-0">#{idx + 1}</span>
+                        <span className="text-sm font-semibold truncate">{product.name}</span>
+                      </div>
+                      <span className="text-[10px] font-black text-red-500 shrink-0 ml-2 px-2 py-0.5 bg-red-500/10 rounded-md">
+                        {product.qty === 0 ? 'ZERO SALES' : `${product.qty} SOLD`}
+                      </span>
+                    </div>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">{product.qty} units sold</p>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
