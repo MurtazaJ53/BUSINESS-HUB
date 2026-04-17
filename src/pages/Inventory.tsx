@@ -500,10 +500,10 @@ export default function Inventory() {
                       <span className="text-[8px] font-black text-muted-foreground uppercase opacity-60">Sell</span>
                       <p className="font-black text-[10px] text-foreground">{formatCurrency(item.price)}</p>
                     </div>
-                    {item.costPrice > 0 && (
+                    {item.costPrice !== undefined && item.costPrice > 0 && (
                       <div className="flex justify-between items-center">
                         <span className="text-[8px] font-black text-amber-500 uppercase opacity-60">Cost</span>
-                        <p className="font-black text-[10px] text-amber-500">{formatCurrency(item.costPrice)}</p>
+                        <p className="font-black text-[10px] text-amber-500">{formatCurrency(item.costPrice || 0)}</p>
                       </div>
                     )}
                     <div className="flex justify-between items-center border-t border-border/5 pt-0.5 mt-0.5">
