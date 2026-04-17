@@ -99,11 +99,9 @@ export default function Inventory() {
     deleteInventoryItem, 
     clearInventory,
     inventorySearchTerm,
-    deleteInventoryItem, 
-    clearInventory,
-    inventorySearchTerm,
     setInventorySearchTerm,
-    restockItem
+    restockItem,
+    role
   } = useBusinessStore();
 
   const [isProcessing, setIsProcessing] = useState(false);
