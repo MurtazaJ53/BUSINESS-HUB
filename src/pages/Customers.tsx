@@ -271,9 +271,9 @@ export default function Customers() {
                 </button>
                 <button 
                   type="submit" 
-                  disabled={!formData.name || !isValidIndianPhone(formData.phone)}
+                  disabled={!formData.name || formData.phone.length !== 10 || !isValidIndianPhone(formData.phone)}
                   className={`py-3 px-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all ${
-                    formData.name && isValidIndianPhone(formData.phone)
+                    formData.name && formData.phone.length === 10 && isValidIndianPhone(formData.phone)
                       ? 'premium-gradient text-white shadow-lg hover:-translate-y-0.5' 
                       : 'bg-accent text-muted-foreground cursor-not-allowed'
                   }`}

@@ -450,10 +450,10 @@ export default function Settings() {
               <button onClick={() => setEditOpen(false)} className="flex-1 py-4 rounded-2xl font-bold text-sm bg-accent hover:bg-accent/80 transition-all uppercase tracking-widest text-muted-foreground">Cancel</button>
               <button 
                 onClick={handleSaveShop} 
-                disabled={!isValidIndianPhone(editForm.phone)}
+                disabled={editForm.phone.length !== 10 || !isValidIndianPhone(editForm.phone)}
                 className={cn(
                   "flex-1 py-4 rounded-2xl font-black text-sm transition-all uppercase tracking-widest",
-                  isValidIndianPhone(editForm.phone)
+                  editForm.phone.length === 10 && isValidIndianPhone(editForm.phone)
                     ? "premium-gradient text-white shadow-xl hover:-translate-y-0.5"
                     : "bg-accent text-muted-foreground cursor-not-allowed opacity-50"
                 )}

@@ -177,11 +177,15 @@ export default function POS() {
   // HARD FORCE: Allow 0.5 rupee tolerance to prevent decimal lock
   const isPaid = totalPayments >= (calcTotal() - 0.5);
   
-  // CONTACT VALIDATION: Ensure 10-digit Indian standard
-  const isPhoneValid = !customerPhone.trim() || isValidIndianPhone(customerPhone);
-  // CREDIT SECURITY: Mandatory Name + VALID Phone for Udhaar
+  // CONTACT VALIDATION: Ensure EXACTLY 10-digit Indian standard
+  const phoneLengthValid = customerPhone.trim().length === 0 || customerPhone.trim().length === 10;
+  const isPhoneValid = phoneLengthValid && (!customerPhone.trim() || isValidIndianPhone(customerPhone));
+  
+  // CREDIT SECURITY: Mandatory Name + VALID 10-digit Phone for Udhaar
   const hasCredit = payments.some(p => p.mode === 'CREDIT');
-  const creditDetailsValid = customerName.trim() && isValidIndianPhone(customerPhone);
+  const creditDetailsValid = customerName.trim() && customerPhone.trim().length === 10 && isValidIndianPhone(customerPhone);
+  
+  // FINAL LOCK: Terminal only unlocks if payment is full and contact is valid
   const canCharge = isPaid && (!hasCredit || creditDetailsValid) && isPhoneValid;
 
   // Auto-update first payment if only one exists
