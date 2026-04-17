@@ -154,6 +154,11 @@ export default function AppLayout({ pages }: AppLayoutProps) {
     if (newRole === 'staff') {
       setRole('staff');
       setProfileOpen(false);
+      // SECURITY REDIRECT: If staff mode is enabled, force them away from sensitive tabs
+      const protectedTabs = ['settings', 'inventory', 'analytics', 'expenses', 'stock-alerts'];
+      if (protectedTabs.includes(activeTab)) {
+        setActiveTab('dashboard');
+      }
     } else {
       setShowUnlockModal(true);
       setProfileOpen(false);
@@ -422,20 +427,24 @@ export default function AppLayout({ pages }: AppLayoutProps) {
                       </button>
                     )}
                     
-                    <button 
-                      onClick={() => { navigate('settings'); setProfileOpen(false); }}
-                      className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all group"
-                    >
-                      <Settings className="h-4 w-4" />
-                      <span className="text-xs font-bold">Shop Profile</span>
-                    </button>
-                    <button 
-                      onClick={() => { navigate('analytics'); setProfileOpen(false); }}
-                      className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all group"
-                    >
-                      <Activity className="h-4 w-4" />
-                      <span className="text-xs font-bold">Live Performance</span>
-                    </button>
+                    {role === 'admin' && (
+                      <>
+                        <button 
+                          onClick={() => { navigate('settings'); setProfileOpen(false); }}
+                          className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all group"
+                        >
+                          <Settings className="h-4 w-4" />
+                          <span className="text-xs font-bold">Shop Profile</span>
+                        </button>
+                        <button 
+                          onClick={() => { navigate('analytics'); setProfileOpen(false); }}
+                          className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all group"
+                        >
+                          <Activity className="h-4 w-4" />
+                          <span className="text-xs font-bold">Live Performance</span>
+                        </button>
+                      </>
+                    )}
                   </div>
 
                   <div className="mt-4 pt-4 border-t border-border/50">
