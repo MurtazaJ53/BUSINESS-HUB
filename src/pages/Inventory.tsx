@@ -778,10 +778,11 @@ export default function Inventory() {
                       </p>
                     </div>
                     <div className="text-right space-y-0.5">
-                      <span className="text-[10px] uppercase font-black text-muted-foreground">Margin</span>
-                      <p className="text-lg font-black">
-                        {(( (parseFloat(restockForm.newSellPrice) - parseFloat(restockForm.cost)) / parseFloat(restockForm.newSellPrice) ) * 100).toFixed(1)}%
-                      </p>
+                      <p className="text-[8px] font-black text-muted-foreground uppercase opacity-60">Insight</p>
+                      <div className="flex flex-col items-end">
+                        <span className="text-[10px] font-black text-emerald-500 uppercase">Margin: {(( (parseFloat(restockForm.newSellPrice) - parseFloat(restockForm.cost)) / parseFloat(restockForm.newSellPrice) ) * 100).toFixed(1)}%</span>
+                        <span className="text-[10px] font-black text-primary uppercase">Markup: {(( (parseFloat(restockForm.newSellPrice) - parseFloat(restockForm.cost)) / parseFloat(restockForm.cost) ) * 100).toFixed(1)}%</span>
+                      </div>
                     </div>
                   </div>
                 </div>
