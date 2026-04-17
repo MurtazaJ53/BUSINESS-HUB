@@ -255,7 +255,7 @@ export default function Analytics() {
                   />
                   <Tooltip
                     contentStyle={{ backgroundColor: 'rgba(0,0,0,0.85)', border: 'none', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', color: '#fff' }}
-                    formatter={(v: number) => [formatCurrency(v), 'Revenue']}
+                    formatter={(v: any) => [formatCurrency(Number(v)), 'Revenue']}
                     cursor={{ fill: 'rgba(14,165,233,0.06)' }}
                   />
                   <Bar dataKey="sales" fill="url(#anaGrad)" radius={[5, 5, 0, 0]} />
@@ -313,7 +313,7 @@ export default function Analytics() {
                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700 }} allowDecimals={false} />
                   <Tooltip
                     contentStyle={{ backgroundColor: 'rgba(0,0,0,0.85)', border: 'none', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', color: '#fff' }}
-                    formatter={(v: number) => [v, 'Orders']}
+                    formatter={(v: any) => [Number(v), 'Orders']}
                     cursor={{ stroke: 'rgba(14,165,233,0.2)' }}
                   />
                   <Line type="monotone" dataKey="orders" stroke="hsl(199,89%,48%)" strokeWidth={2.5} dot={false} />

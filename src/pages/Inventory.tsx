@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
-  Plus, Package, Trash2, Pencil, Search, Tag, Database,
-  X, FileText, ClipboardPaste, Copy, AlertCircle, AlertTriangle
+  Plus, Minus, Package, Trash2, Pencil, Search, Tag, Database,
+  X, FileText, ClipboardPaste, Copy, AlertCircle, AlertTriangle, Sparkles
 } from 'lucide-react';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency } from '@/lib/utils';
@@ -93,6 +93,7 @@ export default function Inventory() {
     inventory, 
     addInventoryItem, 
     updateInventoryItem, 
+    updateStock,
     deleteInventoryItem, 
     clearInventory,
     inventorySearchTerm,
@@ -196,12 +197,12 @@ export default function Inventory() {
             name: form.name,
             price: parseFloat(row.price) || 0,
             costPrice: row.costPrice ? parseFloat(row.costPrice) : undefined,
-            sku: form.sku ? `${form.sku}-${row.sub || ''}-${row.size || ''}`.replace(/--/g, '-') : undefined,
+            sku: form.sku ? `${form.sku}-${row.sub || ''}-${row.size || ''}`.replace(/--/g, '-') : '',
             category: form.category || 'General',
-            subcategory: row.sub || undefined,
-            size: row.size || undefined,
-            description: form.description || undefined,
-            stock: row.stock ? parseInt(row.stock) : undefined,
+            subcategory: row.sub || '',
+            size: row.size || '',
+            description: form.description || '',
+            stock: row.stock ? parseInt(row.stock) : 0,
             createdAt: new Date().toISOString(),
           };
           await addInventoryItem(itemData);
@@ -214,12 +215,12 @@ export default function Inventory() {
           name: form.name,
           price: parseFloat(form.price) || 0,
           costPrice: form.costPrice ? parseFloat(form.costPrice) : undefined,
-          sku: form.sku || undefined,
+          sku: form.sku || '',
           category: form.category || 'General',
-          subcategory: form.subcategory || undefined,
-          size: form.size || undefined,
-          description: form.description || undefined,
-          stock: form.stock ? parseInt(form.stock) : undefined,
+          subcategory: form.subcategory || '',
+          size: form.size || '',
+          description: form.description || '',
+          stock: form.stock ? parseInt(form.stock) : 0,
           createdAt: new Date().toISOString(),
         };
         await addInventoryItem(itemData);
@@ -228,8 +229,9 @@ export default function Inventory() {
       setAddOpen(false);
       setForm(emptyForm);
       setVariantMatrix([]);
-    } catch {
-      showToast('Failed to add items');
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || 'Failed to add items');
     }
   };
 
@@ -398,7 +400,7 @@ export default function Inventory() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((item) => {
             const isLow = item.stock !== undefined && item.stock <= 5;
-            const margin = item.costPrice ? item.price - item.costPrice : null;
+            const margin = item.price - (item.costPrice || 0);
             return (
               <div
                 key={item.id}
@@ -531,23 +533,23 @@ export default function Inventory() {
                 onChange={(e) => setForm({ ...form, subcategory: e.target.value })} />
             </div>
           </div>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-1.5">
-              <Label>Sell Price (₹) *</Label>
+              <Label className="block min-h-[1.25rem]">Sell Price (₹) *</Label>
               <Input type="number" placeholder="0.00" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label>Cost Price (₹)</Label>
+              <Label className="block min-h-[1.25rem]">Cost Price (₹)</Label>
               <Input type="number" placeholder="0.00" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label>Stock</Label>
+              <Label className="block min-h-[1.25rem]">Stock</Label>
               <Input type="number" placeholder="∞" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label>Size / Variant</Label>
+              <Label className="block min-h-[1.25rem]">Size / Variant</Label>
               <Input placeholder="S,M,L…" value={form.size} onChange={(e) => setForm({ ...form, size: e.target.value })} />
-              <p className="text-[9px] text-muted-foreground italic">Comma-separated for multiple</p>
+              <p className="text-[9px] text-muted-foreground italic leading-none mt-1">Comma-separated</p>
             </div>
           </div>
           <div className="space-y-1.5">
@@ -733,6 +735,16 @@ export default function Inventory() {
         confirmText="Yes, Wipe All"
         variant="danger"
       />
+
+      {/* ── Toast Notification ── */}
+      {toast && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-4">
+          <div className="bg-white text-black px-6 py-3 rounded-2xl shadow-2xl font-black text-xs uppercase tracking-widest flex items-center gap-3 border border-white/20">
+            <Sparkles className="h-4 w-4 text-primary" />
+            {toast}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

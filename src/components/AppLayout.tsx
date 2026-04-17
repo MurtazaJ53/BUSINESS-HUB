@@ -17,15 +17,18 @@ import {
   AlertTriangle,
   ChevronRight,
   ShieldCheck,
-  Activity,
+  ExternalLink,
+  ShieldAlert,
+  Lock,
+  Loader2,
+  Delete,
   LogOut,
-  Database,
-  ExternalLink
+  Activity,
+  ChevronLeft
 } from 'lucide-react';
 import { useRef } from 'react';
-import { cn } from '@/lib/utils';
 import { useBusinessStore } from '@/lib/useBusinessStore';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 
 interface NavItemProps {
   icon: React.ElementType;
@@ -56,7 +59,7 @@ interface AppLayoutProps {
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
   { id: 'inventory', label: 'Inventory', icon: Package },
-  { id: 'pos', label: 'POS System', icon: ShoppingCart },
+  { id: 'sell', label: 'Sales Hub', icon: ShoppingCart },
   { id: 'customers', label: 'Customers', icon: Users },
   { id: 'history', label: 'History', icon: Clock },
   { id: 'expenses', label: 'Expenses', icon: TrendingUp },
@@ -67,7 +70,7 @@ const NAV_ITEMS = [
 const PAGE_TITLES: Record<string, string> = {
   dashboard: 'Command Center',
   inventory: 'Inventory',
-  pos: 'POS System',
+  sell: 'Sales Hub',
   customers: 'Customer Ledger',
   expenses: 'Expense Ledger',
   'stock-alerts': 'Stock Alerts',
@@ -77,9 +80,13 @@ const PAGE_TITLES: Record<string, string> = {
 };
 export default function AppLayout({ pages }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { sales, inventory, activeTab, setActiveTab, shop, theme, setTheme } = useBusinessStore();
+  const { sales, inventory, activeTab, setActiveTab, shop, theme, setTheme, role } = useBusinessStore();
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [pinEntry, setPinEntry] = useState('');
+  const [pinError, setPinError] = useState(false);
+  const [pinLoading, setPinLoading] = useState(false);
   
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -118,6 +125,46 @@ export default function AppLayout({ pages }: AppLayoutProps) {
     setSidebarOpen(false); // close mobile sidebar on nav
   };
 
+  const handleLogout = () => {
+    const { logout } = useBusinessStore.getState();
+    logout();
+  };
+
+  const handleRoleSwitch = (newRole: 'admin' | 'staff') => {
+    const { setRole } = useBusinessStore.getState();
+    if (newRole === 'staff') {
+      setRole('staff');
+      setProfileOpen(false);
+    } else {
+      setShowUnlockModal(true);
+      setProfileOpen(false);
+    }
+  };
+
+  const handlePinPress = (num: string) => {
+    if (pinEntry.length < 4) {
+      const next = pinEntry + num;
+      setPinEntry(next);
+      setPinError(false);
+      if (next.length === 4) verifyAdminPin(next);
+    }
+  };
+
+  const verifyAdminPin = (code: string) => {
+    setPinLoading(true);
+    setTimeout(() => {
+      if (code === shop.adminPin) {
+        useBusinessStore.getState().setRole('admin');
+        setShowUnlockModal(false);
+        setPinEntry('');
+      } else {
+        setPinError(true);
+        setPinEntry('');
+      }
+      setPinLoading(false);
+    }, 600);
+  };
+
   return (
     <div className="flex min-h-screen bg-background selection:bg-primary/30">
       {/* Mobile overlay */}
@@ -140,38 +187,49 @@ export default function AppLayout({ pages }: AppLayoutProps) {
               <Store className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-lg font-black tracking-tight">Business Hub</h1>
-              <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">Pro Edition</p>
+              <h1 className="text-lg font-black tracking-tight text-foreground">Business Hub</h1>
+              <p className="text-[10px] text-foreground/50 font-black uppercase tracking-[0.2em]">Pro Edition</p>
             </div>
           </div>
 
           {/* Main nav */}
           <nav className="flex-1 space-y-1">
-            {NAV_ITEMS.map(item => (
-              <NavItem
-                key={item.id}
-                icon={item.icon}
-                label={item.label}
-                active={activeTab === item.id}
-                onClick={() => navigate(item.id)}
-              />
-            ))}
+            {NAV_ITEMS
+              .filter(item => {
+                const { role } = useBusinessStore.getState();
+                if (role === 'staff') {
+                  const allowed = ['sell', 'history', 'customers', 'dashboard'];
+                  return allowed.includes(item.id);
+                }
+                return true;
+              })
+              .map(item => (
+                <NavItem
+                  key={item.id}
+                  icon={item.icon}
+                  label={item.label}
+                  active={activeTab === item.id}
+                  onClick={() => navigate(item.id)}
+                />
+              ))}
           </nav>
 
           {/* Bottom nav */}
           <div className="pt-4 border-t border-border space-y-1">
-            <NavItem
-              icon={Settings}
-              label="Settings"
-              active={activeTab === 'settings'}
-              onClick={() => navigate('settings')}
-            />
+            {useBusinessStore.getState().role === 'admin' && (
+              <NavItem
+                icon={Settings}
+                label="Settings"
+                active={activeTab === 'settings'}
+                onClick={() => navigate('settings')}
+              />
+            )}
             {/* User badge */}
             <div className="flex items-center gap-3 px-4 py-3 mt-1">
               <div className="h-8 w-8 rounded-full premium-gradient shrink-0" />
               <div className="min-w-0">
-                <p className="text-sm font-semibold truncate">Shop Owner</p>
-                <p className="text-[10px] text-muted-foreground truncate">admin@mybusiness.com</p>
+                <p className="text-sm font-black truncate capitalize text-foreground">{role || 'User'}</p>
+                <p className="text-[10px] text-foreground/40 truncate font-bold uppercase tracking-tighter">Local Standalone Session</p>
               </div>
             </div>
           </div>
@@ -182,19 +240,31 @@ export default function AppLayout({ pages }: AppLayoutProps) {
       <main className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden">
         {/* Topbar */}
         <header className="h-16 shrink-0 flex items-center justify-between px-6 border-b border-border bg-background/80 backdrop-blur-md z-30 no-print">
-          {/* Hamburger (mobile) */}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="md:hidden p-2 hover:bg-accent rounded-lg transition-colors"
-            aria-label="Toggle sidebar"
-          >
-            {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Sidebar Toggle - ALWAYS VISIBLE */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-2.5 hover:bg-accent rounded-xl transition-all border border-border/50 group"
+              title="Open Navigation Menu"
+            >
+              <Menu className="h-5 w-5 text-foreground group-hover:scale-110 transition-transform" />
+            </button>
 
-          {/* Page title (desktop) */}
-          <span className="hidden md:block text-sm font-bold text-muted-foreground uppercase tracking-widest">
-            {PAGE_TITLES[activeTab] ?? 'Business Hub'}
-          </span>
+            {/* Back Button - Only if not on Dashboard */}
+            {activeTab !== 'dashboard' && (
+              <button
+                onClick={() => setActiveTab('dashboard')}
+                className="p-2 hover:bg-accent rounded-sm transition-all group ml-1"
+                title="Go to Dashboard"
+              >
+                <ChevronLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform opacity-60" />
+              </button>
+            )}
+
+            <span className="hidden sm:block text-sm font-black text-muted-foreground uppercase tracking-[0.3em] ml-2">
+              {PAGE_TITLES[activeTab] ?? 'Business Hub'}
+            </span>
+          </div>
 
           {/* Topbar right */}
           <div className="flex items-center gap-3 ml-auto">
@@ -211,11 +281,21 @@ export default function AppLayout({ pages }: AppLayoutProps) {
               )}
             </button>
             {/* Today's revenue badge */}
-            <div className="flex items-center gap-2 bg-accent/50 px-3 py-1.5 rounded-full border border-border" title="Today's Revenue">
+            <div className="flex items-center gap-2 bg-primary/5 px-4 py-2 rounded-2xl border border-primary/20" title="Today's Revenue">
               <TrendingUp className="h-4 w-4 text-primary" />
-              <span className="text-sm font-black">{formatCurrency(todayRevenue)}</span>
-              <span className="text-[9px] text-muted-foreground uppercase font-bold">today</span>
+              <span className="text-sm font-black text-foreground">{formatCurrency(todayRevenue)}</span>
+              <span className="text-[9px] text-primary font-black uppercase tracking-widest">today</span>
             </div>
+
+            {/* QUICK LOGOUT */}
+            <button
+              onClick={handleLogout}
+              className="hidden sm:flex items-center gap-2 px-4 py-2 bg-red-500/5 hover:bg-red-500/10 text-red-600 rounded-xl border border-red-500/20 transition-all group lg:ml-2"
+              title="End Session"
+            >
+              <LogOut className="h-4 w-4 group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-black uppercase tracking-widest">Logout</span>
+            </button>
             {/* Notification bell */}
             <div className="relative" ref={notifRef}>
               <button 
@@ -289,7 +369,7 @@ export default function AppLayout({ pages }: AppLayoutProps) {
                 )}
               >
                 <div className="h-full w-full rounded-full bg-white/10 backdrop-blur-sm overflow-hidden flex items-center justify-center text-white">
-                  <span className="text-xs font-black">{shop.name.charAt(0)}</span>
+                  <span className="text-xs font-black">{shop?.name?.charAt(0) || 'B'}</span>
                 </div>
               </button>
 
@@ -307,6 +387,24 @@ export default function AppLayout({ pages }: AppLayoutProps) {
                   </div>
 
                   <div className="space-y-1">
+                    {role === 'admin' ? (
+                      <button 
+                        onClick={() => handleRoleSwitch('staff')}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-amber-500/10 text-muted-foreground hover:text-amber-500 transition-all group"
+                      >
+                        <Lock className="h-4 w-4" />
+                        <span className="text-xs font-bold">Lock to Staff Mode</span>
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => handleRoleSwitch('admin')}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all group"
+                      >
+                        <ShieldCheck className="h-4 w-4" />
+                        <span className="text-xs font-bold">Unlock Admin Mode</span>
+                      </button>
+                    )}
+                    
                     <button 
                       onClick={() => { navigate('settings'); setProfileOpen(false); }}
                       className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all group"
@@ -321,22 +419,15 @@ export default function AppLayout({ pages }: AppLayoutProps) {
                       <Activity className="h-4 w-4" />
                       <span className="text-xs font-bold">Live Performance</span>
                     </button>
-                    <button 
-                      onClick={() => { navigate('settings'); setProfileOpen(false); }}
-                      className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all group"
-                    >
-                      <Database className="h-4 w-4" />
-                      <span className="text-xs font-bold">Quick Backup</span>
-                    </button>
                   </div>
 
                   <div className="mt-4 pt-4 border-t border-border/50">
                     <button 
-                      onClick={() => window.location.reload()}
+                      onClick={handleLogout}
                       className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all font-bold text-xs"
                     >
                       <LogOut className="h-4 w-4" />
-                      Reload Session
+                      Exit Application
                     </button>
                   </div>
                 </div>
@@ -344,6 +435,78 @@ export default function AppLayout({ pages }: AppLayoutProps) {
             </div>
           </div>
         </header>
+
+        {/* ADMIN UNLOCK MODAL */}
+        {showUnlockModal && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in" onClick={() => setShowUnlockModal(false)} />
+            <div className="relative z-10 w-full max-w-sm glass-card rounded-[3rem] p-10 shadow-2xl animate-in zoom-in slide-in-from-bottom-5 duration-300">
+              {pinLoading && (
+                <div className="absolute inset-0 bg-background/60 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-3 rounded-[3rem]">
+                  <Loader2 className="h-10 w-10 text-primary animate-spin" />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-primary">Verifying...</p>
+                </div>
+              )}
+
+              <div className="text-center mb-8">
+                <div className="h-14 w-14 premium-gradient rounded-2xl flex items-center justify-center text-white shadow-xl mx-auto mb-4">
+                  <ShieldCheck className="h-7 w-7" />
+                </div>
+                <h2 className="text-2xl font-black mb-1">Admin Unlock</h2>
+                <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest opacity-60">Enter Master PIN</p>
+              </div>
+
+              {/* PIN Display */}
+              <div className="flex justify-center gap-4 mb-10">
+                {[...Array(4)].map((_, i) => (
+                  <div 
+                    key={i}
+                    className={`h-3 w-3 rounded-full border-2 transition-all duration-300 ${
+                      pinEntry.length > i 
+                        ? 'bg-primary border-primary scale-125 shadow-[0_0_10px_rgba(14,165,233,0.5)]' 
+                        : pinError 
+                          ? 'border-red-500/50 animate-shake' 
+                          : 'border-muted-foreground/30'
+                    }`}
+                  />
+                ))}
+              </div>
+
+              {/* Pad */}
+              <div className="grid grid-cols-3 gap-3">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                  <button
+                    key={num}
+                    onClick={() => handlePinPress(String(num))}
+                    className="h-14 rounded-2xl bg-accent/30 hover:bg-primary/10 text-lg font-black transition-all active:scale-90 border border-border/50"
+                  >
+                    {num}
+                  </button>
+                ))}
+                <div />
+                <button
+                  onClick={() => handlePinPress('0')}
+                  className="h-14 rounded-2xl bg-accent/30 hover:bg-primary/10 text-lg font-black transition-all active:scale-90 border border-border/50"
+                >
+                  0
+                </button>
+                <button
+                  onClick={() => setPinEntry(pinEntry.slice(0, -1))}
+                  className="h-14 rounded-2xl bg-accent/10 flex items-center justify-center text-muted-foreground hover:bg-red-500/10 hover:text-red-500 transition-all border border-transparent"
+                >
+                  <Delete className="h-4 w-4" />
+                </button>
+              </div>
+
+              <button 
+                onClick={() => setShowUnlockModal(false)}
+                className="w-full mt-8 py-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Cancel 
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Page content */}
         <div className="flex-1 overflow-y-auto no-print">

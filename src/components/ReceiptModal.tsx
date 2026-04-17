@@ -2,6 +2,7 @@ import React from 'react';
 import { X, Printer, Check, ShoppingBag, Calendar, Clock, Hash } from 'lucide-react';
 import type { Sale } from '@/lib/types';
 import { loadShopSettings } from '@/lib/shopSettings';
+import { printReceipt } from '@/lib/printerService';
 
 interface Props {
   sale: Sale;
@@ -16,71 +17,10 @@ export default function ReceiptModal({ sale, onClose, onConfirm }: Props) {
   const subtotal = sale.items.reduce((s, i) => s + i.price * i.quantity, 0);
 
   const handlePrint = () => {
-    // If we haven't confirmed yet and onConfirm exists, treat print as confirmation
     if (onConfirm) {
       onConfirm();
     }
-    
-    const content = document.getElementById('printable-receipt');
-    if (!content) return;
-
-    // Create a hidden iframe for silent, isolated printing
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentWindow?.document;
-    if (!doc) return;
-
-    // 1. Migrate Styles: Copy all document stylesheets into the iframe
-    Array.from(document.styleSheets).forEach((styleSheet) => {
-      try {
-        const newStyle = doc.createElement('style');
-        const rules = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-        newStyle.textContent = rules;
-        doc.head.appendChild(newStyle);
-      } catch (e) {
-        // Fallback for cross-origin or complex stylesheets
-        const link = doc.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = styleSheet.href || '';
-        if (link.href) doc.head.appendChild(link);
-      }
-    });
-
-    // 2. Add standalone Thermal CSS for the iframe context
-    const extraStyles = doc.createElement('style');
-    extraStyles.textContent = `
-      @page { margin: 0; size: 80mm auto; }
-      body { 
-        margin: 0 auto; 
-        padding: 10px 5px; 
-        width: 80mm; 
-        background: #fff !important; 
-        color: #000 !important;
-        visibility: visible !important;
-      }
-      * { visibility: visible !important; -webkit-print-color-adjust: exact !important; }
-    `;
-    doc.head.appendChild(extraStyles);
-
-    // 3. Inject Content
-    doc.body.innerHTML = content.outerHTML;
-
-    // 4. Print after a tiny timeout to ensure the browser has painted the styles
-    setTimeout(() => {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
-      // Cleanup after a delay to ensure the print dialog is actually finished
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-      }, 1000);
-    }, 300);
+    printReceipt(sale, shop);
   };
 
   return (
@@ -184,11 +124,23 @@ export default function ReceiptModal({ sale, onClose, onConfirm }: Props) {
                 </div>
               </div>
 
-              {/* Payment Mode */}
-              <div className="text-center mb-6">
-                <div className="inline-block border-2 border-zinc-800 px-4 py-1 rounded-sm">
-                  <span className="text-[10px] font-black tracking-widest uppercase">PAID VIA {sale.paymentMode}</span>
-                </div>
+              {/* Payment Details Section */}
+              <div className="border-t border-zinc-200 pt-3 mb-6 space-y-1">
+                <p className="text-[9px] font-black tracking-widest uppercase text-center mb-2 opacity-60">Payment Breakdown</p>
+                {sale.payments && sale.payments.length > 0 ? (
+                  sale.payments.map((p, i) => (
+                    <div key={i} className="flex justify-between text-[11px] font-bold px-2">
+                      <span className="uppercase text-zinc-500">{p.mode}</span>
+                      <span className="font-black">₹{p.amount.toFixed(2)}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center">
+                    <div className="inline-block border-2 border-zinc-800 px-4 py-1 rounded-sm">
+                      <span className="text-[10px] font-black tracking-widest uppercase">PAID VIA {sale.paymentMode}</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Footer text */}

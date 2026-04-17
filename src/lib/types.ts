@@ -41,6 +41,8 @@ export interface ShopMetadata {
   gst: string;
   footer: string;
   currency: string;
+  adminPin: string;
+  staffPin: string;
 }
 
 export interface SaleItem {
@@ -56,10 +58,12 @@ export interface Sale {
   items: SaleItem[];
   total: number;
   discount: number;
+  discountValue: string;
   discountType: 'fixed' | 'percent';
-  paymentMode: 'CASH' | 'UPI' | 'CARD' | 'CREDIT' | 'ONLINE' | 'OTHERS';
+  paymentMode: 'CASH' | 'UPI' | 'CARD' | 'CREDIT' | 'ONLINE' | 'OTHERS'; // Keeping for backwards compatibility
+  payments: { mode: string; amount: number }[]; // New Multi-payment support
   customerName?: string;
-  customerId?: string; // Link to the Customer database
+  customerId?: string;
   date: string;
   createdAt: string;
 }

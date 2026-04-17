@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Business Hub</string>
+    <string name="title_activity_main">Business Hub</string>
+    <string name="package_name">com.businesshub.pro</string>
+    <string name="custom_url_scheme">com.businesshub.pro</string>
+</resources>

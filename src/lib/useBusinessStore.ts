@@ -1,13 +1,17 @@
 import { create } from 'zustand';
-import type { InventoryItem, Sale, Customer, ShopMetadata } from './types';
-
-// ── Persistence helpers ────────────────────────────────────────────────────
-const LS_INVENTORY = 'biz_inventory';
-const LS_SALES = 'biz_sales';
-const LS_CUSTOMERS = 'biz_customers';
-const LS_EXPENSES = 'biz_expenses';
-const LS_SHOP = 'biz_shop_settings';
-const LS_THEME = 'biz_theme';
+import type { InventoryItem, Sale, Customer, ShopMetadata, Expense } from './types';
+import { db } from './firebase';
+import { 
+  doc, 
+  onSnapshot, 
+  setDoc, 
+  collection, 
+  updateDoc, 
+  deleteDoc, 
+  arrayUnion, 
+  query, 
+  where 
+} from 'firebase/firestore';
 
 const SHOP_DEFAULTS: ShopMetadata = {
   name: 'Business Hub Pro',
@@ -18,24 +22,10 @@ const SHOP_DEFAULTS: ShopMetadata = {
   gst: '',
   footer: 'Thank you for your business! 😊',
   currency: 'INR',
+  adminPin: '9999',
+  staffPin: '0000',
 };
 
-function loadFromLS<T>(key: string, defaultValue: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : defaultValue;
-  } catch {
-    return defaultValue;
-  }
-}
-
-function saveToLS<T>(key: string, data: T) {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch {}
-}
-
-// ── Store ──────────────────────────────────────────────────────────────────
 interface BusinessState {
   inventory: InventoryItem[];
   sales: Sale[];
@@ -45,13 +35,23 @@ interface BusinessState {
   theme: 'dark' | 'light';
   activeTab: string;
   inventorySearchTerm: string;
+  role: 'admin' | 'staff' | null;
+  shopId: string | null;
+  lastBackupDate: string | null;
+
+  // Initialization
+  initStore: (shopId: string, role: 'admin' | 'staff') => () => void;
+
+  // Auth
+  setRole: (role: 'admin' | 'staff' | null) => void;
+  logout: () => void;
 
   // Navigation
   setActiveTab: (tab: string) => void;
   setInventorySearchTerm: (term: string) => void;
 
   // Shop & Theme
-  updateShop: (data: Partial<ShopMetadata>) => void;
+  updateShop: (data: Partial<ShopMetadata>) => Promise<void>;
   setTheme: (theme: 'dark' | 'light') => void;
 
   // Inventory
@@ -74,206 +74,213 @@ interface BusinessState {
   // Expenses
   addExpense: (expense: Expense) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
-
-  // System
-  importData: (data: { 
-    inventory: InventoryItem[]; 
-    sales: Sale[]; 
-    customers: Customer[]; 
-    expenses?: Expense[];
-    shop?: ShopMetadata 
-  }) => Promise<void>;
 }
 
 export const useBusinessStore = create<BusinessState>((set, get) => ({
-  inventory: loadFromLS<InventoryItem[]>(LS_INVENTORY, []),
-  sales: loadFromLS<Sale[]>(LS_SALES, []),
-  customers: loadFromLS<Customer[]>(LS_CUSTOMERS, []),
-  expenses: loadFromLS<Expense[]>(LS_EXPENSES, []),
-  shop: loadFromLS<ShopMetadata>(LS_SHOP, SHOP_DEFAULTS),
-  theme: loadFromLS<'dark' | 'light'>(LS_THEME, 'dark'),
+  inventory: [],
+  sales: [],
+  customers: [],
+  expenses: [],
+  shop: SHOP_DEFAULTS,
+  theme: 'dark',
   activeTab: 'dashboard',
   inventorySearchTerm: '',
+  role: null,
+  shopId: null,
+  lastBackupDate: null,
+
+  initStore: (shopId, role) => {
+    set({ shopId, role });
+
+    // 1. Subscribe to Shop Metadata
+    const unsubShop = onSnapshot(doc(db, 'shops', shopId), (s) => {
+      if (s.exists()) {
+        const data = s.data();
+        set({ shop: { ...SHOP_DEFAULTS, ...data.settings, name: data.name } });
+      }
+    });
+
+    // 2. Subscribe to Inventory
+    const unsubInv = onSnapshot(collection(db, `shops/${shopId}/inventory`), (snap) => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem));
+      set({ inventory: items });
+    });
+
+    // 3. Subscribe to Sales (Recent 100)
+    const unsubSales = onSnapshot(collection(db, `shops/${shopId}/sales`), (snap) => {
+      const sales = snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as Sale))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      set({ sales });
+    });
+
+    // 4. Subscribe to Customers
+    const unsubCust = onSnapshot(collection(db, `shops/${shopId}/customers`), (snap) => {
+      const customers = snap.docs.map(d => ({ id: d.id, ...d.data() } as Customer));
+      set({ customers });
+    });
+
+    // 5. Subscribe to Expenses
+    const unsubExp = onSnapshot(collection(db, `shops/${shopId}/expenses`), (snap) => {
+      const expenses = snap.docs.map(d => ({ id: d.id, ...d.data() } as Expense));
+      set({ expenses });
+    });
+
+    return () => {
+      unsubShop();
+      unsubInv();
+      unsubSales();
+      unsubCust();
+      unsubExp();
+    };
+  },
+
+  setRole: (role) => set({ role }),
+  logout: () => set({ role: null, shopId: null }),
 
   setActiveTab: (tab) => set({ activeTab: tab }),
   setInventorySearchTerm: (term) => set({ inventorySearchTerm: term }),
 
-  updateShop: (data) => {
-    const next = { ...get().shop, ...data };
-    saveToLS(LS_SHOP, next);
-    set({ shop: next });
+  updateShop: async (data) => {
+    const { shopId } = get();
+    if (!shopId) return;
+    await updateDoc(doc(db, 'shops', shopId), {
+      settings: data,
+      name: data.name || get().shop.name
+    });
   },
 
   setTheme: (theme) => {
-    saveToLS(LS_THEME, theme);
     set({ theme });
-    // Apply to DOM
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    if (theme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
   },
 
   addInventoryItem: async (item) => {
-    const next = [...get().inventory, item];
-    saveToLS(LS_INVENTORY, next);
-    set({ inventory: next });
+    const { shopId } = get();
+    if (!shopId) throw new Error('Sync Error: Shop ID not found. Please refresh.');
+    await setDoc(doc(db, `shops/${shopId}/inventory`, item.id), item);
   },
 
   updateInventoryItem: async (item) => {
-    const next = get().inventory.map((i) => (i.id === item.id ? item : i));
-    saveToLS(LS_INVENTORY, next);
-    set({ inventory: next });
+    const { shopId } = get();
+    if (!shopId) return;
+    await setDoc(doc(db, `shops/${shopId}/inventory`, item.id), item);
   },
 
   updateStock: async (id, delta) => {
-    const next = get().inventory.map((i) => 
-      i.id === id ? { ...i, stock: Math.max(0, (i.stock || 0) + delta) } : i
-    );
-    saveToLS(LS_INVENTORY, next);
-    set({ inventory: next });
+    const { shopId, inventory } = get();
+    if (!shopId) return;
+    const item = inventory.find(i => i.id === id);
+    if (!item) return;
+    await updateDoc(doc(db, `shops/${shopId}/inventory`, id), {
+      stock: Math.max(0, (item.stock || 0) + delta)
+    });
   },
 
   deleteInventoryItem: async (id) => {
-    const next = get().inventory.filter((i) => i.id !== id);
-    saveToLS(LS_INVENTORY, next);
-    set({ inventory: next });
+    const { shopId } = get();
+    if (!shopId) return;
+    await deleteDoc(doc(db, `shops/${shopId}/inventory`, id));
   },
 
   clearInventory: async () => {
-    saveToLS(LS_INVENTORY, []);
-    set({ inventory: [] });
+    // Note: Batch deletion would be better, but for now simple clear
+    const { shopId, inventory } = get();
+    if (!shopId) return;
+    for (const item of inventory) {
+      await deleteDoc(doc(db, `shops/${shopId}/inventory`, item.id));
+    }
   },
 
   addSale: async (sale) => {
-    let nextCustomers = [...get().customers];
-    let finalSale = { ...sale };
+    const { shopId, customers } = get();
+    if (!shopId) return;
 
-    if (finalSale.paymentMode === 'CREDIT' && finalSale.customerName && !finalSale.customerId) {
-      const existing = nextCustomers.find(c => c.name.toLowerCase() === finalSale.customerName?.toLowerCase());
+    let finalSale = { ...sale };
+    let customerAction: Promise<any> | null = null;
+
+    const creditPayment = finalSale.payments.find(p => p.mode === 'CREDIT');
+    const creditAmount = creditPayment ? creditPayment.amount : 0;
+
+    if (creditAmount > 0 && finalSale.customerName && !finalSale.customerId) {
+      const existing = customers.find(c => c.name.toLowerCase() === finalSale.customerName?.toLowerCase());
       if (existing) {
         finalSale.customerId = existing.id;
-        nextCustomers = nextCustomers.map(c => {
-          if (c.id === existing.id) {
-            return {
-              ...c,
-              totalSpent: c.totalSpent + finalSale.total,
-              balance: c.balance + finalSale.total
-            };
-          }
-          return c;
+        customerAction = updateDoc(doc(db, `shops/${shopId}/customers`, existing.id), {
+          totalSpent: existing.totalSpent + finalSale.total,
+          balance: existing.balance + creditAmount
         });
       } else {
         const newCustomerId = `cust-${Date.now()}`;
-        const newCustomer: Customer = {
+        finalSale.customerId = newCustomerId;
+        customerAction = setDoc(doc(db, `shops/${shopId}/customers`, newCustomerId), {
           id: newCustomerId,
           name: finalSale.customerName,
-          phone: '-', 
+          phone: '-',
           totalSpent: finalSale.total,
-          balance: finalSale.total,
+          balance: creditAmount,
           createdAt: new Date().toISOString()
-        };
-        nextCustomers.push(newCustomer);
-        finalSale.customerId = newCustomerId;
+        });
       }
     } else if (finalSale.customerId) {
-      nextCustomers = nextCustomers.map(c => {
-        if (c.id === finalSale.customerId) {
-          return {
-            ...c,
-            totalSpent: c.totalSpent + finalSale.total,
-            balance: finalSale.paymentMode === 'CREDIT' ? c.balance + finalSale.total : c.balance
-          };
-        }
-        return c;
-      });
+      const customer = customers.find(c => c.id === finalSale.customerId);
+      if (customer) {
+        customerAction = updateDoc(doc(db, `shops/${shopId}/customers`, customer.id), {
+          totalSpent: customer.totalSpent + finalSale.total,
+          balance: customer.balance + creditAmount
+        });
+      }
     }
 
-    const nextSales = [...get().sales, finalSale];
-    saveToLS(LS_SALES, nextSales);
-    saveToLS(LS_CUSTOMERS, nextCustomers);
+    await setDoc(doc(db, `shops/${shopId}/sales`, finalSale.id), finalSale);
+    if (customerAction) await customerAction;
 
-    set({ sales: nextSales, customers: nextCustomers });
+    // Deduct stock
+    for (const item of finalSale.items) {
+      if (!item.itemId.startsWith('custom-') && item.itemId !== 'payment-received') {
+        await get().updateStock(item.itemId, -item.quantity);
+      }
+    }
   },
 
   updateSale: async (sale) => {
-    const next = get().sales.map((s) => (s.id === sale.id ? sale : s));
-    saveToLS(LS_SALES, next);
-    set({ sales: next });
+    const { shopId } = get();
+    if (!shopId) return;
+    await setDoc(doc(db, `shops/${shopId}/sales`, sale.id), sale);
   },
 
   deleteSale: async (id) => {
-    const state = get();
-    const sale = state.sales.find((s) => s.id === id);
+    const { shopId, sales, inventory } = get();
+    if (!shopId) return;
+    const sale = sales.find(s => s.id === id);
     if (!sale) return;
 
-    // 1. Inventory Restoration (Only for product sales)
-    const updatedInventory = [...state.inventory];
-    if (!id.startsWith('PAY-')) {
-      for (const item of sale.items) {
-        if (item.itemId.startsWith('custom-') || item.itemId === 'payment-received') continue;
-        const invIdx = updatedInventory.findIndex((i) => i.id === item.itemId);
-        if (invIdx > -1) {
-          updatedInventory[invIdx] = {
-            ...updatedInventory[invIdx],
-            stock: (updatedInventory[invIdx].stock ?? 0) + item.quantity,
-          };
-        }
+    // Restore stock
+    for (const item of sale.items) {
+      if (!item.itemId.startsWith('custom-') && item.itemId !== 'payment-received') {
+        await get().updateStock(item.itemId, item.quantity);
       }
     }
 
-    // 2. Customer Ledger Reversal
-    let nextCustomers = [...state.customers];
-    if (sale.customerId) {
-      nextCustomers = nextCustomers.map(c => {
-        if (c.id === sale.customerId) {
-          if (id.startsWith('PAY-')) {
-            // Reversing a payment means the debt comes back
-            return {
-              ...c,
-              balance: c.balance + sale.total
-            };
-          } else {
-            // Reversing a sale means spending goes down, and debt goes down (if it was credit)
-            return {
-              ...c,
-              totalSpent: Math.max(0, c.totalSpent - sale.total),
-              balance: sale.paymentMode === 'CREDIT' ? Math.max(0, c.balance - sale.total) : c.balance
-            };
-          }
-        }
-        return c;
-      });
-    }
-
-    const nextSales = state.sales.filter((s) => s.id !== id);
-
-    saveToLS(LS_INVENTORY, updatedInventory);
-    saveToLS(LS_SALES, nextSales);
-    if (sale.customerId) saveToLS(LS_CUSTOMERS, nextCustomers);
-
-    set({ inventory: updatedInventory, sales: nextSales, customers: nextCustomers });
+    await deleteDoc(doc(db, `shops/${shopId}/sales`, id));
   },
 
   upsertCustomer: async (customer) => {
-    const exists = get().customers.find(c => c.id === customer.id);
-    const next = exists 
-      ? get().customers.map(c => c.id === customer.id ? customer : c)
-      : [...get().customers, customer];
-    saveToLS(LS_CUSTOMERS, next);
-    set({ customers: next });
+    const { shopId } = get();
+    if (!shopId) return;
+    await setDoc(doc(db, `shops/${shopId}/customers`, customer.id), customer);
   },
 
   deleteCustomer: async (id) => {
-    const next = get().customers.filter(c => c.id !== id);
-    saveToLS(LS_CUSTOMERS, next);
-    set({ customers: next });
+    const { shopId } = get();
+    if (!shopId) return;
+    await deleteDoc(doc(db, `shops/${shopId}/customers`, id));
   },
 
   addCustomerPayment: async (customerId, amount) => {
-    const state = get();
-    const customer = state.customers.find(c => c.id === customerId);
+    const { customers } = get();
+    const customer = customers.find(c => c.id === customerId);
     if (!customer) return;
 
     const today = new Date().toISOString().split('T')[0];
@@ -288,55 +295,27 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
       total: amount,
       discount: 0,
       discountType: 'fixed',
-      paymentMode: 'CASH', // Defaulting to CASH for ledger, User can edit later if needed
+      discountValue: '0',
+      paymentMode: 'CASH',
+      payments: [{ mode: 'CASH', amount: amount }],
       customerId: customer.id,
       customerName: customer.name,
       date: today,
       createdAt: new Date().toISOString()
     };
 
-    const nextCustomers = state.customers.map(c => 
-      c.id === customerId ? { ...c, balance: Math.max(0, c.balance - amount) } : c
-    );
-    const nextSales = [...state.sales, newPaymentSale];
-
-    saveToLS(LS_CUSTOMERS, nextCustomers);
-    saveToLS(LS_SALES, nextSales);
-    set({ customers: nextCustomers, sales: nextSales });
+    await get().addSale(newPaymentSale);
   },
 
   addExpense: async (expense) => {
-    const next = [...get().expenses, expense];
-    saveToLS(LS_EXPENSES, next);
-    set({ expenses: next });
+    const { shopId } = get();
+    if (!shopId) return;
+    await setDoc(doc(db, `shops/${shopId}/expenses`, expense.id), expense);
   },
 
   deleteExpense: async (id) => {
-    const next = get().expenses.filter((e) => e.id !== id);
-    saveToLS(LS_EXPENSES, next);
-    set({ expenses: next });
-  },
-
-  importData: async (data) => {
-    if (data.inventory) {
-      saveToLS(LS_INVENTORY, data.inventory);
-      set({ inventory: data.inventory });
-    }
-    if (data.sales) {
-      saveToLS(LS_SALES, data.sales);
-      set({ sales: data.sales });
-    }
-    if (data.customers) {
-      saveToLS(LS_CUSTOMERS, data.customers);
-      set({ customers: data.customers });
-    }
-    if (data.expenses) {
-      saveToLS(LS_EXPENSES, data.expenses);
-      set({ expenses: data.expenses });
-    }
-    if (data.shop) {
-      saveToLS(LS_SHOP, data.shop);
-      set({ shop: data.shop });
-    }
+    const { shopId } = get();
+    if (!shopId) return;
+    await deleteDoc(doc(db, `shops/${shopId}/expenses`, id));
   },
 }));

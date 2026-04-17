@@ -13,16 +13,19 @@ import {
   Check,
   CreditCard,
   IndianRupee,
-  ShieldCheck
+  ShieldCheck,
+  Printer
 } from 'lucide-react';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn } from '@/lib/utils';
+import { printReceipt } from '@/lib/printerService';
+import { loadShopSettings } from '@/lib/shopSettings';
 import type { Sale } from '@/lib/types';
 import ReceiptModal from '@/components/ReceiptModal';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
 export default function History() {
-  const { sales, deleteSale, updateSale } = useBusinessStore();
+  const { sales, deleteSale, updateSale, role } = useBusinessStore();
   const [search, setSearch] = useState('');
   const [viewingSale, setViewingSale] = useState<Sale | null>(null);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
@@ -206,26 +209,40 @@ export default function History() {
                     <td className="px-6 py-5">
                       <div className="flex items-center justify-center gap-2">
                         <button 
+                          onClick={() => {
+                            const shop = loadShopSettings();
+                            printReceipt(sale, shop);
+                          }}
+                          className="p-2 hover:bg-primary/10 hover:text-primary rounded-xl transition-all"
+                          title="Print Receipt"
+                        >
+                          <Printer className="h-4 w-4" />
+                        </button>
+                        <button 
                           onClick={() => setViewingSale(sale)}
                           className="p-2 hover:bg-primary/10 hover:text-primary rounded-xl transition-all"
-                          title="View Receipt"
+                          title="View Details"
                         >
                           <Eye className="h-4 w-4" />
                         </button>
-                        <button 
-                          onClick={() => handleEditOpen(sale)}
-                          className="p-2 hover:bg-primary/10 hover:text-primary rounded-xl transition-all"
-                          title="Edit Details"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={() => setDeletingId(sale.id)}
-                          className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-all"
-                          title="Delete Sale"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {role === 'admin' && (
+                          <>
+                            <button 
+                              onClick={() => handleEditOpen(sale)}
+                              className="p-2 hover:bg-primary/10 hover:text-primary rounded-xl transition-all"
+                              title="Edit Details"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button 
+                              onClick={() => setDeletingId(sale.id)}
+                              className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-all"
+                              title="Delete Sale"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

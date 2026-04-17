@@ -1,16 +1,13 @@
-import React from 'react';
 import { 
   AlertTriangle, 
   Package, 
   ArrowUpCircle, 
-  ChevronRight,
   TrendingDown,
   ShoppingCart,
   ShieldCheck,
   Plus
 } from 'lucide-react';
 import { useBusinessStore } from '@/lib/useBusinessStore';
-import { formatCurrency, cn } from '@/lib/utils';
 
 export default function StockAlerts() {
   const { inventory, updateStock, setActiveTab } = useBusinessStore();

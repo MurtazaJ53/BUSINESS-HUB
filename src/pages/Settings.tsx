@@ -2,83 +2,67 @@ import React, { useState } from 'react';
 import { 
   Settings as SettingsIcon, 
   Download, 
-  FileJson, 
   FileSpreadsheet, 
-  Trash2, 
   AlertTriangle,
   HardDrive,
   Database,
   Store,
-  RefreshCcw,
+  Monitor,
   CheckCircle2,
-  Moon,
+  Lock,
+  ShieldCheck,
+  Users,
   Sun,
-  Monitor
+  Moon,
+  RefreshCcw,
+  Sparkles
 } from 'lucide-react';
+import { db, auth } from '@/lib/firebase';
+import { collection, addDoc, onSnapshot, query, setDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { UserPlus, Ticket, LogOut, X } from 'lucide-react';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { downloadFile, convertToCSV, exportSalesReport } from '@/lib/exportUtils';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { loadShopSettings } from '@/lib/shopSettings';
+import { useAuthStore } from '@/lib/useAuthStore';
+import type { InventoryItem } from '@/lib/types';
 
 export default function Settings() {
-  const { inventory, sales, customers, shop, updateShop, importData, clearInventory, theme, setTheme } = useBusinessStore();
+  const { inventory, sales, customers, shop, updateShop, clearInventory, theme, setTheme, shopId } = useBusinessStore();
+  const { role, user } = useAuthStore();
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
-  const [restoreData, setRestoreData] = useState<any>(null);
   const [exporting, setExporting] = useState<string | null>(null);
+  const [toast, setToast] = useState('');
+  const [invites, setInvites] = useState<{ id: string, code: string }[]>([]);
+  const [generatingInvite, setGeneratingInvite] = useState(false);
+
+  // Subscriptions for Invitations
+  React.useEffect(() => {
+    if (shopId && role === 'admin') {
+      const q = collection(db, `shops/${shopId}/invitations`);
+      return onSnapshot(q, (snap) => {
+        setInvites(snap.docs.map(d => ({ id: d.id, code: d.data().code })));
+      });
+    }
+  }, [shopId, role]);
+  
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 3000);
+  };
   
   const [editForm, setEditForm] = useState(shop);
-
-  const handleJSONRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const data = JSON.parse(event.target?.result as string);
-        if (data.inventory || data.sales || data.customers) {
-          setRestoreData(data);
-          setRestoreConfirmOpen(true);
-        } else {
-          alert("Invalid backup file format.");
-        }
-      } catch {
-        alert("Failed to parse JSON file.");
-      }
-    };
-    reader.readAsText(file);
-    // Reset input
-    e.target.value = '';
-  };
 
   const handleSaveShop = () => {
     updateShop(editForm);
     setEditOpen(false);
   };
 
-  const handleJSONBackup = () => {
-    setExporting('json');
-    const fullState = {
-      inventory,
-      sales,
-      customers,
-      shopMetadata: shop,
-      exportDate: new Date().toISOString()
-    };
-    downloadFile(
-      JSON.stringify(fullState, null, 2),
-      `BusinessHub_FullBackup_${new Date().toISOString().split('T')[0]}.json`,
-      'application/json'
-    );
-    setTimeout(() => setExporting(null), 1000);
-  };
-
   const handleInventoryCSV = () => {
     setExporting('inv-csv');
     // Sanitize for CSV
-    const csvData = inventory.map(i => ({
+    const csvData = inventory.map((i: InventoryItem) => ({
       Name: i.name,
       SKU: i.sku || 'N/A',
       Category: i.category,
@@ -150,7 +134,7 @@ export default function Settings() {
           </div>
           <div className="space-y-1">
             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Store Value</p>
-            <p className="text-xl font-black italic text-primary">₹{inventory.reduce((sum, i) => sum + (i.price * (i.stock || 0)), 0).toLocaleString()}</p>
+            <p className="text-xl font-black italic text-primary">₹{inventory.reduce((sum: number, i: InventoryItem) => sum + (i.price * (i.stock || 0)), 0).toLocaleString()}</p>
           </div>
         </div>
       </div>
@@ -205,6 +189,105 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* STAFF & INVITATIONS - ADMIN ONLY */}
+      {role === 'admin' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-black tracking-tight">Staff & Team Access</h3>
+            </div>
+            <button 
+              onClick={async () => {
+                if (!shopId) return;
+                setGeneratingInvite(true);
+                const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+                await setDoc(doc(db, `shops/${shopId}/invitations`, code), {
+                  code,
+                  createdAt: new Date().toISOString()
+                });
+                // Also update the shop document with a search helper for the code
+                await updateDoc(doc(db, 'shops', shopId), { inviteCode: code });
+                setGeneratingInvite(false);
+                showToast('New Invitation Code Generated');
+              }}
+              disabled={generatingInvite}
+              className="px-4 py-2 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2"
+            >
+              <Ticket className="h-4 w-4" />
+              Generate Invite Code
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {invites.length === 0 ? (
+              <div className="md:col-span-3 glass-card p-10 rounded-[2rem] text-center border-dashed border-zinc-500/20">
+                <Users className="h-10 w-10 text-zinc-500 mx-auto mb-4 opacity-20" />
+                <p className="text-sm font-bold text-zinc-500">No active invitation codes.</p>
+                <p className="text-[10px] text-zinc-600 mt-1 uppercase tracking-widest font-black">Generate one to add staff members</p>
+              </div>
+            ) : (
+              invites.map(invite => (
+                <div key={invite.id} className="glass-card p-6 rounded-3xl border-primary/20 flex flex-col items-center justify-center group relative overflow-hidden">
+                  <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3">Staff Code</p>
+                  <h4 className="text-2xl font-black tracking-[0.2em] text-primary">{invite.code}</h4>
+                  <button 
+                    onClick={() => {
+                      navigator.clipboard.writeText(invite.code);
+                      showToast('Code Copied to Clipboard');
+                    }}
+                    className="mt-4 text-[9px] font-black uppercase tracking-widest bg-zinc-500/10 px-3 py-1.5 rounded-lg hover:bg-zinc-500/20 transition-all"
+                  >
+                    Copy & Share
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      await deleteDoc(doc(db, `shops/${shopId}/invitations`, invite.id));
+                      showToast('Invitation Code Revoked');
+                    }}
+                    className="absolute top-2 right-2 p-1.5 text-zinc-500 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+          
+          <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 flex items-start gap-4">
+            <ShieldCheck className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[11px] font-bold text-zinc-400 leading-relaxed">
+                <span className="text-primary font-black">Admin Protocol:</span> Share these codes with your staff. They can enter the code on the Login screen to join your shop hub. Staff members can create sales and view inventory, but cannot access Expenses, Reports, or these Settings.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Profile & Account */}
+      <div className="space-y-4 pt-4 border-t border-border/50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-full bg-accent flex items-center justify-center overflow-hidden border-2 border-primary/20">
+               <img src={user?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.email}`} alt="avatar" />
+            </div>
+            <div>
+              <p className="text-sm font-black tracking-tight">{user?.email}</p>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{role} Account</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => auth.signOut()}
+            className="flex items-center gap-2 px-6 py-3 bg-red-500/10 text-red-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all shadow-lg shadow-red-500/10"
+          >
+            <LogOut className="h-4 w-4" />
+            Log Out Hub
+          </button>
+        </div>
+      </div>
+
       {/* Data Management Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Backup & Export */}
@@ -215,36 +298,6 @@ export default function Settings() {
           </div>
           
           <div className="glass-card rounded-3xl p-6 space-y-3">
-            <button 
-              onClick={handleJSONBackup}
-              disabled={exporting === 'json'}
-              className="w-full flex items-center justify-between p-4 bg-accent/30 hover:bg-primary/10 rounded-2xl transition-all group"
-            >
-              <div className="flex items-center gap-3">
-                <Download className="h-5 w-5 text-primary" />
-                <div className="text-left">
-                  <p className="text-sm font-bold">Export Full Backup</p>
-                  <p className="text-[10px] text-muted-foreground uppercase font-black">JSON Format</p>
-                </div>
-              </div>
-            </button>
-
-            <label className="w-full flex items-center justify-between p-4 bg-accent/30 hover:bg-amber-500/10 rounded-2xl transition-all group cursor-pointer border border-transparent hover:border-amber-500/20">
-              <div className="flex items-center gap-3">
-                <RefreshCcw className="h-5 w-5 text-amber-500" />
-                <div className="text-left">
-                  <p className="text-sm font-bold">Restore from Backup</p>
-                  <p className="text-[10px] text-muted-foreground uppercase font-black">Import JSON File</p>
-                </div>
-              </div>
-              <input 
-                type="file" 
-                accept=".json" 
-                className="hidden" 
-                onChange={handleJSONRestore}
-              />
-            </label>
-
             <button 
               onClick={handleInventoryCSV}
               disabled={exporting === 'inv-csv'}
@@ -378,24 +431,6 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Restore Confirmation */}
-      <ConfirmDialog
-        open={restoreConfirmOpen}
-        title="Restore Full Database?"
-        description="This will overwrite all current items, sales, and settings with the data from your backup file. This cannot be undone."
-        confirmText="Yes, Restore Everything"
-        variant="danger"
-        onConfirm={async () => {
-          await importData(restoreData);
-          setRestoreConfirmOpen(false);
-          setRestoreData(null);
-        }}
-        onClose={() => {
-          setRestoreConfirmOpen(false);
-          setRestoreData(null);
-        }}
-      />
-
       {resetConfirmOpen && (
         <ConfirmDialog
           open={resetConfirmOpen}
@@ -409,6 +444,16 @@ export default function Settings() {
           }}
           onClose={() => setResetConfirmOpen(false)}
         />
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[300] animate-in fade-in slide-in-from-bottom-5 duration-300">
+          <div className="bg-primary text-white px-8 py-4 rounded-3xl shadow-2xl font-black text-xs uppercase tracking-widest flex items-center gap-3">
+            <CheckCircle2 className="h-4 w-4" />
+            {toast}
+          </div>
+        </div>
       )}
     </div>
   );
