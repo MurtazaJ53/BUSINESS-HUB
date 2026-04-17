@@ -213,6 +213,7 @@ export default function POS() {
 
       if (warnings.length > 0) {
         setStockWarningItems(warnings);
+        setIsProcessing(false);
         return;
       }
     }
@@ -286,9 +287,33 @@ export default function POS() {
         "flex-1 space-y-4 min-w-0",
         terminalStep === 'checkout' ? "hidden lg:block" : "block"
       )}>
+        {/* EXECUTIVE MINI-CART (Mobile Only - Catalog View) */}
+        {cart.length > 0 && (
+          <div className="lg:hidden animate-in slide-in-from-top-2">
+            <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-2 flex items-center gap-1.5">
+              <Sparkles className="h-3 w-3" /> Recently Added
+            </p>
+            <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-none snap-x">
+              {cart.map((item) => (
+                <div 
+                  key={item.itemId}
+                  className="flex-shrink-0 w-32 glass-card p-3 rounded-2xl border-primary/20 snap-start animate-in zoom-in-95 duration-300"
+                >
+                  <p className="text-[10px] font-bold truncate mb-1">{item.name}</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-primary">x{item.quantity}</span>
+                    <span className="text-[9px] font-bold opacity-50">{formatCurrency(item.price)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="h-px bg-border/50 my-2" />
+          </div>
+        )}
+
         <div>
           <h1 className="text-4xl font-black tracking-tighter">Sales Hub</h1>
-          <p className="text-muted-foreground mt-1">High-speed elite terminal checkout</p>
+          <p className="text-muted-foreground mt-1 text-xs">High-speed elite terminal checkout</p>
         </div>
 
         <div className="relative">
