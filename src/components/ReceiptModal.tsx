@@ -101,7 +101,9 @@ export default function ReceiptModal({ sale, onClose, onConfirm }: Props) {
                 <div className="space-y-3">
                   {sale.items.map((item, i) => (
                     <div key={i} className="grid grid-cols-[1fr_30px_60px_70px] gap-2 text-[11px] items-start">
-                      <span className="font-bold uppercase leading-tight">{item.name}</span>
+                      <span className="font-bold uppercase leading-tight">
+                        {item.name} {item.isReturn && <span className="text-[8px] text-red-500 font-black ml-1">(RETURN)</span>}
+                      </span>
                       <span className="text-center text-zinc-500">{item.quantity}</span>
                       <span className="text-right text-zinc-500">₹{item.price.toFixed(0)}</span>
                       <span className="text-right font-black">₹{(item.price * item.quantity).toFixed(0)}</span>

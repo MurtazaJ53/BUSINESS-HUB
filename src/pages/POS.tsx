@@ -436,6 +436,25 @@ export default function POS() {
                       )}
                     </div>
                   </div>
+
+                  <div className="space-y-1">
+                    <h3 className="font-extrabold text-[11px] uppercase tracking-tight truncate pr-2">{product.name}</h3>
+                    <div className="flex gap-1 flex-wrap">
+                      <span className="px-1.5 py-0.5 bg-accent/50 text-muted-foreground text-[8px] font-black uppercase rounded-md border border-border/50">
+                        {product.categoryShort || product.category.slice(0, 4)}
+                      </span>
+                      {product.size && (
+                        <span className="px-1.5 py-0.5 bg-purple-500/10 text-purple-500 text-[8px] font-black uppercase rounded-md border border-purple-500/20">
+                          {product.size}
+                        </span>
+                      )}
+                      <span className={`px-1.5 py-0.5 text-[8px] font-black uppercase rounded-md border ${
+                        outOfStock ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                      }`}>
+                        Stk: {product.stock || 0}
+                      </span>
+                    </div>
+                  </div>
                   <div className="flex flex-col text-left">
                     <span className="font-extrabold text-sm truncate uppercase tracking-tight group-hover:text-primary transition-colors text-foreground">{product.name}</span>
                     <div className="flex flex-wrap items-center gap-1 mt-2">
