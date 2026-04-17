@@ -634,11 +634,13 @@ export default function Inventory() {
             <div className="space-y-1.5"><Label>Category</Label><Input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} /></div>
             <div className="space-y-1.5"><Label>Sub-category</Label><Input value={editForm.subcategory} onChange={(e) => setEditForm({ ...editForm, subcategory: e.target.value })} /></div>
           </div>
-          <div className="grid grid-cols-4 gap-3">
-            <div className="space-y-1.5"><Label>Sell Price</Label><Input type="number" value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: e.target.value })} /></div>
-            <div className="space-y-1.5"><Label>Cost Price</Label><Input type="number" value={editForm.costPrice} onChange={(e) => setEditForm({ ...editForm, costPrice: e.target.value })} /></div>
-            <div className="space-y-1.5"><Label>Stock</Label><Input type="number" value={editForm.stock} onChange={(e) => setEditForm({ ...editForm, stock: e.target.value })} /></div>
-            <div className="space-y-1.5"><Label>Size</Label><Input value={editForm.size} onChange={(e) => setEditForm({ ...editForm, size: e.target.value })} /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-muted-foreground">Sell Price</Label><Input type="number" value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-amber-500">Cost Price</Label><Input type="number" value={editForm.costPrice} onChange={(e) => setEditForm({ ...editForm, costPrice: e.target.value })} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-muted-foreground">Stock</Label><Input type="number" value={editForm.stock} onChange={(e) => setEditForm({ ...editForm, stock: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-muted-foreground">Size</Label><Input value={editForm.size} onChange={(e) => setEditForm({ ...editForm, size: e.target.value })} /></div>
           </div>
           <div className="space-y-1.5"><Label>Description</Label><Input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} /></div>
           <div className="flex gap-3">
