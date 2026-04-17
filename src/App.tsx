@@ -12,8 +12,9 @@ import StockAlerts from './pages/StockAlerts';
 import AuthPage from './pages/Auth';
 import { useAuthStore } from './lib/useAuthStore';
 import { useBusinessStore } from './lib/useBusinessStore';
-import { Sparkles } from 'lucide-react';
 import { App as CapacitorApp } from '@capacitor/app';
+import { useUpdateCheck } from './hooks/useUpdateCheck';
+import UpdateBanner from './components/UpdateBanner';
 
 const PAGES: Record<string, React.ReactNode> = {
   dashboard: <Dashboard />,
@@ -30,6 +31,8 @@ const PAGES: Record<string, React.ReactNode> = {
 export default function App() {
   const { user, shopId, role, loading, initialize } = useAuthStore();
   const { initStore } = useBusinessStore();
+  const { updateAvailable } = useUpdateCheck();
+  const [showUpdate, setShowUpdate] = React.useState(true);
 
   useEffect(() => {
     initialize();
@@ -74,5 +77,15 @@ export default function App() {
     return <AuthPage />;
   }
 
-  return <AppLayout pages={PAGES} />;
+  return (
+    <>
+      {updateAvailable && showUpdate && (
+        <UpdateBanner 
+          metadata={updateAvailable} 
+          onClose={() => setShowUpdate(false)} 
+        />
+      )}
+      <AppLayout pages={PAGES} />
+    </>
+  );
 }
