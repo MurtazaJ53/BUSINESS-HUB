@@ -74,6 +74,9 @@ interface BusinessState {
   // Expenses
   addExpense: (expense: Expense) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
+
+  // Restock logic
+  restockItem: (id: string, newQty: number, newPurchasePrice: number) => Promise<void>;
 }
 
 export const useBusinessStore = create<BusinessState>((set, get) => ({
@@ -326,5 +329,27 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const { shopId } = get();
     if (!shopId) return;
     await deleteDoc(doc(db, `shops/${shopId}/expenses`, id));
+  },
+
+  restockItem: async (id, newQty, newPurchasePrice) => {
+    const { shopId, inventory } = get();
+    if (!shopId) return;
+
+    const item = inventory.find(i => i.id === id);
+    if (!item) return;
+
+    const currentStock = item.stock || 0;
+    const currentCost = item.costPrice || 0;
+    
+    // Formula: (Current Value + New Value) / Total Quantity
+    const totalQuantity = currentStock + newQty;
+    const weightedAverageCost = totalQuantity > 0 
+      ? ((currentStock * currentCost) + (newQty * newPurchasePrice)) / totalQuantity
+      : newPurchasePrice;
+
+    await updateDoc(doc(db, `shops/${shopId}/inventory`, id), {
+      stock: totalQuantity,
+      costPrice: Number(weightedAverageCost.toFixed(2))
+    });
   },
 }));

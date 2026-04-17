@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   Plus, Minus, Package, Trash2, Pencil, Search, Tag, Database,
-  X, FileText, ClipboardPaste, Copy, AlertCircle, AlertTriangle, Sparkles, Loader2
+  X, FileText, ClipboardPaste, Copy, AlertCircle, AlertTriangle, Sparkles, Loader2,
+  PackagePlus
 } from 'lucide-react';
 import ErrorModal from '@/components/ErrorModal';
 import { useBusinessStore } from '@/lib/useBusinessStore';
@@ -98,18 +99,24 @@ export default function Inventory() {
     deleteInventoryItem, 
     clearInventory,
     inventorySearchTerm,
-    setInventorySearchTerm
+    deleteInventoryItem, 
+    clearInventory,
+    inventorySearchTerm,
+    setInventorySearchTerm,
+    restockItem
   } = useBusinessStore();
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [restockOpen, setRestockOpen] = useState<InventoryItem | null>(null);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const [errorModal, setErrorModal] = useState({ show: false, title: '', message: '' });
   const [form, setForm] = useState(emptyForm);
   const [editForm, setEditForm] = useState(emptyForm);
+  const [restockForm, setRestockForm] = useState({ qty: '', cost: '' });
   const [variantMatrix, setVariantMatrix] = useState<MatrixRow[]>([]);
   const [bulkRows, setBulkRows] = useState<BulkRow[]>(Array(5).fill(null).map(emptyBulkRow));
   const [toast, setToast] = useState('');
@@ -253,6 +260,28 @@ export default function Inventory() {
         title: 'Save Failed',
         message: err.message || 'There was an error saving this item to your inventory.'
       });
+    }
+  };
+
+  const handleRestock = async () => {
+    if (!restockOpen) return;
+    const q = parseFloat(restockForm.qty);
+    const c = parseFloat(restockForm.cost);
+    if (isNaN(q) || isNaN(c) || q <= 0) {
+      showToast('Please enter valid quantity and cost');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      await restockItem(restockOpen.id, q, c);
+      showToast(`Restocked ${restockOpen.name} successfully!`);
+      setRestockOpen(null);
+      setRestockForm({ qty: '', cost: '' });
+    } catch (err: any) {
+      setErrorModal({ show: true, title: 'Restock Error', message: err.message });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -462,24 +491,33 @@ export default function Inventory() {
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between gap-1 overflow-hidden">
                     <p className="font-extrabold text-[11px] uppercase tracking-tight truncate flex-1">{item.name}</p>
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      <button
-                        onClick={() => {
-                          setEditingItem(item);
-                          setEditForm({
-                            name: item.name, price: String(item.price),
-                            costPrice: item.costPrice ? String(item.costPrice) : '',
-                            sku: item.sku || '', category: item.category,
-                            subcategory: item.subcategory || '', size: item.size || '',
-                            description: item.description || '',
-                            stock: item.stock !== undefined ? String(item.stock) : '',
-                          });
-                        }}
-                        className="p-1 hover:bg-accent rounded-md transition-colors"
-                      >
-                        <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
-                      </button>
-                    </div>
+                    
+                    {/* Admin Controls */}
+                    {role === 'admin' && (
+                      <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-all pointer-events-none group-hover:pointer-events-auto">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setRestockOpen(item); setRestockForm({ qty: '', cost: (item.costPrice || 0).toString() }); }}
+                          className="p-1 rounded-lg bg-emerald-500 text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
+                          title="Restock Arrival"
+                        >
+                          <PackagePlus className="h-3 w-3" />
+                        </button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setEditingItem(item); setEditForm({ ...emptyForm, ...item, costPrice: item.costPrice?.toString() || '', price: item.price.toString(), stock: item.stock?.toString() || '0' }); }}
+                          className="p-1 rounded-lg bg-blue-500 text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
+                          title="Edit Details"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); deleteInventoryItem(item.id); }}
+                          className="p-1 rounded-lg bg-destructive text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
+                          title="Delete Product"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap gap-1">
@@ -620,6 +658,85 @@ export default function Inventory() {
           >
             {variantMatrix.length > 1 ? `Save ${variantMatrix.length} Variations` : 'Save Product'}
           </button>
+        </div>
+      </Modal>
+
+      {/* ── Restock Arrival Modal ── */}
+      <Modal open={!!restockOpen} onClose={() => setRestockOpen(null)} title="Restock Arrival 📦">
+        <div className="space-y-6">
+          <div className="p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10 space-y-2">
+            <h3 className="text-sm font-bold text-emerald-500 uppercase tracking-tighter">Current Status</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-0.5">
+                <span className="text-[10px] uppercase font-black text-muted-foreground">Original Stock</span>
+                <p className="text-lg font-black">{restockOpen?.stock || 0} units</p>
+              </div>
+              <div className="space-y-0.5">
+                <span className="text-[10px] uppercase font-black text-muted-foreground">Current Cost</span>
+                <p className="text-lg font-black text-amber-500">{formatCurrency(restockOpen?.costPrice || 0)}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-[10px] uppercase font-black text-muted-foreground">Quantity Added</Label>
+              <Input 
+                autoFocus
+                type="number" 
+                placeholder="e.g. 10" 
+                value={restockForm.qty} 
+                onChange={(e) => setRestockForm({ ...restockForm, qty: e.target.value })} 
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[10px] uppercase font-black text-amber-500">New Purchase Price</Label>
+              <Input 
+                type="number" 
+                placeholder="₹ Per Unit" 
+                value={restockForm.cost} 
+                onChange={(e) => setRestockForm({ ...restockForm, cost: e.target.value })} 
+              />
+            </div>
+          </div>
+
+          {restockForm.qty && restockForm.cost && restockOpen && (
+            <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="flex justify-between items-center">
+                <div className="space-y-0.5">
+                  <span className="text-[10px] uppercase font-black text-primary">New Market Value (Avg)</span>
+                  <p className="text-xl font-black text-primary">
+                    {formatCurrency(
+                      (( (restockOpen?.stock || 0) * (restockOpen?.costPrice || 0) ) + 
+                       ( parseFloat(restockForm.qty) * parseFloat(restockForm.cost) )) / 
+                      ( (restockOpen?.stock || 0) + parseFloat(restockForm.qty) )
+                    )}
+                  </p>
+                </div>
+                <div className="text-right space-y-0.5">
+                  <span className="text-[10px] uppercase font-black text-muted-foreground">Total Units</span>
+                  <p className="text-xl font-black">{(restockOpen?.stock || 0) + parseFloat(restockForm.qty)}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <button 
+              onClick={() => setRestockOpen(null)} 
+              disabled={isProcessing}
+              className="flex-1 py-4 rounded-2xl font-bold text-sm border border-border hover:bg-accent transition-all"
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={handleRestock} 
+              disabled={isProcessing}
+              className="flex-1 premium-gradient text-white py-4 rounded-2xl font-bold text-sm hover:shadow-xl transition-all shadow-lg active:scale-95 disabled:opacity-50"
+            >
+              {isProcessing ? 'Processing Arrival...' : 'Commit Arrival ✨'}
+            </button>
+          </div>
         </div>
       </Modal>
 
