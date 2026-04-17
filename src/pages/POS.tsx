@@ -771,9 +771,6 @@ export default function POS() {
       )}
 
 
-        />
-      )}
-
       {/* TOAST SYSTEM - HIGH-SPEED FEEDBACK */}
       {toast && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[1000] animate-in slide-in-from-bottom-5">
