@@ -113,6 +113,8 @@ export default function Inventory() {
   const [variantMatrix, setVariantMatrix] = useState<MatrixRow[]>([]);
   const [bulkRows, setBulkRows] = useState<BulkRow[]>(Array(5).fill(null).map(emptyBulkRow));
   const [toast, setToast] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string>('All');
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -124,6 +126,13 @@ export default function Inventory() {
     () => Array.from(new Set(inventory.map((i) => i.category))).filter(Boolean),
     [inventory]
   );
+
+  const uniqueSubcategories = useMemo(() => {
+    const subset = selectedCategory === 'All' 
+      ? inventory 
+      : inventory.filter(i => i.category === selectedCategory);
+    return Array.from(new Set(subset.map(i => i.subcategory))).filter(Boolean);
+  }, [inventory, selectedCategory]);
 
   // ── Variant matrix sync ──
   useEffect(() => {
@@ -165,14 +174,20 @@ export default function Inventory() {
 
   // ── Filtered list ──
   const filtered = useMemo(() =>
-    inventory.filter((item) =>
-      item.name.toLowerCase().includes(search.toLowerCase()) ||
-      item.category.toLowerCase().includes(search.toLowerCase()) ||
-      (item.subcategory?.toLowerCase() ?? '').includes(search.toLowerCase()) ||
-      (item.size?.toLowerCase() ?? '').includes(search.toLowerCase()) ||
-      (item.sku?.toLowerCase() ?? '').includes(search.toLowerCase())
-    ),
-    [inventory, search]
+    inventory.filter((item) => {
+      const matchesSearch = 
+        item.name.toLowerCase().includes(search.toLowerCase()) ||
+        item.category.toLowerCase().includes(search.toLowerCase()) ||
+        (item.subcategory?.toLowerCase() ?? '').includes(search.toLowerCase()) ||
+        (item.size?.toLowerCase() ?? '').includes(search.toLowerCase()) ||
+        (item.sku?.toLowerCase() ?? '').includes(search.toLowerCase());
+      
+      const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
+      const matchesSubcategory = selectedSubcategory === 'All' || item.subcategory === selectedSubcategory;
+      
+      return matchesSearch && matchesCategory && matchesSubcategory;
+    }),
+    [inventory, search, selectedCategory, selectedSubcategory]
   );
 
   // ── Stats ──
@@ -394,16 +409,36 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <input
-          type="text"
-          placeholder="Search by name, category, SKU, size..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-11 pr-4 py-3 bg-card border border-border rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-        />
+      {/* Toolbar - Pro Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between p-4 bg-accent/30 border border-border/50 rounded-2xl animate-in fade-in slide-in-from-top-2">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search catalog name/category/sku..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-11 pr-4 py-2.5 bg-card border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </div>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <select 
+            value={selectedCategory}
+            onChange={(e) => { setSelectedCategory(e.target.value); setSelectedSubcategory('All'); }}
+            className="flex-1 sm:w-40 bg-card border border-border rounded-xl px-4 py-2.5 text-xs font-black uppercase tracking-tight focus:outline-none focus:ring-2 focus:ring-primary/30"
+          >
+            <option value="All">All Categories</option>
+            {uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select 
+            value={selectedSubcategory}
+            onChange={(e) => setSelectedSubcategory(e.target.value)}
+            className="flex-1 sm:w-40 bg-card border border-border rounded-xl px-4 py-2.5 text-xs font-black uppercase tracking-tight focus:outline-none focus:ring-2 focus:ring-primary/30"
+          >
+            <option value="All">All Sub-categories</option>
+            {uniqueSubcategories.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
       </div>
 
       {/* Product Grid - Variant Aware */}
@@ -487,21 +522,28 @@ export default function Inventory() {
                 </div>
 
                 <div className="min-w-0">
-                  <p className="font-bold text-sm truncate">{name}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter mt-0.5">
-                    {firstItem.category}{firstItem.subcategory ? ` · ${firstItem.subcategory}` : ''}
-                  </p>
+                  <p className="font-bold text-lg truncate group-hover:text-primary transition-colors">{name}</p>
+                  <div className="flex flex-wrap gap-2 mt-1.5 focus-within:">
+                    <span className="px-3 py-1 bg-primary/10 text-primary text-[12px] font-black uppercase rounded-xl border border-primary/30 shadow-sm transition-all focus-within:scale-105">
+                      {firstItem.category}
+                    </span>
+                    {firstItem.subcategory && (
+                      <span className="px-3 py-1 bg-amber-500/10 text-amber-500 text-[12px] font-black uppercase rounded-xl border border-amber-500/30 shadow-sm transition-all focus-within:scale-105">
+                        {firstItem.subcategory}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex flex-wrap gap-1 mt-3 mb-4 min-h-[22px]">
+                <div className="flex flex-wrap gap-2.5 mt-4 mb-4 min-h-[32px]">
                   {sizes.length > 0 ? (
                     sizes.map(s => (
-                      <span key={s} className="text-[9px] bg-accent text-foreground px-2 py-0.5 rounded-md font-black uppercase">
+                      <span key={s} className="text-sm bg-accent text-foreground px-3 py-1 rounded-xl font-black uppercase border border-border/50 shadow-md transform hover:scale-110 transition-transform">
                         {s}
                       </span>
                     ))
                   ) : (
-                    <span className="text-[9px] italic text-muted-foreground opacity-50">No size variants</span>
+                    <span className="text-[12px] italic text-muted-foreground opacity-50">No size variants</span>
                   )}
                 </div>
 

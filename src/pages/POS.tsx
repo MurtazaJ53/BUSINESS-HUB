@@ -368,10 +368,21 @@ export default function POS() {
                     <Package className="h-4 w-4 text-white" />
                   </div>
                   <div className="flex flex-col text-left">
-                    <span className="font-bold text-sm truncate group-hover:text-primary transition-colors text-foreground">{product.name}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-foreground/40 font-black uppercase tracking-widest">{product.category}</span>
-                      {product.sku && <span className="text-[10px] text-primary/60 font-medium">· {product.sku}</span>}
+                    <span className="font-bold text-base truncate group-hover:text-primary transition-colors text-foreground">{product.name}</span>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                      <span className="px-2.5 py-1 bg-primary/10 text-primary text-[11px] font-black uppercase rounded-xl border border-primary/20 shadow-sm transition-all active:scale-95">
+                        {product.category}
+                      </span>
+                      {product.subcategory && (
+                        <span className="px-2.5 py-1 bg-amber-500/10 text-amber-500 text-[11px] font-black uppercase rounded-xl border border-amber-500/20 shadow-sm transition-all active:scale-95">
+                          {product.subcategory}
+                        </span>
+                      )}
+                      {product.size && (
+                        <span className="px-2.5 py-1 bg-purple-500/10 text-purple-500 text-[11px] font-black uppercase rounded-xl border border-purple-500/20 shadow-sm transition-all active:scale-95">
+                          SIZE: {product.size}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <p className="text-primary font-black mt-1">{formatCurrency(product.price)}</p>

@@ -192,18 +192,19 @@ export default function AppLayout({ pages }: AppLayoutProps) {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-[60] w-64 bg-card border-r border-border transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 md:z-auto no-print shadow-2xl md:shadow-none",
+        "fixed inset-y-0 left-0 z-[60] w-64 bg-card border-r border-border transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 md:z-auto no-print shadow-2xl md:shadow-none overflow-hidden flex flex-col",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        {/* Mobile Close Button */}
+        {/* Mobile Close Button - Executive Hit-Area */}
         <button 
           onClick={() => setSidebarOpen(false)}
-          className="absolute right-4 top-4 p-2 bg-accent rounded-xl text-muted-foreground md:hidden flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-all z-[70]"
+          className="absolute right-4 top-4 p-3 bg-accent rounded-2xl text-muted-foreground md:hidden flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-all z-[100] active:scale-95 shadow-2xl border border-border/50"
+          aria-label="Close navigation"
         >
-          <X className="h-5 w-5" />
+          <X className="h-6 w-6 stroke-[3px]" />
         </button>
 
-        <div className="flex flex-col h-full p-4">
+        <div className="flex flex-col h-full p-4 overflow-y-auto scroll-smooth">
           {/* Logo */}
           <div className="flex items-center gap-3 px-2 mb-8 mt-2">
             <div className="h-10 w-10 premium-gradient rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/30">
