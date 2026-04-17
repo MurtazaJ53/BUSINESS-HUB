@@ -240,8 +240,8 @@ export default function Analytics() {
           {totalRevenue === 0 ? (
             <div className="h-48 flex flex-col items-center justify-center text-muted-foreground opacity-30">
               <BarChart3 className="h-12 w-12 mb-3" />
-              <p className="text-sm font-bold">No sales data yet</p>
-              <p className="text-xs mt-1">Use POS to record your first sale</p>
+              <p className="text-sm font-bold">No sales yet</p>
+              <p className="text-xs mt-1">Use the Sales Hub to record your first sale</p>
             </div>
           ) : (
             <div className="h-48">

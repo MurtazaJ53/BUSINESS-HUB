@@ -128,8 +128,8 @@ export default function History() {
 
       {/* Sales List */}
       <div className="glass-card rounded-[2.5rem] overflow-hidden border border-border/50">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto scrollbar-none">
+          <table className="w-full text-left border-collapse min-w-[850px]">
             <thead>
               <tr className="bg-accent/30 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
                 <th className="px-6 py-5">Date & Invoice</th>

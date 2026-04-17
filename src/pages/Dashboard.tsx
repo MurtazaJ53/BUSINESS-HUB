@@ -317,7 +317,7 @@ export default function Dashboard() {
         {sales.length === 0 ? (
           <div className="text-center py-10 text-muted-foreground opacity-40">
             <ShoppingCart className="h-10 w-10 mx-auto mb-3" />
-            <p className="text-sm font-bold">No sales yet. Use the POS to record your first sale!</p>
+            <p className="text-sm font-bold">No sales yet. Use the Sales Hub to record your first sale!</p>
           </div>
         ) : (
           <div className="divide-y divide-border/50">
