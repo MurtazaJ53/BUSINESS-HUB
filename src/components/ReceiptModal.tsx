@@ -147,7 +147,7 @@ export default function ReceiptModal({ sale, onClose, onConfirm }: Props) {
 
               {/* Footer text */}
               <div className="text-center space-y-2">
-                <div className="text-[12px] font-black uppercase tracking-wider">{shop.footer || 'THANK YOU! VISIT AGAIN'}</div>
+                <div className="text-[12px] font-black uppercase tracking-wider">{sale.footerNote || shop.footer || 'THANK YOU! VISIT AGAIN'}</div>
                 <div className="text-[9px] text-zinc-400 font-bold">
                   {sale.items.length} ITEM(S) SCANNED · SAVE THIS RECEIPT
                 </div>

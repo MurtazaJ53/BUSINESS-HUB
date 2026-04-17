@@ -126,6 +126,10 @@ export default function AppLayout({ pages }: AppLayoutProps) {
     };
   }, [sidebarOpen]);
 
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [activeTab]);
+
   // Low stock notifications
   const lowStockItems = inventory.filter(p => p.stock !== undefined && p.stock <= 5);
 

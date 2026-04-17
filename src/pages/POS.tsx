@@ -35,6 +35,7 @@ export default function POS() {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [stockWarningItems, setStockWarningItems] = useState<{item: SaleItem, stock: number}[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [footerNote, setFooterNote] = useState('');
   const [errorModal, setErrorModal] = useState({ show: false, title: '', message: '' });
 
   // Keyboard Shortcuts
@@ -218,6 +219,7 @@ export default function POS() {
       customerName: customerName.trim() || "Cash Customer",
       customerPhone: customerPhone.trim() || "",
       customerId: selectedCustomerId || "",
+      footerNote: footerNote.trim() || "",
       date: saleDate,
       createdAt: new Date().toISOString(),
     };
@@ -577,6 +579,19 @@ export default function POS() {
                     <Plus className="h-3.5 w-3.5" /> Add Split Payment
                   </button>
                 )}
+                
+                {/* Special Footer Note Field */}
+                <div className="pt-2">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1.5 flex items-center gap-1.5 grayscale opacity-70">
+                    <Sparkles className="h-3 w-3" /> Special Footer Note
+                  </p>
+                  <textarea 
+                    value={footerNote}
+                    onChange={(e) => setFooterNote(e.target.value)}
+                    placeholder={`Default: ${shop.footer || 'Thank you!'}`}
+                    className="w-full bg-accent/40 border border-border/50 rounded-xl p-3 text-[11px] font-semibold min-h-[60px] focus:ring-2 focus:ring-primary/20 outline-none transition-all resize-none"
+                  />
+                </div>
               </div>
 
               <button

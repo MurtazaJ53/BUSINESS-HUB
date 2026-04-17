@@ -106,17 +106,19 @@ export default function Settings() {
               <Store className="h-10 w-10" />
             </div>
             <div>
-              <h2 className="text-2xl font-black tracking-tight">{shop.name}</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-black tracking-tight">{shop.name}</h2>
+                <button 
+                  onClick={() => { setEditForm(shop); setEditOpen(true); }}
+                  className="px-3 py-1 bg-primary/10 text-primary rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-sm border border-primary/20"
+                >
+                  Edit Profile
+                </button>
+              </div>
               <p className="text-sm font-bold text-muted-foreground uppercase tracking-[0.2em]">{shop.tagline}</p>
               <p className="text-xs text-muted-foreground mt-1 opacity-60">{shop.address || 'No address set'}</p>
             </div>
           </div>
-          <button 
-            onClick={() => { setEditForm(shop); setEditOpen(true); }}
-            className="px-4 py-2 bg-primary/10 text-primary rounded-xl text-xs font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all"
-          >
-            Edit Profile
-          </button>
         </div>
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-6 border-t border-border/50">

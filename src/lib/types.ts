@@ -65,6 +65,7 @@ export interface Sale {
   customerName?: string;
   customerPhone?: string;
   customerId?: string;
+  footerNote?: string;
   date: string;
   createdAt: string;
 }
