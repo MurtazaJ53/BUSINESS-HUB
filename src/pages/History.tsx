@@ -25,7 +25,8 @@ import ReceiptModal from '@/components/ReceiptModal';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
 export default function History() {
-  const { sales, deleteSale, updateSale, role } = useBusinessStore();
+  const { sales, expenses, deleteSale, deleteExpense, updateSale, role } = useBusinessStore();
+  const [tab, setTab] = useState<'sales' | 'expenses'>('sales');
   const [search, setSearch] = useState('');
   const [viewingSale, setViewingSale] = useState<Sale | null>(null);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
@@ -75,12 +76,26 @@ export default function History() {
 
       return matchSearch && matchDate;
     })
-    // HISTORY SORTING: By Transaction Date (Newest first)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+
+  const filteredExpenses = expenses
+    .filter(e => {
+      const matchSearch = e.category.toLowerCase().includes(search.toLowerCase()) || 
+                          e.description.toLowerCase().includes(search.toLowerCase());
+      
+      let matchDate = true;
+      if (dateFilter === 'Today') matchDate = e.date === today;
+      else if (dateFilter === 'Yesterday') matchDate = e.date === yesterday;
+      else if (dateFilter === 'Last 7 Days') matchDate = e.date >= last7Days;
+
+      return matchSearch && matchDate;
+    })
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
 
   const handleDelete = () => {
     if (deletingId) {
-      deleteSale(deletingId);
+      if (tab === 'sales') deleteSale(deletingId);
+      else deleteExpense(deletingId);
       setDeletingId(null);
     }
   };
@@ -92,10 +107,34 @@ export default function History() {
     <div className="space-y-10 pb-10">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-border/50">
-        <div>
-          <h1 className="text-3xl md:text-5xl font-black tracking-tighter leading-none mb-2">History Log</h1>
-          <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest opacity-70">Sales & Transactions Ledger</p>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div>
+            <h1 className="text-3xl md:text-5xl font-black tracking-tighter leading-none mb-2">History Log</h1>
+            <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest opacity-70">Complete Ledger Activity</p>
+          </div>
+          
+          <div className="flex bg-accent/50 p-1 rounded-2xl border border-border/50 h-fit">
+            <button 
+              onClick={() => setTab('sales')}
+              className={cn(
+                "px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                tab === 'sales' ? "bg-primary text-white shadow-lg" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Sales
+            </button>
+            <button 
+              onClick={() => setTab('expenses')}
+              className={cn(
+                "px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                tab === 'expenses' ? "bg-primary text-white shadow-lg" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Expenses
+            </button>
+          </div>
         </div>
+        
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
           {dateFilters.map(f => (
             <button
@@ -119,156 +158,209 @@ export default function History() {
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <input
           type="text"
-          placeholder="Search invoice # or customer name..."
+          placeholder={tab === 'sales' ? "Search invoice # or customer name..." : "Search expense category or description..."}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full pl-11 pr-4 py-3 bg-card border border-border rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all shadow-sm"
         />
       </div>
 
-      {/* Sales List */}
+      {/* Content Feed */}
       <div className="glass-card rounded-[2.5rem] overflow-hidden border border-border/50">
         <div className="overflow-x-auto scrollbar-none">
-          <table className="w-full text-left border-collapse min-w-[850px]">
-            <thead>
-              <tr className="bg-accent/30 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-                <th className="px-6 py-5">Date & Invoice</th>
-                <th className="px-6 py-5">Customer</th>
-                <th className="px-6 py-5 text-center">Items</th>
-                <th className="px-6 py-5">Payment</th>
-                <th className="px-6 py-5 text-right">Amount</th>
-                <th className="px-6 py-5 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/50">
-              {filteredSales.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-20 text-center">
-                    <div className="flex flex-col items-center justify-center opacity-30">
-                      <FilterX className="h-12 w-12 mb-3" />
-                      <p className="text-sm font-bold uppercase tracking-widest">No transactions found</p>
-                    </div>
-                  </td>
+          {tab === 'sales' ? (
+            <table className="w-full text-left border-collapse min-w-[850px]">
+              <thead>
+                <tr className="bg-accent/30 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+                  <th className="px-6 py-5">Date & Invoice</th>
+                  <th className="px-6 py-5">Customer</th>
+                  <th className="px-6 py-5 text-center">Items</th>
+                  <th className="px-6 py-5">Payment</th>
+                  <th className="px-6 py-5 text-right">Amount</th>
+                  <th className="px-6 py-5 text-center">Actions</th>
                 </tr>
-              ) : (
-                filteredSales.map((sale) => (
-                  <tr key={sale.id} className="group hover:bg-primary/[0.02] transition-colors">
-                    <td className="px-6 py-5">
-                      <div className="flex items-center gap-3">
-                        <div className={cn(
-                          "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform",
-                          sale.id.startsWith('PAY-') ? "bg-green-500/10 text-green-600" : "bg-primary/5 text-primary"
-                        )}>
-                          {sale.id.startsWith('PAY-') ? (
-                            <IndianRupee className="h-5 w-5" />
-                          ) : (
-                            sale.date === today ? <Receipt className="h-5 w-5" /> : <Calendar className="h-5 w-5 opacity-60" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-sm font-black uppercase tracking-tighter">
-                            {sale.id.startsWith('PAY-') ? 'PAYMENT' : `INV-${sale.id.replace('sale-', '').toUpperCase()}`}
-                          </p>
-                          <p className="text-[10px] font-bold text-muted-foreground flex items-center gap-1 mt-0.5">
-                            {sale.date}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-5">
-                      <div className="flex items-center gap-2">
-                        <div className="h-7 w-7 rounded-full bg-accent flex items-center justify-center">
-                          <User className="h-3.5 w-3.5 text-muted-foreground" />
-                        </div>
-                        <span className="text-sm font-bold truncate max-w-[120px]">
-                          {sale.customerName || 'Walk-in'}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-5 text-center">
-                      <span className="text-xs font-black bg-accent px-2.5 py-1 rounded-full">
-                        {sale.items.reduce((acc, i) => acc + i.quantity, 0)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-5">
-                      <div className="flex items-center gap-2">
-                        <div className={cn(
-                          "h-2 w-2 rounded-full",
-                          sale.id.startsWith('PAY-') ? "bg-green-500 animate-pulse" : 
-                          (sale.payments && sale.payments.length > 1 ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : 
-                          (sale.paymentMode === 'CASH' ? "bg-green-500" : "bg-primary"))
-                        )} />
-                        <span className="text-[11px] font-black uppercase tracking-widest leading-none">
-                          {sale.id.startsWith('PAY-') 
-                            ? 'CASH COLLECTION' 
-                            : (sale.payments && sale.payments.length > 1 
-                                ? 'SPLIT' 
-                                : sale.paymentMode)}
-                        </span>
-                        {sale.payments && sale.payments.length > 1 && (
-                          <div className="flex gap-1 ml-1">
-                            {sale.payments.map((p, pi) => (
-                              <div 
-                                key={pi} 
-                                className="h-4 px-1.5 rounded-md bg-accent/50 flex items-center justify-center border border-border/50"
-                                title={`${p.mode}: ${formatCurrency(p.amount)}`}
-                              >
-                                <span className="text-[7px] font-black text-foreground/60">{p.mode}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-5 text-right">
-                      <p className="text-sm font-black text-foreground">
-                        {formatCurrency(sale.total)}
-                      </p>
-                    </td>
-                    <td className="px-6 py-5">
-                      <div className="flex items-center justify-center gap-2">
-                        <button 
-                          onClick={() => {
-                            const shop = loadShopSettings();
-                            printReceipt(sale, shop);
-                          }}
-                          className="p-2 hover:bg-primary/10 hover:text-primary rounded-xl transition-all"
-                          title="Print Receipt"
-                        >
-                          <Printer className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={() => setViewingSale(sale)}
-                          className="p-2 hover:bg-primary/10 hover:text-primary rounded-xl transition-all"
-                          title="View Details"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        {role === 'admin' && (
-                          <>
-                            <button 
-                              onClick={() => handleEditOpen(sale)}
-                              className="p-2 hover:bg-primary/10 hover:text-primary rounded-xl transition-all"
-                              title="Edit Details"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </button>
-                            <button 
-                              onClick={() => setDeletingId(sale.id)}
-                              className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-all"
-                              title="Delete Sale"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </>
-                        )}
+              </thead>
+              <tbody className="divide-y divide-border/50">
+                {filteredSales.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-20 text-center">
+                      <div className="flex flex-col items-center justify-center opacity-30">
+                        <FilterX className="h-12 w-12 mb-3" />
+                        <p className="text-sm font-bold uppercase tracking-widest">No transactions found</p>
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  filteredSales.map((sale) => (
+                    <tr key={sale.id} className="group hover:bg-primary/[0.02] transition-colors">
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform",
+                            sale.id.startsWith('PAY-') ? "bg-green-500/10 text-green-600" : "bg-primary/5 text-primary"
+                          )}>
+                            {sale.id.startsWith('PAY-') ? (
+                              <IndianRupee className="h-5 w-5" />
+                            ) : (
+                              sale.date === today ? <Receipt className="h-5 w-5" /> : <Calendar className="h-5 w-5 opacity-60" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-sm font-black uppercase tracking-tighter">
+                              {sale.id.startsWith('PAY-') ? 'PAYMENT' : `INV-${sale.id.replace('sale-', '').toUpperCase()}`}
+                            </p>
+                            <p className="text-[10px] font-bold text-muted-foreground flex items-center gap-1 mt-0.5">
+                              {sale.date}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-2">
+                          <div className="h-7 w-7 rounded-full bg-accent flex items-center justify-center">
+                            <User className="h-3.5 w-3.5 text-muted-foreground" />
+                          </div>
+                          <span className="text-sm font-bold truncate max-w-[120px]">
+                            {sale.customerName || 'Walk-in'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5 text-center">
+                        <span className="text-xs font-black bg-accent px-2.5 py-1 rounded-full">
+                          {sale.items.reduce((acc, i) => acc + i.quantity, 0)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-2">
+                          <div className={cn(
+                            "h-2 w-2 rounded-full",
+                            sale.id.startsWith('PAY-') ? "bg-green-500 animate-pulse" : 
+                            (sale.payments && sale.payments.length > 1 ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : 
+                            (sale.paymentMode === 'CASH' ? "bg-green-500" : "bg-primary"))
+                          )} />
+                          <span className="text-[11px] font-black uppercase tracking-widest leading-none">
+                            {sale.id.startsWith('PAY-') 
+                              ? 'CASH COLLECTION' 
+                              : (sale.payments && sale.payments.length > 1 
+                                  ? 'SPLIT' 
+                                  : sale.paymentMode)}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5 text-right">
+                        <p className="text-sm font-black text-foreground">
+                          {formatCurrency(sale.total)}
+                        </p>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="flex items-center justify-center gap-2">
+                          <button 
+                            onClick={() => {
+                              const shop = loadShopSettings();
+                              printReceipt(sale, shop);
+                            }}
+                            className="p-2 hover:bg-primary/10 hover:text-primary rounded-xl transition-all"
+                            title="Print Receipt"
+                          >
+                            <Printer className="h-4 w-4" />
+                          </button>
+                          <button 
+                            onClick={() => setViewingSale(sale)}
+                            className="p-2 hover:bg-primary/10 hover:text-primary rounded-xl transition-all"
+                            title="View Details"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                          {role === 'admin' && (
+                            <>
+                              <button 
+                                onClick={() => handleEditOpen(sale)}
+                                className="p-2 hover:bg-primary/10 hover:text-primary rounded-xl transition-all"
+                                title="Edit Details"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button 
+                                onClick={() => setDeletingId(sale.id)}
+                                className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-all"
+                                title="Delete Sale"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          ) : (
+            <table className="w-full text-left border-collapse min-w-[850px]">
+              <thead>
+                <tr className="bg-accent/30 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+                  <th className="px-6 py-5">Date & Type</th>
+                  <th className="px-6 py-5">Category</th>
+                  <th className="px-6 py-5">Description</th>
+                  <th className="px-6 py-5 text-right">Amount</th>
+                  <th className="px-6 py-5 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/50">
+                {filteredExpenses.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-20 text-center">
+                      <div className="flex flex-col items-center justify-center opacity-30">
+                        <FilterX className="h-12 w-12 mb-3" />
+                        <p className="text-sm font-bold uppercase tracking-widest">No expenses found</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredExpenses.map((exp) => (
+                    <tr key={exp.id} className="group hover:bg-red-500/[0.02] transition-colors">
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-xl bg-red-500/5 text-red-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                            <TrendingUp className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-black uppercase tracking-tighter text-red-600">EXPENSE</p>
+                            <p className="text-[10px] font-bold text-muted-foreground flex items-center gap-1 mt-0.5">
+                              {exp.date}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <span className="text-[10px] font-black bg-accent px-2.5 py-1 rounded-full uppercase tracking-widest">
+                          {exp.category}
+                        </span>
+                      </td>
+                      <td className="px-6 py-5">
+                        <p className="text-xs font-bold truncate max-w-[200px]">{exp.description || 'No description'}</p>
+                      </td>
+                      <td className="px-6 py-5 text-right font-black text-red-600 tabular-nums">
+                        -{formatCurrency(exp.amount)}
+                      </td>
+                      <td className="px-6 py-5 text-center">
+                        {role === 'admin' && (
+                          <button 
+                            onClick={() => setDeletingId(exp.id)}
+                            className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-all"
+                            title="Delete Expense"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
