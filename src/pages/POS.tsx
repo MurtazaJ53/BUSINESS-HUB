@@ -554,9 +554,16 @@ export default function POS() {
                       <p className="text-[10px] text-muted-foreground font-bold uppercase">{formatCurrency(c.price)} / unit</p>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      <p className={`font-black text-sm ${c.isReturn ? 'text-red-500' : ''}`}>
-                        {c.isReturn ? '-' : ''}{formatCurrency(c.price * c.quantity)}
-                      </p>
+                      <div className="flex items-center gap-1.5">
+                        {role === 'admin' && c.costPrice !== undefined && !c.isReturn && (
+                          <span className="text-[9px] font-black text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded-lg border border-emerald-500/20 animate-in fade-in zoom-in duration-500">
+                            +₹{((c.price - c.costPrice) * c.quantity).toFixed(0)} PROFIT
+                          </span>
+                        )}
+                        <p className={`font-black text-sm ${c.isReturn ? 'text-red-500' : ''}`}>
+                          {c.isReturn ? '-' : ''}{formatCurrency(c.price * c.quantity)}
+                        </p>
+                      </div>
                       <div className="flex items-center gap-1 bg-accent/50 rounded-xl p-1">
                         <button onClick={() => updateQty(c.itemId, !!c.isReturn, -1)} className="h-6 w-6 rounded-lg bg-accent flex items-center justify-center"><Minus className="h-3 w-3" /></button>
                         <span className="w-6 text-center font-black text-xs">{c.quantity}</span>
