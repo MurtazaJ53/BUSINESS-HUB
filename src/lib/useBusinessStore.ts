@@ -203,21 +203,30 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const creditPayment = finalSale.payments.find(p => p.mode === 'CREDIT');
     const creditAmount = creditPayment ? creditPayment.amount : 0;
 
-    if (creditAmount > 0 && finalSale.customerName && !finalSale.customerId) {
-      const existing = customers.find(c => c.name.toLowerCase() === finalSale.customerName?.toLowerCase());
+    if (creditAmount > 0 && customerName && !finalSale.customerId) {
+      // SMART MATCH: Try Phone first, then Name
+      const phoneToMatch = finalSale.customerPhone?.trim();
+      const nameToMatch = finalSale.customerName?.trim().toLowerCase();
+      
+      const existing = customers.find(c => 
+        (phoneToMatch && c.phone === phoneToMatch) || 
+        (nameToMatch && c.name.toLowerCase() === nameToMatch)
+      );
+
       if (existing) {
         finalSale.customerId = existing.id;
-        customerAction = updateDoc(doc(db, `shops/${shopId}/customers`, existing.id), {
+        // If they matching but name/phone was slightly different, keep current for the sale but link them
+        customerAction = updateDoc(doc(db, `shops/${get().shopId}/customers`, existing.id), {
           totalSpent: existing.totalSpent + finalSale.total,
           balance: existing.balance + creditAmount
         });
       } else {
         const newCustomerId = `cust-${Date.now()}`;
         finalSale.customerId = newCustomerId;
-        customerAction = setDoc(doc(db, `shops/${shopId}/customers`, newCustomerId), {
+        customerAction = setDoc(doc(db, `shops/${get().shopId}/customers`, newCustomerId), {
           id: newCustomerId,
           name: finalSale.customerName,
-          phone: '-',
+          phone: finalSale.customerPhone || '-',
           totalSpent: finalSale.total,
           balance: creditAmount,
           createdAt: new Date().toISOString()
