@@ -51,6 +51,7 @@ export interface SaleItem {
   quantity: number;
   price: number;
   costPrice?: number;
+  isReturn?: boolean;
 }
 
 export interface Sale {

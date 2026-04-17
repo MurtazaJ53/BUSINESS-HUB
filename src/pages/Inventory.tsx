@@ -327,17 +327,28 @@ export default function Inventory() {
           ? row.size.split(',').map((s) => s.trim()).filter(Boolean)
           : [row.size.trim() || ''];
 
-        for (const size of sizes) {
+        for (const sizeStr of sizes) {
+          let variantSize = sizeStr;
+          let variantPrice = parseFloat(row.price);
+
+          // Support for Syntax SIZE:PRICE (e.g., S:100)
+          if (sizeStr.includes(':')) {
+            const [sz, pr] = sizeStr.split(':');
+            variantSize = sz.trim();
+            const parsedPr = parseFloat(pr);
+            if (!isNaN(parsedPr)) variantPrice = parsedPr;
+          }
+
           const uniqueId = `item-${timestamp}-${count}-${Math.random().toString(36).substr(2, 5)}`;
           await addInventoryItem({
             id: uniqueId,
             name: row.name,
-            price: parseFloat(row.price),
+            price: variantPrice,
             costPrice: row.costPrice && !isNaN(parseFloat(row.costPrice)) ? parseFloat(row.costPrice) : undefined,
             stock: row.stock && !isNaN(parseInt(row.stock)) ? parseInt(row.stock) : undefined,
             category: row.category || 'General',
             subcategory: row.subcategory || undefined,
-            size: size || undefined,
+            size: variantSize || undefined,
             createdAt: new Date().toISOString(),
           });
           count++;

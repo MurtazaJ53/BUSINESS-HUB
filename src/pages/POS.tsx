@@ -103,12 +103,12 @@ export default function POS() {
     ).slice(0, 5);
   }, [customers, customerName, selectedCustomerId]);
 
-  const addToCart = (product: typeof inventory[0]) => {
+  const addToCart = (product: typeof inventory[0], isReturn: boolean = false) => {
     setCart((prev) => {
-      const existing = prev.find((c) => c.itemId === product.id);
+      const existing = prev.find((c) => c.itemId === product.id && c.isReturn === isReturn);
       if (existing) {
         // If it exists, pull it to the TOP and increment
-        const others = prev.filter((c) => c.itemId !== product.id);
+        const others = prev.filter((c) => !(c.itemId === product.id && c.isReturn === isReturn));
         return [{ ...existing, quantity: existing.quantity + 1 }, ...others];
       }
       // New items always go to the TOP for high-visibility
@@ -118,6 +118,7 @@ export default function POS() {
         quantity: 1,
         price: product.price,
         costPrice: product.costPrice,
+        isReturn
       }, ...prev];
     });
   };
@@ -134,19 +135,22 @@ export default function POS() {
     setCustomItem({ name: '', price: '' });
   };
 
-  const updateQty = (itemId: string, delta: number) => {
+  const updateQty = (itemId: string, isReturn: boolean, delta: number) => {
     setCart((prev) =>
       prev
-        .map((c) => c.itemId === itemId ? { ...c, quantity: c.quantity + delta } : c)
+        .map((c) => (c.itemId === itemId && !!c.isReturn === isReturn) ? { ...c, quantity: c.quantity + delta } : c)
         .filter((c) => c.quantity > 0)
     );
   };
 
-  const removeFromCart = (itemId: string) => {
-    setCart((prev) => prev.filter((c) => c.itemId !== itemId));
+  const removeFromCart = (itemId: string, isReturn: boolean) => {
+    setCart((prev) => prev.filter((c) => !(c.itemId === itemId && !!c.isReturn === isReturn)));
   };
 
-  const subTotal = () => cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
+  const subTotal = () => cart.reduce((sum, c) => {
+    const itemTotal = c.price * c.quantity;
+    return c.isReturn ? sum - itemTotal : sum + itemTotal;
+  }, 0);
   
   const calcTotal = () => {
     const dv = parseFloat(discountValue) || 0;
@@ -156,10 +160,14 @@ export default function POS() {
   };
 
   const totalPayments = payments.reduce((sum, p) => sum + p.amount, 0);
-  const remainingBalance = Math.max(0, calcTotal() - totalPayments);
+  const totalDue = calcTotal();
+  const remainingBalance = Math.max(0, totalDue - totalPayments);
   const hasMultiplePayments = payments.length > 1;
-  // HARD FORCE: Allow 0.5 rupee tolerance to prevent decimal lock
-  const isPaid = totalPayments >= (calcTotal() - 0.5);
+  // HARD FORCE: Allow 0.5 rupee tolerance
+  // If totalDue is negative, it's a refund, so we check if the refund is recorded (negative payment) or just proceed
+  const isPaid = totalDue >= 0 
+    ? (totalPayments >= (totalDue - 0.5))
+    : (totalPayments <= (totalDue + 0.5));
   
   // CONTACT VALIDATION: Ensure EXACTLY 10-digit Indian standard
   const phoneLengthValid = customerPhone.trim().length === 0 || customerPhone.trim().length === 10;
@@ -232,9 +240,13 @@ export default function POS() {
         if (cartItem.itemId.startsWith('custom-')) continue;
         const invItem = inventory.find((i) => i.id === cartItem.itemId);
         if (invItem && invItem.stock !== undefined) {
+          const newStock = cartItem.isReturn 
+            ? invItem.stock + cartItem.quantity 
+            : invItem.stock - cartItem.quantity;
+            
           await updateInventoryItem({
             ...invItem,
-            stock: invItem.stock - cartItem.quantity,
+            stock: newStock,
           });
         }
       }
@@ -300,33 +312,40 @@ export default function POS() {
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
               {cart.map(item => (
                 <div
-                  key={item.itemId}
-                  className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-3xl animate-in zoom-in-95 duration-300 shadow-sm"
+                  key={`${item.itemId}-${!!item.isReturn}`}
+                  className={`flex items-center gap-3 p-3 border rounded-3xl animate-in zoom-in-95 duration-300 shadow-sm ${
+                    item.isReturn ? 'bg-red-500/5 border-red-500/20' : 'bg-primary/5 border-primary/20'
+                  }`}
                 >
-                  <div className="h-12 w-12 shrink-0 premium-gradient rounded-2xl flex items-center justify-center shadow-md">
-                    <Package className="h-5 w-5 text-white" />
+                  <div className={`h-12 w-12 shrink-0 rounded-2xl flex items-center justify-center shadow-md ${item.isReturn ? 'bg-red-500' : 'premium-gradient'}`}>
+                    {item.isReturn ? <RotateCcw className="h-5 w-5 text-white" /> : <Package className="h-5 w-5 text-white" />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-black uppercase tracking-tight truncate">{item.name}</p>
-                    <p className="text-[10px] font-bold text-primary">{formatCurrency(item.price * item.quantity)}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs font-black uppercase tracking-tight truncate">{item.name}</p>
+                      {item.isReturn && <span className="text-[8px] font-black uppercase bg-red-500 text-white px-1 rounded">Return</span>}
+                    </div>
+                    <p className={`text-[10px] font-bold ${item.isReturn ? 'text-red-500' : 'text-primary'}`}>
+                      {item.isReturn ? '-' : ''}{formatCurrency(item.price * item.quantity)}
+                    </p>
                   </div>
                   <div className="flex items-center bg-card rounded-2xl border border-border/50 p-1 gap-1">
                     <button 
-                      onClick={() => updateQty(item.itemId, -1)}
+                      onClick={() => updateQty(item.itemId, !!item.isReturn, -1)}
                       className="p-1.5 hover:bg-accent rounded-xl transition-colors text-muted-foreground"
                     >
                       <Minus className="h-3 w-3" />
                     </button>
                     <span className="text-[11px] font-black min-w-[1.5rem] text-center">{item.quantity}</span>
                     <button 
-                      onClick={() => updateQty(item.itemId, 1)}
-                      className="p-1.5 hover:bg-accent rounded-xl transition-colors text-primary"
+                      onClick={() => updateQty(item.itemId, !!item.isReturn, 1)}
+                      className={`p-1.5 hover:bg-accent rounded-xl transition-colors ${item.isReturn ? 'text-red-500' : 'text-primary'}`}
                     >
                       <Plus className="h-3 w-3" />
                     </button>
                     <div className="w-px h-4 bg-border/50 mx-0.5" />
                     <button 
-                      onClick={() => removeFromCart(item.itemId)}
+                      onClick={() => removeFromCart(item.itemId, !!item.isReturn)}
                       className="p-1.5 hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-colors"
                     >
                       <Trash2 className="h-3 w-3" />
@@ -388,37 +407,50 @@ export default function POS() {
             {filtered.map((product) => {
               const outOfStock = product.stock !== undefined && product.stock <= 0;
               return (
-                <button
+                <div
                   key={product.id}
-                  onClick={() => !outOfStock && addToCart(product)}
-                  disabled={outOfStock}
-                  className={`glass-card p-4 rounded-2xl text-left transition-all duration-200 group ${
-                    outOfStock ? 'opacity-40 cursor-not-allowed' : 'hover:shadow-xl hover:-translate-y-0.5'
+                  className={`glass-card p-4 rounded-3xl text-left transition-all duration-300 group relative ${
+                    outOfStock ? 'opacity-70 grayscale-[0.5]' : 'hover:shadow-2xl hover:-translate-y-1'
                   }`}
                 >
-                  <div className="h-9 w-9 premium-gradient rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                    <Package className="h-4 w-4 text-white" />
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="h-10 w-10 premium-gradient rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
+                      <Package className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); addToCart(product, true); }}
+                        className="h-8 w-8 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                        title="Add as Return"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </button>
+                      {!outOfStock && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); addToCart(product); }}
+                          className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-all shadow-sm"
+                          title="Add to Sale"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="flex flex-col text-left">
-                    <span className="font-bold text-base truncate group-hover:text-primary transition-colors text-foreground">{product.name}</span>
-                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                      <span className="px-2.5 py-1 bg-primary/10 text-primary text-[11px] font-black uppercase rounded-xl border border-primary/20 shadow-sm transition-all active:scale-95">
+                    <span className="font-extrabold text-sm truncate uppercase tracking-tight group-hover:text-primary transition-colors text-foreground">{product.name}</span>
+                    <div className="flex flex-wrap items-center gap-1 mt-2">
+                      <span className="px-2 py-0.5 bg-accent text-muted-foreground text-[8px] font-black uppercase rounded shadow-sm">
                         {product.category}
                       </span>
-                      {product.subcategory && (
-                        <span className="px-2.5 py-1 bg-amber-500/10 text-amber-500 text-[11px] font-black uppercase rounded-xl border border-amber-500/20 shadow-sm transition-all active:scale-95">
-                          {product.subcategory}
-                        </span>
-                      )}
                       {product.size && (
-                        <span className="px-2.5 py-1 bg-purple-500/10 text-purple-500 text-[11px] font-black uppercase rounded-xl border border-purple-500/20 shadow-sm transition-all active:scale-95">
-                          SIZE: {product.size}
+                        <span className="px-2 py-0.5 bg-purple-500/10 text-purple-500 text-[8px] font-black uppercase rounded border border-purple-500/20">
+                          {product.size}
                         </span>
                       )}
                     </div>
                   </div>
-                  <p className="text-primary font-black mt-1">{formatCurrency(product.price)}</p>
-                </button>
+                  <p className="text-primary font-black mt-3 text-lg">{formatCurrency(product.price)}</p>
+                </div>
               );
             })}
           </div>
@@ -521,18 +553,27 @@ export default function POS() {
           {cart.length > 0 && (
             <>
               <div className="space-y-2.5 max-h-52 overflow-y-auto pr-1">
-                {cart.map((item) => (
-                  <div key={item.itemId} className="flex items-center gap-2 p-1.5 rounded-xl">
+                {cart.map((c) => (
+                  <div key={`${c.itemId}-${!!c.isReturn}`} className="flex items-center gap-2 p-1.5 rounded-xl">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold truncate">{item.name}</p>
-                      <p className="text-[10px] text-muted-foreground">{formatCurrency(item.price)}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-extrabold text-sm truncate">{c.name}</p>
+                        {c.isReturn && (
+                          <span className="bg-red-500 text-white text-[8px] font-black px-1 rounded uppercase">Return</span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase">{formatCurrency(c.price)} / unit</p>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => updateQty(item.itemId, -1)} className="h-6 w-6 rounded-lg bg-accent flex items-center justify-center"><Minus className="h-3 w-3" /></button>
-                      <span className="w-6 text-center font-black text-xs">{item.quantity}</span>
-                      <button onClick={() => updateQty(item.itemId, 1)} className="h-6 w-6 rounded-lg bg-accent flex items-center justify-center"><Plus className="h-3 w-3" /></button>
+                    <div className="flex flex-col items-end gap-1">
+                      <p className={`font-black text-sm ${c.isReturn ? 'text-red-500' : ''}`}>
+                        {c.isReturn ? '-' : ''}{formatCurrency(c.price * c.quantity)}
+                      </p>
+                      <div className="flex items-center gap-1 bg-accent/50 rounded-xl p-1">
+                        <button onClick={() => updateQty(c.itemId, !!c.isReturn, -1)} className="h-6 w-6 rounded-lg bg-accent flex items-center justify-center"><Minus className="h-3 w-3" /></button>
+                        <span className="w-6 text-center font-black text-xs">{c.quantity}</span>
+                        <button onClick={() => updateQty(c.itemId, !!c.isReturn, 1)} className="h-6 w-6 rounded-lg bg-accent flex items-center justify-center"><Plus className="h-3 w-3" /></button>
+                      </div>
                     </div>
-                    <span className="text-xs font-black w-14 text-right">{formatCurrency(item.price * item.quantity)}</span>
                   </div>
                 ))}
               </div>
