@@ -81,32 +81,38 @@ export default function Customers() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="glass-card p-6 rounded-3xl relative overflow-hidden group">
-          <Users className="absolute -right-2 -bottom-2 h-24 w-24 text-primary/5 -rotate-12 group-hover:rotate-0 transition-transform duration-500" />
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Total Network</p>
-          <div className="flex items-end gap-2">
-            <span className="text-3xl font-black italic">{stats.total}</span>
-            <span className="text-xs text-primary font-bold mb-1">Verified</span>
+      {/* High-Density Customer Analytics Grid */}
+      <div className="grid grid-cols-3 gap-4">
+        {/* TOTAL NETWORK */}
+        <div className="glass-card flex flex-col items-center justify-center aspect-square p-4 rounded-3xl group transition-all duration-500">
+          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+            <Users className="h-5 w-5 text-primary" />
           </div>
+          <p className="text-[8px] text-muted-foreground font-black uppercase tracking-[0.2em] opacity-80 text-center leading-tight">Total<br/>Network</p>
+          <p className="text-2xl font-black mt-1 text-foreground tracking-tighter italic">{stats.total}</p>
+          <p className="text-[8px] text-primary/60 mt-1 font-black uppercase">Verified</p>
         </div>
 
-        <div className="glass-card p-6 rounded-3xl relative overflow-hidden group border-red-500/10">
-          <AlertCircle className="absolute -right-2 -bottom-2 h-24 w-24 text-red-500/5 -rotate-12 group-hover:rotate-0 transition-transform duration-500" />
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Active Udhaar</p>
-          <div className="flex items-end gap-2">
-            <span className="text-3xl font-black italic text-red-500">{stats.activeCredits}</span>
-            <span className="text-xs text-muted-foreground font-bold mb-1">Customers</span>
+        {/* ACTIVE UDHAAR */}
+        <div className="glass-card border-red-500/10 flex flex-col items-center justify-center aspect-square p-4 rounded-3xl group transition-all duration-500">
+          <div className="h-10 w-10 rounded-xl bg-red-500/10 flex items-center justify-center mb-3">
+            <AlertCircle className="h-5 w-5 text-red-500" />
           </div>
+          <p className="text-[8px] text-muted-foreground font-black uppercase tracking-[0.2em] opacity-80 text-center leading-tight">Active<br/>Udhaar</p>
+          <p className="text-2xl font-black mt-1 text-red-500 tracking-tighter italic">{stats.activeCredits}</p>
+          <p className="text-[8px] text-muted-foreground/60 mt-1 font-bold uppercase">Customers</p>
         </div>
 
-        <div className="glass-card p-6 rounded-3xl relative overflow-hidden group border-primary/20 bg-primary/5">
-          <IndianRupee className="absolute -right-2 -bottom-2 h-24 w-24 text-primary/10 -rotate-12 group-hover:rotate-0 transition-transform duration-500" />
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Total Credit Out</p>
-          <div className="flex items-end gap-2">
-            <span className="text-3xl font-black italic text-primary">{formatCurrency(stats.totalCreditAmount)}</span>
-            <TrendingUp className="h-4 w-4 text-primary mb-2" />
+        {/* TOTAL CREDIT OUT */}
+        <div className="glass-card border-primary/20 bg-primary/5 flex flex-col items-center justify-center aspect-square p-4 rounded-3xl group transition-all duration-500">
+          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+            <IndianRupee className="h-5 w-5 text-primary" />
+          </div>
+          <p className="text-[8px] text-muted-foreground font-black uppercase tracking-[0.2em] opacity-80 text-center leading-tight">Total<br/>Credit Out</p>
+          <p className="text-xl font-black mt-1 text-primary tracking-tighter italic whitespace-nowrap">{formatCurrency(stats.totalCreditAmount)}</p>
+          <div className="flex items-center gap-1 mt-1">
+             <TrendingUp className="h-2.5 w-2.5 text-primary" />
+             <p className="text-[8px] text-primary font-black uppercase tracking-widest">Growth</p>
           </div>
         </div>
       </div>
