@@ -79,12 +79,6 @@ export default function Customers() {
           <h1 className="text-3xl md:text-5xl font-black tracking-tighter leading-none mb-2">Customer Ledger</h1>
           <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest opacity-70">Udhaar & Loyalty Management</p>
         </div>
-        <button 
-          onClick={() => setIsAdding(true)}
-          className="premium-gradient text-white px-6 py-3 rounded-2xl font-black text-sm flex items-center gap-2 shadow-lg shadow-primary/20 hover:shadow-xl hover:-translate-y-0.5 transition-all uppercase tracking-widest"
-        >
-          <UserPlus className="h-4 w-4" /> Add New Customer
-        </button>
       </div>
 
       {/* Stats Cards */}
@@ -130,10 +124,16 @@ export default function Customers() {
               className="w-full bg-accent/50 border border-border rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
             />
           </div>
+          <button 
+            onClick={() => setIsAdding(true)}
+            className="w-full md:w-auto premium-gradient text-white px-6 py-3 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:shadow-xl hover:-translate-y-0.5 transition-all uppercase tracking-widest whitespace-nowrap"
+          >
+            <UserPlus className="h-4 w-4" /> Add Customer
+          </button>
         </div>
 
-        <div className="flex-1 overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="flex-1 overflow-x-auto scrollbar-none">
+          <table className="w-full text-left border-collapse min-w-[700px]">
             <thead>
               <tr className="bg-accent/30">
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Customer Detail</th>

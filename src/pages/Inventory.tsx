@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   Plus, Minus, Package, Trash2, Pencil, Search, Tag, Database,
-  X, FileText, ClipboardPaste, Copy, AlertCircle, AlertTriangle, Sparkles
+  X, FileText, ClipboardPaste, Copy, AlertCircle, AlertTriangle, Sparkles, Loader2
 } from 'lucide-react';
 import ErrorModal from '@/components/ErrorModal';
 import { useBusinessStore } from '@/lib/useBusinessStore';
@@ -101,6 +101,7 @@ export default function Inventory() {
     setInventorySearchTerm
   } = useBusinessStore();
 
+  const [isProcessing, setIsProcessing] = useState(false);
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -273,33 +274,43 @@ export default function Inventory() {
   const handleBulkAdd = async () => {
     const validRows = bulkRows.filter((r) => r.name && r.price && !isNaN(parseFloat(r.price)));
     if (validRows.length === 0) { showToast('No valid items to import'); return; }
+    
+    setIsProcessing(true);
     let count = 0;
+    const timestamp = Date.now();
 
-    for (const row of validRows) {
-      // If SIZE has commas → auto-expand into separate items per size
-      const sizes = row.size.includes(',')
-        ? row.size.split(',').map((s) => s.trim()).filter(Boolean)
-        : [row.size.trim() || ''];
+    try {
+      for (const row of validRows) {
+        const sizes = row.size.includes(',')
+          ? row.size.split(',').map((s) => s.trim()).filter(Boolean)
+          : [row.size.trim() || ''];
 
-      for (const size of sizes) {
-        await addInventoryItem({
-          id: `item-${Date.now()}-${count}`,
-          name: row.name,
-          price: parseFloat(row.price),
-          costPrice: row.costPrice && !isNaN(parseFloat(row.costPrice)) ? parseFloat(row.costPrice) : undefined,
-          stock: row.stock && !isNaN(parseInt(row.stock)) ? parseInt(row.stock) : undefined,
-          category: row.category || 'General',
-          subcategory: row.subcategory || undefined,
-          size: size || undefined,
-          createdAt: new Date().toISOString(),
-        });
-        count++;
+        for (const size of sizes) {
+          const uniqueId = `item-${timestamp}-${count}-${Math.random().toString(36).substr(2, 5)}`;
+          await addInventoryItem({
+            id: uniqueId,
+            name: row.name,
+            price: parseFloat(row.price),
+            costPrice: row.costPrice && !isNaN(parseFloat(row.costPrice)) ? parseFloat(row.costPrice) : undefined,
+            stock: row.stock && !isNaN(parseInt(row.stock)) ? parseInt(row.stock) : undefined,
+            category: row.category || 'General',
+            subcategory: row.subcategory || undefined,
+            size: size || undefined,
+            createdAt: new Date().toISOString(),
+          });
+          count++;
+        }
       }
-    }
 
-    setBulkRows(Array(5).fill(null).map(emptyBulkRow));
-    setBulkOpen(false);
-    showToast(`Imported ${count} products! (variants auto-expanded)`);
+      setBulkRows(Array(5).fill(null).map(emptyBulkRow));
+      setBulkOpen(false);
+      showToast(`Success! Imported ${count} items with variants.`);
+    } catch (error) {
+      console.error("Bulk Add Failed:", error);
+      showToast("Sync Error: Some items might not have saved.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const smartPaste = async () => {
@@ -395,7 +406,7 @@ export default function Inventory() {
         />
       </div>
 
-      {/* Product Grid */}
+      {/* Product Grid - Variant Aware */}
       {filtered.length === 0 ? (
         <div className="text-center py-20 text-muted-foreground opacity-40">
           <Package className="h-16 w-16 mx-auto mb-4" />
@@ -403,109 +414,117 @@ export default function Inventory() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((item) => {
-            const isLow = item.stock !== undefined && item.stock <= 5;
-            const margin = item.price - (item.costPrice || 0);
+          {Object.entries(
+            filtered.reduce((acc, item) => {
+              if (!acc[item.name]) acc[item.name] = [];
+              acc[item.name].push(item);
+              return acc;
+            }, {} as Record<string, typeof filtered>)
+          ).map(([name, group]) => {
+            const firstItem = group[0];
+            const prices = group.map(i => i.price);
+            const minPrice = Math.min(...prices);
+            const maxPrice = Math.max(...prices);
+            const totalStock = group.reduce((sum, i) => sum + (i.stock || 0), 0);
+            const sizes = group.map(i => i.size).filter(Boolean).sort();
+            const isLow = totalStock <= 5;
+            const hasVariants = group.length > 1;
+
             return (
               <div
-                key={item.id}
+                key={name}
                 className={`glass-card group rounded-2xl p-5 hover:shadow-xl transition-all duration-300 border ${
                   isLow ? 'border-red-500/20' : 'border-border/30'
                 }`}
               >
                 <div className="flex items-start justify-between mb-3">
-                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                    <Package className="h-5 w-5 text-primary" />
+                  <div className="relative">
+                    <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                      <Package className="h-5 w-5 text-primary" />
+                    </div>
+                    {hasVariants && (
+                      <span className="absolute -top-2 -right-2 bg-primary text-[8px] font-black text-white px-1.5 py-0.5 rounded-full shadow-lg border border-background animate-pulse">
+                        {group.length} VAR
+                      </span>
+                    )}
                   </div>
-                  {/* Action buttons - visible on hover */}
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => handleDuplicate(item)}
-                      className="p-1.5 hover:bg-accent rounded-lg transition-colors"
-                      title="Add Another Variant"
-                    >
-                      <Copy className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" />
-                    </button>
+                    {!hasVariants && (
+                      <button
+                        onClick={() => handleDuplicate(firstItem)}
+                        className="p-1.5 hover:bg-accent rounded-lg transition-colors"
+                        title="Add Variant"
+                      >
+                        <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                      </button>
+                    )}
                     <button
                       onClick={() => {
-                        setEditingItem(item);
+                        setEditingItem(firstItem);
                         setEditForm({
-                          name: item.name, price: String(item.price),
-                          costPrice: item.costPrice ? String(item.costPrice) : '',
-                          sku: item.sku || '', category: item.category,
-                          subcategory: item.subcategory || '', size: item.size || '',
-                          description: item.description || '',
-                          stock: item.stock !== undefined ? String(item.stock) : '',
+                          name: firstItem.name, price: String(firstItem.price),
+                          costPrice: firstItem.costPrice ? String(firstItem.costPrice) : '',
+                          sku: firstItem.sku || '', category: firstItem.category,
+                          subcategory: firstItem.subcategory || '', size: firstItem.size || '',
+                          description: firstItem.description || '',
+                          stock: firstItem.stock !== undefined ? String(firstItem.stock) : '',
                         });
                       }}
                       className="p-1.5 hover:bg-accent rounded-lg transition-colors"
                     >
-                      <Pencil className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" />
+                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                     </button>
                     <button
-                      onClick={() => deleteInventoryItem(item.id).then(() => showToast('Item deleted'))}
-                      className="p-1.5 hover:bg-red-500/10 rounded-lg transition-colors"
+                      onClick={() => {
+                        Promise.all(group.map(i => deleteInventoryItem(i.id)))
+                          .then(() => showToast(`Product & ${group.length} variants deleted`));
+                      }}
+                      className="p-1.5 hover:bg-red-500/10 rounded-lg transition-colors text-muted-foreground hover:text-red-500"
                     >
-                      <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                      <Trash2 className="h-3.5 w-3.5 px-0.5" />
                     </button>
                   </div>
                 </div>
 
-                <p className="font-bold text-sm truncate">{item.name}</p>
-                <div className="flex items-center gap-1.5 flex-wrap mt-1 mb-3">
-                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                    <Tag className="h-2.5 w-2.5" /> {item.category}
-                    {item.subcategory && <> / <span className="text-primary/70 font-semibold">{item.subcategory}</span></>}
-                  </span>
-                  {item.size && (
-                    <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-md font-black uppercase">{item.size}</span>
-                  )}
-                  {item.sku && (
-                    <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground font-mono">{item.sku}</span>
+                <div className="min-w-0">
+                  <p className="font-bold text-sm truncate">{name}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter mt-0.5">
+                    {firstItem.category}{firstItem.subcategory ? ` · ${firstItem.subcategory}` : ''}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-1 mt-3 mb-4 min-h-[22px]">
+                  {sizes.length > 0 ? (
+                    sizes.map(s => (
+                      <span key={s} className="text-[9px] bg-accent text-foreground px-2 py-0.5 rounded-md font-black uppercase">
+                        {s}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-[9px] italic text-muted-foreground opacity-50">No size variants</span>
                   )}
                 </div>
 
                 <div className="flex justify-between items-end">
                   <div>
-                    <p className="text-2xl font-black text-primary leading-none">{formatCurrency(item.price)}</p>
-                    {margin !== null && (
-                      <p className="text-[10px] text-green-400 font-bold mt-0.5">+{formatCurrency(margin)} margin</p>
+                    {hasVariants ? (
+                      <div className="space-y-0.5">
+                        <p className="text-[10px] font-black uppercase text-primary tracking-widest leading-none">Price Range</p>
+                        <p className="text-xl font-black text-foreground">
+                          {formatCurrency(minPrice)} - {formatCurrency(maxPrice)}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-2xl font-black text-primary leading-none">{formatCurrency(firstItem.price)}</p>
                     )}
                   </div>
-                </div>
-
-                {item.stock !== undefined && (
-                  <div className="mt-3 space-y-3">
-                    <div className="flex justify-between items-center bg-accent/30 p-2 rounded-xl border border-border/50">
-                      <button 
-                        onClick={() => updateStock(item.id, -1)}
-                        className="h-8 w-8 rounded-lg bg-background flex items-center justify-center hover:bg-red-500/10 hover:text-red-500 transition-all shadow-sm"
-                      >
-                        <Minus className="h-4 w-4" />
-                      </button>
-                      <div className="text-center">
-                        <p className="text-[10px] font-black text-muted-foreground uppercase opacity-60">In Stock</p>
-                        <p className={`text-sm font-black ${isLow ? 'text-destructive' : 'text-foreground'}`}>{item.stock}</p>
-                      </div>
-                      <button 
-                        onClick={() => updateStock(item.id, 1)}
-                        className="h-8 w-8 rounded-lg bg-background flex items-center justify-center hover:bg-primary/20 hover:text-primary transition-all shadow-sm"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${
-                            item.stock > 10 ? 'bg-green-500' : item.stock > 0 ? 'bg-orange-500' : 'bg-destructive'
-                          }`}
-                          style={{ width: `${Math.min((item.stock / 50) * 100, 100)}%` }}
-                        />
-                      </div>
-                    </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-muted-foreground uppercase opacity-60">Total Stock</p>
+                    <p className={`text-sm font-black ${isLow ? 'text-destructive' : 'text-primary'}`}>
+                      {totalStock} <span className="text-[9px] uppercase">Units</span>
+                    </p>
                   </div>
-                )}
+                </div>
               </div>
             );
           })}
@@ -717,10 +736,15 @@ export default function Inventory() {
               <button onClick={() => setBulkOpen(false)} className="px-5 py-2.5 rounded-2xl font-bold text-sm border border-border hover:bg-accent transition-all">Cancel</button>
               <button
                 onClick={handleBulkAdd}
-                disabled={!bulkRows.some((r) => r.name && r.price)}
-                className="premium-gradient text-white px-6 py-2.5 rounded-2xl font-bold text-sm hover:shadow-xl transition-all disabled:opacity-50"
+                disabled={isProcessing || !bulkRows.some((r) => r.name && r.price)}
+                className="premium-gradient text-white px-6 py-2.5 rounded-2xl font-bold text-sm hover:shadow-xl transition-all disabled:opacity-50 flex items-center gap-2"
               >
-                Process & Save All
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : 'Process & Save All'}
               </button>
             </div>
           </div>
