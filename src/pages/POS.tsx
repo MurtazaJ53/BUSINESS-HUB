@@ -334,15 +334,8 @@ export default function POS() {
           <input
             id="pos-search"
             type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Scan barcode or type product name..."
-            className="w-full bg-accent/30 border-border/50 text-foreground placeholder:text-muted-foreground/60 rounded-2xl py-3.5 pl-12 pr-4 focus:ring-2 focus:ring-primary/50 transition-all font-bold"
-          />
-        </div>
-
-        {/* RESTORED EXECUTIVE CART COMMAND: BELOW SEARCH TO AVOID JUMPING CONTROLS */}
-        {cart.length > 0 && !search && (
+        {/* EXECUTIVE CART COMMAND: NOW AT THE TOP FOR PERMANENT OVERSIGHT */}
+        {cart.length > 0 && (
           <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-700">
             <h3 className="text-[11px] font-black uppercase tracking-[0.25em] text-primary flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -351,7 +344,7 @@ export default function POS() {
               </div>
               <span className="text-[10px] opacity-50">{cart.length} ITEMS TOTAL</span>
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {cart.slice(0, 6).map(item => (
                 <div
                   key={`${item.itemId}-${!!item.isReturn}`}
@@ -415,6 +408,27 @@ export default function POS() {
             <div className="h-px bg-border/50 my-2" />
           </div>
         )}
+
+        {/* Search Bar - NOW BELOW ORDERS FOR ZERO-DISTURBANCE PRODUCT FILTERING */}
+        <div className="relative group">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+          <input
+            id="pos-search"
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search catalog named/barcode..."
+            className="w-full bg-accent/30 border-border/50 text-foreground placeholder:text-muted-foreground/60 rounded-2xl py-4 pl-12 pr-12 focus:ring-2 focus:ring-primary/50 transition-all font-bold text-sm"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-accent rounded-lg transition-all animate-in fade-in zoom-in"
+            >
+              <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+            </button>
+          )}
+        </div>
 
         {/* Custom Actions Hub */}
         <div className="flex gap-2">
