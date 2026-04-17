@@ -88,12 +88,10 @@ export default function POS() {
     return matchSearch && matchCat;
   });
 
-  // LATEST ARRIVALS ENGINE: Get most recently added items from inventory
   const latestProducts = useMemo(() => {
     return [...inventory]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 10); // Show top 10 newest arrivals
-  }, [inventory]);
   }, [inventory]);
   
   // CUSTOMER AUTOCOMPLETE ENGINE
