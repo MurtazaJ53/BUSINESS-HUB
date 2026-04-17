@@ -328,12 +328,7 @@ export default function POS() {
           ))}
         </div>
 
-        {/* Search Bar - NOW BELOW CATEGORIES */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input
-            id="pos-search"
-            type="text"
+
         {/* EXECUTIVE CART COMMAND: NOW AT THE TOP FOR PERMANENT OVERSIGHT */}
         {cart.length > 0 && (
           <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-700">
