@@ -560,9 +560,15 @@ export default function POS() {
                             +₹{((c.price - c.costPrice) * c.quantity).toFixed(0)} PROFIT
                           </span>
                         )}
-                        <p className={`font-black text-sm ${c.isReturn ? 'text-red-500' : ''}`}>
-                          {c.isReturn ? '-' : ''}{formatCurrency(c.price * c.quantity)}
-                        </p>
+                        <div className="flex items-center gap-1">
+                          <span className={`text-sm font-black ${c.isReturn ? 'text-red-500' : 'text-foreground'}`}>{c.isReturn ? '-' : ''}₹</span>
+                          <input 
+                            type="number"
+                            value={c.price}
+                            onChange={(e) => updatePrice(c.itemId, !!c.isReturn, parseFloat(e.target.value) || 0)}
+                            className={`bg-transparent border-none p-0 text-sm font-black w-14 focus:ring-0 text-right ${c.isReturn ? 'text-red-500' : 'text-foreground'}`}
+                          />
+                        </div>
                       </div>
                       <div className="flex items-center gap-1 bg-accent/50 rounded-xl p-1">
                         <button onClick={() => updateQty(c.itemId, !!c.isReturn, -1)} className="h-6 w-6 rounded-lg bg-accent flex items-center justify-center"><Minus className="h-3 w-3" /></button>
