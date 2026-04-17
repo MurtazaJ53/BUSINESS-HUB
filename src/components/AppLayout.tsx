@@ -189,20 +189,20 @@ export default function AppLayout({ pages }: AppLayoutProps) {
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-[60] w-64 bg-card border-r border-border transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 md:z-auto no-print shadow-2xl md:shadow-none overflow-hidden flex flex-col",
+        "fixed inset-y-0 left-0 z-[60] w-64 bg-card border-r border-border transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 lg:z-auto no-print shadow-2xl lg:shadow-none overflow-hidden flex flex-col",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         {/* Mobile Close Button - Executive Hit-Area */}
         <button 
           onClick={() => setSidebarOpen(false)}
-          className="absolute right-4 top-4 p-3 bg-accent rounded-2xl text-muted-foreground md:hidden flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-all z-[100] active:scale-95 shadow-2xl border border-border/50"
+          className="absolute right-4 top-4 p-3 bg-accent rounded-2xl text-muted-foreground lg:hidden flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-all z-[100] active:scale-95 shadow-2xl border border-border/50"
           aria-label="Close navigation"
         >
           <X className="h-6 w-6 stroke-[3px]" />
