@@ -202,10 +202,10 @@ export default function AppLayout({ pages }: AppLayoutProps) {
         {/* Mobile Close Button - Executive Hit-Area */}
         <button 
           onClick={() => setSidebarOpen(false)}
-          className="absolute right-4 top-4 p-3 bg-accent rounded-2xl text-muted-foreground lg:hidden flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-all z-[100] active:scale-95 shadow-2xl border border-border/50"
+          className="absolute right-4 top-4 h-12 w-12 bg-accent/80 backdrop-blur-md rounded-2xl text-primary lg:hidden flex items-center justify-center hover:bg-primary/20 hover:scale-110 active:scale-90 transition-all z-[100] shadow-xl border border-primary/20"
           aria-label="Close navigation"
         >
-          <X className="h-6 w-6 stroke-[3px]" />
+          <ChevronLeft className="h-7 w-7 stroke-[3px]" />
         </button>
 
         <div className="flex flex-col h-full p-4 overflow-y-auto scroll-smooth">
