@@ -114,7 +114,7 @@ export default function Inventory() {
   const [errorModal, setErrorModal] = useState({ show: false, title: '', message: '' });
   const [form, setForm] = useState(emptyForm);
   const [editForm, setEditForm] = useState(emptyForm);
-  const [restockForm, setRestockForm] = useState({ qty: '', cost: '' });
+  const [restockForm, setRestockForm] = useState({ qty: '', cost: '', newSellPrice: '' });
   const [variantMatrix, setVariantMatrix] = useState<MatrixRow[]>([]);
   const [bulkRows, setBulkRows] = useState<BulkRow[]>(Array(5).fill(null).map(emptyBulkRow));
   const [toast, setToast] = useState('');
@@ -272,10 +272,17 @@ export default function Inventory() {
 
     try {
       setIsProcessing(true);
+      
+      // If a new sell price is provided, update it first
+      const s = parseFloat(restockForm.newSellPrice);
+      if (!isNaN(s) && s > 0) {
+        await updateInventoryItem({ ...restockOpen, price: s });
+      }
+
       await restockItem(restockOpen.id, q, c);
       showToast(`Restocked ${restockOpen.name} successfully!`);
       setRestockOpen(null);
-      setRestockForm({ qty: '', cost: '' });
+      setRestockForm({ qty: '', cost: '', newSellPrice: '' });
     } catch (err: any) {
       setErrorModal({ show: true, title: 'Restock Error', message: err.message });
     } finally {
@@ -521,7 +528,11 @@ export default function Inventory() {
                     {role === 'admin' && (
                       <div className="absolute top-1 right-1 flex gap-1 opacity-100 transition-all">
                         <button 
-                          onClick={(e) => { e.stopPropagation(); setRestockOpen(item); setRestockForm({ qty: '', cost: (item.costPrice || 0).toString() }); }}
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setRestockOpen(item); 
+                            setRestockForm({ qty: '', cost: (item.costPrice || 0).toString(), newSellPrice: '' }); 
+                          }}
                           className="p-1 rounded-lg bg-emerald-500 text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
                           title="Restock Arrival"
                         >
@@ -725,24 +736,56 @@ export default function Inventory() {
             </div>
           </div>
 
+          <div className="space-y-1.5">
+            <Label className="text-[10px] uppercase font-black text-primary">Optional: New Sell Price</Label>
+            <Input 
+              type="number" 
+              placeholder={`Current: ₹${restockOpen?.price}`} 
+              value={restockForm.newSellPrice} 
+              onChange={(e) => setRestockForm({ ...restockForm, newSellPrice: e.target.value })} 
+            />
+            <p className="text-[9px] text-muted-foreground font-bold">Leave blank to keep current price</p>
+          </div>
+
           {restockForm.qty && restockForm.cost && restockOpen && (
-            <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="flex justify-between items-center">
-                <div className="space-y-0.5">
-                  <span className="text-[10px] uppercase font-black text-primary">New Market Value (Avg)</span>
-                  <p className="text-xl font-black text-primary">
-                    {formatCurrency(
-                      (( (restockOpen?.stock || 0) * (restockOpen?.costPrice || 0) ) + 
-                       ( parseFloat(restockForm.qty) * parseFloat(restockForm.cost) )) / 
-                      ( (restockOpen?.stock || 0) + parseFloat(restockForm.qty) )
-                    )}
-                  </p>
-                </div>
-                <div className="text-right space-y-0.5">
-                  <span className="text-[10px] uppercase font-black text-muted-foreground">Total Units</span>
-                  <p className="text-xl font-black">{(restockOpen?.stock || 0) + parseFloat(restockForm.qty)}</p>
+            <div className="space-y-3">
+              <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="flex justify-between items-center">
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] uppercase font-black text-primary">New Avg Cost</span>
+                    <p className="text-xl font-black text-primary">
+                      {formatCurrency(
+                        (( (restockOpen?.stock || 0) * (restockOpen?.costPrice || 0) ) + 
+                         ( parseFloat(restockForm.qty) * parseFloat(restockForm.cost) )) / 
+                        ( (restockOpen?.stock || 0) + parseFloat(restockForm.qty) )
+                      )}
+                    </p>
+                  </div>
+                  <div className="text-right space-y-0.5">
+                    <span className="text-[10px] uppercase font-black text-muted-foreground">Total Units</span>
+                    <p className="text-xl font-black">{(restockOpen?.stock || 0) + parseFloat(restockForm.qty)}</p>
+                  </div>
                 </div>
               </div>
+
+              {restockForm.newSellPrice && (
+                <div className="p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10 animate-in zoom-in duration-300">
+                   <div className="flex justify-between items-center">
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] uppercase font-black text-emerald-500">New Profit / Unit</span>
+                      <p className="text-xl font-black text-emerald-500">
+                        {formatCurrency(parseFloat(restockForm.newSellPrice) - parseFloat(restockForm.cost))}
+                      </p>
+                    </div>
+                    <div className="text-right space-y-0.5">
+                      <span className="text-[10px] uppercase font-black text-muted-foreground">Margin</span>
+                      <p className="text-lg font-black">
+                        {(( (parseFloat(restockForm.newSellPrice) - parseFloat(restockForm.cost)) / parseFloat(restockForm.newSellPrice) ) * 100).toFixed(1)}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
