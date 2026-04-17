@@ -292,10 +292,12 @@ export default function Settings() {
           </div>
           <button 
             onClick={() => auth.signOut()}
-            className="flex items-center gap-2 px-6 py-3 bg-red-500/10 text-red-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all shadow-lg shadow-red-500/10"
+            className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-red-500/10 to-transparent hover:from-red-600 hover:to-red-500 text-red-500 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl shadow-red-500/5 group border border-red-500/20"
           >
-            <LogOut className="h-4 w-4" />
-            Log Out Hub
+            <div className="h-8 w-8 rounded-xl bg-red-500/20 flex items-center justify-center group-hover:bg-white/20 transition-colors">
+              <LogOut className="h-4 w-4" />
+            </div>
+            <span>Terminate Hub Session</span>
           </button>
         </div>
       </div>

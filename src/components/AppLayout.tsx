@@ -257,6 +257,17 @@ export default function AppLayout({ pages }: AppLayoutProps) {
                 onClick={() => navigate('settings')}
               />
             )}
+            
+            {/* INSTANT LOGOUT HUD */}
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all group"
+              title="Terminate Current Session"
+            >
+              <LogOut className="h-5 w-5 group-hover:scale-110 transition-transform" />
+              <span className="font-semibold text-sm">Instant Logout</span>
+            </button>
+
             {/* User badge */}
             <div className="flex items-center gap-3 px-4 py-3 mt-1">
               <div className="h-8 w-8 rounded-full premium-gradient shrink-0" />

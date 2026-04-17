@@ -236,7 +236,7 @@ export default function AuthPage() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-bold"
-                      placeholder="admin@shop.com"
+                      placeholder="your@email.com"
                     />
                   </div>
                 </div>
@@ -282,8 +282,9 @@ export default function AuthPage() {
               <button 
                 type="button"
                 onClick={() => auth.signOut()}
-                className="w-full text-[10px] font-black uppercase tracking-widest text-zinc-600 hover:text-red-500 transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-600 hover:text-red-500 transition-all border border-transparent hover:border-red-500/20 rounded-xl hover:bg-red-500/5"
               >
+                <LogOut className="h-3 w-3" />
                 Logout and Switch Account
               </button>
             )}
