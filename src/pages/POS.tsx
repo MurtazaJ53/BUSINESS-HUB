@@ -37,6 +37,7 @@ export default function POS() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [footerNote, setFooterNote] = useState(shop.footer || '');
   const [errorModal, setErrorModal] = useState({ show: false, title: '', message: '' });
+  const [terminalStep, setTerminalStep] = useState<'catalog' | 'checkout'>('catalog');
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -128,17 +129,18 @@ export default function POS() {
     setCart((prev) => {
       const existing = prev.find((c) => c.itemId === product.id);
       if (existing) {
-        return prev.map((c) =>
-          c.itemId === product.id ? { ...c, quantity: c.quantity + 1 } : c
-        );
+        // If it exists, pull it to the TOP and increment
+        const others = prev.filter((c) => c.itemId !== product.id);
+        return [{ ...existing, quantity: existing.quantity + 1 }, ...others];
       }
-      return [...prev, {
+      // New items always go to the TOP for high-visibility
+      return [{
         itemId: product.id,
         name: product.name,
         quantity: 1,
         price: product.price,
         costPrice: product.costPrice,
-      }];
+      }, ...prev];
     });
   };
 
@@ -278,8 +280,12 @@ export default function POS() {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-8rem)]">
-      <div className="flex-1 space-y-4 min-w-0">
+    <div className="flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-8rem)] pb-24 lg:pb-0">
+      {/* STEP 1: CATALOG VIEW (Always visible on Desktop, Conditional on Mobile) */}
+      <div className={cn(
+        "flex-1 space-y-4 min-w-0",
+        terminalStep === 'checkout' ? "hidden lg:block" : "block"
+      )}>
         <div>
           <h1 className="text-4xl font-black tracking-tighter">Sales Hub</h1>
           <p className="text-muted-foreground mt-1">High-speed elite terminal checkout</p>
@@ -426,7 +432,19 @@ export default function POS() {
         )}
       </div>
 
-      <div className="lg:w-80 xl:w-96 shrink-0">
+      {/* STEP 2: CHECKOUT VIEW (Always visible on Desktop, Conditional on Mobile) */}
+      <div className={cn(
+        "lg:w-80 xl:w-96 shrink-0",
+        terminalStep === 'catalog' ? "hidden lg:block" : "block"
+      )}>
+        {/* BACK BUTTON (Mobile Only) */}
+        <button 
+          onClick={() => setTerminalStep('catalog')}
+          className="lg:hidden flex items-center gap-2 text-primary font-black uppercase tracking-widest mb-4 bg-primary/10 px-4 py-2 rounded-xl"
+        >
+          <ArrowRight className="h-4 w-4 rotate-180" /> Add More Items
+        </button>
+
         <div className="glass-card rounded-3xl p-6 lg:sticky lg:top-24 space-y-4">
           <div className="flex items-center gap-2">
             <ShoppingCart className="h-5 w-5 text-primary" />
@@ -649,6 +667,22 @@ export default function POS() {
           )}
         </div>
       </div>
+
+      {/* FLOATING ACTION BAR (Mobile Only - Catalog View) */}
+      {terminalStep === 'catalog' && cart.length > 0 && (
+        <div className="lg:hidden fixed bottom-6 left-6 right-6 z-[200] animate-in slide-in-from-bottom-5">
+          <button 
+            onClick={() => setTerminalStep('checkout')}
+            className="w-full premium-gradient text-white py-4 rounded-3xl font-black uppercase tracking-widest shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all border border-white/20"
+          >
+            <div className="bg-white/20 px-2 py-0.5 rounded-lg text-xs">
+              {cart.length}
+            </div>
+            Review Order
+            <ArrowRight className="h-5 w-5" />
+          </button>
+        </div>
+      )}
 
 
       <ErrorModal 
