@@ -12,6 +12,7 @@ import StockAlerts from './pages/StockAlerts';
 import AuthPage from './pages/Auth';
 import { useAuthStore } from './lib/useAuthStore';
 import { useBusinessStore } from './lib/useBusinessStore';
+import { Sparkles } from 'lucide-react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { useUpdateCheck } from './hooks/useUpdateCheck';
 import UpdateBanner from './components/UpdateBanner';
