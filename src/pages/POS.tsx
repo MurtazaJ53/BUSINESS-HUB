@@ -265,30 +265,6 @@ export default function POS() {
         "flex-1 space-y-4 min-w-0",
         terminalStep === 'checkout' ? "hidden lg:block" : "block"
       )}>
-        {/* EXECUTIVE MINI-CART (Mobile Only - Catalog View) */}
-        {cart.length > 0 && (
-          <div className="lg:hidden animate-in slide-in-from-top-2">
-            <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-2 flex items-center gap-1.5">
-              <Sparkles className="h-3 w-3" /> Recently Added
-            </p>
-            <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-none snap-x">
-              {cart.map((item) => (
-                <div 
-                  key={item.itemId}
-                  className="flex-shrink-0 w-32 glass-card p-3 rounded-2xl border-primary/20 snap-start animate-in zoom-in-95 duration-300"
-                >
-                  <p className="text-[10px] font-bold truncate mb-1">{item.name}</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black text-primary">x{item.quantity}</span>
-                    <span className="text-[9px] font-bold opacity-50">{formatCurrency(item.price)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="h-px bg-border/50 my-2" />
-          </div>
-        )}
-
         <div>
           <h1 className="text-4xl font-black tracking-tighter">Sales Hub</h1>
           <p className="text-muted-foreground mt-1 text-xs">High-speed elite terminal checkout</p>
@@ -306,47 +282,55 @@ export default function POS() {
           />
         </div>
 
-        {/* NEW ARRIVALS GRID: BIG SCREEN TREATMENT */}
-        {latestProducts.length > 0 && !search && category === 'All' && (
+        {/* EXECUTIVE CART COMMAND: BIG SCREEN TREATMENT */}
+        {cart.length > 0 && !search && (
           <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-700">
-            <h3 className="text-[11px] font-black uppercase tracking-[0.25em] text-primary flex items-center gap-2.5">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
-              </span>
-              Recently Added Items
+            <h3 className="text-[11px] font-black uppercase tracking-[0.25em] text-primary flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <ShoppingCart className="h-4 w-4" />
+                Current Order
+              </div>
+              <span className="text-[10px] opacity-50">{cart.length} ITEMS</span>
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-              {latestProducts.map(item => (
-                <button
-                  key={item.id}
-                  onClick={() => addToCart(item)}
-                  className="flex items-center gap-4 p-4 bg-primary/5 border border-primary/20 rounded-3xl hover:bg-primary hover:text-white transition-all group relative overflow-hidden active:scale-95 shadow-sm"
+              {cart.map(item => (
+                <div
+                  key={item.itemId}
+                  className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-3xl animate-in zoom-in-95 duration-300 shadow-sm"
                 >
-                  <div className="h-14 w-14 shrink-0 premium-gradient rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                    <Package className="h-6 w-6 text-white" />
+                  <div className="h-12 w-12 shrink-0 premium-gradient rounded-2xl flex items-center justify-center shadow-md">
+                    <Package className="h-5 w-5 text-white" />
                   </div>
-                  <div className="flex-1 text-left min-w-0">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <p className="text-sm font-black uppercase tracking-tight truncate">{item.name}</p>
-                      <span className="px-1.5 py-0.5 bg-green-500 text-white text-[8px] font-black uppercase rounded-lg shadow-sm">NEW</span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1">
-                      <span className="px-1.5 py-0.5 bg-primary/10 text-primary text-[9px] font-black uppercase rounded-lg border border-primary/20 group-hover:bg-white/20 group-hover:text-white group-hover:border-white/30">
-                        {item.category}
-                      </span>
-                      {item.size && (
-                        <span className="px-1.5 py-0.5 bg-purple-500/10 text-purple-500 text-[9px] font-black uppercase rounded-lg border border-purple-500/20 group-hover:bg-white/20 group-hover:text-white group-hover:border-white/30">
-                          {item.size}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm font-black mt-1">{formatCurrency(item.price)}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-black uppercase tracking-tight truncate">{item.name}</p>
+                    <p className="text-[10px] font-bold text-primary">{formatCurrency(item.price * item.quantity)}</p>
                   </div>
-                  <PlusCircle className="absolute -right-2 -bottom-2 h-12 w-12 opacity-5 group-hover:opacity-20 transition-opacity" />
-                </button>
+                  <div className="flex items-center bg-card rounded-2xl border border-border/50 p-1 gap-1">
+                    <button 
+                      onClick={() => updateQuantity(item.itemId, item.quantity - 1)}
+                      className="p-1.5 hover:bg-accent rounded-xl transition-colors text-muted-foreground"
+                    >
+                      <Minus className="h-3 w-3" />
+                    </button>
+                    <span className="text-[11px] font-black min-w-[1.5rem] text-center">{item.quantity}</span>
+                    <button 
+                      onClick={() => updateQuantity(item.itemId, item.quantity + 1)}
+                      className="p-1.5 hover:bg-accent rounded-xl transition-colors text-primary"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </button>
+                    <div className="w-px h-4 bg-border/50 mx-0.5" />
+                    <button 
+                      onClick={() => removeFromCart(item.itemId)}
+                      className="p-1.5 hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-colors"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
+            <div className="h-px bg-border/50 my-2" />
           </div>
         )}
 
