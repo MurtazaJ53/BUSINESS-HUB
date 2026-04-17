@@ -273,17 +273,6 @@ export default function AppLayout({ pages }: AppLayoutProps) {
               <Menu className="h-5 w-5 text-foreground group-hover:scale-110 transition-transform" />
             </button>
 
-            {/* Back Button - Only if not on Dashboard */}
-            {activeTab !== 'dashboard' && (
-              <button
-                onClick={() => setActiveTab('dashboard')}
-                className="p-2 hover:bg-accent rounded-sm transition-all group ml-1"
-                title="Go to Dashboard"
-              >
-                <ChevronLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform opacity-60" />
-              </button>
-            )}
-
             <span className="hidden sm:block text-sm font-black text-muted-foreground uppercase tracking-[0.3em] ml-2">
               {PAGE_TITLES[activeTab] ?? 'Business Hub'}
             </span>
