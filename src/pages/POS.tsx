@@ -437,38 +437,30 @@ export default function POS() {
                     </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <h3 className="font-extrabold text-[11px] uppercase tracking-tight truncate pr-2">{product.name}</h3>
-                    <div className="flex gap-1 flex-wrap">
-                      <span className="px-1.5 py-0.5 bg-accent/50 text-muted-foreground text-[8px] font-black uppercase rounded-md border border-border/50">
+                  <div className="space-y-1.5 mt-1">
+                    <h3 className="font-extrabold text-[12px] uppercase tracking-tight truncate leading-tight">{product.name}</h3>
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="px-2 py-0.5 bg-accent/50 text-zinc-400 text-[9px] font-black uppercase rounded-lg border border-border/50">
                         {product.categoryShort || product.category.slice(0, 4)}
                       </span>
                       {product.size && (
-                        <span className="px-1.5 py-0.5 bg-purple-500/10 text-purple-500 text-[8px] font-black uppercase rounded-md border border-purple-500/20">
+                        <span className="px-3 py-1 bg-purple-500/10 text-purple-500 text-[12px] font-black uppercase rounded-lg border border-purple-500/20 shadow-sm leading-none">
                           {product.size}
                         </span>
                       )}
-                      <span className={`px-1.5 py-0.5 text-[8px] font-black uppercase rounded-md border ${
+                      <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-lg border ${
                         outOfStock ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
                       }`}>
                         Stk: {product.stock || 0}
                       </span>
                     </div>
                   </div>
-                  <div className="flex flex-col text-left">
-                    <span className="font-extrabold text-sm truncate uppercase tracking-tight group-hover:text-primary transition-colors text-foreground">{product.name}</span>
-                    <div className="flex flex-wrap items-center gap-1 mt-2">
-                      <span className="px-2 py-0.5 bg-accent text-muted-foreground text-[8px] font-black uppercase rounded shadow-sm">
-                        {product.category}
-                      </span>
-                      {product.size && (
-                        <span className="px-2 py-0.5 bg-purple-500/10 text-purple-500 text-[8px] font-black uppercase rounded border border-purple-500/20">
-                          {product.size}
-                        </span>
-                      )}
-                    </div>
+                  
+                  <div className="flex justify-between items-end mt-4 pt-2 border-t border-border/10">
+                    <p className="font-black text-xl tracking-tighter text-foreground leading-none">
+                      {formatCurrency(product.price)}
+                    </p>
                   </div>
-                  <p className="text-primary font-black mt-3 text-lg">{formatCurrency(product.price)}</p>
                 </div>
               );
             })}
