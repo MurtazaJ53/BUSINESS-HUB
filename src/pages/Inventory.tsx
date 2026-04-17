@@ -448,22 +448,25 @@ export default function Inventory() {
           <p className="font-bold">{search ? 'No products match your search' : 'Your inventory is empty. Add your first product!'}</p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((item) => {
             const isLow = item.stock !== undefined && item.stock <= 5;
 
             return (
               <div
                 key={item.id}
-                className={`glass-card group rounded-2xl p-5 hover:shadow-xl transition-all duration-300 border ${
+                className={`glass-card group rounded-xl p-3 hover:shadow-lg transition-all border ${
                   isLow ? 'border-red-500/20' : 'border-border/30'
                 }`}
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                    <Package className="h-5 w-5 text-primary" />
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <Package className="h-3.5 w-3.5 text-primary" />
+                    </div>
+                    <p className="font-bold text-sm truncate">{item.name}</p>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-0.5 shrink-0">
                     <button
                       onClick={() => {
                         setEditingItem(item);
@@ -476,9 +479,9 @@ export default function Inventory() {
                           stock: item.stock !== undefined ? String(item.stock) : '',
                         });
                       }}
-                      className="p-1.5 hover:bg-accent rounded-lg transition-colors"
+                      className="p-1 hover:bg-accent rounded-md transition-colors"
                     >
-                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                      <Pencil className="h-3 w-3 text-muted-foreground" />
                     </button>
                     <button
                       onClick={() => {
@@ -486,48 +489,34 @@ export default function Inventory() {
                           deleteInventoryItem(item.id).then(() => showToast("Item deleted"));
                         }
                       }}
-                      className="p-1.5 hover:bg-red-500/10 rounded-lg transition-colors text-muted-foreground hover:text-red-500"
+                      className="p-1 hover:bg-red-500/10 rounded-md transition-colors text-muted-foreground hover:text-red-500"
                     >
-                      <Trash2 className="h-3.5 w-3.5 px-0.5" />
+                      <Trash2 className="h-3 w-3" />
                     </button>
                   </div>
                 </div>
 
-                <div className="min-w-0">
-                  <p className="font-bold text-lg truncate group-hover:text-primary transition-colors">{item.name}</p>
-                  <div className="flex flex-wrap gap-2 mt-1.5">
-                    <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-black uppercase rounded-xl border border-primary/20">
-                      {item.category}
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  <span className="px-1.5 py-0.5 bg-primary/5 text-primary text-[9px] font-black uppercase rounded-lg border border-primary/10">
+                    {item.category}
+                  </span>
+                  {item.subcategory && (
+                    <span className="px-1.5 py-0.5 bg-amber-500/5 text-amber-500 text-[9px] font-black uppercase rounded-lg border border-amber-500/10">
+                      {item.subcategory}
                     </span>
-                    {item.subcategory && (
-                      <span className="px-3 py-1 bg-amber-500/10 text-amber-500 text-[10px] font-black uppercase rounded-xl border border-amber-500/20">
-                        {item.subcategory}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-4 mb-4 min-h-[32px] flex items-center">
-                  {item.size ? (
-                    <span className="text-xs bg-accent text-foreground px-3 py-1.5 rounded-xl font-black uppercase border border-border/50 shadow-sm">
-                      Size: {item.size}
+                  )}
+                  {item.size && (
+                    <span className="px-1.5 py-0.5 bg-purple-500/5 text-purple-500 text-[9px] font-black uppercase rounded-lg border border-purple-500/10">
+                      {item.size}
                     </span>
-                  ) : (
-                    <span className="text-[10px] italic text-muted-foreground opacity-50">Standard Size</span>
                   )}
                 </div>
 
-                <div className="flex justify-between items-end">
-                  <div>
-                    <p className="text-[10px] font-black uppercase text-primary tracking-widest leading-none">Price</p>
-                    <p className="text-xl font-black text-foreground">{formatCurrency(item.price)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase opacity-60">Stock</p>
-                    <p className={`text-sm font-black ${isLow ? 'text-destructive' : 'text-primary'}`}>
-                      {item.stock || 0} <span className="text-[9px] uppercase">Units</span>
-                    </p>
-                  </div>
+                <div className="flex justify-between items-center text-xs">
+                  <p className="font-black text-foreground">{formatCurrency(item.price)}</p>
+                  <p className={`font-black ${isLow ? 'text-destructive' : 'text-primary'}`}>
+                    {item.stock || 0} <span className="text-[8px] uppercase font-normal opacity-60">STK</span>
+                  </p>
                 </div>
               </div>
             );
