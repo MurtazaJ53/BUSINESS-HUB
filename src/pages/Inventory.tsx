@@ -625,14 +625,13 @@ export default function Inventory() {
 
       {/* ── Edit Product Modal ── */}
       <Modal open={!!editingItem} onClose={() => setEditingItem(null)} title="Edit Product">
-        <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5"><Label>Product Name</Label><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
-            <div className="space-y-1.5"><Label>SKU</Label><Input value={editForm.sku} onChange={(e) => setEditForm({ ...editForm, sku: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-muted-foreground">Product Name</Label><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-muted-foreground">SKU (Option)</Label><Input value={editForm.sku} onChange={(e) => setEditForm({ ...editForm, sku: e.target.value })} /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5"><Label>Category</Label><Input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} /></div>
-            <div className="space-y-1.5"><Label>Sub-category</Label><Input value={editForm.subcategory} onChange={(e) => setEditForm({ ...editForm, subcategory: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-muted-foreground">Category</Label><Input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-muted-foreground">Sub-category</Label><Input value={editForm.subcategory} onChange={(e) => setEditForm({ ...editForm, subcategory: e.target.value })} /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-muted-foreground">Sell Price</Label><Input type="number" value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: e.target.value })} /></div>
@@ -642,7 +641,7 @@ export default function Inventory() {
             <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-muted-foreground">Stock</Label><Input type="number" value={editForm.stock} onChange={(e) => setEditForm({ ...editForm, stock: e.target.value })} /></div>
             <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-muted-foreground">Size</Label><Input value={editForm.size} onChange={(e) => setEditForm({ ...editForm, size: e.target.value })} /></div>
           </div>
-          <div className="space-y-1.5"><Label>Description</Label><Input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-muted-foreground">Description</Label><Input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} /></div>
           <div className="flex gap-3">
             <button onClick={() => setEditingItem(null)} className="flex-1 py-3 rounded-2xl font-bold text-sm border border-border hover:bg-accent transition-all">Cancel</button>
             <button onClick={handleUpdate} className="flex-1 premium-gradient text-white py-3 rounded-2xl font-bold text-sm hover:shadow-xl transition-all">Save Changes</button>
