@@ -3,6 +3,7 @@ import {
   Plus, Minus, Package, Trash2, Pencil, Search, Tag, Database,
   X, FileText, ClipboardPaste, Copy, AlertCircle, AlertTriangle, Sparkles
 } from 'lucide-react';
+import ErrorModal from '@/components/ErrorModal';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency } from '@/lib/utils';
 import type { InventoryItem } from '@/lib/types';
@@ -105,6 +106,7 @@ export default function Inventory() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [errorModal, setErrorModal] = useState({ show: false, title: '', message: '' });
   const [form, setForm] = useState(emptyForm);
   const [editForm, setEditForm] = useState(emptyForm);
   const [variantMatrix, setVariantMatrix] = useState<MatrixRow[]>([]);
@@ -156,7 +158,6 @@ export default function Inventory() {
   useEffect(() => {
     if (inventorySearchTerm) {
       setSearch(inventorySearchTerm);
-      // Optional: clear the global term so it doesn't persist on next visit
       setInventorySearchTerm('');
     }
   }, [inventorySearchTerm, setInventorySearchTerm]);
@@ -196,12 +197,12 @@ export default function Inventory() {
             id: `item-${Date.now()}-${count}`,
             name: form.name,
             price: parseFloat(row.price) || 0,
-            costPrice: row.costPrice ? parseFloat(row.costPrice) : undefined,
-            sku: form.sku ? `${form.sku}-${row.sub || ''}-${row.size || ''}`.replace(/--/g, '-') : '',
+            costPrice: row.costPrice ? parseFloat(row.costPrice) : 0,
+            sku: form.sku ? `${form.sku}-${row.sub || ''}-${row.size || ''}`.replace(/--/g, '-') : "",
             category: form.category || 'General',
-            subcategory: row.sub || '',
-            size: row.size || '',
-            description: form.description || '',
+            subcategory: row.sub || "",
+            size: row.size || "",
+            description: form.description || "",
             stock: row.stock ? parseInt(row.stock) : 0,
             createdAt: new Date().toISOString(),
           };
@@ -214,12 +215,12 @@ export default function Inventory() {
           id: `item-${Date.now()}`,
           name: form.name,
           price: parseFloat(form.price) || 0,
-          costPrice: form.costPrice ? parseFloat(form.costPrice) : undefined,
-          sku: form.sku || '',
+          costPrice: form.costPrice ? parseFloat(form.costPrice) : 0,
+          sku: form.sku || "",
           category: form.category || 'General',
-          subcategory: form.subcategory || '',
-          size: form.size || '',
-          description: form.description || '',
+          subcategory: form.subcategory || "",
+          size: form.size || "",
+          description: form.description || "",
           stock: form.stock ? parseInt(form.stock) : 0,
           createdAt: new Date().toISOString(),
         };
@@ -231,7 +232,11 @@ export default function Inventory() {
       setVariantMatrix([]);
     } catch (err: any) {
       console.error(err);
-      showToast(err.message || 'Failed to add items');
+      setErrorModal({
+        show: true,
+        title: 'Save Failed',
+        message: err.message || 'There was an error saving this item to your inventory.'
+      });
     }
   };
 

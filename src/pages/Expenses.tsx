@@ -40,19 +40,39 @@ export default function Expenses() {
     date: new Date().toISOString().split('T')[0]
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newExpense: Expense = {
-      id: `exp-${Date.now()}`,
-      category: formData.category,
-      amount: parseFloat(formData.amount) || 0,
-      description: formData.description,
-      date: formData.date,
-      createdAt: new Date().toISOString()
-    };
-    addExpense(newExpense);
-    setIsAdding(false);
-    setFormData({ amount: '', category: 'Others', description: '', date: new Date().toISOString().split('T')[0] });
+    const amount = parseFloat(formData.amount) || 0;
+    const description = formData.description.trim();
+
+    try {
+      if (!amount || !description) {
+        setErrorModal({
+          show: true,
+          title: 'Missing Info',
+          message: 'Please enter both an amount and a description for your expense.'
+        });
+        return;
+      }
+
+      await addExpense({
+        id: `exp-${Date.now()}`,
+        category: formData.category,
+        amount: amount,
+        description: description,
+        date: formData.date,
+        createdAt: new Date().toISOString()
+      });
+      
+      setIsAdding(false);
+      setFormData({ amount: '', category: 'Others', description: '', date: new Date().toISOString().split('T')[0] });
+    } catch (err: any) {
+      setErrorModal({
+        show: true,
+        title: 'Save Failed',
+        message: err.message || 'There was a connection error while saving your expense.'
+      });
+    }
   };
 
   const currentMonth = new Date().toISOString().split('-').slice(0, 2).join('-');

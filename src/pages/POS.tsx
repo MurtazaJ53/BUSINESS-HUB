@@ -7,6 +7,7 @@ import {
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn } from '@/lib/utils';
 import ReceiptModal from '@/components/ReceiptModal';
+import ErrorModal from '@/components/ErrorModal';
 import type { Sale, SaleItem } from '@/lib/types';
 
 type PayMode = 'CASH' | 'UPI' | 'CARD' | 'CREDIT' | 'ONLINE' | 'OTHERS';
@@ -33,6 +34,7 @@ export default function POS() {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [stockWarningItems, setStockWarningItems] = useState<{item: SaleItem, stock: number}[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [errorModal, setErrorModal] = useState({ show: false, title: '', message: '' });
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -185,8 +187,9 @@ export default function POS() {
       discountValue,
       paymentMode: payments[0].mode as any,
       payments: [...payments],
-      customerName: customerName || undefined,
-      customerId: selectedCustomerId || undefined,
+      // SANITIZATION: Ensure NO undefined values ever reach Firestore
+      customerName: customerName || "",
+      customerId: selectedCustomerId || "",
       date: saleDate,
       createdAt: new Date().toISOString(),
     };
@@ -209,7 +212,11 @@ export default function POS() {
       }
     } catch (e: any) {
       console.error("Turbo Checkout Failed:", e);
-      window.alert(`Checkout Failed: ${e.message || 'Unknown Error'}. Please check your internet.`);
+      setErrorModal({
+        show: true,
+        title: 'Checkout Failed',
+        message: e.message || 'There was a connection error while saving your sale.'
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -499,6 +506,13 @@ export default function POS() {
         </div>
       </div>
 
+
+      <ErrorModal 
+        isOpen={errorModal.show}
+        title={errorModal.title}
+        message={errorModal.message}
+        onClose={() => setErrorModal({ ...errorModal, show: false })}
+      />
 
       {receiptOpen && lastReceipt && (
         <ReceiptModal
