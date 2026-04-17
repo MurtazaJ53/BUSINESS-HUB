@@ -448,7 +448,7 @@ export default function Inventory() {
             className="w-full pl-11 pr-4 py-2.5 bg-card border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <select 
             value={selectedCategory}
             onChange={(e) => { setSelectedCategory(e.target.value); setSelectedSubcategory('All'); }}
@@ -487,12 +487,12 @@ export default function Inventory() {
                 }`}
               >
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between gap-1 overflow-hidden">
+                  <div className={`flex items-center justify-between gap-1 overflow-hidden ${role === 'admin' ? 'pr-12' : ''}`}>
                     <p className="font-extrabold text-[11px] uppercase tracking-tight truncate flex-1">{item.name}</p>
                     
-                    {/* Admin Controls */}
+                    {/* Admin Controls - Persistent on mobile */}
                     {role === 'admin' && (
-                      <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-all pointer-events-none group-hover:pointer-events-auto">
+                      <div className="absolute top-1 right-1 flex gap-1 opacity-100 transition-all">
                         <button 
                           onClick={(e) => { e.stopPropagation(); setRestockOpen(item); setRestockForm({ qty: '', cost: (item.costPrice || 0).toString() }); }}
                           className="p-1 rounded-lg bg-emerald-500 text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
