@@ -32,6 +32,7 @@ export default function POS() {
   const [lastReceipt, setLastReceipt] = useState<Sale | null>(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [stockWarningItems, setStockWarningItems] = useState<{item: SaleItem, stock: number}[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -141,17 +142,19 @@ export default function POS() {
   const totalPayments = payments.reduce((sum, p) => sum + p.amount, 0);
   const remainingBalance = Math.max(0, calcTotal() - totalPayments);
   const hasMultiplePayments = payments.length > 1;
-  const isPaid = Math.abs(totalPayments - calcTotal()) < 0.01 || totalPayments >= calcTotal();
+  // HARD FORCE: Allow 0.5 rupee tolerance to prevent decimal lock
+  const isPaid = totalPayments >= (calcTotal() - 0.5);
 
   // Auto-update first payment if only one exists
   useEffect(() => {
-    if (payments.length === 1 && Math.abs(payments[0].amount - calcTotal()) > 0.01) {
+    if (payments.length === 1 && Math.abs(payments[0].amount - calcTotal()) > 0.1) {
       setPayments([{ mode: payments[0].mode, amount: calcTotal() }]);
     }
   }, [cart, discountValue, discountType, payments.length]);
 
   const handleCheckout = async (force: boolean = false) => {
-    if (cart.length === 0) return;
+    if (cart.length === 0 || isProcessing) return;
+    setIsProcessing(true);
 
     if (!force) {
       const warnings: {item: SaleItem, stock: number}[] = [];
@@ -204,8 +207,11 @@ export default function POS() {
           });
         }
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Turbo Checkout Failed:", e);
+      window.alert(`Checkout Failed: ${e.message || 'Unknown Error'}. Please check your internet.`);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -478,14 +484,15 @@ export default function POS() {
 
               <button
                 onClick={() => handleCheckout(false)}
-                disabled={!isPaid}
-                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm transition-all ${
-                  isPaid
-                    ? 'premium-gradient text-white shadow-xl hover:-translate-y-0.5' 
+                disabled={!isPaid || isProcessing}
+                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm transition-all flex items-center justify-center gap-3 ${
+                  isPaid && !isProcessing
+                    ? 'premium-gradient text-white shadow-xl hover:-translate-y-0.5 active:scale-95' 
                     : 'bg-accent text-muted-foreground cursor-not-allowed opacity-50'
                 }`}
               >
-                Charge {formatCurrency(calcTotal())}
+                {isProcessing && <RotateCcw className="h-4 w-4 animate-spin" />}
+                {isProcessing ? 'Saving Transaction...' : `Charge ${formatCurrency(calcTotal())}`}
               </button>
             </>
           )}
