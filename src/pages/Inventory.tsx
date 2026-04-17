@@ -449,60 +449,31 @@ export default function Inventory() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {Object.entries(
-            filtered.reduce((acc, item) => {
-              if (!acc[item.name]) acc[item.name] = [];
-              acc[item.name].push(item);
-              return acc;
-            }, {} as Record<string, typeof filtered>)
-          ).map(([name, group]) => {
-            const firstItem = group[0];
-            const prices = group.map(i => i.price);
-            const minPrice = Math.min(...prices);
-            const maxPrice = Math.max(...prices);
-            const totalStock = group.reduce((sum, i) => sum + (i.stock || 0), 0);
-            const sizes = group.map(i => i.size).filter(Boolean).sort();
-            const isLow = totalStock <= 5;
-            const hasVariants = group.length > 1;
+          {filtered.map((item) => {
+            const isLow = item.stock !== undefined && item.stock <= 5;
 
             return (
               <div
-                key={name}
+                key={item.id}
                 className={`glass-card group rounded-2xl p-5 hover:shadow-xl transition-all duration-300 border ${
                   isLow ? 'border-red-500/20' : 'border-border/30'
                 }`}
               >
                 <div className="flex items-start justify-between mb-3">
-                  <div className="relative">
-                    <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                      <Package className="h-5 w-5 text-primary" />
-                    </div>
-                    {hasVariants && (
-                      <span className="absolute -top-2 -right-2 bg-primary text-[8px] font-black text-white px-1.5 py-0.5 rounded-full shadow-lg border border-background animate-pulse">
-                        {group.length} VAR
-                      </span>
-                    )}
+                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                    <Package className="h-5 w-5 text-primary" />
                   </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {!hasVariants && (
-                      <button
-                        onClick={() => handleDuplicate(firstItem)}
-                        className="p-1.5 hover:bg-accent rounded-lg transition-colors"
-                        title="Add Variant"
-                      >
-                        <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-                      </button>
-                    )}
+                  <div className="flex items-center gap-1">
                     <button
                       onClick={() => {
-                        setEditingItem(firstItem);
+                        setEditingItem(item);
                         setEditForm({
-                          name: firstItem.name, price: String(firstItem.price),
-                          costPrice: firstItem.costPrice ? String(firstItem.costPrice) : '',
-                          sku: firstItem.sku || '', category: firstItem.category,
-                          subcategory: firstItem.subcategory || '', size: firstItem.size || '',
-                          description: firstItem.description || '',
-                          stock: firstItem.stock !== undefined ? String(firstItem.stock) : '',
+                          name: item.name, price: String(item.price),
+                          costPrice: item.costPrice ? String(item.costPrice) : '',
+                          sku: item.sku || '', category: item.category,
+                          subcategory: item.subcategory || '', size: item.size || '',
+                          description: item.description || '',
+                          stock: item.stock !== undefined ? String(item.stock) : '',
                         });
                       }}
                       className="p-1.5 hover:bg-accent rounded-lg transition-colors"
@@ -511,8 +482,9 @@ export default function Inventory() {
                     </button>
                     <button
                       onClick={() => {
-                        Promise.all(group.map(i => deleteInventoryItem(i.id)))
-                          .then(() => showToast(`Product & ${group.length} variants deleted`));
+                        if (window.confirm("Delete this item?")) {
+                          deleteInventoryItem(item.id).then(() => showToast("Item deleted"));
+                        }
                       }}
                       className="p-1.5 hover:bg-red-500/10 rounded-lg transition-colors text-muted-foreground hover:text-red-500"
                     >
@@ -522,48 +494,38 @@ export default function Inventory() {
                 </div>
 
                 <div className="min-w-0">
-                  <p className="font-bold text-lg truncate group-hover:text-primary transition-colors">{name}</p>
-                  <div className="flex flex-wrap gap-2 mt-1.5 focus-within:">
-                    <span className="px-3 py-1 bg-primary/10 text-primary text-[12px] font-black uppercase rounded-xl border border-primary/30 shadow-sm transition-all focus-within:scale-105">
-                      {firstItem.category}
+                  <p className="font-bold text-lg truncate group-hover:text-primary transition-colors">{item.name}</p>
+                  <div className="flex flex-wrap gap-2 mt-1.5">
+                    <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-black uppercase rounded-xl border border-primary/20">
+                      {item.category}
                     </span>
-                    {firstItem.subcategory && (
-                      <span className="px-3 py-1 bg-amber-500/10 text-amber-500 text-[12px] font-black uppercase rounded-xl border border-amber-500/30 shadow-sm transition-all focus-within:scale-105">
-                        {firstItem.subcategory}
+                    {item.subcategory && (
+                      <span className="px-3 py-1 bg-amber-500/10 text-amber-500 text-[10px] font-black uppercase rounded-xl border border-amber-500/20">
+                        {item.subcategory}
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2.5 mt-4 mb-4 min-h-[32px]">
-                  {sizes.length > 0 ? (
-                    sizes.map(s => (
-                      <span key={s} className="text-sm bg-accent text-foreground px-3 py-1 rounded-xl font-black uppercase border border-border/50 shadow-md transform hover:scale-110 transition-transform">
-                        {s}
-                      </span>
-                    ))
+                <div className="mt-4 mb-4 min-h-[32px] flex items-center">
+                  {item.size ? (
+                    <span className="text-xs bg-accent text-foreground px-3 py-1.5 rounded-xl font-black uppercase border border-border/50 shadow-sm">
+                      Size: {item.size}
+                    </span>
                   ) : (
-                    <span className="text-[12px] italic text-muted-foreground opacity-50">No size variants</span>
+                    <span className="text-[10px] italic text-muted-foreground opacity-50">Standard Size</span>
                   )}
                 </div>
 
                 <div className="flex justify-between items-end">
                   <div>
-                    {hasVariants ? (
-                      <div className="space-y-0.5">
-                        <p className="text-[10px] font-black uppercase text-primary tracking-widest leading-none">Price Range</p>
-                        <p className="text-xl font-black text-foreground">
-                          {formatCurrency(minPrice)} - {formatCurrency(maxPrice)}
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-2xl font-black text-primary leading-none">{formatCurrency(firstItem.price)}</p>
-                    )}
+                    <p className="text-[10px] font-black uppercase text-primary tracking-widest leading-none">Price</p>
+                    <p className="text-xl font-black text-foreground">{formatCurrency(item.price)}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase opacity-60">Total Stock</p>
+                    <p className="text-[10px] font-black text-muted-foreground uppercase opacity-60">Stock</p>
                     <p className={`text-sm font-black ${isLow ? 'text-destructive' : 'text-primary'}`}>
-                      {totalStock} <span className="text-[9px] uppercase">Units</span>
+                      {item.stock || 0} <span className="text-[9px] uppercase">Units</span>
                     </p>
                   </div>
                 </div>
