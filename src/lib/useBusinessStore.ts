@@ -203,7 +203,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const creditPayment = finalSale.payments.find(p => p.mode === 'CREDIT');
     const creditAmount = creditPayment ? creditPayment.amount : 0;
 
-    if (creditAmount > 0 && customerName && !finalSale.customerId) {
+    if (creditAmount > 0 && finalSale.customerName && !finalSale.customerId) {
       // SMART MATCH: Try Phone first, then Name
       const phoneToMatch = finalSale.customerPhone?.trim();
       const nameToMatch = finalSale.customerName?.trim().toLowerCase();
