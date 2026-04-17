@@ -5,7 +5,7 @@ import {
   ArrowRight, CheckCircle2, Sparkles
 } from 'lucide-react';
 import { useBusinessStore } from '@/lib/useBusinessStore';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, cn, isValidIndianPhone, sanitizePhone } from '@/lib/utils';
 import ReceiptModal from '@/components/ReceiptModal';
 import ErrorModal from '@/components/ErrorModal';
 import type { Sale, SaleItem } from '@/lib/types';
@@ -177,10 +177,12 @@ export default function POS() {
   // HARD FORCE: Allow 0.5 rupee tolerance to prevent decimal lock
   const isPaid = totalPayments >= (calcTotal() - 0.5);
   
-  // CREDIT SECURITY: Mandatory Name + Phone for Udhaar
+  // CONTACT VALIDATION: Ensure 10-digit Indian standard
+  const isPhoneValid = !customerPhone.trim() || isValidIndianPhone(customerPhone);
+  // CREDIT SECURITY: Mandatory Name + VALID Phone for Udhaar
   const hasCredit = payments.some(p => p.mode === 'CREDIT');
-  const creditDetailsValid = customerName.trim() && customerPhone.trim();
-  const canCharge = isPaid && (!hasCredit || creditDetailsValid);
+  const creditDetailsValid = customerName.trim() && isValidIndianPhone(customerPhone);
+  const canCharge = isPaid && (!hasCredit || creditDetailsValid) && isPhoneValid;
 
   // Auto-update first payment if only one exists
   useEffect(() => {
@@ -475,22 +477,30 @@ export default function POS() {
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <input
-                type="tel"
-                placeholder={hasCredit ? "Phone Number (REDACTED)" : "Phone (Optional)"}
+                type="text"
+                placeholder={hasCredit ? "Valid 10-digit mobile" : "Phone (Optional)"}
                 value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
+                maxLength={10}
+                onChange={(e) => setCustomerPhone(sanitizePhone(e.target.value))}
                 className={cn(
                   "w-full pl-9 pr-3 py-2 bg-accent border border-border rounded-xl text-xs focus:outline-none focus:ring-2 transition-all font-bold",
-                  hasCredit && !customerPhone ? "border-red-500/50 ring-red-500/20" : "focus:ring-primary/30"
+                  (hasCredit && !customerPhone) || (!isPhoneValid && customerPhone) ? "border-red-500/50 ring-red-500/20 text-red-500" : "focus:ring-primary/30"
                 )}
               />
-            </div>
+              
+              {/* Validation Warning */}
+              {!isPhoneValid && customerPhone && (
+                <p className="text-[9px] text-red-500 mt-1 font-bold flex items-center gap-1 animate-in fade-in slide-in-from-top-1">
+                  <AlertCircle className="h-3 w-3" /> Enter valid 10-digit number
+                </p>
+              )}
 
-            {hasCredit && !creditDetailsValid && (
-              <p className="text-[9px] font-bold text-red-500 flex items-center gap-1 mt-1 animate-pulse">
-                <AlertCircle className="h-3 w-3" /> Name & Phone required for Credit
-              </p>
-            )}
+              {hasCredit && !customerPhone && (
+                <p className="text-[10px] text-red-500 mt-2 font-black uppercase tracking-tighter flex items-center gap-1 bg-red-500/10 p-2 rounded-lg border border-red-500/20">
+                  <AlertCircle className="h-3 w-3" /> Name & VALID Phone required for Credit
+                </p>
+              )}
+            </div>
           </div>
 
           {cart.length > 0 && (

@@ -15,17 +15,26 @@ import {
   Sun,
   Moon,
   RefreshCcw,
-  Sparkles
+  Sparkles,
+  Building2,
+  Smartphone,
+  Mail,
+  MapPin,
+  Trash2,
+  PlusCircle,
+  RotateCcw,
+  Building
 } from 'lucide-react';
 import { db, auth } from '@/lib/firebase';
 import { collection, addDoc, onSnapshot, query, setDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { UserPlus, Ticket, LogOut, X } from 'lucide-react';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { downloadFile, convertToCSV, exportSalesReport } from '@/lib/exportUtils';
+import { formatCurrency, cn, isValidIndianPhone, sanitizePhone } from '@/lib/utils';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { loadShopSettings } from '@/lib/shopSettings';
 import { useAuthStore } from '@/lib/useAuthStore';
-import type { InventoryItem } from '@/lib/types';
+import type { InventoryItem, ShopSettings } from '@/lib/types';
 
 export default function Settings() {
   const { inventory, sales, customers, shop, updateShop, clearInventory, theme, setTheme, shopId } = useBusinessStore();
@@ -400,11 +409,23 @@ export default function Settings() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest ml-1 opacity-50">Phone Number</label>
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-black uppercase tracking-widest ml-1 opacity-50">Phone Number</label>
+                  {editForm.phone && !isValidIndianPhone(editForm.phone) && (
+                    <span className="text-[9px] text-red-500 font-bold flex items-center gap-0.5 animate-pulse">
+                      <AlertCircle className="h-2.5 w-2.5" /> 10-digit req.
+                    </span>
+                  )}
+                </div>
                 <input 
-                  className="w-full bg-accent/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  maxLength={10}
+                  className={cn(
+                    "w-full bg-accent/50 border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 transition-all font-bold",
+                    editForm.phone && !isValidIndianPhone(editForm.phone) ? "border-red-500/50 ring-red-500/20 text-red-500" : "border-border focus:ring-primary/20"
+                  )}
                   value={editForm.phone}
-                  onChange={e => setEditForm({...editForm, phone: e.target.value})}
+                  onChange={e => setEditForm({...editForm, phone: sanitizePhone(e.target.value)})}
+                  placeholder="9876543210"
                 />
               </div>
               <div className="space-y-1">
@@ -426,8 +447,19 @@ export default function Settings() {
             </div>
 
             <div className="flex gap-3">
-              <button onClick={() => setEditOpen(false)} className="flex-1 py-4 rounded-2xl font-bold text-sm bg-accent hover:bg-accent/80 transition-all">Cancel</button>
-              <button onClick={handleSaveShop} className="flex-1 premium-gradient text-white py-4 rounded-2xl font-black text-sm hover:shadow-xl transition-all uppercase tracking-widest">Save Settings</button>
+              <button onClick={() => setEditOpen(false)} className="flex-1 py-4 rounded-2xl font-bold text-sm bg-accent hover:bg-accent/80 transition-all uppercase tracking-widest text-muted-foreground">Cancel</button>
+              <button 
+                onClick={handleSaveShop} 
+                disabled={!isValidIndianPhone(editForm.phone)}
+                className={cn(
+                  "flex-1 py-4 rounded-2xl font-black text-sm transition-all uppercase tracking-widest",
+                  isValidIndianPhone(editForm.phone)
+                    ? "premium-gradient text-white shadow-xl hover:-translate-y-0.5"
+                    : "bg-accent text-muted-foreground cursor-not-allowed opacity-50"
+                )}
+              >
+                Save Settings
+              </button>
             </div>
           </div>
         </div>

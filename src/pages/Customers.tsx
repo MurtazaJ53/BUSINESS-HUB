@@ -16,7 +16,7 @@ import {
   X
 } from 'lucide-react';
 import { useBusinessStore } from '@/lib/useBusinessStore';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, isValidIndianPhone, sanitizePhone } from '@/lib/utils';
 import type { Customer } from '@/lib/types';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
@@ -236,12 +236,20 @@ export default function Customers() {
                 <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Mobile Number</label>
                 <input 
                   required
-                  type="tel" 
+                  type="text" 
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  maxLength={10}
+                  onChange={(e) => setFormData({ ...formData, phone: sanitizePhone(e.target.value) })}
                   placeholder="e.g. 9876543210"
-                  className="w-full bg-accent border border-border rounded-2xl py-3 px-4 text-sm focus:ring-2 focus:ring-primary/20 outline-none font-bold"
+                  className={`w-full bg-accent border rounded-2xl py-3 px-4 text-sm focus:ring-2 outline-none font-bold transition-all ${
+                    formData.phone && !isValidIndianPhone(formData.phone) ? "border-red-500/50 ring-red-500/20 text-red-500" : "border-border focus:ring-primary/20"
+                  }`}
                 />
+                {formData.phone && !isValidIndianPhone(formData.phone) && (
+                  <p className="text-[9px] text-red-500 font-bold flex items-center gap-1 mt-1 animate-in fade-in slide-in-from-top-1">
+                    <AlertCircle className="h-3 w-3" /> Enter valid 10-digit Indian number
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Email ID (Optional)</label>
@@ -262,10 +270,15 @@ export default function Customers() {
                   Cancel
                 </button>
                 <button 
-                  type="submit"
-                  className="py-3 px-4 rounded-2xl font-black text-sm premium-gradient text-white hover:shadow-xl hover:-translate-y-0.5 transition-all uppercase tracking-widest"
+                  type="submit" 
+                  disabled={!formData.name || !isValidIndianPhone(formData.phone)}
+                  className={`py-3 px-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all ${
+                    formData.name && isValidIndianPhone(formData.phone)
+                      ? 'premium-gradient text-white shadow-lg hover:-translate-y-0.5' 
+                      : 'bg-accent text-muted-foreground cursor-not-allowed'
+                  }`}
                 >
-                  Create Account
+                  Save Customer
                 </button>
               </div>
             </form>

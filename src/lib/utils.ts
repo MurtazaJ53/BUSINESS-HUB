@@ -12,3 +12,13 @@ export function formatCurrency(amount: number): string {
     maximumFractionDigits: 0,
   }).format(amount);
 }
+
+export function isValidIndianPhone(phone: string): boolean {
+  // Regex for standard 10-digit Indian mobile starting with 6, 7, 8, or 9
+  return /^[6-9]\d{9}$/.test(phone);
+}
+
+export function sanitizePhone(input: string): string {
+  // Only allow digits 0-9
+  return input.replace(/\D/g, '').slice(0, 10);
+}
