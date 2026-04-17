@@ -439,23 +439,13 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* Toolbar - Pro Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between p-4 bg-accent/30 border border-border/50 rounded-2xl animate-in fade-in slide-in-from-top-2">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search catalog name/category/sku..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-11 pr-4 py-2.5 bg-card border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-        </div>
+      {/* Toolbar - Global Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 items-center justify-end p-4 bg-accent/30 border border-border/50 rounded-2xl animate-in fade-in slide-in-from-top-2">
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <select 
             value={selectedCategory}
             onChange={(e) => { setSelectedCategory(e.target.value); setSelectedSubcategory('All'); }}
-            className="flex-1 sm:w-40 bg-card border border-border rounded-xl px-4 py-2.5 text-xs font-black uppercase tracking-tight focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="flex-1 sm:w-48 bg-card border border-border rounded-xl px-4 py-2.5 text-xs font-black uppercase tracking-tight focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
             <option value="All">All Categories</option>
             {uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
@@ -463,7 +453,7 @@ export default function Inventory() {
           <select 
             value={selectedSubcategory}
             onChange={(e) => setSelectedSubcategory(e.target.value)}
-            className="flex-1 sm:w-40 bg-card border border-border rounded-xl px-4 py-2.5 text-xs font-black uppercase tracking-tight focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="flex-1 sm:w-48 bg-card border border-border rounded-xl px-4 py-2.5 text-xs font-black uppercase tracking-tight focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
             <option value="All">All Sub-categories</option>
             {uniqueSubcategories.map(s => <option key={s} value={s}>{s}</option>)}
@@ -491,6 +481,18 @@ export default function Inventory() {
         >
           <Plus className="h-4 w-4" /> Add Product
         </button>
+      </div>
+
+      {/* Local Search Bar - NOW ABOVE PRODUCTS */}
+      <div className="relative">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <input
+          type="text"
+          placeholder="Search items by name, category, or SKU..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full pl-11 pr-4 py-3 bg-card border border-border rounded-2xl text-xs font-black uppercase tracking-widest placeholder:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm"
+        />
       </div>
 
       {/* Product Grid - Variant Aware */}
