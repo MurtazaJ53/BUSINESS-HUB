@@ -17,6 +17,7 @@ import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn } from '@/lib/utils';
 import type { Expense } from '@/lib/types';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import ErrorModal from '@/components/ErrorModal';
 
 const CATEGORIES = [
   { name: 'Rent & Place', icon: Home, color: 'text-blue-500' },
@@ -32,6 +33,7 @@ export default function Expenses() {
   const { expenses, addExpense, deleteExpense } = useBusinessStore();
   const [isAdding, setIsAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [errorModal, setErrorModal] = useState({ show: false, title: '', message: '' });
   
   const [formData, setFormData] = useState({
     amount: '',
@@ -277,6 +279,12 @@ export default function Expenses() {
         description="This will permanently remove this record from your shop's overhead history. This cannot be undone."
         confirmText="Yes, Delete Record"
         variant="danger"
+      />
+      <ErrorModal 
+        isOpen={errorModal.show}
+        title={errorModal.title}
+        message={errorModal.message}
+        onClose={() => setErrorModal({ ...errorModal, show: false })}
       />
     </div>
   );
