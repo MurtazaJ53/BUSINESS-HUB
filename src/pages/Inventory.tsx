@@ -285,21 +285,30 @@ export default function Inventory() {
 
   // ── Update ──
   const handleUpdate = async () => {
-    if (!editingItem || !editForm.name || !editForm.price) return;
-    await updateInventoryItem({
-      ...editingItem,
-      name: editForm.name,
-      price: parseFloat(editForm.price) || 0,
-      costPrice: editForm.costPrice ? parseFloat(editForm.costPrice) : undefined,
-      sku: editForm.sku || undefined,
-      category: editForm.category || 'General',
-      subcategory: editForm.subcategory || undefined,
-      size: editForm.size || undefined,
-      description: editForm.description || undefined,
-      stock: editForm.stock ? parseInt(editForm.stock) : undefined,
-    });
-    setEditingItem(null);
-    showToast('Item updated!');
+    if (!editingItem || !editForm.name || editForm.price === '') return;
+    
+    setIsProcessing(true);
+    try {
+      await updateInventoryItem({
+        ...editingItem,
+        name: editForm.name,
+        price: parseFloat(editForm.price) || 0,
+        costPrice: editForm.costPrice ? parseFloat(editForm.costPrice) : undefined,
+        sku: editForm.sku || undefined,
+        category: editForm.category || 'General',
+        subcategory: editForm.subcategory || undefined,
+        size: editForm.size || undefined,
+        description: editForm.description || undefined,
+        stock: editForm.stock ? parseInt(editForm.stock) : undefined,
+      });
+      setEditingItem(null);
+      showToast('Item updated!');
+    } catch (err: any) {
+      console.error("Update Failed:", err);
+      setErrorModal({ show: true, title: 'Update Error', message: err.message || 'Failed to save changes.' });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // ── Duplicate ──
@@ -770,8 +779,10 @@ export default function Inventory() {
           </div>
           <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-muted-foreground">Description</Label><Input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} /></div>
           <div className="flex gap-3">
-            <button onClick={() => setEditingItem(null)} className="flex-1 py-3 rounded-2xl font-bold text-sm border border-border hover:bg-accent transition-all">Cancel</button>
-            <button onClick={handleUpdate} className="flex-1 premium-gradient text-white py-3 rounded-2xl font-bold text-sm hover:shadow-xl transition-all">Save Changes</button>
+            <button onClick={() => setEditingItem(null)} disabled={isProcessing} className="flex-1 py-3 rounded-2xl font-bold text-sm border border-border hover:bg-accent transition-all disabled:opacity-30">Cancel</button>
+            <button onClick={handleUpdate} disabled={isProcessing} className="flex-1 premium-gradient text-white py-3 rounded-2xl font-bold text-sm hover:shadow-xl transition-all disabled:opacity-50">
+              {isProcessing ? 'Updating...' : 'Save Changes'}
+            </button>
           </div>
         </div>
       </Modal>
