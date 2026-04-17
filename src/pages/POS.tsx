@@ -15,7 +15,7 @@ type PayMode = 'CASH' | 'UPI' | 'CARD' | 'CREDIT' | 'ONLINE' | 'OTHERS';
 const PAY_MODES: PayMode[] = ['CASH', 'UPI', 'CARD', 'CREDIT', 'ONLINE', 'OTHERS'];
 
 export default function POS() {
-  const { inventory, customers, addSale, updateInventoryItem, shop } = useBusinessStore();
+  const { inventory, customers, addSale, updateInventoryItem, shop, role } = useBusinessStore();
 
   const [cart, setCart] = useState<SaleItem[]>([]);
   const [search, setSearch] = useState('');
