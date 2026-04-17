@@ -330,8 +330,19 @@ export default function Dashboard() {
                     <p className="font-semibold text-sm">
                       {sale.customerName ? `Customer: ${sale.customerName}` : 'Walk-in Customer'}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {sale.items.length} item{sale.items.length !== 1 ? 's' : ''} · {sale.paymentMode} · {sale.date}
+                    <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                      <span>{sale.items.length} item{sale.items.length !== 1 ? 's' : ''}</span>
+                      <span className="opacity-30">·</span>
+                      <span className={cn(
+                        "font-black uppercase tracking-tighter px-1.5 py-0.5 rounded-md",
+                        sale.payments && sale.payments.length > 1 
+                          ? "bg-amber-500/10 text-amber-600 border border-amber-500/10" 
+                          : "bg-accent text-muted-foreground"
+                      )}>
+                        {sale.payments && sale.payments.length > 1 ? 'SPLIT' : sale.paymentMode}
+                      </span>
+                      <span className="opacity-30">·</span>
+                      <span>{sale.date}</span>
                     </p>
                   </div>
                   <div className="text-right">

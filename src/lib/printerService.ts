@@ -93,10 +93,10 @@ export const printReceipt = (sale: Sale, shop: any) => {
       </head>
       <body>
         <div class="no-print" style="position: fixed; top: 0; left: 0; right: 0; background: #000; color: #fff; padding: 20px; text-align: center; font-family: sans-serif; z-index: 9999;">
-          <button onclick="window.close()" style="background: #0ea5e9; color: white; border: none; padding: 12px 24px; border-radius: 12px; font-weight: bold; font-size: 16px; width: 100%; box-shadow: 0 4px 12px rgba(14,165,233,0.3);">
+          <a href="/" style="display: block; text-decoration: none; background: #0ea5e9; color: white; padding: 16px 24px; border-radius: 12px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 12px rgba(14,165,233,0.3); border: none; text-transform: uppercase; letter-spacing: 1px;">
             ← BACK TO BUSINESS HUB
-          </button>
-          <p style="font-size: 10px; margin-top: 10px; opacity: 0.6;">(This button will not appear on your receipt)</p>
+          </a>
+          <p style="font-size: 10px; margin-top: 10px; opacity: 0.6;">(Tap here to return to your shop if stuck)</p>
         </div>
 
         <div class="header">
