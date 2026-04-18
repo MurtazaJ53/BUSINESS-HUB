@@ -36,9 +36,21 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Verify Build Secrets
+        run: |
+          MISSING=0
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then echo "❌ ANDROID_KEYSTORE_BASE64 is missing"; MISSING=1; fi
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ]; then echo "❌ ANDROID_KEYSTORE_PASSWORD is missing"; MISSING=1; fi
+          if [ -z "${{ secrets.ANDROID_KEY_ALIAS }}" ]; then echo "❌ ANDROID_KEY_ALIAS is missing"; MISSING=1; fi
+          if [ -z "${{ secrets.ANDROID_KEY_PASSWORD }}" ]; then echo "❌ ANDROID_KEY_PASSWORD is missing"; MISSING=1; fi
+          if [ $MISSING -eq 1 ]; then exit 1; fi
+          echo "✅ All build secrets are presence."
+
       - name: Decode Keystore
         if: github.ref == 'refs/heads/main'
-        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/business-hub.jks
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | tr -d '\r\n ' | base64 --decode > android/app/business-hub.jks
+          if [ ! -s android/app/business-hub.jks ]; then echo "❌ Keystore decoding failed"; exit 1; fi
 
       - name: Build Android APK
         run: |
