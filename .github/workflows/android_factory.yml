@@ -52,6 +52,22 @@ jobs:
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | tr -d '\r\n ' | base64 --decode > android/app/business-hub.jks
           if [ ! -s android/app/business-hub.jks ]; then echo "❌ Keystore decoding failed"; exit 1; fi
 
+      - name: Keystore Doctor (Validation)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "🩺 Starting Keystore Diagnostics..."
+          # 1. Check Store Password
+          if ! keytool -list -keystore android/app/business-hub.jks -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > /dev/null 2>&1; then
+            echo "❌ ERROR: 'ANDROID_KEYSTORE_PASSWORD' is incorrect for this keystore file."
+            exit 1
+          fi
+          # 2. Check Alias
+          if ! keytool -list -keystore android/app/business-hub.jks -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" -alias "${{ secrets.ANDROID_KEY_ALIAS }}" > /dev/null 2>&1; then
+            echo "❌ ERROR: Key Alias '${{ secrets.ANDROID_KEY_ALIAS }}' not found in this keystore."
+            exit 1
+          fi
+          echo "✅ Keystore diagnostics passed! Passwords and Alias are valid."
+
       - name: Build Android APK
         run: |
           cd android
