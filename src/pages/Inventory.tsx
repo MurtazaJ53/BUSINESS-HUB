@@ -510,81 +510,87 @@ export default function Inventory() {
           <p className="font-bold">{search ? 'No products match your search' : 'Your inventory is empty. Add your first product!'}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filtered.map((item) => {
             const isLow = item.stock !== undefined && item.stock <= 5;
 
             return (
               <div
                 key={item.id}
-                className={`glass-card group rounded-xl p-2.5 hover:shadow-lg transition-all border flex flex-col justify-between min-h-[140px] ${
-                  isLow ? 'border-red-500/20' : 'border-border/20'
+                className={`glass-card group rounded-[2rem] p-5 hover:shadow-2xl transition-all border-2 flex flex-col justify-between min-h-[180px] ${
+                  isLow ? 'border-red-500/30' : 'border-border/10'
                 }`}
               >
-                <div className="space-y-1.5">
-                  <div className={`flex items-center justify-between gap-1 overflow-hidden ${role === 'admin' ? 'pr-12' : ''}`}>
-                    <p className="font-extrabold text-[11px] uppercase tracking-tight truncate flex-1">{item.name}</p>
+                <div className="space-y-3">
+                  <div className={`flex items-start justify-between gap-1 overflow-hidden ${role === 'admin' ? 'pr-20' : ''}`}>
+                    <p className="font-black text-sm uppercase tracking-tight truncate flex-1 group-hover:text-primary transition-colors">{item.name}</p>
                     
-                    {/* Admin Controls - Persistent on mobile */}
+                    {/* Admin Controls - Floating Command Group */}
                     {role === 'admin' && (
-                      <div className="absolute top-1 right-1 flex gap-1 opacity-100 transition-all">
+                      <div className="absolute top-2 right-2 flex gap-1.5 opacity-100 transition-all">
                         <button 
                           onClick={(e) => { 
                             e.stopPropagation(); 
                             setRestockOpen(item); 
                             setRestockForm({ qty: '', cost: (item.costPrice || 0).toString(), newSellPrice: '' }); 
                           }}
-                          className="p-1 rounded-lg bg-emerald-500 text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
+                          className="p-2 rounded-xl bg-emerald-500 text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
                           title="Restock Arrival"
                         >
-                          <PackagePlus className="h-3 w-3" />
+                          <PackagePlus className="h-4 w-4" />
                         </button>
                         <button 
                           onClick={(e) => { e.stopPropagation(); setEditingItem(item); setEditForm({ ...emptyForm, ...item, costPrice: item.costPrice?.toString() || '', price: item.price.toString(), stock: item.stock?.toString() || '0' }); }}
-                          className="p-1 rounded-lg bg-blue-500 text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
+                          className="p-2 rounded-xl bg-blue-500 text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
                           title="Edit Details"
                         >
-                          <Pencil className="h-3 w-3" />
+                          <Pencil className="h-4 w-4" />
                         </button>
                         <button 
                           onClick={(e) => { e.stopPropagation(); deleteInventoryItem(item.id); }}
-                          className="p-1 rounded-lg bg-destructive text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
+                          className="p-2 rounded-xl bg-destructive text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
                           title="Delete Product"
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     )}
                   </div>
 
-                  <div className="flex flex-wrap gap-1">
-                    <span className="px-1 py-0.5 bg-primary/5 text-primary text-[8px] font-black uppercase rounded-md border border-primary/10">
-                      {item.categoryShort || item.category.slice(0, 4)}
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="px-2 py-1 bg-accent/80 text-foreground text-[10px] font-black uppercase rounded-lg border border-border shadow-sm">
+                      {item.category}
                     </span>
+                    {item.subcategory && (
+                      <span className="px-2 py-1 bg-primary/10 text-primary text-[10px] font-black uppercase rounded-lg border border-primary/20 shadow-sm">
+                        {item.subcategory}
+                      </span>
+                    )}
                     {item.size && (
-                      <span className="px-1 py-0.5 bg-purple-500/5 text-purple-500 text-[8px] font-black uppercase rounded-md border border-purple-500/10">
+                      <span className="px-2.5 py-1 bg-purple-500/10 text-purple-500 text-[10px] font-black uppercase rounded-lg border border-purple-500/20 shadow-sm leading-none">
                         {item.size}
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="space-y-1 mt-auto pt-2 border-t border-border/10">
-                  <div className="flex flex-col gap-0.5">
+                <div className="space-y-2 mt-auto pt-4 border-t border-border/10">
+                  <div className="flex flex-col gap-1">
                     <div className="flex justify-between items-center">
-                      <span className="text-[8px] font-black text-muted-foreground uppercase opacity-60">Sell</span>
-                      <p className="font-black text-[10px] text-foreground">{formatCurrency(item.price)}</p>
+                      <span className="text-[10px] font-black text-muted-foreground uppercase opacity-60">Price</span>
+                      <p className="font-black text-lg text-foreground tracking-tighter">{formatCurrency(item.price)}</p>
                     </div>
                     {item.costPrice !== undefined && item.costPrice > 0 && (
                       <div className="flex justify-between items-center">
-                        <span className="text-[8px] font-black text-amber-500 uppercase opacity-60">Cost</span>
-                        <p className="font-black text-[10px] text-amber-500">{formatCurrency(item.costPrice || 0)}</p>
+                        <span className="text-[10px] font-black text-amber-500/80 uppercase">Original Cost</span>
+                        <p className="font-black text-xs text-amber-500/80">{formatCurrency(item.costPrice || 0)}</p>
                       </div>
                     )}
-                    <div className="flex justify-between items-center border-t border-border/5 pt-0.5 mt-0.5">
-                      <span className="text-[8px] font-black text-muted-foreground uppercase opacity-60">Stk</span>
-                      <p className={`font-black text-[10px] ${isLow ? 'text-destructive' : 'text-primary'}`}>
-                        {item.stock || 0}
+                    <div className="flex justify-between items-center border-t border-border/5 pt-1 mt-1">
+                      <span className="text-[10px] font-black text-muted-foreground uppercase opacity-60">In Hand</span>
+                      <p className={`font-black text-sm flex items-center gap-1.5 ${isLow ? 'text-destructive animate-pulse' : 'text-primary'}`}>
+                        {isLow && <AlertTriangle className="h-3 w-3" />}
+                        {item.stock || 0} Units
                       </p>
                     </div>
                   </div>

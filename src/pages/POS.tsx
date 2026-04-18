@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Plus, Minus, Trash2, ShoppingCart, Search, Check,
   Printer, RotateCcw, Package, User, Phone, Percent, AlertCircle, AlertTriangle, Calendar,
-  ArrowRight, CheckCircle2, Sparkles, PlusCircle, X
+  ArrowRight, CheckCircle2, Sparkles, PlusCircle, X, Database
 } from 'lucide-react';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn, isValidIndianPhone, sanitizePhone } from '@/lib/utils';
@@ -179,12 +179,12 @@ export default function POS() {
     const dv = parseFloat(discountValue) || 0;
     const sub = subTotal();
     const disc = discountType === 'fixed' ? dv : (sub * (dv / 100));
-    return Math.max(0, sub - disc);
+    return sub - disc;
   };
 
   const totalPayments = payments.reduce((sum, p) => sum + p.amount, 0);
   const totalDue = calcTotal();
-  const remainingBalance = Math.max(0, totalDue - totalPayments);
+  const remainingBalance = totalDue >= 0 ? Math.max(0, totalDue - totalPayments) : 0;
   const hasMultiplePayments = payments.length > 1;
   // HARD FORCE: Allow 0.5 rupee tolerance
   // If totalDue is negative, it's a refund, so we check if the refund is recorded (negative payment) or just proceed
@@ -467,54 +467,62 @@ export default function POS() {
                 <div
                   key={product.id}
                   onClick={() => !outOfStock && addToCart(product)}
-                  className={`glass-card p-4 rounded-3xl text-left transition-all duration-300 group relative cursor-pointer active:scale-95 ${
-                    outOfStock ? 'opacity-70 grayscale-[0.5] cursor-not-allowed' : 'hover:shadow-2xl hover:-translate-y-1 hover:border-primary/30'
+                  className={`glass-card p-5 rounded-[2.5rem] text-left transition-all duration-500 group relative cursor-pointer active:scale-95 ${
+                    outOfStock ? 'opacity-70 grayscale-[0.5] cursor-not-allowed' : 'hover:shadow-3xl hover:-translate-y-2 hover:border-primary/50'
                   }`}
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="h-10 w-10 premium-gradient rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
-                      <Package className="h-5 w-5 text-white" />
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="h-12 w-12 premium-gradient rounded-2xl flex items-center justify-center shadow-xl group-hover:rotate-6 transition-transform duration-500">
+                      <Package className="h-6 w-6 text-white" />
                     </div>
-                    <div className="flex gap-1.5 grayscale group-hover:grayscale-0 transition-all">
+                    <div className="flex gap-2 opacity-40 group-hover:opacity-100 transition-all">
                       <button
                         onClick={(e) => { e.stopPropagation(); addToCart(product, true); }}
-                        className="h-8 w-8 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                        className="h-10 w-10 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-lg border border-red-500/20"
                         title="Add as Return"
                       >
-                        <RotateCcw className="h-4 w-4" />
+                        <RotateCcw className="h-5 w-5" />
                       </button>
                       {!outOfStock && (
                         <div
-                          className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-all shadow-sm"
+                          className="h-10 w-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-all shadow-lg border border-primary/20"
                           title="Add to Sale"
                         >
-                          <Plus className="h-4 w-4" />
+                          <Plus className="h-5 w-5" />
                         </div>
                       )}
                     </div>
                   </div>
 
-                  <div className="space-y-1.5 mt-1">
-                    <h3 className="font-extrabold text-[12px] uppercase tracking-tight truncate leading-tight">{product.name}</h3>
+                  <div className="space-y-2">
+                    <h3 className="font-black text-sm uppercase tracking-tight truncate leading-tight group-hover:text-primary transition-colors">{product.name}</h3>
                     <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                      <span className="px-2 py-0.5 bg-accent/50 text-zinc-400 text-[9px] font-black uppercase rounded-lg border border-border/50">
-                        {product.categoryShort || product.category.slice(0, 4)}
+                      <span className="px-2.5 py-1 bg-accent/80 text-foreground text-[10px] font-black uppercase rounded-lg border border-border shadow-sm">
+                        {product.category}
                       </span>
+                      {product.subcategory && (
+                        <span className="px-2.5 py-1 bg-primary/10 text-primary text-[10px] font-black uppercase rounded-lg border border-primary/20 shadow-sm">
+                          {product.subcategory}
+                        </span>
+                      )}
                       {product.size && (
-                        <span className="px-3 py-1 bg-purple-500/10 text-purple-500 text-[12px] font-black uppercase rounded-lg border border-purple-500/20 shadow-sm leading-none">
+                        <span className="px-3 py-1 bg-purple-500/10 text-purple-500 text-[10px] font-black uppercase rounded-lg border border-purple-500/20 shadow-sm leading-none">
                           {product.size}
                         </span>
                       )}
-                      <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-lg border ${
+                    </div>
+                    
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className={`px-2 py-0.5 text-[10px] font-black uppercase rounded-lg border flex items-center gap-1 ${
                         outOfStock ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
                       }`}>
-                        Stk: {product.stock || 0}
+                        <Database className="h-3 w-3" /> STK: {product.stock || 0}
                       </span>
                     </div>
                   </div>
                   
-                  <div className="flex justify-between items-end mt-4 pt-2 border-t border-border/10">
-                    <p className="font-black text-xl tracking-tighter text-foreground leading-none">
+                  <div className="flex justify-between items-end mt-5 pt-3 border-t border-border/20">
+                    <p className="font-black text-2xl tracking-tighter text-foreground leading-none group-hover:scale-105 transition-transform origin-left">
                       {formatCurrency(product.price)}
                     </p>
                   </div>
@@ -766,12 +774,12 @@ export default function POS() {
                 disabled={!canCharge || isProcessing}
                 className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm transition-all flex items-center justify-center gap-3 ${
                   canCharge && !isProcessing
-                    ? 'premium-gradient text-white shadow-xl hover:-translate-y-0.5 active:scale-95' 
+                    ? (calcTotal() < 0 ? 'bg-red-500 text-white shadow-xl hover:-translate-y-0.5 active:scale-95' : 'premium-gradient text-white shadow-xl hover:-translate-y-0.5 active:scale-95')
                     : 'bg-accent text-muted-foreground cursor-not-allowed opacity-50'
                 }`}
               >
                 {isProcessing && <RotateCcw className="h-4 w-4 animate-spin" />}
-                {isProcessing ? 'Saving Transaction...' : `Charge ${formatCurrency(calcTotal())}`}
+                {isProcessing ? 'Saving Transaction...' : (calcTotal() < 0 ? `Refund ${formatCurrency(Math.abs(calcTotal()))}` : `Charge ${formatCurrency(calcTotal())}`)}
               </button>
             </>
           )}
