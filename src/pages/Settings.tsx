@@ -37,10 +37,14 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import { loadShopSettings } from '@/lib/shopSettings';
 import { useAuthStore } from '@/lib/useAuthStore';
 import type { InventoryItem, ShopMetadata } from '@/lib/types';
-import { parseZobazeExcel, MigrationResult } from '@/lib/migrationEngine';
+import { MigrationResult } from '@/lib/migrationEngine';
 
 export default function Settings() {
-  const { inventory, sales, customers, shop, updateShop, clearInventory, theme, setTheme, shopId, addInventoryItem } = useBusinessStore();
+  const { 
+    inventory, sales, customers, shop, updateShop, 
+    clearInventory, theme, setTheme, shopId, 
+    addInventoryItem, upsertCustomer, addSale 
+  } = useBusinessStore();
   const { role, user } = useAuthStore();
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -49,6 +53,7 @@ export default function Settings() {
   
   // Migration State
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [importType, setImportType] = useState<'inventory' | 'customer' | 'sale'>('inventory');
   const [migrationStatus, setMigrationStatus] = useState<string | null>(null);
   const [migrationData, setMigrationData] = useState<MigrationResult | null>(null);
   const [invites, setInvites] = useState<{ id: string, code: string }[]>([]);
@@ -71,9 +76,14 @@ export default function Settings() {
   
   const [editForm, setEditForm] = useState(shop);
 
-  const handleSaveShop = () => {
-    updateShop(editForm);
-    setEditOpen(false);
+  const handleSaveShop = async () => {
+    try {
+      await updateShop(editForm);
+      setEditOpen(false);
+      showToast('Profile Updated Successfully');
+    } catch (err: any) {
+      showToast(`Error: ${err.message}`);
+    }
   };
 
   const handleInventoryCSV = () => {
@@ -100,15 +110,16 @@ export default function Settings() {
     setTimeout(() => setExporting(null), 1000);
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'inventory' | 'customer' | 'sale') => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    setMigrationStatus('Scanning Excel Engine...');
-    const result = await parseZobazeExcel(file);
+    setMigrationStatus(`Parsing ${type} data...`);
+    const { parseGenericExcel } = await import('@/lib/migrationEngine');
+    const result = await parseGenericExcel(file, type);
     
     if (!result.success || result.validItems.length === 0) {
-      showToast(`Import Failed: ${result.errors[0] || 'No valid products found'}`);
+      showToast(`Import Failed: ${result.errors[0] || 'No valid records found'}`);
       setMigrationStatus(null);
     } else {
       setMigrationData(result);
@@ -120,28 +131,38 @@ export default function Settings() {
 
   const executeMigration = async () => {
     if (!migrationData) return;
-    setMigrationStatus('Injecting items into database...');
+    setMigrationStatus(`Importing ${migrationData.validItems.length} records...`);
     
-    let injected = 0;
+    let count = 0;
     try {
       for (const item of migrationData.validItems) {
-        // Create an InventoryItem matching the Business Hub Schema
-        const newItem: InventoryItem = {
-          id: Math.random().toString(36).substring(2, 9),
-          name: item.name,
-          price: item.price,
-          costPrice: item.costPrice,
-          stock: item.stock,
-          category: item.category,
-          sku: item.sku,
-          createdAt: new Date().toISOString()
-        };
-        await addInventoryItem(newItem);
-        injected++;
+        if (migrationData.type === 'inventory') {
+          await addInventoryItem({
+            id: `inv-${Date.now()}-${count}`,
+            ...item,
+            createdAt: new Date().toISOString()
+          });
+        } else if (migrationData.type === 'customer') {
+          await upsertCustomer({
+            id: `cust-${Date.now()}-${count}`,
+            name: item.name,
+            phone: item.phone,
+            balance: item.balance,
+            totalSpent: item.totalSpent,
+            createdAt: new Date().toISOString()
+          });
+        } else if (migrationData.type === 'sale') {
+          await addSale({
+            id: `sale-${Date.now()}-${count}`,
+            ...item,
+            status: 'COMPLETED'
+          });
+        }
+        count++;
       }
-      showToast(`Perfect Installation: Added ${injected} Items`);
+      showToast(`Success: Imported ${count} ${migrationData.type} records!`);
     } catch (e: any) {
-      showToast(`Error during import: ${e.message}`);
+      showToast(`Partial Success: ${count} added. Error: ${e.message}`);
     }
     setMigrationData(null);
     setMigrationStatus(null);
@@ -398,28 +419,54 @@ export default function Settings() {
             
             {/* Zobaze Migration Button */}
             <div className="pt-4 border-t border-border/50">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3 ml-1">Legacy Migration Engine</p>
               <input 
                 type="file" 
                 ref={fileInputRef}
                 accept=".xlsx,.xls,.csv"
                 className="hidden"
-                onChange={handleFileUpload}
+                onChange={(e) => handleFileUpload(e, importType)}
               />
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                disabled={migrationStatus !== null || role !== 'admin'}
-                className="w-full flex items-center justify-between p-4 bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 rounded-2xl transition-all group border border-orange-500/20"
-              >
-                <div className="flex items-center gap-3">
-                  <Upload className="h-5 w-5 group-hover:-translate-y-1 transition-transform" />
-                  <div className="text-left">
-                    <p className="text-sm font-black">Migrate Old Data</p>
-                    <p className="text-[10px] uppercase font-bold opacity-80">
-                      {migrationStatus || 'Import Zobaze Excel'}
-                    </p>
-                  </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button 
+                  onClick={() => { setImportType('inventory'); setTimeout(() => fileInputRef.current?.click(), 10); }}
+                  disabled={migrationStatus !== null || role !== 'admin'}
+                  className="flex flex-col items-center gap-2 p-4 bg-orange-500/5 hover:bg-orange-500/10 text-orange-500 rounded-2xl transition-all border border-orange-500/10 opacity-70 hover:opacity-100"
+                >
+                  <Database className="h-5 w-5" />
+                  <span className="text-[9px] font-black uppercase tracking-widest">Import Stock</span>
+                </button>
+                <button 
+                  onClick={() => { setImportType('customer'); setTimeout(() => fileInputRef.current?.click(), 10); }}
+                  disabled={migrationStatus !== null || role !== 'admin'}
+                  className="flex flex-col items-center gap-2 p-4 bg-blue-600/5 hover:bg-blue-600/10 text-blue-600 rounded-2xl transition-all border border-blue-600/10 opacity-70 hover:opacity-100"
+                >
+                  <Users className="h-5 w-5" />
+                  <span className="text-[9px] font-black uppercase tracking-widest">Import Users</span>
+                </button>
+                <button 
+                  onClick={() => { setImportType('sale'); setTimeout(() => fileInputRef.current?.click(), 10); }}
+                  disabled={migrationStatus !== null || role !== 'admin'}
+                  className="flex flex-col items-center gap-2 p-4 bg-emerald-600/5 hover:bg-emerald-600/10 text-emerald-600 rounded-2xl transition-all border border-emerald-600/10 opacity-70 hover:opacity-100"
+                >
+                  <RefreshCcw className="h-5 w-5" />
+                  <span className="text-[9px] font-black uppercase tracking-widest">Import Sales</span>
+                </button>
+                <button 
+                  onClick={() => { setImportType('inventory'); setTimeout(() => fileInputRef.current?.click(), 10); }}
+                  disabled={migrationStatus !== null || role !== 'admin'}
+                  className="flex flex-col items-center gap-2 p-4 bg-purple-600/5 hover:bg-purple-600/10 text-purple-600 rounded-2xl transition-all border border-purple-600/10 opacity-70 hover:opacity-100"
+                >
+                  <Sparkles className="h-5 w-5" />
+                  <span className="text-[9px] font-black uppercase tracking-widest">Master Import</span>
+                </button>
+              </div>
+              {migrationStatus && (
+                <div className="mt-4 p-3 bg-accent/50 rounded-xl flex items-center gap-3">
+                  <RotateCcw className="h-4 w-4 animate-spin text-primary" />
+                  <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">{migrationStatus}</span>
                 </div>
-              </button>
+              )}
             </div>
           </div>
         </div>
@@ -432,13 +479,51 @@ export default function Settings() {
           </div>
           
           <div className="glass-card rounded-3xl p-6 space-y-4">
+            <div className="space-y-3">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Pin Security Control</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest ml-1 text-primary">Master Admin PIN</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                    <input 
+                      type="password"
+                      maxLength={4}
+                      className="w-full pl-8 pr-4 py-2 bg-accent/30 border border-border rounded-xl text-xs font-black tracking-[0.5em] focus:ring-2 focus:ring-primary/20"
+                      value={editForm.adminPin}
+                      onChange={e => setEditForm({...editForm, adminPin: e.target.value.replace(/[^0-9]/g, '')})}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest ml-1 text-blue-500">Staff Access PIN</label>
+                  <div className="relative">
+                    <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                    <input 
+                      type="password"
+                      maxLength={4}
+                      className="w-full pl-8 pr-4 py-2 bg-accent/30 border border-border rounded-xl text-xs font-black tracking-[0.5em] focus:ring-2 focus:ring-blue-500/20"
+                      value={editForm.staffPin}
+                      onChange={e => setEditForm({...editForm, staffPin: e.target.value.replace(/[^0-9]/g, '')})}
+                    />
+                  </div>
+                </div>
+              </div>
+              <button 
+                onClick={handleSaveShop}
+                className="w-full py-2 bg-primary/10 text-primary rounded-xl text-[9px] font-black uppercase tracking-widest border border-primary/20 hover:bg-primary hover:text-white transition-all"
+              >
+                Sync Security Keys
+              </button>
+            </div>
+
             <div className="p-4 bg-destructive/5 border border-destructive/10 rounded-2xl">
               <div className="flex items-center gap-3 text-destructive mb-2">
                 <AlertTriangle className="h-4 w-4" />
                 <p className="text-xs font-black uppercase tracking-widest">Danger Zone</p>
               </div>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Resetting the inventory will delete every product, SKU, and stock count permanently. This cannot be undone unless you have a JSON backup.
+                Resetting the inventory will delete every product, SKU, and stock count permanently. This cannot be undone!
               </p>
               <button 
                 onClick={() => setResetConfirmOpen(true)}
@@ -447,22 +532,15 @@ export default function Settings() {
                 Reset Inventory Data
               </button>
             </div>
-
-            <div className="flex items-center gap-3 p-4 bg-primary/5 rounded-2xl border border-primary/10">
-              <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-              <p className="text-[10px] text-muted-foreground font-bold leading-tight">
-                Your data is stored locally in your browser. Clearing your browser cache may delete your shop records. <span className="text-primary underline">Download backups weekly.</span>
-              </p>
-            </div>
           </div>
         </div>
       </div>
 
       {/* Shop Editor Modal */}
       {editOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditOpen(false)} />
-          <div className="relative z-10 w-full max-w-xl glass-card rounded-[2.5rem] p-8 shadow-2xl animate-in">
+        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-10 overflow-y-auto">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditOpen(false)} />
+          <div className="relative z-10 w-full max-w-xl glass-card rounded-[2.5rem] p-8 shadow-2xl animate-in fade-in slide-in-from-top-4 duration-500">
             <h2 className="text-3xl font-black mb-1">Edit Shop Profile</h2>
             <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-8 opacity-60">This info appears on your receipts</p>
             
@@ -567,8 +645,8 @@ export default function Settings() {
       {migrationData && (
         <ConfirmDialog
           open={!!migrationData}
-          title="Zobaze Data Analyzed"
-          description={`The neural engine successfully mapped ${migrationData.validItems.length} products from your Excel file. Do you want to inject them into the Business Hub immediately?`}
+          title={`${migrationData.type.toUpperCase()} Analysis Complete`}
+          description={`The neural engine mapping is ready. ${migrationData.validItems.length} records detected from your file. Inject into Business Hub?`}
           confirmText="Inject Data"
           variant="danger"
           onConfirm={executeMigration}
