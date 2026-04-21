@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { TrendingUp, TrendingDown, BarChart3, Target, Calendar, ShoppingCart, Wallet } from 'lucide-react';
+import { TrendingUp, TrendingDown, BarChart3, Target, Calendar, ShoppingCart, Wallet, CheckCircle2 } from 'lucide-react';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn } from '@/lib/utils';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, LineChart, Line
 } from 'recharts';
+import { getDeadStock } from '@/lib/analyticsUtils';
 
 export default function Analytics() {
   const { sales, inventory } = useBusinessStore();
@@ -151,6 +152,8 @@ export default function Analytics() {
   const payModeSorted = Object.entries(payModes).sort((a, b) => b[1] - a[1]);
 
   const bestDay = chartData.reduce((best, d) => (d.sales > best.sales ? d : best), chartData[0] ?? { day: '—', sales: 0 });
+
+  const deadStockItems = getDeadStock(inventory, sales);
 
   return (
     <div className="space-y-10 pb-20">
@@ -403,6 +406,68 @@ export default function Analytics() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* DEAD STOCK LIQUIDATOR */}
+      <div className="glass-card rounded-3xl p-8 border-amber-500/10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
+              <TrendingDown className="h-4 w-4 text-amber-500" />
+              Dead Stock Liquidator
+            </h3>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase mt-1">Zero sales in the last 30 days — recover your capital now.</p>
+          </div>
+          {deadStockItems.length > 0 && (
+            <div className="bg-amber-500/10 border border-amber-500/20 px-4 py-2 rounded-xl">
+              <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">
+                Stuck Capital: {formatCurrency(deadStockItems.reduce((s, i) => s + (i.costPrice || 0) * (i.stock || 0), 0))}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {deadStockItems.length === 0 ? (
+          <div className="text-center py-10 opacity-30">
+            <CheckCircle2 className="h-10 w-10 mx-auto mb-3 text-green-500" />
+            <p className="text-sm font-bold uppercase tracking-widest">No dead stock detected. Great inventory rotation!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {deadStockItems.slice(0, 6).map((item) => {
+              const clearancePrice = (item.costPrice || 0) * 1.15; // 15% margin for clearance
+              return (
+                <div key={item.id} className="p-4 rounded-2xl bg-accent/20 border border-border/50 hover:border-amber-500/30 transition-all group">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm truncate uppercase tracking-tight">{item.name}</p>
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase">{item.category} · {item.size || 'N/A'}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-black text-amber-600">{item.stock} units</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2 mt-4 pt-4 border-t border-border/10">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest opacity-60">
+                      <span>Cur. Price</span>
+                      <span>{formatCurrency(item.price)}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-amber-500/10 rounded-xl border border-amber-500/10">
+                      <div className="flex flex-col">
+                        <span className="text-[8px] font-black text-amber-600 uppercase">Clearance Target</span>
+                        <span className="text-xs font-black text-amber-600">{formatCurrency(clearancePrice)}</span>
+                      </div>
+                      <span className="text-[10px] font-black px-2 py-1 bg-amber-600 text-white rounded-lg animate-pulse">
+                        -{(100 - (clearancePrice/item.price)*100).toFixed(0)}% OFF
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

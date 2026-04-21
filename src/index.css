@@ -163,5 +163,9 @@ body {
   animation: bounce-subtle 2s ease-in-out infinite;
 }
 
-/* ─── Professional Thermal Print Styles ────────────────────────────────── */
+/* ─── Dropdown Fix for Dark Mode ────────────────────────────────────────── */
+.dark select option {
+  background-color: #1a1b1e !important;
+  color: white !important;
+}
 

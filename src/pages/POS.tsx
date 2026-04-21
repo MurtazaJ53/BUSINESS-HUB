@@ -19,6 +19,7 @@ export default function POS() {
 
   const [cart, setCart] = useState<SaleItem[]>([]);
   const [search, setSearch] = useState('');
+  const [localSearch, setLocalSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -39,6 +40,37 @@ export default function POS() {
   const [errorModal, setErrorModal] = useState({ show: false, title: '', message: '' });
   const [terminalStep, setTerminalStep] = useState<'catalog' | 'checkout'>('catalog');
   const [toast, setToast] = useState('');
+  const [pinInput, setPinInput] = useState('');
+  const [showPinField, setShowPinField] = useState(false);
+
+  // ─── Drill-down / Navigation State ──────────────────────────────────────
+  const [drillDepth, setDrillDepth] = useState<0 | 1 | 2>(0);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeProductName, setActiveProductName] = useState<string | null>(null);
+
+  // Sync with Browser History (Back Button Support)
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state?.depth !== undefined) {
+        setDrillDepth(event.state.depth);
+        setActiveCategory(event.state.category);
+        setActiveProductName(event.state.product);
+      } else {
+        setDrillDepth(0);
+        setActiveCategory(null);
+        setActiveProductName(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigateTo = (depth: 0 | 1 | 2, cat: string | null = null, prod: string | null = null) => {
+    setDrillDepth(depth);
+    setActiveCategory(cat);
+    setActiveProductName(prod);
+    window.history.pushState({ depth, category: cat, product: prod }, '');
+  };
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -84,15 +116,73 @@ export default function POS() {
     }
   }, [shop.footer]);
 
-  const categories = ['All', ...Array.from(new Set(inventory.map((p) => p.category)))];
+  const uniqueCategoriesSummary = useMemo(() => {
+    const counts: Record<string, number> = {};
+    inventory.forEach(item => {
+      const cat = item.category || 'General';
+      if (!counts[cat]) counts[cat] = 0;
+      const productNamesInCategory = new Set(inventory.filter(i => (i.category || 'General') === cat).map(i => i.name));
+      counts[cat] = productNamesInCategory.size;
+    });
+    return counts;
+  }, [inventory]);
 
-  const filtered = inventory.filter((p) => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.category.toLowerCase().includes(search.toLowerCase()) ||
-      (p.sku?.toLowerCase() ?? '').includes(search.toLowerCase());
-    const matchCat = category === 'All' || p.category === category;
-    return matchSearch && matchCat;
-  });
+  const filteredCategoriesSummary = useMemo(() => {
+    if (!localSearch) return uniqueCategoriesSummary;
+    const filtered: Record<string, number> = {};
+    Object.entries(uniqueCategoriesSummary).forEach(([cat, count]) => {
+      if (cat.toLowerCase().includes(localSearch.toLowerCase())) {
+        filtered[cat] = count;
+      }
+    });
+    return filtered;
+  }, [uniqueCategoriesSummary, localSearch]);
+
+  const productNamesInCategory = useMemo(() => {
+    if (!activeCategory) return {};
+    const groups: Record<string, { items: typeof inventory, totalStock: number }> = {};
+    inventory.filter(i => (i.category || 'General') === activeCategory).forEach(item => {
+      if (!groups[item.name]) groups[item.name] = { items: [], totalStock: 0 };
+      groups[item.name].items.push(item);
+      groups[item.name].totalStock += (item.stock || 0);
+    });
+    return groups;
+  }, [inventory, activeCategory]);
+
+  const filteredProductNamesInCategory = useMemo(() => {
+    if (!localSearch) return productNamesInCategory;
+    const filtered: Record<string, { items: typeof inventory, totalStock: number }> = {};
+    Object.entries(productNamesInCategory).forEach(([name, data]) => {
+      if (name.toLowerCase().includes(localSearch.toLowerCase())) {
+        filtered[name] = data;
+      }
+    });
+    return filtered;
+  }, [productNamesInCategory, localSearch]);
+
+  const itemsInSelectedProduct = useMemo(() => {
+    if (!activeCategory || !activeProductName) return [];
+    return inventory.filter(i => (i.category || 'General') === activeCategory && i.name === activeProductName);
+  }, [inventory, activeCategory, activeProductName]);
+
+  const filteredItemsInSelectedProduct = useMemo(() => {
+    if (!localSearch) return itemsInSelectedProduct;
+    return itemsInSelectedProduct.filter(i => 
+      i.name.toLowerCase().includes(localSearch.toLowerCase()) || 
+      (i.sku?.toLowerCase() ?? '').includes(localSearch.toLowerCase()) ||
+      (i.size?.toLowerCase() ?? '').includes(localSearch.toLowerCase())
+    );
+  }, [itemsInSelectedProduct, localSearch]);
+
+  const filtered = useMemo(() =>
+    inventory.filter((p) => {
+      const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
+        p.category.toLowerCase().includes(search.toLowerCase()) ||
+        (p.sku?.toLowerCase() ?? '').includes(search.toLowerCase());
+      return matchSearch;
+    }),
+    [inventory, search]
+  );
 
   const latestProducts = useMemo(() => {
     return [...inventory]
@@ -124,6 +214,7 @@ export default function POS() {
         quantity: 1,
         price: product.price,
         costPrice: product.costPrice,
+        size: product.size,
         isReturn
       }, ...prev];
     });
@@ -217,7 +308,7 @@ export default function POS() {
     if (!force) {
       const warnings: {item: SaleItem, stock: number}[] = [];
       for (const cartItem of cart) {
-        if (cartItem.itemId.startsWith('custom-')) continue;
+        if (cartItem.itemId.startsWith('custom-') || cartItem.isReturn) continue;
         const invItem = inventory.find((i) => i.id === cartItem.itemId);
         if (invItem && (invItem.stock ?? 0) < cartItem.quantity) {
           warnings.push({ item: cartItem, stock: invItem.stock ?? 0 });
@@ -231,7 +322,18 @@ export default function POS() {
       }
     }
 
+    // PIN Verification for Force Sale
+    if (force) {
+      if (pinInput !== shop.adminPin) {
+        setToast("❌ Invalid Manager PIN");
+        setIsProcessing(false);
+        return;
+      }
+    }
+
     setStockWarningItems([]);
+    setPinInput('');
+    setShowPinField(false);
 
     const total = calcTotal();
     const discountAmount = subTotal() - total;
@@ -259,17 +361,21 @@ export default function POS() {
       setLastReceipt(finalSale);
       setReceiptOpen(true);
       
+      // Aggregate all changes for each item in the transaction
+      const stockDeltas: Record<string, number> = {};
       for (const cartItem of finalSale.items) {
         if (cartItem.itemId.startsWith('custom-')) continue;
-        const invItem = inventory.find((i) => i.id === cartItem.itemId);
+        const delta = cartItem.isReturn ? cartItem.quantity : -cartItem.quantity;
+        stockDeltas[cartItem.itemId] = (stockDeltas[cartItem.itemId] || 0) + delta;
+      }
+
+      // Perform single update per item ID
+      for (const [itemId, netChange] of Object.entries(stockDeltas)) {
+        const invItem = inventory.find((i) => i.id === itemId);
         if (invItem && invItem.stock !== undefined) {
-          const newStock = cartItem.isReturn 
-            ? invItem.stock + cartItem.quantity 
-            : invItem.stock - cartItem.quantity;
-            
           await updateInventoryItem({
             ...invItem,
-            stock: newStock,
+            stock: invItem.stock + netChange,
           });
         }
       }
@@ -296,6 +402,9 @@ export default function POS() {
     setLastReceipt(null);
     setFooterNote(shop.footer || '');
     setTerminalStep('catalog');
+    setDrillDepth(0);
+    setActiveCategory(null);
+    setActiveProductName(null);
   };
 
   return (
@@ -309,25 +418,6 @@ export default function POS() {
           <h1 className="text-4xl font-black tracking-tighter">Sales Hub</h1>
           <p className="text-muted-foreground mt-1 text-xs">High-speed elite terminal checkout</p>
         </div>
-
-        {/* Category Tabs - NOW AT TOP */}
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none snap-x h-16 items-center">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setCategory(cat)}
-              className={cn(
-                "px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all snap-start border shadow-sm",
-                category === cat
-                  ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-105'
-                  : 'bg-card text-muted-foreground border-border hover:border-primary/30 hover:text-foreground'
-              )}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-
 
         {/* EXECUTIVE CART COMMAND: NOW AT THE TOP FOR PERMANENT OVERSIGHT */}
         {cart.length > 0 && (
@@ -399,6 +489,70 @@ export default function POS() {
           </div>
         )}
 
+        {/* Navigation Breadcrumbs & Easy Back */}
+        <div className="flex items-center gap-3">
+          {drillDepth > 0 && !search && (
+            <button
+              onClick={() => navigateTo((drillDepth - 1) as any, drillDepth === 2 ? activeCategory : null)}
+              className="flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-sm active:scale-95"
+            >
+              <ArrowRight className="h-3 w-3 rotate-180" />
+              Back
+            </button>
+          )}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 flex-1">
+            <button 
+              onClick={() => navigateTo(0)}
+              className={cn("hover:text-primary transition-colors whitespace-nowrap", drillDepth === 0 && "text-primary")}
+            >
+              CATALOG
+            </button>
+            
+            {(drillDepth >= 1 || activeCategory) && (
+              <>
+                <ArrowRight className="h-3 w-3 shrink-0" />
+                <button 
+                  onClick={() => navigateTo(1, activeCategory)}
+                  className={cn("hover:text-primary transition-colors whitespace-nowrap truncate max-w-[100px]", drillDepth === 1 && "text-primary")}
+                >
+                  {activeCategory}
+                </button>
+              </>
+            )}
+
+            {(drillDepth >= 2 || activeProductName) && (
+              <>
+                <ArrowRight className="h-3 w-3 shrink-0" />
+                <button 
+                  className={cn("hover:text-primary transition-colors whitespace-nowrap truncate max-w-[100px]", drillDepth === 2 && "text-primary")}
+                >
+                  {activeProductName}
+                </button>
+              </>
+            )}
+          </div>
+          
+          {/* LOCAL FILTER SEARCH BAR */}
+          <div className="relative w-40 sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder={`Filter ${drillDepth === 0 ? 'Categories' : drillDepth === 1 ? 'Products' : 'Variants'}...`}
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 bg-accent/30 border border-border/50 rounded-xl text-[10px] font-bold focus:outline-none focus:ring-1 focus:ring-primary/30"
+            />
+            {localSearch && (
+              <button 
+                onClick={() => setLocalSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-accent rounded-full"
+              >
+                <X className="h-2.5 w-2.5 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Search Bar - NOW BELOW ORDERS FOR ZERO-DISTURBANCE PRODUCT FILTERING */}
         <div className="relative group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
@@ -459,50 +613,151 @@ export default function POS() {
             <Package className="h-16 w-16 mx-auto mb-3" />
             <p className="font-bold">No products found.</p>
           </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-            {filtered.map((product) => {
-              const outOfStock = product.stock !== undefined && product.stock <= 0;
-              return (
-                <div
-                  key={product.id}
-                  onClick={() => !outOfStock && addToCart(product)}
-                  className={`glass-card p-5 rounded-[2.5rem] text-left transition-all duration-500 group relative cursor-pointer active:scale-95 ${
-                    outOfStock ? 'opacity-70 grayscale-[0.5] cursor-not-allowed' : 'hover:shadow-3xl hover:-translate-y-2 hover:border-primary/50'
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="h-12 w-12 premium-gradient rounded-2xl flex items-center justify-center shadow-xl group-hover:rotate-6 transition-transform duration-500">
-                      <Package className="h-6 w-6 text-white" />
+        ) : !search ? (
+          <>
+            {/* LEVEL 0: CATEGORIES */}
+            {drillDepth === 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                {Object.entries(filteredCategoriesSummary).map(([cat, count]) => (
+                  <button
+                    key={cat}
+                    onClick={() => navigateTo(1, cat)}
+                    className="glass-card p-6 rounded-3xl text-left transition-all hover:shadow-2xl hover:-translate-y-1 hover:border-primary/30 group active:scale-95"
+                  >
+                    <div className="h-12 w-12 premium-gradient rounded-2xl flex items-center justify-center shadow-lg mb-4 group-hover:scale-110 transition-transform">
+                      <Sparkles className="h-6 w-6 text-white" />
                     </div>
-                    <div className="flex gap-2 opacity-40 group-hover:opacity-100 transition-all">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); addToCart(product, true); }}
-                        className="h-10 w-10 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-lg border border-red-500/20"
-                        title="Add as Return"
-                      >
-                        <RotateCcw className="h-5 w-5" />
-                      </button>
-                      {!outOfStock && (
-                        <div
-                          className="h-10 w-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-all shadow-lg border border-primary/20"
-                          title="Add to Sale"
-                        >
-                          <Plus className="h-5 w-5" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                    <h3 className="font-black text-sm uppercase tracking-tighter leading-tight break-words">{cat}</h3>
+                    <p className="text-[10px] text-muted-foreground font-bold mt-1 uppercase tracking-widest">{count} Products</p>
+                  </button>
+                ))}
+              </div>
+            )}
 
-                  <div className="space-y-2">
-                    <h3 className="font-black text-sm uppercase tracking-tight truncate leading-tight group-hover:text-primary transition-colors">{product.name}</h3>
-                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                      <span className="px-2.5 py-1 bg-accent/80 text-foreground text-[10px] font-black uppercase rounded-lg border border-border shadow-sm">
-                        {product.category}
+            {/* LEVEL 1: PRODUCT NAMES IN CATEGORY */}
+            {drillDepth === 1 && activeCategory && (
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                {Object.entries(filteredProductNamesInCategory).map(([name, data]) => (
+                  <button
+                    key={name}
+                    onClick={() => navigateTo(2, activeCategory, name)}
+                    className="glass-card p-6 rounded-3xl text-left transition-all hover:shadow-2xl hover:-translate-y-1 hover:border-primary/30 group active:scale-95"
+                  >
+                    <div className="h-12 w-12 bg-accent/50 rounded-2xl flex items-center justify-center border border-border/50 mb-4 group-hover:scale-110 transition-transform">
+                      <Package className="h-6 w-6 text-primary" />
+                    </div>
+                    <h3 className="font-black text-sm uppercase tracking-tighter leading-tight">{name}</h3>
+                    <div className="flex items-center gap-2 mt-2">
+                       <span className="text-[10px] font-black uppercase bg-primary/10 text-primary px-2 py-0.5 rounded-lg">
+                        {data.items.length} Variants
                       </span>
-                      {product.subcategory && (
-                        <span className="px-2.5 py-1 bg-primary/10 text-primary text-[10px] font-black uppercase rounded-lg border border-primary/20 shadow-sm">
-                          {product.subcategory}
+                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg ${data.totalStock > 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                        Stk: {data.totalStock}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* LEVEL 2: VARIANTS OF SELECTED PRODUCT */}
+            {drillDepth === 2 && activeCategory && activeProductName && (
+              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {filteredItemsInSelectedProduct.map((product) => {
+                  const outOfStock = product.stock !== undefined && product.stock <= 0;
+                  return (
+                    <div
+                      key={product.id}
+                      onClick={() => {
+                        if (outOfStock) setToast("Warning: Adding out-of-stock item!");
+                        addToCart(product);
+                      }}
+                      className={`glass-card p-4 rounded-3xl text-left transition-all duration-300 group relative cursor-pointer active:scale-95 ${
+                        outOfStock ? 'opacity-80 hover:border-red-500/30' : 'hover:shadow-2xl hover:-translate-y-1 hover:border-primary/30'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="h-10 w-10 premium-gradient rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
+                          <Package className="h-5 w-5 text-white" />
+                        </div>
+                        <div className="flex gap-1.5 grayscale group-hover:grayscale-0 transition-all">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); addToCart(product, true); }}
+                            className="h-8 w-8 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                            title="Add as Return"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5 mt-1">
+                        <h3 className="font-extrabold text-[12px] uppercase tracking-tight truncate leading-tight">{product.name}</h3>
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          {product.size && (
+                            <span className="px-3 py-1 bg-purple-500/10 text-purple-500 text-[12px] font-black uppercase rounded-lg border border-purple-500/20 shadow-sm leading-none">
+                              {product.size}
+                            </span>
+                          )}
+                          <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-lg border ${
+                            outOfStock ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                          }`}>
+                            Stk: {product.stock || 0}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex justify-between items-end mt-4 pt-2 border-t border-border/10">
+                        <p className="font-black text-xl tracking-tighter text-foreground leading-none">
+                          {formatCurrency(product.price)}
+                        </p>
+                        <div className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
+                          <Plus className="h-4 w-4" />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        ) : (
+          /* SEARCH RESULTS (FLAT LIST BYPASS) */
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+            {filtered.length === 0 ? (
+              <div className="col-span-full text-center py-20 text-muted-foreground opacity-40">
+                <Package className="h-16 w-16 mx-auto mb-3" />
+                <p className="font-bold">No matches found for "{search}"</p>
+              </div>
+            ) : (
+              filtered.map((product) => {
+                const outOfStock = product.stock !== undefined && product.stock <= 0;
+                return (
+                  <div
+                    key={product.id}
+                    onClick={() => {
+                      if (outOfStock) setToast("Warning: Adding out-of-stock item!");
+                      addToCart(product);
+                    }}
+                    className={`glass-card p-4 rounded-3xl text-left transition-all duration-300 group relative cursor-pointer active:scale-95 ${
+                      outOfStock ? 'opacity-80 hover:border-red-500/30' : 'hover:shadow-2xl hover:-translate-y-1 hover:border-primary/30'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="h-10 w-10 premium-gradient rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
+                        <Package className="h-5 w-5 text-white" />
+                      </div>
+                      <div className="flex gap-1.5 grayscale group-hover:grayscale-0 transition-all">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); addToCart(product, true); }}
+                          className="h-8 w-8 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                          title="Add as Return"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+
                         </span>
                       )}
                       {product.size && (
@@ -529,6 +784,39 @@ export default function POS() {
                 </div>
               );
             })}
+=======
+                    <div className="space-y-1.5 mt-1">
+                      <h3 className="font-extrabold text-[12px] uppercase tracking-tight truncate leading-tight">{product.name}</h3>
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                        <span className="px-2 py-0.5 bg-accent/50 text-zinc-400 text-[9px] font-black uppercase rounded-lg border border-border/50">
+                          {product.categoryShort || product.category.slice(0, 4)}
+                        </span>
+                        {product.size && (
+                          <span className="px-3 py-1 bg-purple-500/10 text-purple-500 text-[12px] font-black uppercase rounded-lg border border-purple-500/20 shadow-sm leading-none">
+                            {product.size}
+                          </span>
+                        )}
+                        <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-lg border ${
+                          outOfStock ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                        }`}>
+                          Stk: {product.stock || 0}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-between items-end mt-4 pt-2 border-t border-border/10">
+                      <p className="font-black text-xl tracking-tighter text-foreground leading-none">
+                        {formatCurrency(product.price)}
+                      </p>
+                      <div className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
+                        <Plus className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+>>>>>>> a8881a8 (feat: security & authentication hardening)
           </div>
         )}
       </div>
@@ -652,11 +940,20 @@ export default function POS() {
                           />
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 bg-accent/50 rounded-xl p-1">
-                        <button onClick={() => updateQty(c.itemId, !!c.isReturn, -1)} className="h-6 w-6 rounded-lg bg-accent flex items-center justify-center"><Minus className="h-3 w-3" /></button>
-                        <span className="w-6 text-center font-black text-xs">{c.quantity}</span>
-                        <button onClick={() => updateQty(c.itemId, !!c.isReturn, 1)} className="h-6 w-6 rounded-lg bg-accent flex items-center justify-center"><Plus className="h-3 w-3" /></button>
-                      </div>
+                        <div className="flex items-center gap-1 bg-accent/50 rounded-xl p-1">
+                          <button onClick={() => updateQty(c.itemId, !!c.isReturn, -1)} className="h-6 w-6 rounded-lg bg-accent flex items-center justify-center hover:bg-accent/80 transition-all"><Minus className="h-3 w-3" /></button>
+                          <input 
+                            type="number"
+                            min="1"
+                            value={c.quantity}
+                            onChange={(e) => {
+                              const val = Math.max(1, parseInt(e.target.value) || 1);
+                              updateQty(c.itemId, !!c.isReturn, val - c.quantity);
+                            }}
+                            className="w-10 bg-transparent border-none p-0 text-center font-black text-xs focus:ring-0"
+                          />
+                          <button onClick={() => updateQty(c.itemId, !!c.isReturn, 1)} className="h-6 w-6 rounded-lg bg-accent flex items-center justify-center hover:bg-accent/80 transition-all"><Plus className="h-3 w-3" /></button>
+                        </div>
                     </div>
                   </div>
                 ))}
@@ -829,24 +1126,84 @@ export default function POS() {
       )}
 
       {stockWarningItems.length > 0 && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setStockWarningItems([])} />
-          <div className="relative z-10 w-full max-w-md glass-card rounded-3xl p-8 border-red-500/20">
-            <div className="flex items-center gap-4 text-red-500 mb-6 font-black text-xl">
-              <AlertCircle className="h-8 w-8" /> Not Enough Stock
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={() => { setStockWarningItems([]); setShowPinField(false); setPinInput(''); }} />
+          <div className="relative z-10 w-full max-w-md glass-card rounded-[2.5rem] p-8 border-red-500/20 shadow-[0_0_50px_rgba(239,68,68,0.15)] animate-in zoom-in-95 duration-300">
+            <div className="flex items-center gap-4 text-red-500 mb-8">
+              <div className="h-14 w-14 rounded-3xl bg-red-500/10 flex items-center justify-center shadow-[inset_0_0_20px_rgba(239,68,68,0.1)]">
+                <AlertCircle className="h-7 w-7" />
+              </div>
+              <div>
+                <h2 className="font-black text-2xl tracking-tighter leading-none">Not Enough Stock</h2>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-50 mt-1">Inventory Shortage Detected</p>
+              </div>
             </div>
+
             <div className="space-y-3 mb-8">
-              {stockWarningItems.map(({ item, stock }, i) => (
-                <div key={i} className="flex justify-between items-center p-3 bg-red-500/5 border border-red-500/10 rounded-2xl">
-                  <p className="text-xs font-black">{item.name}</p>
-                  <p className="text-sm font-black text-red-500">{item.quantity} requested ({stock} left)</p>
+              {stockWarningItems.map(({ item, stock }, i) => {
+                const shortage = item.quantity - stock;
+                return (
+                  <div key={i} className="flex justify-between items-center p-4 bg-red-500/5 border border-red-500/10 rounded-2xl group hover:bg-red-500/10 transition-colors">
+                    <div className="min-w-0">
+                      <p className="text-xs font-black uppercase tracking-tight truncate">
+                        {item.name} {item.size && <span className="text-primary font-black ml-1 text-[10px] bg-primary/10 px-1.5 py-0.5 rounded-md">{item.size}</span>}
+                      </p>
+                      <p className="text-[10px] font-bold uppercase opacity-40 mt-0.5 tracking-tighter">Inventory Level Alert</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-[11px] font-black text-red-400 uppercase tracking-tighter">Shortage: {shortage} Unit{shortage !== 1 ? 's' : ''}</p>
+                      <p className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Req: {item.quantity} | Cur: {stock}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {!showPinField ? (
+              <div className="grid grid-cols-2 gap-4">
+                <button 
+                  onClick={() => { setStockWarningItems([]); setPinInput(''); }} 
+                  className="py-4 rounded-2xl font-black text-xs uppercase tracking-widest border border-border/50 hover:bg-accent transition-all active:scale-95"
+                >
+                  Go back
+                </button>
+                <button 
+                  onClick={() => setShowPinField(true)} 
+                  className="py-4 rounded-2xl font-black text-xs uppercase tracking-widest premium-gradient text-white shadow-xl shadow-primary/20 hover:-translate-y-1 active:scale-95 transition-all"
+                >
+                  Force Sale
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4 animate-in slide-in-from-bottom-5">
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-muted-foreground opacity-50">PIN</span>
+                  <input
+                    type="password"
+                    placeholder="Enter Manager PIN"
+                    autoFocus
+                    value={pinInput}
+                    onChange={(e) => setPinInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleCheckout(true)}
+                    className="w-full pl-12 pr-4 py-4 bg-accent/40 border-2 border-primary/20 rounded-2xl text-sm font-black outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all text-center tracking-[1em]"
+                  />
                 </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => setStockWarningItems([])} className="py-3 rounded-2xl font-bold text-sm border border-border">Go back</button>
-              <button onClick={() => handleCheckout(true)} className="py-3 rounded-2xl font-black text-sm premium-gradient text-white">Force Sale</button>
-            </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <button 
+                    onClick={() => setShowPinField(false)} 
+                    className="py-4 rounded-2xl font-black text-xs uppercase tracking-widest border border-border/50 hover:bg-accent transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={() => handleCheckout(true)} 
+                    className="py-4 rounded-2xl font-black text-xs uppercase tracking-widest premium-gradient text-white shadow-lg shadow-primary/20 hover:-translate-y-1 transition-all"
+                  >
+                    Authorize Sale
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

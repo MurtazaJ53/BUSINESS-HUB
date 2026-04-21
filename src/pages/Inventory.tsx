@@ -4,61 +4,17 @@ import {
   X, FileText, ClipboardPaste, Copy, AlertCircle, AlertTriangle, Sparkles, Loader2,
   PackagePlus
 } from 'lucide-react';
+import { calculateSalesVelocity, calculateDaysRemaining } from '@/lib/analyticsUtils';
 import ErrorModal from '@/components/ErrorModal';
 import { useBusinessStore } from '@/lib/useBusinessStore';
-import { formatCurrency } from '@/lib/utils';
-import type { InventoryItem } from '@/lib/types';
+import { formatCurrency, cn } from '@/lib/utils';
+import type { InventoryItem, Sale } from '@/lib/types';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { useAuthStore } from '@/lib/useAuthStore';
+import Modal from '@/components/Modal';
+import Label from '@/components/Label';
+import Input from '@/components/Input';
 
-// ─── Tiny UI primitives (no shadcn dependency) ─────────────────────────────
-
-const Input = ({ className = '', ...props }: React.InputHTMLAttributes<HTMLInputElement>) => (
-  <input
-    className={`w-full px-3 py-2 bg-accent border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${className}`}
-    {...props}
-  />
-);
-
-const Label = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
-  <label className={`text-xs font-bold uppercase tracking-wider text-muted-foreground ${className}`}>
-    {children}
-  </label>
-);
-
-function Modal({
-  open,
-  onClose,
-  title,
-  children,
-  wide = false,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: string;
-  children: React.ReactNode;
-  wide?: boolean;
-}) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div
-        className={`relative glass-card rounded-3xl shadow-2xl flex flex-col max-h-[90vh] ${
-          wide ? 'w-full max-w-4xl' : 'w-full max-w-lg'
-        }`}
-      >
-        <div className="flex items-center justify-between p-6 border-b border-border shrink-0">
-          <h2 className="font-black text-xl">{title}</h2>
-          <button onClick={onClose} className="p-2 hover:bg-accent rounded-xl transition-colors">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="overflow-y-auto flex-1 p-6">{children}</div>
-      </div>
-    </div>
-  );
-}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -89,6 +45,124 @@ const emptyBulkRow = (): BulkRow => ({
   name: '', price: '', costPrice: '', stock: '', category: '', subcategory: '', size: '',
 });
 
+// ─── Inventory Card Component ───────────────────────────────────────────────
+
+const InventoryCard = ({ 
+  item, 
+  role, 
+  onRestock, 
+  setRestockForm, 
+  onEdit, 
+  setEditForm, 
+  onDelete,
+  sales
+}: { 
+  item: InventoryItem, 
+  role: string,
+  onRestock: (item: InventoryItem) => void,
+  setRestockForm: any,
+  onEdit: (item: InventoryItem) => void,
+  setEditForm: any,
+  onDelete: (id: string) => void,
+  sales: Sale[]
+}) => {
+  const isLow = item.stock !== undefined && item.stock <= 5;
+  const velocity = calculateSalesVelocity(item.id, sales);
+  const daysLeft = calculateDaysRemaining(item.stock || 0, velocity);
+
+  return (
+    <div
+      className={`glass-card group rounded-xl p-3 hover:shadow-lg transition-all border flex flex-col justify-between min-h-[160px] lg:min-h-[220px] ${
+        isLow ? 'border-red-500/20' : 'border-border/20'
+      }`}
+    >
+      <div className="space-y-2">
+        <div className={`flex items-center justify-between gap-2 overflow-hidden ${role === 'admin' ? 'pr-12' : ''}`}>
+          <p className="font-extrabold text-lg uppercase tracking-tight truncate flex-1">{item.name}</p>
+          
+          {role === 'admin' && (
+            <div className="absolute top-2 right-2 flex gap-1.5 opacity-100 transition-all">
+              <button 
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  onRestock(item); 
+                  setRestockForm({ qty: '', cost: (item.costPrice || 0).toString(), newSellPrice: '' }); 
+                }}
+                className="p-3 rounded-xl bg-emerald-500 text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
+                title="Restock Arrival"
+              >
+                <PackagePlus className="h-4 w-4" />
+              </button>
+              <button 
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  onEdit(item); 
+                  setEditForm({ 
+                    name: item.name, 
+                    price: item.price.toString(), 
+                    costPrice: item.costPrice?.toString() || '', 
+                    sku: item.sku || '', 
+                    category: item.category, 
+                    subcategory: item.subcategory || '', 
+                    size: item.size || '', 
+                    description: item.description || '', 
+                    stock: item.stock?.toString() || '0' 
+                  }); 
+                }}
+                className="p-3 rounded-xl bg-blue-500 text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
+                title="Edit Details"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
+                className="p-3 rounded-xl bg-destructive text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
+                title="Delete Product"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <span className="px-2.5 py-1 bg-primary/10 text-primary text-xs font-black uppercase rounded-lg border border-primary/20">
+            {item.category}
+          </span>
+          {item.size && (
+            <span className="px-2.5 py-1 bg-purple-500/10 text-purple-500 text-xs font-black uppercase rounded-lg border border-purple-500/20">
+              {item.size}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-auto pt-4 border-t border-border/10">
+        <div className="flex items-center justify-between bg-accent/20 p-3 rounded-xl gap-4">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black text-muted-foreground uppercase opacity-60 tracking-wider">Sell Price</span>
+            <p className="font-black text-lg text-foreground">{formatCurrency(item.price)}</p>
+          </div>
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] font-black text-muted-foreground uppercase opacity-60 tracking-wider">In Stock</span>
+            <p className={`font-black text-lg ${isLow ? 'text-destructive' : 'text-primary'}`}>
+              {item.stock || 0}
+            </p>
+            {daysLeft !== 'Infinity' && (
+              <span className={cn(
+                "text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md mt-0.5",
+                daysLeft <= 3 ? "bg-red-500/10 text-red-500 animate-pulse" : "bg-primary/10 text-primary"
+              )}>
+                ±{daysLeft} days left
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 export default function Inventory() {
@@ -102,11 +176,13 @@ export default function Inventory() {
     inventorySearchTerm,
     setInventorySearchTerm,
     restockItem,
-    role
+    role,
+    sales
   } = useBusinessStore();
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [search, setSearch] = useState('');
+  const [localSearch, setLocalSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [restockOpen, setRestockOpen] = useState<InventoryItem | null>(null);
@@ -122,23 +198,101 @@ export default function Inventory() {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>('All');
 
+  // ─── Drill-down / Navigation State ──────────────────────────────────────
+  const [drillDepth, setDrillDepth] = useState<0 | 1 | 2>(0);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeProductName, setActiveProductName] = useState<string | null>(null);
+
+  // Sync with Browser History (Back Button Support)
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state?.depth !== undefined) {
+        setDrillDepth(event.state.depth);
+        setActiveCategory(event.state.category);
+        setActiveProductName(event.state.product);
+      } else {
+        setDrillDepth(0);
+        setActiveCategory(null);
+        setActiveProductName(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigateTo = (depth: 0 | 1 | 2, cat: string | null = null, prod: string | null = null) => {
+    setDrillDepth(depth);
+    setActiveCategory(cat);
+    setActiveProductName(prod);
+    setLocalSearch('');
+    window.history.pushState({ depth, category: cat, product: prod }, '');
+  };
+
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(''), 3000);
   };
 
   // ── Autocomplete data ──
-  const uniqueCategories = useMemo(
-    () => Array.from(new Set(inventory.map((i) => i.category))).filter(Boolean),
-    [inventory]
-  );
+  const uniqueCategoriesSummary = useMemo(() => {
+    const counts: Record<string, number> = {};
+    inventory.forEach(item => {
+      const cat = item.category || 'General';
+      if (!counts[cat]) counts[cat] = 0;
+      const productNamesInCategory = new Set(inventory.filter(i => (i.category || 'General') === cat).map(i => i.name));
+      counts[cat] = productNamesInCategory.size;
+    });
+    return counts;
+  }, [inventory]);
 
-  const uniqueSubcategories = useMemo(() => {
-    const subset = selectedCategory === 'All' 
-      ? inventory 
-      : inventory.filter(i => i.category === selectedCategory);
-    return Array.from(new Set(subset.map(i => i.subcategory))).filter(Boolean);
-  }, [inventory, selectedCategory]);
+  const filteredCategoriesSummary = useMemo(() => {
+    if (!localSearch) return uniqueCategoriesSummary;
+    const filtered: Record<string, number> = {};
+    Object.entries(uniqueCategoriesSummary).forEach(([cat, count]) => {
+      if (cat.toLowerCase().includes(localSearch.toLowerCase())) {
+        filtered[cat] = count;
+      }
+    });
+    return filtered;
+  }, [uniqueCategoriesSummary, localSearch]);
+
+  const productNamesInCategory = useMemo(() => {
+    if (!activeCategory) return {};
+    const groups: Record<string, { items: InventoryItem[], totalStock: number, totalCost: number, totalValue: number }> = {};
+    inventory.filter(i => (i.category || 'General') === activeCategory).forEach(item => {
+      if (!groups[item.name]) groups[item.name] = { items: [], totalStock: 0, totalCost: 0, totalValue: 0 };
+      groups[item.name].items.push(item);
+      groups[item.name].totalStock += (item.stock || 0);
+      groups[item.name].totalCost += (item.costPrice || 0) * (item.stock || 0);
+      groups[item.name].totalValue += (item.price || 0) * (item.stock || 0);
+    });
+    return groups;
+  }, [inventory, activeCategory]);
+
+  const filteredProductNamesInCategory = useMemo(() => {
+    if (!localSearch) return productNamesInCategory;
+    const filtered: Record<string, { items: InventoryItem[], totalStock: number, totalCost: number, totalValue: number }> = {};
+    Object.entries(productNamesInCategory).forEach(([name, data]) => {
+       if (name.toLowerCase().includes(localSearch.toLowerCase())) {
+         filtered[name] = data;
+       }
+    });
+    return filtered;
+  }, [productNamesInCategory, localSearch]);
+
+  const itemsInSelectedProduct = useMemo(() => {
+    if (!activeCategory || !activeProductName) return [];
+    return inventory.filter(i => (i.category || 'General') === activeCategory && i.name === activeProductName);
+  }, [inventory, activeCategory, activeProductName]);
+
+  const filteredItemsInSelectedProduct = useMemo(() => {
+    if (!localSearch) return itemsInSelectedProduct;
+    return itemsInSelectedProduct.filter(i => 
+      i.name.toLowerCase().includes(localSearch.toLowerCase()) || 
+      (i.sku?.toLowerCase() ?? '').includes(localSearch.toLowerCase()) ||
+      (i.size?.toLowerCase() ?? '').includes(localSearch.toLowerCase())
+    );
+  }, [itemsInSelectedProduct, localSearch]);
 
   // ── Variant matrix sync ──
   useEffect(() => {
@@ -426,10 +580,12 @@ export default function Inventory() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Inventory Value', value: formatCurrency(stats.inventoryValue), color: 'text-primary' },
-          { label: 'Potential Profit', value: formatCurrency(stats.potentialProfit), color: 'text-green-400' },
+          ...(role === 'admin' ? [
+            { label: 'Inventory Value', value: formatCurrency(stats.inventoryValue), color: 'text-primary' },
+            { label: 'Potential Profit', value: formatCurrency(stats.potentialProfit), color: 'text-green-400' },
+          ] : []),
           { label: 'Distinct Products', value: String(stats.totalItems), color: '' },
           { label: 'Total Stock Units', value: String(stats.totalStock), color: '' },
         ].map((s) => (
@@ -447,28 +603,67 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* Toolbar - Global Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-end p-4 bg-accent/30 border border-border/50 rounded-2xl animate-in fade-in slide-in-from-top-2">
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <select 
-            value={selectedCategory}
-            onChange={(e) => { setSelectedCategory(e.target.value); setSelectedSubcategory('All'); }}
-            className="flex-1 sm:w-48 bg-card border border-border rounded-xl px-4 py-2.5 text-xs font-black uppercase tracking-tight focus:outline-none focus:ring-2 focus:ring-primary/30"
-          >
-            <option value="All">All Categories</option>
-            {uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <select 
-            value={selectedSubcategory}
-            onChange={(e) => setSelectedSubcategory(e.target.value)}
-            className="flex-1 sm:w-48 bg-card border border-border rounded-xl px-4 py-2.5 text-xs font-black uppercase tracking-tight focus:outline-none focus:ring-2 focus:ring-primary/30"
-          >
-            <option value="All">All Sub-categories</option>
-            {uniqueSubcategories.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
+      {/* ── Breadcrumbs & Navigation ── */}
+      {!search && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex items-center gap-2 pb-1 overflow-x-auto whitespace-nowrap scrollbar-hide flex-1">
+            <button 
+              onClick={() => navigateTo(0)}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                drillDepth === 0 ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              All Categories
+            </button>
+            
+            {drillDepth >= 1 && activeCategory && (
+              <>
+                <span className="text-muted-foreground/30 font-bold">/</span>
+                <button 
+                  onClick={() => navigateTo(1, activeCategory)}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                    drillDepth === 1 ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:bg-accent"
+                  }`}
+                >
+                  {activeCategory}
+                </button>
+              </>
+            )}
+
+            {drillDepth >= 2 && activeProductName && (
+              <>
+                <span className="text-muted-foreground/30 font-bold">/</span>
+                <button 
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest bg-primary text-primary-foreground shadow-lg"
+                >
+                  {activeProductName}
+                </button>
+              </>
+            )}
+          </div>
+          
+          {/* LOCAL FILTER SEARCH BAR */}
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder={`Filter ${drillDepth === 0 ? 'Categories' : drillDepth === 1 ? 'Products' : 'Variants'}...`}
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 bg-accent/30 border border-border/50 rounded-xl text-[10px] font-black uppercase tracking-widest focus:outline-none focus:ring-1 focus:ring-primary/30 shadow-inner"
+            />
+            {localSearch && (
+              <button 
+                onClick={() => setLocalSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-accent rounded-full"
+              >
+                <X className="h-2.5 w-2.5 text-muted-foreground" />
+              </button>
+            )}
+          </div>
         </div>
-      </div>
-      
+      )}
+
       {/* Management Actions - Command Center */}
       <div className="flex flex-wrap gap-3 p-4 bg-accent/20 border border-border/30 rounded-2xl">
         <button
@@ -484,120 +679,121 @@ export default function Inventory() {
           <FileText className="h-4 w-4" /> Bulk Add
         </button>
         <button
-          onClick={() => setAddOpen(true)}
+          onClick={() => {
+            setForm({ ...emptyForm, category: activeCategory || '' });
+            setAddOpen(true);
+          }}
           className="flex-1 sm:flex-none flex items-center justify-center gap-2 premium-gradient text-white px-6 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
         >
-          <Plus className="h-4 w-4" /> Add Product
+          <Plus className="h-4 w-4" /> {activeCategory ? `Add in ${activeCategory}` : 'Add Product'}
         </button>
       </div>
 
-      {/* Local Search Bar - NOW ABOVE PRODUCTS */}
+      {/* Global Search Bar - SEARCHES ENTIRE INVENTORY */}
       <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
         <input
           type="text"
-          placeholder="Search items by name, category, or SKU..."
+          placeholder="SEARCH ENTIRE SHOP (Bypass Categories)..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-11 pr-4 py-3 bg-card border border-border rounded-2xl text-xs font-black uppercase tracking-widest placeholder:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm"
+          className="w-full pl-11 pr-4 py-4 bg-card border-2 border-primary/20 rounded-2xl text-[12px] font-black uppercase tracking-widest placeholder:opacity-50 focus:outline-none focus:ring-4 focus:ring-primary/10 shadow-lg transition-all"
         />
       </div>
 
-      {/* Product Grid - Variant Aware */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-20 text-muted-foreground opacity-40">
-          <Package className="h-16 w-16 mx-auto mb-4" />
-          <p className="font-bold">{search ? 'No products match your search' : 'Your inventory is empty. Add your first product!'}</p>
+      {/* Content Switcher */}
+      {search ? (
+        <div className="space-y-4">
+          <p className="text-[10px] font-black uppercase tracking-widest text-primary">Search Results</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filtered.map((item) => (
+              <InventoryCard 
+                key={item.id} 
+                item={item} 
+                role={role || 'staff'} 
+                onRestock={restockItem} 
+                setRestockForm={setRestockForm}
+                onEdit={setEditingItem}
+                setEditForm={setEditForm}
+                onDelete={deleteInventoryItem}
+                sales={sales}
+              />
+            ))}
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map((item) => {
-            const isLow = item.stock !== undefined && item.stock <= 5;
-
-            return (
-              <div
-                key={item.id}
-                className={`glass-card group rounded-[2rem] p-5 hover:shadow-2xl transition-all border-2 flex flex-col justify-between min-h-[180px] ${
-                  isLow ? 'border-red-500/30' : 'border-border/10'
-                }`}
-              >
-                <div className="space-y-3">
-                  <div className={`flex items-start justify-between gap-1 overflow-hidden ${role === 'admin' ? 'pr-20' : ''}`}>
-                    <p className="font-black text-sm uppercase tracking-tight truncate flex-1 group-hover:text-primary transition-colors">{item.name}</p>
-                    
-                    {/* Admin Controls - Floating Command Group */}
-                    {role === 'admin' && (
-                      <div className="absolute top-2 right-2 flex gap-1.5 opacity-100 transition-all">
-                        <button 
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            setRestockOpen(item); 
-                            setRestockForm({ qty: '', cost: (item.costPrice || 0).toString(), newSellPrice: '' }); 
-                          }}
-                          className="p-2 rounded-xl bg-emerald-500 text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
-                          title="Restock Arrival"
-                        >
-                          <PackagePlus className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); setEditingItem(item); setEditForm({ ...emptyForm, ...item, costPrice: item.costPrice?.toString() || '', price: item.price.toString(), stock: item.stock?.toString() || '0' }); }}
-                          className="p-2 rounded-xl bg-blue-500 text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
-                          title="Edit Details"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); deleteInventoryItem(item.id); }}
-                          className="p-2 rounded-xl bg-destructive text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
-                          title="Delete Product"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    )}
+        <div className="min-h-[400px]">
+          {/* LEVEL 0: Category Selection */}
+          {drillDepth === 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {Object.entries(filteredCategoriesSummary).map(([cat, count]) => (
+                <button
+                  key={cat}
+                  onClick={() => navigateTo(1, cat)}
+                  className="glass-card group p-6 rounded-[2.5rem] flex flex-col items-center justify-center gap-4 hover:scale-105 hover:shadow-2xl transition-all border-2 border-border/10 hover:border-primary/50"
+                >
+                  <div className="h-16 w-16 rounded-[1.5rem] bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Tag className="h-8 w-8 text-primary" />
                   </div>
-
-                  <div className="flex flex-wrap gap-1.5">
-                    <span className="px-2 py-1 bg-accent/80 text-foreground text-[10px] font-black uppercase rounded-lg border border-border shadow-sm">
-                      {item.category}
-                    </span>
-                    {item.subcategory && (
-                      <span className="px-2 py-1 bg-primary/10 text-primary text-[10px] font-black uppercase rounded-lg border border-primary/20 shadow-sm">
-                        {item.subcategory}
-                      </span>
-                    )}
-                    {item.size && (
-                      <span className="px-2.5 py-1 bg-purple-500/10 text-purple-500 text-[10px] font-black uppercase rounded-lg border border-purple-500/20 shadow-sm leading-none">
-                        {item.size}
-                      </span>
-                    )}
+                  <div className="text-center">
+                    <p className="font-black text-lg uppercase tracking-tighter leading-tight truncate px-2">{cat}</p>
+                    <p className="text-xs font-black text-muted-foreground uppercase opacity-40 tracking-widest mt-1">
+                      {count} Products
+                    </p>
                   </div>
+                </button>
+              ))}
+              {Object.keys(filteredCategoriesSummary).length === 0 && (
+                <div className="col-span-full py-20 text-center opacity-40">
+                  <Database className="h-12 w-12 mx-auto mb-4" />
+                  <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Catalog Empty</p>
                 </div>
+              )}
+            </div>
+          )}
 
-                <div className="space-y-2 mt-auto pt-4 border-t border-border/10">
-                  <div className="flex flex-col gap-1">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-black text-muted-foreground uppercase opacity-60">Price</span>
-                      <p className="font-black text-lg text-foreground tracking-tighter">{formatCurrency(item.price)}</p>
-                    </div>
-                    {item.costPrice !== undefined && item.costPrice > 0 && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-black text-amber-500/80 uppercase">Original Cost</span>
-                        <p className="font-black text-xs text-amber-500/80">{formatCurrency(item.costPrice || 0)}</p>
-                      </div>
-                    )}
-                    <div className="flex justify-between items-center border-t border-border/5 pt-1 mt-1">
-                      <span className="text-[10px] font-black text-muted-foreground uppercase opacity-60">In Hand</span>
-                      <p className={`font-black text-sm flex items-center gap-1.5 ${isLow ? 'text-destructive animate-pulse' : 'text-primary'}`}>
-                        {isLow && <AlertTriangle className="h-3 w-3" />}
-                        {item.stock || 0} Units
+          {/* LEVEL 1: Product Name Selection */}
+          {drillDepth === 1 && activeCategory && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {Object.entries(filteredProductNamesInCategory).map(([name, data]) => (
+                <button
+                  key={name}
+                  onClick={() => navigateTo(2, activeCategory, name)}
+                  className="glass-card group p-5 rounded-[2rem] flex flex-col items-start gap-4 hover:scale-105 hover:shadow-2xl transition-all border border-border/20 hover:border-primary/40 text-left w-full"
+                >
+                  <div className="h-10 w-10 rounded-xl bg-accent flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-all">
+                    <Package className="h-5 w-5" />
+                  </div>
+                  <div className="w-full">
+                    <p className="font-black text-base uppercase tracking-tight truncate w-full">{name}</p>
+                    <div className="flex justify-between items-center mt-2">
+                       <p className="text-xs font-black text-muted-foreground uppercase opacity-40 tracking-widest">
+                        {data.items.length} Variants
+                      </p>
+                      <p className={`text-sm font-bold ${data.totalStock <= 5 ? 'text-red-500' : 'text-primary'}`}>
+                        {data.totalStock} units
                       </p>
                     </div>
                   </div>
-                </div>
-              </div>
-            );
-          })}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* LEVEL 2: Variant Details */}
+          {drillDepth === 2 && activeCategory && activeProductName && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredItemsInSelectedProduct.map((item) => (
+                <InventoryCard 
+                  key={item.id} 
+                  item={item} 
+                  role={role || 'staff'} 
+                  onRestock={setRestockOpen} 
+                  setRestockForm={setRestockForm}
+                  onEdit={setEditingItem}
+                  setEditForm={setEditForm}
+                  onDelete={deleteInventoryItem}
+          )}
         </div>
       )}
 
@@ -619,7 +815,7 @@ export default function Inventory() {
               <Label>Category</Label>
               <Input placeholder="Category" value={form.category} list="hub-cats"
                 onChange={(e) => setForm({ ...form, category: e.target.value })} />
-              <datalist id="hub-cats">{uniqueCategories.map((c) => <option key={c} value={c} />)}</datalist>
+              <datalist id="hub-cats">{Object.keys(uniqueCategoriesSummary).map((c) => <option key={c} value={c} />)}</datalist>
             </div>
             <div className="space-y-1.5">
               <Label>Sub-category</Label>

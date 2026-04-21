@@ -31,10 +31,28 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ loading: true });
       try {
         if (user) {
+          // GUEST SESSION PROTECTION: If user is anonymous, setup "Wipe on Close"
+          if (user.isAnonymous) {
+            window.addEventListener('beforeunload', () => {
+              auth.signOut();
+            });
+          }
+
           // Fetch user profile from Firestore to get shop context
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
             const data = userDoc.data();
+            
+            // SECURITY GUARD: If they are a staff member, verify they still exist in the shop's staff roster
+            if (data.role === 'staff' && data.shopId) {
+              const staffDoc = await getDoc(doc(db, `shops/${data.shopId}/staff`, user.uid));
+              if (!staffDoc.exists()) {
+                console.warn('RECURSIVE SECURITY: Staff member no longer exists in shop roster. Revoking access.');
+                set({ user, shopId: null, role: null, initialized: true });
+                return;
+              }
+            }
+
             set({ 
               user, 
               shopId: data.shopId, 

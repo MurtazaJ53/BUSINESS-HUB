@@ -152,6 +152,20 @@ export default function Customers() {
             <tbody className="divide-y divide-border/50">
               {filtered.map(customer => {
                 const hasCredit = customer.balance > 0;
+                
+                // Aging Logic
+                let agingTag = null;
+                if (hasCredit) {
+                  const customerSales = sales.filter(s => s.customerId === customer.id && s.paymentMode === 'CREDIT');
+                  if (customerSales.length > 0) {
+                    const oldestCredit = customerSales.sort((a,b) => a.date.localeCompare(b.date))[0];
+                    const days = Math.floor((Date.now() - new Date(oldestCredit.date).getTime()) / (1000 * 60 * 60 * 24));
+                    if (days >= 30) agingTag = { label: '30d+', color: 'bg-red-500/20 text-red-600' };
+                    else if (days >= 15) agingTag = { label: '15d+', color: 'bg-amber-500/20 text-amber-600' };
+                    else if (days >= 7) agingTag = { label: '7d+', color: 'bg-blue-500/20 text-blue-600' };
+                  }
+                }
+
                 return (
                   <tr key={customer.id} className="group hover:bg-primary/5 transition-colors">
                     <td className="px-6 py-5">
@@ -169,11 +183,18 @@ export default function Customers() {
                       </div>
                     </td>
                     <td className="px-6 py-5 text-center">
-                      <div className={cn(
-                        "inline-flex items-center px-4 py-1.5 rounded-full font-black text-xs transition-all",
-                        hasCredit ? "bg-red-500/10 text-red-500 border border-red-500/20" : "bg-green-500/10 text-green-500 border border-green-500/20"
-                      )}>
-                        {hasCredit ? formatCurrency(customer.balance) : <><CheckCircle2 className="h-3 w-3 mr-1.5" /> PAID</>}
+                      <div className="flex flex-col items-center gap-1">
+                        <div className={cn(
+                          "inline-flex items-center px-4 py-1.5 rounded-full font-black text-xs transition-all",
+                          hasCredit ? "bg-red-500/10 text-red-500 border border-red-500/20" : "bg-green-500/10 text-green-500 border border-green-500/20"
+                        )}>
+                          {hasCredit ? formatCurrency(customer.balance) : <><CheckCircle2 className="h-3 w-3 mr-1.5" /> PAID</>}
+                        </div>
+                        {agingTag && (
+                          <span className={cn("text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest", agingTag.color)}>
+                            Aging: {agingTag.label}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-5 text-right font-black tabular-nums text-sm">

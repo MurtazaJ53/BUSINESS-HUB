@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { InventoryItem, Sale, Customer, ShopMetadata, Expense } from './types';
-import { db } from './firebase';
+import type { InventoryItem, Sale, Customer, ShopMetadata, Expense, Staff, Attendance, Invitation } from './types';
+import { db, auth } from './firebase';
 import { 
   doc, 
   onSnapshot, 
@@ -24,6 +24,8 @@ const SHOP_DEFAULTS: ShopMetadata = {
   currency: 'INR',
   adminPin: '9999',
   staffPin: '0000',
+  standardWorkingHours: 9,
+  allowStaffAttendance: true,
 };
 
 interface BusinessState {
@@ -31,6 +33,8 @@ interface BusinessState {
   sales: Sale[];
   customers: Customer[];
   expenses: Expense[];
+  staff: Staff[];
+  attendance: Attendance[];
   shop: ShopMetadata;
   theme: 'dark' | 'light';
   activeTab: string;
@@ -38,6 +42,8 @@ interface BusinessState {
   role: 'admin' | 'staff' | null;
   shopId: string | null;
   lastBackupDate: string | null;
+  invitations: Invitation[];
+  currentStaff: Staff | null;
 
   // Initialization
   initStore: (shopId: string, role: 'admin' | 'staff') => () => void;
@@ -77,6 +83,11 @@ interface BusinessState {
 
   // Restock logic
   restockItem: (id: string, newQty: number, newPurchasePrice: number) => Promise<void>;
+
+  // Staff & Attendance
+  upsertStaff: (staff: Staff) => Promise<void>;
+  deleteStaff: (id: string) => Promise<void>;
+  recordAttendance: (entry: Attendance) => Promise<void>;
 }
 
 export const useBusinessStore = create<BusinessState>((set, get) => ({
@@ -84,6 +95,8 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
   sales: [],
   customers: [],
   expenses: [],
+  staff: [],
+  attendance: [],
   shop: SHOP_DEFAULTS,
   theme: 'dark',
   activeTab: 'dashboard',
@@ -91,6 +104,8 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
   role: null,
   shopId: null,
   lastBackupDate: null,
+  invitations: [],
+  currentStaff: null,
 
   initStore: (shopId, role) => {
     set({ shopId, role });
@@ -129,12 +144,44 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
       set({ expenses });
     });
 
+    // 6. Subscribe to Staff
+    const unsubStaff = onSnapshot(collection(db, `shops/${shopId}/staff`), (snap) => {
+      const staff = snap.docs.map(d => ({ id: d.id, ...d.data() } as Staff));
+      set({ staff });
+    });
+
+    // 7. Subscribe to Attendance (Current Month)
+    const unsubAtt = onSnapshot(collection(db, `shops/${shopId}/attendance`), (snap) => {
+      const attendance = snap.docs.map(d => ({ id: d.id, ...d.data() } as Attendance));
+      set({ attendance });
+    });
+
+    // 8. Subscribe to Invitations
+    const unsubInvites = onSnapshot(collection(db, `shops/${shopId}/invitations`), (snap) => {
+      const invitations = snap.docs.map(d => ({ id: d.id, ...d.data() } as Invitation));
+      set({ invitations });
+    });
+
+    // 9. Subscribe to Current Staff Object (if role is staff)
+    let unsubCurrentStaff = () => {};
+    if (role === 'staff' && auth.currentUser) {
+      unsubCurrentStaff = onSnapshot(doc(db, `shops/${shopId}/staff`, auth.currentUser.uid), (docSnap) => {
+        if (docSnap.exists()) {
+          set({ currentStaff: { id: docSnap.id, ...docSnap.data() } as Staff });
+        }
+      });
+    }
+
     return () => {
       unsubShop();
       unsubInv();
       unsubSales();
       unsubCust();
       unsubExp();
+      unsubStaff();
+      unsubAtt();
+      unsubInvites();
+      unsubCurrentStaff();
     };
   },
 
@@ -351,5 +398,62 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
       stock: totalQuantity,
       costPrice: Number(weightedAverageCost.toFixed(2))
     });
+  },
+
+  upsertStaff: async (staff) => {
+    const { shopId } = get();
+    if (!shopId) return;
+    await setDoc(doc(db, `shops/${shopId}/staff`, staff.id), staff);
+  },
+
+  deleteStaff: async (id) => {
+    const { shopId } = get();
+    if (!shopId) return;
+    
+    // 1. Remove from shop roster
+    await deleteDoc(doc(db, `shops/${shopId}/staff`, id));
+    
+    // 2. Clear global user profile if they are a logged-in user (prevents ghost access)
+    try {
+      await updateDoc(doc(db, 'users', id), {
+        shopId: null,
+        role: null
+      });
+    } catch (e) {
+      // It's possible the id was a custom 'staff-xxx' ID for someone not yet joined, ignore errors
+      console.log('No global user to clear for staff:', id);
+    }
+  },
+
+  recordAttendance: async (entry) => {
+    const { shopId, shop, attendance } = get();
+    if (!shopId) return;
+
+    // Smart logic for clock-out: Calculate hours
+    let finalEntry = { ...entry };
+    if (entry.clockIn && entry.clockOut) {
+      try {
+        const [inH, inM] = entry.clockIn.split(':').map(Number);
+        const [outH, outM] = entry.clockOut.split(':').map(Number);
+        const durationHours = (outH + outM / 60) - (inH + inM / 60);
+        finalEntry.totalHours = Number(durationHours.toFixed(2));
+
+        // Auto-suggest status based on hours if not already explicitly set
+        if (!finalEntry.status) {
+          const standard = shop.standardWorkingHours || 9;
+          if (durationHours >= standard) {
+            finalEntry.status = 'PRESENT';
+          } else if (durationHours >= standard / 2) {
+            finalEntry.status = 'HALF_DAY';
+          } else {
+            finalEntry.status = 'ABSENT';
+          }
+        }
+      } catch (e) {
+        console.error('Error calculating attendance duration', e);
+      }
+    }
+
+    await setDoc(doc(db, `shops/${shopId}/attendance`, finalEntry.id), finalEntry);
   },
 }));
