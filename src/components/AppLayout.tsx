@@ -244,12 +244,13 @@ export default function AppLayout({ pages }: AppLayoutProps) {
             {NAV_ITEMS
               .filter(item => {
                 if (role === 'admin') return true;
-                if (role === 'staff') {
+                if (role === 'staff' && currentStaff) {
                   // Staff always see Team/Presence by default to see their own logs
                   if (item.id === 'team') return true;
                   return currentStaff?.permissions?.includes(item.id as any);
                 }
-                return true;
+                // DEFAULT DENY: Show nothing if role is null or not recognized
+                return false;
               })
               .map(item => {
                 const label = item.id === 'team' 
