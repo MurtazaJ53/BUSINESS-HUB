@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { X, Printer, Check, Calendar, Clock, Hash, Info } from 'lucide-react';
+import { X, Printer, Check, Calendar, Clock, Hash, Info, MessageSquare } from 'lucide-react';
 import ErrorModal from './ErrorModal';
 import type { Sale } from '@/lib/types';
 import { loadShopSettings } from '@/lib/shopSettings';
 import { printReceipt } from '@/lib/printerService';
+import { cn } from '@/lib/utils';
 
 interface Props {
   sale: Sale;
@@ -16,13 +17,53 @@ export default function ReceiptModal({ sale, onClose, onConfirm }: Props) {
   const shop = loadShopSettings();
   const now = new Date();
   const invoiceNo = `INV-${sale.id.replace('sale-', '').slice(-8).toUpperCase()}`;
-  const subtotal = sale.items.reduce((s, i) => s + i.price * i.quantity, 0);
+  
+  // Calculate distinct subtotals for better logic
+  const purchaseSubtotal = sale.items.reduce((s, i) => !i.isReturn ? s + (i.price * i.quantity) : s, 0);
+  const returnTotal = sale.items.reduce((s, i) => i.isReturn ? s + (i.price * i.quantity) : s, 0);
+  const netSubtotal = purchaseSubtotal - returnTotal;
 
   const handlePrint = () => {
     if (onConfirm) {
       onConfirm();
     }
     printReceipt(sale, shop);
+  };
+
+  const handleWhatsApp = () => {
+    // 1. Build the Receipt Text
+    const date = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const time = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    
+    let text = `*${(shop.name || 'RECEIPT').toUpperCase()}*\n`;
+    if (shop.tagline) text += `_${shop.tagline}_\n`;
+    text += `--------------------------\n`;
+    text += `*Invoice:* ${invoiceNo}\n`;
+    text += `*Date:* ${date} | ${time}\n`;
+    if (sale.customerName) text += `*Customer:* ${sale.customerName}\n`;
+    text += `--------------------------\n`;
+    
+    sale.items.forEach(item => {
+      const isReturn = item.isReturn;
+      text += `${isReturn ? '↩️' : '🔹'} ${item.name}\n`;
+      text += `   ${isReturn ? '-' : ''}${item.quantity} x ₹${item.price.toFixed(0)} = *${isReturn ? '-' : ''}₹${(item.price * item.quantity).toFixed(0)}*\n`;
+    });
+    
+    text += `--------------------------\n`;
+    text += `*GRAND TOTAL: ₹${sale.total.toFixed(2)}*\n`;
+    text += `--------------------------\n`;
+    text += `_${sale.footerNote || shop.footer || 'Thank you for shopping!'}_`;
+
+    // 2. Encode and Launch
+    const encoded = encodeURIComponent(text);
+    const phone = sale.customerPhone?.replace(/\D/g, '') || '';
+    
+    // Check if phone is valid (10 digits)
+    const waUrl = phone.length === 10
+      ? `https://wa.me/91${phone}?text=${encoded}`
+      : `https://wa.me/?text=${encoded}`;
+      
+    window.open(waUrl, '_blank');
   };
 
   return (
@@ -92,39 +133,59 @@ export default function ReceiptModal({ sale, onClose, onConfirm }: Props) {
 
               {/* Items Table */}
               <div className="border-y-2 border-zinc-800 py-2 mb-4">
-                <div className="grid grid-cols-[1fr_30px_60px_70px] gap-2 text-[9px] font-black uppercase tracking-wider mb-2">
+                <div className="grid grid-cols-[1fr_30px_65px_75px] gap-2 text-[9px] font-black uppercase tracking-wider mb-2">
                   <span>ITEM</span>
                   <span className="text-center">QTY</span>
                   <span className="text-right">PRICE</span>
-                  <span className="text-right">TOTAL</span>
+                  <span className="text-right pr-1">TOTAL</span>
                 </div>
                 <div className="space-y-3">
-                  {sale.items.map((item, i) => (
-                    <div key={i} className="grid grid-cols-[1fr_30px_60px_70px] gap-2 text-[11px] items-start">
-                      <span className="font-bold uppercase leading-tight">
-                        {item.name} {item.isReturn && <span className="text-[8px] text-red-500 font-black ml-1">(RETURN)</span>}
-                      </span>
-                      <span className="text-center text-zinc-500">{item.quantity}</span>
-                      <span className="text-right text-zinc-500">₹{item.price.toFixed(0)}</span>
-                      <span className="text-right font-black">₹{(item.price * item.quantity).toFixed(0)}</span>
-                    </div>
-                  ))}
+                  {sale.items.map((item, i) => {
+                    const isReturn = item.isReturn;
+                    return (
+                      <div key={i} className={cn(
+                        "grid grid-cols-[1fr_30px_65px_75px] gap-2 text-[11px] items-start",
+                        isReturn && "text-red-600"
+                      )}>
+                        <span className="font-bold uppercase leading-tight">
+                          {item.name} {isReturn && <span className="text-[8px] font-black ml-1">(RETURN)</span>}
+                        </span>
+                        <span className="text-center font-bold">
+                          {isReturn ? '-' : ''}{item.quantity}
+                        </span>
+                        <span className="text-right text-zinc-500">
+                          ₹{item.price.toFixed(0)}
+                        </span>
+                          <span className="text-right font-black tabular-nums pr-1">
+                            {isReturn ? '-' : ''}₹{(item.price * item.quantity).toFixed(0)}
+                          </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
               {/* Totals Section */}
               <div className="space-y-1.5 mb-6">
-                <div className="flex justify-between text-[11px] text-zinc-500">
-                  <span>SUBTOTAL</span><span>₹{subtotal.toFixed(2)}</span>
+                <div className="flex justify-between text-[11px] text-zinc-500 font-bold">
+                  <span>SUBTOTAL</span><span className="tabular-nums">₹{purchaseSubtotal.toFixed(2)}</span>
                 </div>
-                {sale.discount > 0 && (
-                  <div className="flex justify-between text-[11px] text-zinc-500">
-                    <span>DISCOUNT</span><span>-₹{sale.discount.toFixed(2)}</span>
+                
+                {returnTotal > 0 && (
+                  <div className="flex justify-between text-[11px] text-red-600 font-black">
+                    <span>RETURNS</span><span className="tabular-nums">-₹{returnTotal.toFixed(2)}</span>
                   </div>
                 )}
+
+                {sale.discount > 0 && (
+                  <div className="flex justify-between text-[11px] text-zinc-500 font-bold">
+                    <span>DISCOUNT</span><span className="tabular-nums">-₹{sale.discount.toFixed(2)}</span>
+                  </div>
+                )}
+
                 <div className="border-t-2 border-double border-zinc-800 pt-2 flex justify-between items-center">
                   <span className="text-sm font-black italic">GRAND TOTAL</span>
-                  <span className="text-lg font-black tracking-tight">₹{sale.total.toFixed(2)}</span>
+                  <span className="text-lg font-black tracking-tight tabular-nums">₹{sale.total.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -183,13 +244,23 @@ export default function ReceiptModal({ sale, onClose, onConfirm }: Props) {
                 Print & Complete
               </button>
             ) : (
-              <button
-                onClick={handlePrint}
-                className="flex-[2] premium-gradient text-white py-3 rounded-2xl font-black text-xs hover:shadow-xl transition-all flex items-center justify-center gap-2 uppercase tracking-widest"
-              >
-                <Printer className="h-4 w-4" />
-                Reprint Receipt
-              </button>
+              <>
+                <button
+                  onClick={handlePrint}
+                  className="flex-1 premium-gradient text-white py-3 rounded-2xl font-black text-xs hover:shadow-xl transition-all flex items-center justify-center gap-2 uppercase tracking-widest"
+                >
+                  <Printer className="h-4 w-4" />
+                  Print
+                </button>
+                
+                <button
+                  onClick={handleWhatsApp}
+                  className="flex-1 bg-green-500 text-white py-3 rounded-2xl font-black text-xs hover:shadow-xl transition-all flex items-center justify-center gap-2 uppercase tracking-widest shadow-lg shadow-green-500/20"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  WhatsApp
+                </button>
+              </>
             )}
           </div>
 

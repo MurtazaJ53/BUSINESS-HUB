@@ -43,6 +43,8 @@ export interface ShopMetadata {
   currency: string;
   adminPin: string;
   staffPin: string;
+  standardWorkingHours: number;
+  allowStaffAttendance: boolean;
 }
 
 export interface SaleItem {
@@ -51,6 +53,7 @@ export interface SaleItem {
   quantity: number;
   price: number;
   costPrice?: number;
+  size?: string;
   isReturn?: boolean;
 }
 
@@ -69,4 +72,49 @@ export interface Sale {
   footerNote?: string;
   date: string;
   createdAt: string;
+}
+
+export type StaffPermission = 
+  | 'dashboard'
+  | 'inventory'
+  | 'sell'
+  | 'customers'
+  | 'history'
+  | 'expenses'
+  | 'stock-alerts'
+  | 'analytics'
+  | 'team';
+
+export interface Staff {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  role: string;
+  salary: number; // Base monthly salary
+  joinedAt: string;
+  pin?: string;
+  status: 'active' | 'inactive';
+  permissions?: StaffPermission[];
+}
+
+export interface Attendance {
+  id: string; // staffId_date
+  staffId: string;
+  date: string; // YYYY-MM-DD
+  clockIn?: string; // ISO string or HH:mm
+  clockOut?: string;
+  status: 'PRESENT' | 'ABSENT' | 'HALF_DAY' | 'LEAVE';
+  totalHours?: number;
+  overtime?: number; // Extra hours
+  bonus?: number; // Custom bonus amount
+  note?: string;
+}
+
+export interface Invitation {
+  id: string;
+  code: string;
+  createdAt: string;
+  expiresAt?: string;
+  usedBy?: string[];
 }

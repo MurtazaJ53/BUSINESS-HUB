@@ -13,6 +13,7 @@ interface ConfirmDialogProps {
   inputValue?: string;
   onInputChange?: (val: string) => void;
   inputPlaceholder?: string;
+  inputType?: string;
   icon?: React.ReactNode;
 }
 
@@ -28,6 +29,7 @@ export default function ConfirmDialog({
   inputValue,
   onInputChange,
   inputPlaceholder = 'Enter amount...',
+  inputType = 'number',
   icon
 }: ConfirmDialogProps) {
   if (!open) return null;
@@ -75,8 +77,9 @@ export default function ConfirmDialog({
             <div className="w-full mt-6 px-2">
               <div className="relative group">
                 <input 
-                  type="number"
+                  type={inputType}
                   autoFocus
+                  autoComplete="new-password"
                   placeholder={inputPlaceholder}
                   value={inputValue}
                   onChange={(e) => onInputChange(e.target.value)}

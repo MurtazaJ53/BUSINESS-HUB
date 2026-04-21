@@ -25,54 +25,45 @@ import {
   RotateCcw,
   Building,
   AlertCircle,
-  Upload
+  Upload,
+  Send
 } from 'lucide-react';
 import { db, auth } from '@/lib/firebase';
 import { collection, addDoc, onSnapshot, query, setDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
-import { UserPlus, Ticket, LogOut, X } from 'lucide-react';
+import { UserPlus, Ticket, LogOut, X, MessageCircle } from 'lucide-react';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { downloadFile, convertToCSV, exportSalesReport } from '@/lib/exportUtils';
 import { formatCurrency, cn, isValidIndianPhone, sanitizePhone } from '@/lib/utils';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { loadShopSettings } from '@/lib/shopSettings';
 import { useAuthStore } from '@/lib/useAuthStore';
-import type { InventoryItem, ShopMetadata } from '@/lib/types';
-import { MigrationResult } from '@/lib/migrationEngine';
+import { MigrationResult, parseZobazeExcel } from '@/lib/migrationEngine';
+import { sendStaffInvite } from '@/lib/mail';
+import { shareInviteWhatsApp } from '@/lib/whatsapp';
 
 export default function Settings() {
   const { 
     inventory, sales, customers, shop, updateShop, 
     clearInventory, theme, setTheme, shopId, 
-    addInventoryItem, upsertCustomer, addSale 
+    addInventoryItem, upsertCustomer, addSale, invitations 
   } = useBusinessStore();
+
   const { role, user } = useAuthStore();
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
   const [toast, setToast] = useState('');
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 3000);
+  };
   
   // Migration State
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [importType, setImportType] = useState<'inventory' | 'customer' | 'sale'>('inventory');
   const [migrationStatus, setMigrationStatus] = useState<string | null>(null);
   const [migrationData, setMigrationData] = useState<MigrationResult | null>(null);
-  const [invites, setInvites] = useState<{ id: string, code: string }[]>([]);
   const [generatingInvite, setGeneratingInvite] = useState(false);
-
-  // Subscriptions for Invitations
-  React.useEffect(() => {
-    if (shopId && role === 'admin') {
-      const q = collection(db, `shops/${shopId}/invitations`);
-      return onSnapshot(q, (snap) => {
-        setInvites(snap.docs.map(d => ({ id: d.id, code: d.data().code })));
-      });
-    }
-  }, [shopId, role]);
-  
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(''), 3000);
-  };
   
   const [editForm, setEditForm] = useState(shop);
 
@@ -223,6 +214,10 @@ export default function Settings() {
             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Store Value</p>
             <p className="text-xl font-black italic text-primary">₹{inventory.reduce((sum: number, i: InventoryItem) => sum + (i.price * (i.stock || 0)), 0).toLocaleString()}</p>
           </div>
+          <div className="space-y-1">
+            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Shift Base</p>
+            <p className="text-xl font-black italic text-primary">{shop.standardWorkingHours || 9}h</p>
+          </div>
         </div>
       </div>
 
@@ -275,83 +270,6 @@ export default function Settings() {
           </button>
         </div>
       </div>
-
-      {/* STAFF & INVITATIONS - ADMIN ONLY */}
-      {role === 'admin' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-black tracking-tight">Staff & Team Access</h3>
-            </div>
-            <button 
-              onClick={async () => {
-                if (!shopId) return;
-                setGeneratingInvite(true);
-                const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-                await setDoc(doc(db, `shops/${shopId}/invitations`, code), {
-                  code,
-                  createdAt: new Date().toISOString()
-                });
-                // Also update the shop document with a search helper for the code
-                await updateDoc(doc(db, 'shops', shopId), { inviteCode: code });
-                setGeneratingInvite(false);
-                showToast('New Invitation Code Generated');
-              }}
-              disabled={generatingInvite}
-              className="px-4 py-2 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2"
-            >
-              <Ticket className="h-4 w-4" />
-              Generate Invite Code
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {invites.length === 0 ? (
-              <div className="md:col-span-3 glass-card p-10 rounded-[2rem] text-center border-dashed border-zinc-500/20">
-                <Users className="h-10 w-10 text-zinc-500 mx-auto mb-4 opacity-20" />
-                <p className="text-sm font-bold text-zinc-500">No active invitation codes.</p>
-                <p className="text-[10px] text-zinc-600 mt-1 uppercase tracking-widest font-black">Generate one to add staff members</p>
-              </div>
-            ) : (
-              invites.map(invite => (
-                <div key={invite.id} className="glass-card p-6 rounded-3xl border-primary/20 flex flex-col items-center justify-center group relative overflow-hidden">
-                  <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3">Staff Code</p>
-                  <h4 className="text-2xl font-black tracking-[0.2em] text-primary">{invite.code}</h4>
-                  <button 
-                    onClick={() => {
-                      navigator.clipboard.writeText(invite.code);
-                      showToast('Code Copied to Clipboard');
-                    }}
-                    className="mt-4 text-[9px] font-black uppercase tracking-widest bg-zinc-500/10 px-3 py-1.5 rounded-lg hover:bg-zinc-500/20 transition-all"
-                  >
-                    Copy & Share
-                  </button>
-                  <button 
-                    onClick={async () => {
-                      await deleteDoc(doc(db, `shops/${shopId}/invitations`, invite.id));
-                      showToast('Invitation Code Revoked');
-                    }}
-                    className="absolute top-2 right-2 p-1.5 text-zinc-500 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-          
-          <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 flex items-start gap-4">
-            <ShieldCheck className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-            <div>
-              <p className="text-[11px] font-bold text-zinc-400 leading-relaxed">
-                <span className="text-primary font-black">Admin Protocol:</span> Share these codes with your staff. They can enter the code on the Login screen to join your shop hub. Staff members can create sales and view inventory, but cannot access Expenses, Reports, or these Settings.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Profile & Account */}
       <div className="space-y-4 pt-4 border-t border-border/50">
@@ -596,6 +514,32 @@ export default function Settings() {
                   value={editForm.gst}
                   onChange={e => setEditForm({...editForm, gst: e.target.value})}
                 />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-widest ml-1 opacity-50">Working Hours / Day</label>
+                <input 
+                  type="number"
+                  className="w-full bg-accent/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 font-black"
+                  value={editForm.standardWorkingHours}
+                  onChange={e => setEditForm({...editForm, standardWorkingHours: Number(e.target.value)})}
+                />
+              </div>
+              <div className="col-span-2 space-y-1 pt-2">
+                <div className="flex items-center justify-between p-4 bg-accent/30 rounded-2xl border border-border/50">
+                   <div>
+                      <p className="text-sm font-black tracking-tight">Staff Attendance Recording</p>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase">Allow staff members to clock in/out themselves</p>
+                   </div>
+                   <button 
+                     onClick={() => setEditForm({...editForm, allowStaffAttendance: !editForm.allowStaffAttendance})}
+                     className={cn(
+                       "px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                       editForm.allowStaffAttendance ? "bg-green-500/10 text-green-500 border border-green-500/20" : "bg-red-500/10 text-red-500 border border-red-500/20"
+                     )}
+                   >
+                     {editForm.allowStaffAttendance ? 'Enabled' : 'Disabled'}
+                   </button>
+                </div>
               </div>
               <div className="col-span-2 space-y-1">
                 <label className="text-[10px] font-black uppercase tracking-widest ml-1 opacity-50">Receipt Footer Note</label>

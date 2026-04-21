@@ -16,24 +16,88 @@ import { auth, db, googleProvider } from '@/lib/firebase';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  signInWithPopup 
+  signInWithPopup,
+  sendPasswordResetEmail,
+  signInAnonymously,
+  fetchSignInMethodsForEmail,
+  linkWithPopup
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { useAuthStore } from '@/lib/useAuthStore';
 import { cn } from '@/lib/utils';
 
 export default function AuthPage() {
-  const { user, shopId } = useAuthStore();
-  const [mode, setMode] = useState<'login' | 'setup' | 'join'>('login');
+  const { user, shopId, role } = useAuthStore();
+  const [mode, setMode] = useState<'login' | 'setup' | 'join' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [shopName, setShopName] = useState('');
   const [joinCode, setJoinCode] = useState('');
+  const [staffName, setStaffName] = useState('');
+  const [staffPhone, setStaffPhone] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   // If user is logged in but has no shop context, force setup
   const needsShopSetup = user && !shopId;
+
+  // Auto-detect invite code from URL
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const invite = params.get('invite');
+    if (invite) {
+      setMode('join');
+      setJoinCode(invite);
+    }
+  }, []);
+
+  const handleGoogleAuth = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      // If the email is already in use by password, Firebase might error if "One account per email" is on.
+      // But standard signInWithPopup handles linking or errors based on console settings.
+      window.location.reload();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      setError('Please enter your email address first.');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setResetSent(true);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAnonymousAuth = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      await signInAnonymously(auth);
+      // Anonymous users start with no shop context
+      window.location.reload();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,13 +115,14 @@ export default function AuthPage() {
             : await createUserWithEmailAndPassword(auth, email, password);
           currentUser = userCredential.user;
         } catch (authErr: any) {
-          // Smart Logic: If they tried to sign up/join but account exists, just log them in!
-          if (authErr.code === 'auth/email-already-in-use') {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            currentUser = userCredential.user;
-          } else {
-            throw authErr;
+          // STRICT RULE: If email already in use, don't auto-login unless it's a known provider error.
+          // The previous "Smart Logic" could create confusion.
+          if (authErr.code === 'auth/email-already-in-use' && mode !== 'login') {
+             setError("An account with this email already exists. Please Sign In instead.");
+             setLoading(false);
+             return;
           }
+          throw authErr;
         }
       }
 
@@ -89,11 +154,25 @@ export default function AuthPage() {
         }
 
         const foundShopId = querySnapshot.docs[0].id;
+        
+        // 1. Link to User Profile
         await setDoc(doc(db, 'users', currentUser.uid), {
           email: currentUser.email,
           shopId: foundShopId,
           role: 'staff',
           createdAt: new Date().toISOString()
+        });
+
+        // 2. Create Staff Record in Shop
+        await setDoc(doc(db, `shops/${foundShopId}/staff`, currentUser.uid), {
+          id: currentUser.uid,
+          name: staffName || currentUser.email?.split('@')[0] || 'Staff',
+          phone: staffPhone || '-',
+          role: 'Sales',
+          salary: 0,
+          joinedAt: new Date().toISOString(),
+          status: 'active',
+          permissions: ['dashboard', 'inventory', 'sell', 'customers', 'history']
         });
       }
 
@@ -122,9 +201,21 @@ export default function AuthPage() {
       await setDoc(doc(db, 'users', user.uid), {
         email: user.email,
         shopId: foundShopId,
-        role: 'staff',
         createdAt: new Date().toISOString()
       });
+
+      // 2. IMPORTANT: Create the staff record here too for one-step joining
+      await setDoc(doc(db, `shops/${foundShopId}/staff`, user.uid), {
+        id: user.uid,
+        name: staffName || user.displayName || user.email?.split('@')[0] || 'Staff',
+        phone: staffPhone || '-',
+        role: 'Sales',
+        salary: 0,
+        joinedAt: new Date().toISOString(),
+        status: 'active',
+        permissions: ['dashboard', 'inventory', 'sell', 'customers', 'history']
+      });
+
       window.location.reload();
     } catch (err: any) {
       setError(err.message);
@@ -181,7 +272,67 @@ export default function AuthPage() {
             </button>
           </div>
 
-          <form onSubmit={handleAuth} className="space-y-5">
+          {mode === 'forgot' ? (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+              <div className="text-center">
+                <h3 className="text-lg font-black mb-2">Recover Access</h3>
+                <p className="text-xs text-zinc-500 font-bold">We'll send a high-security reset link to your inbox.</p>
+              </div>
+              
+              {resetSent ? (
+                <div className="p-6 rounded-3xl bg-green-500/10 border border-green-500/20 text-center animate-in zoom-in">
+                  <Mail className="h-10 w-10 text-green-500 mx-auto mb-4" />
+                  <p className="text-xs font-black text-green-500 uppercase tracking-widest mb-1">Link Transmitted!</p>
+                  <p className="text-[10px] text-zinc-400 font-bold">Check your inbox (and spam) for instructions.</p>
+                  <button 
+                    onClick={() => { setMode('login'); setResetSent(false); }}
+                    className="mt-6 text-[10px] font-black uppercase tracking-widest text-white hover:text-primary transition-colors"
+                  >
+                    Back to Login
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleForgotPassword} className="space-y-5">
+                   <div className="space-y-2 group">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Registered Email</label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                      <input
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-bold"
+                        placeholder="your@email.com"
+                      />
+                    </div>
+                  </div>
+                  
+                  {error && (
+                    <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold">
+                      {error}
+                    </div>
+                  )}
+
+                  <button
+                    disabled={loading}
+                    className="w-full premium-gradient text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:shadow-2xl transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                  >
+                    {loading ? <Sparkles className="h-5 w-5 animate-spin" /> : 'Send Reset Link'}
+                  </button>
+                  
+                  <button 
+                    type="button"
+                    onClick={() => setMode('login')}
+                    className="w-full text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-colors py-2"
+                  >
+                    Cancel
+                  </button>
+                </form>
+              )}
+            </div>
+          ) : (
+            <form onSubmit={handleAuth} className="space-y-5">
             {needsShopSetup && (
                <div className="p-4 rounded-2xl bg-primary/10 border border-primary/20 mb-4">
                   <p className="text-[10px] font-black text-primary uppercase tracking-widest flex items-center gap-2 mb-1">
@@ -225,6 +376,37 @@ export default function AuthPage() {
               </div>
             )}
 
+            {mode === 'join' && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                <div className="space-y-2 group">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Your Full Name</label>
+                  <div className="relative">
+                    <LogIn className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                    <input
+                      type="text"
+                      required
+                      value={staffName}
+                      onChange={(e) => setStaffName(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-bold"
+                      placeholder="Enter your name"
+                    />
+                  </div>
+                </div>
+
+                  <div className="space-y-2 group col-span-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Phone Number</label>
+                    <input
+                      type="tel"
+                      required
+                      value={staffPhone}
+                      onChange={(e) => setStaffPhone(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-bold"
+                      placeholder="e.g. +91 98765 43210"
+                    />
+                  </div>
+              </div>
+            )}
+
             {!user && (
               <>
                 <div className="space-y-2 group">
@@ -242,8 +424,17 @@ export default function AuthPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2 group">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Security Key</label>
+                 <div className="space-y-2 group">
+                  <div className="flex justify-between items-center ml-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Security Key</label>
+                    <button 
+                      type="button" 
+                      onClick={() => setMode('forgot')}
+                      className="text-[9px] font-black uppercase tracking-widest text-primary hover:text-primary/70 transition-colors"
+                    >
+                      Forgot?
+                    </button>
+                  </div>
                   <div className="relative">
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
                     <input
@@ -278,6 +469,34 @@ export default function AuthPage() {
                 </>
               )}
             </button>
+
+            {!user && mode !== 'setup' && (
+              <>
+                <div className="relative my-8">
+                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5"></div></div>
+                  <div className="relative flex justify-center text-[8px] font-black uppercase tracking-[0.3em] text-zinc-600 bg-[#050505] px-4">Instant Entry</div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={handleGoogleAuth}
+                    className="flex items-center justify-center gap-3 py-4 bg-white/5 border border-white/10 rounded-[1.2rem] hover:bg-white/10 transition-all group"
+                  >
+                    <Globe className="h-4 w-4 text-zinc-400 group-hover:text-white transition-colors" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Google</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAnonymousAuth}
+                    className="flex items-center justify-center gap-3 py-4 bg-white/5 border border-white/10 rounded-[1.2rem] hover:bg-white/10 transition-all group"
+                  >
+                    <LogIn className="h-4 w-4 text-zinc-400 group-hover:text-white transition-colors" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Guest</span>
+                  </button>
+                </div>
+              </>
+            )}
             
             {user && (
               <button 
@@ -290,7 +509,8 @@ export default function AuthPage() {
               </button>
             )}
           </form>
-        </div>
+        )}
+      </div>
 
         <div className="mt-8 flex items-center justify-center gap-6 opacity-30">
           <div className="flex items-center gap-2">

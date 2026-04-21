@@ -9,6 +9,7 @@ import History from './pages/History';
 import Customers from './pages/Customers';
 import Expenses from './pages/Expenses';
 import StockAlerts from './pages/StockAlerts';
+import Team from './pages/Team';
 import AuthPage from './pages/Auth';
 import { useAuthStore } from './lib/useAuthStore';
 import { useBusinessStore } from './lib/useBusinessStore';
@@ -27,6 +28,7 @@ const PAGES: Record<string, React.ReactNode> = {
   expenses: <Expenses />,
   'stock-alerts': <StockAlerts />,
   settings: <Settings />,
+  team: <Team />,
 };
 
 export default function App() {

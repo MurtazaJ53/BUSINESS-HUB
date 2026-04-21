@@ -180,36 +180,38 @@ export default function History() {
           className="w-full pl-11 pr-4 py-3 bg-card border border-border rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all shadow-sm"
         />
       </div>
-      {/* Summary Header */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className={cn(
-          "glass-card p-6 rounded-[2rem] border-l-4 transition-all duration-500",
-          tab === 'sales' ? "border-l-primary scale-100 opacity-100" : "border-l-transparent scale-95 opacity-50 grayscale"
-        )}>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Current Revenue</p>
-          <div className="flex items-center justify-between">
-            <h3 className="text-3xl font-black italic tracking-tighter">{formatCurrency(totalSalesAmount)}</h3>
-            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <IndianRupee className="h-5 w-5 text-primary" />
+      {/* Summary Header - ADMIN ONLY */}
+      {role === 'admin' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className={cn(
+            "glass-card p-6 rounded-[2rem] border-l-4 transition-all duration-500",
+            tab === 'sales' ? "border-l-primary scale-100 opacity-100" : "border-l-transparent scale-95 opacity-50 grayscale"
+          )}>
+            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Current Revenue</p>
+            <div className="flex items-center justify-between">
+              <h3 className="text-3xl font-black italic tracking-tighter">{formatCurrency(totalSalesAmount)}</h3>
+              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <IndianRupee className="h-5 w-5 text-primary" />
+              </div>
             </div>
+            <p className="text-[10px] font-bold text-primary mt-1 uppercase tracking-widest">{filteredSales.length} Successful Orders</p>
           </div>
-          <p className="text-[10px] font-bold text-primary mt-1 uppercase tracking-widest">{filteredSales.length} Successful Orders</p>
-        </div>
 
-        <div className={cn(
-          "glass-card p-6 rounded-[2rem] border-l-4 transition-all duration-500",
-          tab === 'expenses' ? "border-l-red-500 scale-100 opacity-100" : "border-l-transparent scale-95 opacity-50 grayscale"
-        )}>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Store Outflow</p>
-          <div className="flex items-center justify-between">
-            <h3 className="text-3xl font-black italic tracking-tighter text-red-500">{formatCurrency(totalExpensesAmount)}</h3>
-            <div className="h-10 w-10 rounded-xl bg-red-500/10 flex items-center justify-center">
-              <TrendingUp className="h-5 w-5 text-red-500 rotate-180" />
+          <div className={cn(
+            "glass-card p-6 rounded-[2rem] border-l-4 transition-all duration-500",
+            tab === 'expenses' ? "border-l-red-500 scale-100 opacity-100" : "border-l-transparent scale-95 opacity-50 grayscale"
+          )}>
+            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Store Outflow</p>
+            <div className="flex items-center justify-between">
+              <h3 className="text-3xl font-black italic tracking-tighter text-red-500">{formatCurrency(totalExpensesAmount)}</h3>
+              <div className="h-10 w-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+                <TrendingUp className="h-5 w-5 text-red-500 rotate-180" />
+              </div>
             </div>
+            <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-widest">{filteredExpenses.length} Overhead Records</p>
           </div>
-          <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-widest">{filteredExpenses.length} Overhead Records</p>
         </div>
-      </div>
+      )}
 
       {/* Content Feed */}
       <div className="glass-card rounded-[2.5rem] overflow-hidden border border-border/50">

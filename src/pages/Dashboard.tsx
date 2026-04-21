@@ -12,9 +12,21 @@ import {
   ShieldAlert,
   Database,
   RefreshCcw,
+  Wallet,
+  Plus,
+  X,
+  CreditCard,
+  History,
+  UserCheck
 } from 'lucide-react';
 import { useBusinessStore } from '@/lib/useBusinessStore';
+import { useAuthStore } from '@/lib/useAuthStore';
 import { formatCurrency, cn } from '@/lib/utils';
+import Modal from '@/components/Modal';
+import Label from '@/components/Label';
+import Input from '@/components/Input';
+import type { Expense } from '@/lib/types';
+import { useState } from 'react';
 import {
   BarChart,
   Bar,
@@ -60,7 +72,49 @@ function KPICard({
 }
 
 export default function Dashboard() {
-  const { inventory, sales, setActiveTab, setInventorySearchTerm, lastBackupDate } = useBusinessStore();
+  const { 
+    inventory, 
+    sales, 
+    staff,
+    attendance,
+    setActiveTab, 
+    setInventorySearchTerm, 
+    lastBackupDate, 
+    addExpense,
+    recordAttendance,
+    role,
+    shop
+  } = useBusinessStore();
+  const { user } = useAuthStore();
+  const [expenseModalOpen, setExpenseModalOpen] = useState(false);
+  const [expenseForm, setExpenseForm] = useState({ amount: '', category: 'General', description: '' });
+  const [isSavingExpense, setIsSavingExpense] = useState(false);
+
+  const today = new Date().toISOString().split('T')[0];
+  const myAttendance = attendance.find(a => a.staffId === user?.uid && a.date === today);
+  const presentStaffCount = attendance.filter(a => a.date === today && a.status === 'PRESENT').length;
+
+  const handleQuickExpense = async () => {
+    if (!expenseForm.amount) return;
+    setIsSavingExpense(true);
+    try {
+      const newExpense: Expense = {
+        id: `EXP-${Date.now()}`,
+        amount: parseFloat(expenseForm.amount),
+        category: expenseForm.category,
+        description: expenseForm.description || 'Quick Expense',
+        date: new Date().toISOString().split('T')[0],
+        createdAt: new Date().toISOString()
+      };
+      await addExpense(newExpense);
+      setExpenseModalOpen(false);
+      setExpenseForm({ amount: '', category: 'General', description: '' });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSavingExpense(false);
+    }
+  };
 
   // Backup Sentinel Logic
   const getBackupStatus = () => {
@@ -157,8 +211,8 @@ export default function Dashboard() {
           <p className="text-muted-foreground text-[8px] font-black uppercase tracking-widest mt-1">Catalog</p>
         </button>
 
-        {/* METRICS START HERE */}
-        {useBusinessStore.getState().role === 'admin' ? (
+        {/* METRICS START HERE - ADMIN ONLY */}
+        {role === 'admin' && (
           <>
             <div className="glass-card flex flex-col items-center justify-center aspect-square p-4 rounded-3xl group transition-all duration-500">
               <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
@@ -187,10 +241,6 @@ export default function Dashboard() {
               <p className="text-[8px] text-muted-foreground/60 mt-1 font-bold text-center">{inventory.length} SKUs</p>
             </div>
           </>
-        ) : (
-          <div className="col-span-1 glass-center aspect-square flex items-center justify-center p-4 bg-accent/20 border border-border/50 rounded-3xl">
-             <p className="text-[8px] text-center font-black uppercase opacity-50">Staff Limit</p>
-          </div>
         )}
 
         {/* ALERTS: RESTOCK */}
@@ -209,6 +259,58 @@ export default function Dashboard() {
             {lowStockItems.length}
           </p>
           <p className="text-[8px] text-muted-foreground/60 mt-1 font-bold text-center">Stock Low</p>
+        </div>
+
+        {/* ATTENDANCE WIDGET */}
+        <div 
+          onClick={() => {
+            if (role === 'staff' && user) {
+              if (!shop?.allowStaffAttendance) {
+                alert("Admin restricted manual clock-in. Contact Admin.");
+                return;
+              }
+              const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+              if (!myAttendance) {
+                // Clock IN
+                recordAttendance({
+                  id: `${user.uid}_${today}`,
+                  staffId: user.uid,
+                  date: today,
+                  clockIn: timeStr,
+                  status: 'PRESENT'
+                });
+              } else if (!myAttendance.clockOut) {
+                // Clock OUT
+                recordAttendance({
+                  ...myAttendance,
+                  clockOut: timeStr
+                });
+              } else {
+                setActiveTab('team');
+              }
+            } else {
+              setActiveTab('team');
+            }
+          }}
+          className={cn(
+            "flex flex-col items-center justify-center aspect-square p-4 rounded-3xl border transition-all hover:scale-105 cursor-pointer",
+            role === 'staff' && (!myAttendance || !myAttendance.clockOut) ? "bg-amber-500/10 border-amber-500/30" : "glass-card"
+          )}
+        >
+          <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center mb-3", role === 'staff' && !myAttendance ? "bg-amber-500/20" : "bg-primary/10")}>
+            <UserCheck className={cn("h-5 w-5", role === 'staff' && (!myAttendance || !myAttendance.clockOut) ? "text-amber-600" : "text-primary")} />
+          </div>
+          <p className="text-[8px] text-muted-foreground font-black uppercase tracking-[0.2em] opacity-80 text-center">Attendance</p>
+          <p className={cn("text-lg font-black mt-0.5 tracking-tighter text-center", role === 'staff' && (!myAttendance || !myAttendance.clockOut) ? "text-amber-600" : "text-foreground")}>
+            {role === 'admin' ? `${presentStaffCount} In` : 
+             (!shop?.allowStaffAttendance && role === 'staff' && !myAttendance ? 'Locked' :
+             (myAttendance?.clockOut ? 'Shift Done' : (myAttendance ? 'Clock Out' : 'Sign In')))}
+          </p>
+          <p className="text-[8px] text-muted-foreground/60 mt-1 font-bold text-center">
+             {role === 'admin' ? 'Team Present' : 
+              (!shop?.allowStaffAttendance && role === 'staff' && !myAttendance ? 'Admin Log Only' :
+              (myAttendance?.clockOut ? `${myAttendance.totalHours}h Worked` : (myAttendance?.clockIn || 'Arrived?')))}
+          </p>
         </div>
       </div>
 
@@ -358,6 +460,69 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* QUICK EXPENSE FAB */}
+      <button
+        onClick={() => setExpenseModalOpen(true)}
+        className="fixed bottom-8 right-8 h-14 w-14 rounded-2xl bg-primary text-white shadow-2xl shadow-primary/40 hover:scale-110 active:scale-95 transition-all flex items-center justify-center z-50 group border border-white/20"
+      >
+        <Plus className="h-6 w-6 group-hover:rotate-90 transition-transform duration-300" />
+        <span className="absolute right-full mr-4 px-3 py-1.5 rounded-xl bg-card border border-border shadow-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+          Post Expense
+        </span>
+      </button>
+
+      {/* QUICK EXPENSE MODAL */}
+      <Modal open={expenseModalOpen} onClose={() => setExpenseModalOpen(false)} title="Quick Expense Report">
+        <div className="space-y-4">
+          <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 flex flex-col items-center">
+            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Impact Analysis</span>
+            <p className="text-[11px] font-bold text-center text-primary/80">Every rupee recorded ensures your profit analysis remains 100% accurate.</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-[10px] uppercase font-black text-muted-foreground">Amount (₹) *</Label>
+            <Input 
+              autoFocus
+              type="number" 
+              placeholder="0.00" 
+              value={expenseForm.amount} 
+              onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })} 
+              className="text-lg font-black"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-[10px] uppercase font-black text-muted-foreground">Category</Label>
+            <select 
+              value={expenseForm.category}
+              onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
+              className="w-full bg-accent/30 border border-border/50 rounded-xl px-4 py-3 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none transition-all"
+            >
+              {['General', 'Rent', 'Electricity', 'Water', 'Staff Salary', 'Maintenance', 'Stock Purchase', 'Marketing', 'Tea/Coffee', 'Cleaning'].map(c => (
+                <option key={c} value={c} className="bg-[#1a1b1e] text-white">{c}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-[10px] uppercase font-black text-muted-foreground">Short Note</Label>
+            <Input 
+              placeholder="e.g. Cleaning Supplies, Daily Tea..." 
+              value={expenseForm.description} 
+              onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })} 
+            />
+          </div>
+
+          <button
+            onClick={handleQuickExpense}
+            disabled={!expenseForm.amount || isSavingExpense}
+            className="w-full premium-gradient text-white py-4 rounded-2xl font-black text-xs hover:shadow-xl transition-all flex items-center justify-center gap-2 uppercase tracking-widest disabled:opacity-50"
+          >
+            {isSavingExpense ? 'Saving...' : 'Record Expense ✨'}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

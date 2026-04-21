@@ -64,8 +64,9 @@ const NAV_ITEMS = [
   { id: 'history', label: 'History', icon: Clock },
   { id: 'expenses', label: 'Expenses', icon: TrendingUp },
   { id: 'stock-alerts', label: 'Stock Alerts', icon: AlertTriangle },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-];
+    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'team', label: 'Team Hub', icon: Users },
+  ];
 
 const PAGE_TITLES: Record<string, string> = {
   dashboard: 'Command Center',
@@ -76,11 +77,12 @@ const PAGE_TITLES: Record<string, string> = {
   'stock-alerts': 'Stock Alerts',
   analytics: 'Analytics',
   history: 'History Log',
+  team: 'Team Hub',
   settings: 'Control Center',
 };
 export default function AppLayout({ pages }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { sales, inventory, activeTab, setActiveTab, shop, theme, setTheme, role } = useBusinessStore();
+  const { sales, inventory, activeTab, setActiveTab, shop, theme, setTheme, role, currentStaff } = useBusinessStore();
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
@@ -138,6 +140,18 @@ export default function AppLayout({ pages }: AppLayoutProps) {
   const todayRevenue = sales
     .filter((s) => s.date === today)
     .reduce((sum, s) => sum + s.total, 0);
+
+  // --- ACCESS CONTROL GUARD ---
+  useEffect(() => {
+    if (role === 'staff' && currentStaff) {
+      const allowed = [...(currentStaff.permissions || []), 'team'];
+      // If current tab is NOT in allowed list AND it's not settings, redirect
+      if (activeTab !== 'settings' && !allowed.includes(activeTab as any)) {
+        const firstAvailable = NAV_ITEMS.find(item => allowed.includes(item.id as any))?.id || 'dashboard';
+        setActiveTab(firstAvailable);
+      }
+    }
+  }, [role, currentStaff, activeTab, setActiveTab]);
 
   const navigate = (tab: string) => {
     setActiveTab(tab);
@@ -229,22 +243,29 @@ export default function AppLayout({ pages }: AppLayoutProps) {
           <nav className="flex-1 space-y-1">
             {NAV_ITEMS
               .filter(item => {
-                const { role } = useBusinessStore.getState();
+                if (role === 'admin') return true;
                 if (role === 'staff') {
-                  const allowed = ['sell', 'history', 'customers', 'dashboard'];
-                  return allowed.includes(item.id);
+                  // Staff always see Team/Presence by default to see their own logs
+                  if (item.id === 'team') return true;
+                  return currentStaff?.permissions?.includes(item.id as any);
                 }
                 return true;
               })
-              .map(item => (
-                <NavItem
-                  key={item.id}
-                  icon={item.icon}
-                  label={item.label}
-                  active={activeTab === item.id}
-                  onClick={() => navigate(item.id)}
-                />
-              ))}
+              .map(item => {
+                const label = item.id === 'team' 
+                  ? (role === 'admin' ? 'Team & HR' : 'My Presence') 
+                  : item.label;
+
+                return (
+                  <NavItem
+                    key={item.id}
+                    icon={item.icon}
+                    label={label}
+                    active={activeTab === item.id}
+                    onClick={() => navigate(item.id)}
+                  />
+                );
+              })}
           </nav>
 
           {/* Bottom nav */}
@@ -313,12 +334,14 @@ export default function AppLayout({ pages }: AppLayoutProps) {
                 <Moon className="h-4 w-4 text-blue-500 group-hover:scale-110 transition-transform" />
               )}
             </button>
-            {/* Today's revenue badge */}
-            <div className="flex items-center gap-2 bg-primary/5 px-4 py-2 rounded-2xl border border-primary/20" title="Today's Revenue">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              <span className="text-sm font-black text-foreground">{formatCurrency(todayRevenue)}</span>
-              <span className="text-[9px] text-primary font-black uppercase tracking-widest">today</span>
-            </div>
+            {/* Today's revenue badge - ADMIN ONLY */}
+            {role === 'admin' && (
+              <div className="flex items-center gap-2 bg-primary/5 px-4 py-2 rounded-2xl border border-primary/20" title="Today's Revenue">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                <span className="text-sm font-black text-foreground">{formatCurrency(todayRevenue)}</span>
+                <span className="text-[9px] text-primary font-black uppercase tracking-widest">today</span>
+              </div>
+            )}
 
             {/* QUICK LOGOUT */}
             <button
