@@ -168,6 +168,7 @@ const InventoryCard = ({
 export default function Inventory() {
   const { 
     inventory, 
+    inventoryPrivate,
     addInventoryItem, 
     updateInventoryItem, 
     updateStock,
@@ -179,6 +180,14 @@ export default function Inventory() {
     role,
     sales
   } = useBusinessStore();
+
+  const inventoryWithPrivate = useMemo(() => {
+    if (role !== 'admin') return inventory;
+    return inventory.map(item => {
+      const p = inventoryPrivate.find(pi => pi.id === item.id);
+      return { ...item, costPrice: p?.costPrice };
+    });
+  }, [inventory, inventoryPrivate, role]);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [search, setSearch] = useState('');
@@ -236,14 +245,14 @@ export default function Inventory() {
   // ── Autocomplete data ──
   const uniqueCategoriesSummary = useMemo(() => {
     const counts: Record<string, number> = {};
-    inventory.forEach(item => {
+    inventoryWithPrivate.forEach(item => {
       const cat = item.category || 'General';
       if (!counts[cat]) counts[cat] = 0;
-      const productNamesInCategory = new Set(inventory.filter(i => (i.category || 'General') === cat).map(i => i.name));
+      const productNamesInCategory = new Set(inventoryWithPrivate.filter(i => (i.category || 'General') === cat).map(i => i.name));
       counts[cat] = productNamesInCategory.size;
     });
     return counts;
-  }, [inventory]);
+  }, [inventoryWithPrivate]);
 
   const filteredCategoriesSummary = useMemo(() => {
     if (!localSearch) return uniqueCategoriesSummary;
@@ -259,7 +268,7 @@ export default function Inventory() {
   const productNamesInCategory = useMemo(() => {
     if (!activeCategory) return {};
     const groups: Record<string, { items: InventoryItem[], totalStock: number, totalCost: number, totalValue: number }> = {};
-    inventory.filter(i => (i.category || 'General') === activeCategory).forEach(item => {
+    inventoryWithPrivate.filter(i => (i.category || 'General') === activeCategory).forEach(item => {
       if (!groups[item.name]) groups[item.name] = { items: [], totalStock: 0, totalCost: 0, totalValue: 0 };
       groups[item.name].items.push(item);
       groups[item.name].totalStock += (item.stock || 0);
@@ -267,7 +276,7 @@ export default function Inventory() {
       groups[item.name].totalValue += (item.price || 0) * (item.stock || 0);
     });
     return groups;
-  }, [inventory, activeCategory]);
+  }, [inventoryWithPrivate, activeCategory]);
 
   const filteredProductNamesInCategory = useMemo(() => {
     if (!localSearch) return productNamesInCategory;
@@ -282,8 +291,8 @@ export default function Inventory() {
 
   const itemsInSelectedProduct = useMemo(() => {
     if (!activeCategory || !activeProductName) return [];
-    return inventory.filter(i => (i.category || 'General') === activeCategory && i.name === activeProductName);
-  }, [inventory, activeCategory, activeProductName]);
+    return inventoryWithPrivate.filter(i => (i.category || 'General') === activeCategory && i.name === activeProductName);
+  }, [inventoryWithPrivate, activeCategory, activeProductName]);
 
   const filteredItemsInSelectedProduct = useMemo(() => {
     if (!localSearch) return itemsInSelectedProduct;
@@ -334,33 +343,22 @@ export default function Inventory() {
 
   // ── Filtered list ──
   const filtered = useMemo(() =>
-    inventory.filter((item) => {
-      const matchesSearch = 
-        item.name.toLowerCase().includes(search.toLowerCase()) ||
-        item.category.toLowerCase().includes(search.toLowerCase()) ||
-        (item.subcategory?.toLowerCase() ?? '').includes(search.toLowerCase()) ||
-        (item.size?.toLowerCase() ?? '').includes(search.toLowerCase()) ||
-        (item.sku?.toLowerCase() ?? '').includes(search.toLowerCase());
-      
-      const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
-      const matchesSubcategory = selectedSubcategory === 'All' || item.subcategory === selectedSubcategory;
-      
       return matchesSearch && matchesCategory && matchesSubcategory;
     }),
-    [inventory, search, selectedCategory, selectedSubcategory]
+    [inventoryWithPrivate, search, selectedCategory, selectedSubcategory]
   );
 
   // ── Stats ──
   const stats = useMemo(() => ({
-    totalItems: inventory.length,
-    totalStock: inventory.reduce((s, i) => s + (i.stock || 0), 0),
-    inventoryValue: inventory.reduce((s, i) => s + i.price * (i.stock || 0), 0),
-    potentialProfit: inventory.reduce((s, i) => {
-      if (i.costPrice && i.stock) return s + (i.price - i.costPrice) * i.stock;
+    totalItems: inventoryWithPrivate.length,
+    totalStock: inventoryWithPrivate.reduce((s, i) => s + (i.stock || 0), 0),
+    inventoryValue: inventoryWithPrivate.reduce((s, i) => s + i.price * (i.stock || 0), 0),
+    potentialProfit: inventoryWithPrivate.reduce((s, i) => {
+      if (i.costPrice !== undefined && i.stock !== undefined) return s + (i.price - i.costPrice) * i.stock;
       return s;
     }, 0),
-    lowStock: inventory.filter((i) => i.stock !== undefined && i.stock <= 5).length,
-  }), [inventory]);
+    lowStock: inventoryWithPrivate.filter((i) => i.stock !== undefined && i.stock <= 5).length,
+  }), [inventoryWithPrivate]);
 
   // ── Add (single / variant) ──
   const handleAdd = async () => {
@@ -575,7 +573,7 @@ export default function Inventory() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-border/50">
         <div>
           <h1 className="text-3xl md:text-5xl font-black tracking-tighter leading-none mb-2">Shop Inventory</h1>
-          <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest opacity-70">{inventory.length} Products in Catalog</p>
+          <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest opacity-70">{inventoryWithPrivate.length} Products in Catalog</p>
         </div>
       </div>
 
@@ -583,8 +581,8 @@ export default function Inventory() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           ...(role === 'admin' ? [
-            { label: 'Inventory Value', value: formatCurrency(stats.inventoryValue), color: 'text-primary' },
-            { label: 'Potential Profit', value: formatCurrency(stats.potentialProfit), color: 'text-green-400' },
+            { label: 'Inventory Value', value: formatCurrency(stats.inventoryValue || 0), color: 'text-primary' },
+            { label: 'Potential Profit', value: formatCurrency(stats.potentialProfit || 0), color: 'text-green-400' },
           ] : []),
           { label: 'Distinct Products', value: String(stats.totalItems), color: '' },
           { label: 'Total Stock Units', value: String(stats.totalStock), color: '' },
@@ -862,10 +860,12 @@ export default function Inventory() {
               <Label className="block min-h-[1.25rem]">Sell Price (₹) *</Label>
               <Input type="number" placeholder="0.00" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
             </div>
-            <div className="space-y-1.5">
-              <Label className="block min-h-[1.25rem]">Cost Price (₹)</Label>
-              <Input type="number" placeholder="0.00" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: e.target.value })} />
-            </div>
+            {role === 'admin' && (
+              <div className="space-y-1.5">
+                <Label className="block min-h-[1.25rem]">Cost Price (₹)</Label>
+                <Input type="number" placeholder="0.00" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: e.target.value })} />
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label className="block min-h-[1.25rem]">Stock</Label>
               <Input type="number" placeholder="∞" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />
@@ -892,7 +892,7 @@ export default function Inventory() {
                 <table className="w-full text-xs">
                   <thead className="bg-accent/50">
                     <tr>
-                      {['Variation', 'Sell Price', 'Cost Price', 'Stock'].map((h) => (
+                      {['Variation', 'Sell Price', ...(role === 'admin' ? ['Cost Price'] : []), 'Stock'].map((h) => (
                         <th key={h} className="px-3 py-2 text-left font-bold text-muted-foreground">{h}</th>
                       ))}
                     </tr>
@@ -903,15 +903,15 @@ export default function Inventory() {
                         <td className="px-3 py-1.5 font-semibold">
                           {row.sub && row.size ? `${row.sub} / ${row.size}` : row.sub || row.size || 'Default'}
                         </td>
-                        {(['price', 'costPrice', 'stock'] as const).map((field) => (
+                        {(['price', ...(role === 'admin' ? ['costPrice'] as const : []), 'stock'] as const).map((field) => (
                           <td key={field} className="px-1 py-1">
                             <input
                               type="number"
-                              value={row[field]}
+                              value={row[field as any]}
                               className="w-full px-2 py-1 bg-background border border-border rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-primary/30"
                               onChange={(e) => {
                                 const nm = [...variantMatrix];
-                                nm[idx] = { ...nm[idx], [field]: e.target.value };
+                                (nm[idx] as any)[field] = e.target.value;
                                 setVariantMatrix(nm);
                               }}
                             />
@@ -944,10 +944,12 @@ export default function Inventory() {
                 <span className="text-[10px] uppercase font-black text-muted-foreground">Original Stock</span>
                 <p className="text-lg font-black">{restockOpen?.stock || 0} units</p>
               </div>
-              <div className="space-y-0.5">
-                <span className="text-[10px] uppercase font-black text-muted-foreground">Current Cost</span>
-                <p className="text-lg font-black text-amber-500">{formatCurrency(restockOpen?.costPrice || 0)}</p>
-              </div>
+              {role === 'admin' && (
+                <div className="space-y-0.5">
+                  <span className="text-[10px] uppercase font-black text-muted-foreground">Current Cost</span>
+                  <p className="text-lg font-black text-amber-500">{formatCurrency(restockOpen?.costPrice || 0)}</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -962,15 +964,17 @@ export default function Inventory() {
                 onChange={(e) => setRestockForm({ ...restockForm, qty: e.target.value })} 
               />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-[10px] uppercase font-black text-amber-500">New Purchase Price</Label>
-              <Input 
-                type="number" 
-                placeholder="₹ Per Unit" 
-                value={restockForm.cost} 
-                onChange={(e) => setRestockForm({ ...restockForm, cost: e.target.value })} 
-              />
-            </div>
+            {role === 'admin' && (
+              <div className="space-y-1.5">
+                <Label className="text-[10px] uppercase font-black text-amber-500">New Purchase Price</Label>
+                <Input 
+                  type="number" 
+                  placeholder="₹ Per Unit" 
+                  value={restockForm.cost} 
+                  onChange={(e) => setRestockForm({ ...restockForm, cost: e.target.value })} 
+                />
+              </div>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -984,7 +988,7 @@ export default function Inventory() {
             <p className="text-[9px] text-muted-foreground font-bold">Leave blank to keep current price</p>
           </div>
 
-          {restockForm.qty && restockForm.cost && restockOpen && (
+          {restockForm.qty && restockForm.cost && restockOpen && role === 'admin' && (
             <div className="space-y-3">
               <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <div className="flex justify-between items-center">
@@ -1059,7 +1063,9 @@ export default function Inventory() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-muted-foreground">Sell Price</Label><Input type="number" value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: e.target.value })} /></div>
-            <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-amber-500">Cost Price</Label><Input type="number" value={editForm.costPrice} onChange={(e) => setEditForm({ ...editForm, costPrice: e.target.value })} /></div>
+            {role === 'admin' && (
+              <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-amber-500">Cost Price</Label><Input type="number" value={editForm.costPrice} onChange={(e) => setEditForm({ ...editForm, costPrice: e.target.value })} /></div>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-muted-foreground">Stock</Label><Input type="number" value={editForm.stock} onChange={(e) => setEditForm({ ...editForm, stock: e.target.value })} /></div>
@@ -1093,7 +1099,7 @@ export default function Inventory() {
             <table className="w-full text-xs">
               <thead className="bg-accent/50 sticky top-0">
                 <tr>
-                  {['#', 'Product Name *', 'Category', 'Sub-cat', 'Size (comma = variants)', 'Sell Price *', 'Cost Price', 'Stock', ''].map((h, i) => (
+                  {['#', 'Product Name *', 'Category', 'Sub-cat', 'Size (comma = variants)', 'Sell Price *', ...(role === 'admin' ? ['Cost Price'] : []), 'Stock', ''].map((h, i) => (
                     <th key={i} className="px-3 py-3 text-left font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -1102,29 +1108,29 @@ export default function Inventory() {
                 {bulkRows.map((row, idx) => (
                   <tr key={idx} className="group border-t border-border/50 hover:bg-accent/10 transition-colors">
                     <td className="px-3 py-1 text-muted-foreground font-mono text-center">{idx + 1}</td>
-                    {(['name', 'category', 'subcategory', 'size', 'price', 'costPrice', 'stock'] as const).map((field) => (
+                    {(['name', 'category', 'subcategory', 'size', 'price', ...(role === 'admin' ? ['costPrice'] as const : []), 'stock'] as const).map((field) => (
                       <td key={field} className="p-1">
                         {field === 'size' ? (
                           <div className="relative">
                             <input
                               type="text"
-                              value={row[field]}
+                              value={row[field as any]}
                               placeholder="e.g. S,M,L or 11,12,32"
-                              onChange={(e) => handleRowChange(idx, field, e.target.value)}
+                              onChange={(e) => handleRowChange(idx, field as any, e.target.value)}
                               className="w-full h-8 px-2 bg-transparent border-transparent focus:border-primary/30 focus:bg-background border rounded-lg text-[11px] focus:outline-none transition-all min-w-[100px]"
                             />
-                            {row[field].includes(',') && (
+                            {row[field as any].includes(',') && (
                               <span className="absolute -top-2.5 right-0 text-[9px] font-black uppercase bg-primary text-white px-1.5 py-0.5 rounded-full leading-none">
-                                ×{row[field].split(',').filter(s => s.trim()).length} variants
+                                ×{row[field as any].split(',').filter((s: string) => s.trim()).length} variants
                               </span>
                             )}
                           </div>
                         ) : (
                           <input
                             type={['price', 'costPrice', 'stock'].includes(field) ? 'number' : 'text'}
-                            value={row[field]}
+                            value={row[field as any]}
                             placeholder={field === 'name' ? 'Product Name' : field === 'price' ? '0.00' : field === 'stock' ? '∞' : ''}
-                            onChange={(e) => handleRowChange(idx, field, e.target.value)}
+                            onChange={(e) => handleRowChange(idx, field as any, e.target.value)}
                             className="w-full h-8 px-2 bg-transparent border-transparent focus:border-primary/30 focus:bg-background border rounded-lg text-[11px] focus:outline-none transition-all min-w-[80px]"
                           />
                         )}

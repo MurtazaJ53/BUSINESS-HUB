@@ -43,8 +43,7 @@ import { sendStaffInvite } from '@/lib/mail';
 import { shareInviteWhatsApp } from '@/lib/whatsapp';
 
 export default function Settings() {
-  const { 
-    inventory, sales, customers, shop, updateShop, 
+    inventory, inventoryPrivate, sales, customers, shop, updateShop, 
     clearInventory, theme, setTheme, shopId, 
     addInventoryItem, upsertCustomer, addSale, invitations 
   } = useBusinessStore();
@@ -81,16 +80,19 @@ export default function Settings() {
   const handleInventoryCSV = () => {
     setExporting('inv-csv');
     // Sanitize for CSV
-    const csvData = inventory.map((i: InventoryItem) => ({
-      Name: i.name,
-      SKU: i.sku || 'N/A',
-      Category: i.category,
-      Subcategory: i.subcategory || '',
-      CostPrice: i.costPrice || 0,
-      SellPrice: i.price,
-      Stock: i.stock ?? 0,
-      AddedOn: i.createdAt
-    }));
+    const csvData = inventory.map((i: InventoryItem) => {
+      const privateData = role === 'admin' ? inventoryPrivate.find(pi => pi.id === i.id) : null;
+      return {
+        Name: i.name,
+        SKU: i.sku || 'N/A',
+        Category: i.category,
+        Subcategory: i.subcategory || '',
+        CostPrice: privateData?.costPrice || 0,
+        SellPrice: i.price,
+        Stock: i.stock ?? 0,
+        AddedOn: i.createdAt
+      };
+    });
     const csv = convertToCSV(csvData);
     downloadFile(csv, `Inventory_Export_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
     setTimeout(() => setExporting(null), 1000);

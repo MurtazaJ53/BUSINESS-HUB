@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { InventoryItem, Sale, Customer, ShopMetadata, Expense, Staff, Attendance, Invitation } from './types';
+import type { InventoryItem, InventoryPrivate, Sale, Customer, ShopMetadata, Expense, Staff, Attendance, Invitation } from './types';
 import { db, auth } from './firebase';
 import { 
   doc, 
@@ -30,6 +30,7 @@ const SHOP_DEFAULTS: ShopMetadata = {
 
 interface BusinessState {
   inventory: InventoryItem[];
+  inventoryPrivate: InventoryPrivate[];
   sales: Sale[];
   customers: Customer[];
   expenses: Expense[];
@@ -92,6 +93,7 @@ interface BusinessState {
 
 export const useBusinessStore = create<BusinessState>((set, get) => ({
   inventory: [],
+  inventoryPrivate: [],
   sales: [],
   customers: [],
   expenses: [],
@@ -120,9 +122,23 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
 
     // 2. Subscribe to Inventory
     const unsubInv = onSnapshot(collection(db, `shops/${shopId}/inventory`), (snap) => {
-      const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem));
+      const items = snap.docs.map(d => {
+        const data = d.data();
+        // CLEANUP: Ensure no leaked costPrice in public collection
+        if (data.costPrice !== undefined) delete data.costPrice;
+        return { id: d.id, ...data } as InventoryItem;
+      });
       set({ inventory: items });
     });
+
+    // 2.5 Subscribe to Private Inventory (Admin Only)
+    let unsubInvPrivate = () => {};
+    if (role === 'admin') {
+      unsubInvPrivate = onSnapshot(collection(db, `shops/${shopId}/inventory_private`), (snap) => {
+        const privateItems = snap.docs.map(d => ({ id: d.id, ...d.data() } as InventoryPrivate));
+        set({ inventoryPrivate: privateItems });
+      });
+    }
 
     // 3. Subscribe to Sales (Recent 100)
     const unsubSales = onSnapshot(collection(db, `shops/${shopId}/sales`), (snap) => {
@@ -175,6 +191,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     return () => {
       unsubShop();
       unsubInv();
+      unsubInvPrivate();
       unsubSales();
       unsubCust();
       unsubExp();
@@ -209,13 +226,37 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
   addInventoryItem: async (item) => {
     const { shopId } = get();
     if (!shopId) throw new Error('Sync Error: Shop ID not found. Please refresh.');
-    await setDoc(doc(db, `shops/${shopId}/inventory`, item.id), item);
+    
+    const { costPrice, ...publicData } = item as any;
+    
+    // Write public data
+    await setDoc(doc(db, `shops/${shopId}/inventory`, item.id), publicData);
+    
+    // Write private data if costPrice exists
+    if (costPrice !== undefined) {
+      await setDoc(doc(db, `shops/${shopId}/inventory_private`, item.id), {
+        id: item.id,
+        costPrice: Number(costPrice)
+      });
+    }
   },
 
   updateInventoryItem: async (item) => {
     const { shopId } = get();
     if (!shopId) return;
-    await setDoc(doc(db, `shops/${shopId}/inventory`, item.id), item);
+    
+    const { costPrice, ...publicData } = item as any;
+    
+    // Write public data
+    await setDoc(doc(db, `shops/${shopId}/inventory`, item.id), publicData);
+    
+    // Write private data if costPrice exists
+    if (costPrice !== undefined) {
+      await setDoc(doc(db, `shops/${shopId}/inventory_private`, item.id), {
+        id: item.id,
+        costPrice: Number(costPrice)
+      });
+    }
   },
 
   updateStock: async (id, delta) => {
@@ -379,14 +420,15 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
   },
 
   restockItem: async (id, newQty, newPurchasePrice) => {
-    const { shopId, inventory } = get();
+    const { shopId, inventory, inventoryPrivate } = get();
     if (!shopId) return;
 
     const item = inventory.find(i => i.id === id);
+    const privateItem = inventoryPrivate.find(i => i.id === id);
     if (!item) return;
 
     const currentStock = item.stock || 0;
-    const currentCost = item.costPrice || 0;
+    const currentCost = privateItem?.costPrice || 0;
     
     // Formula: (Current Value + New Value) / Total Quantity
     const totalQuantity = currentStock + newQty;
@@ -394,10 +436,16 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
       ? ((currentStock * currentCost) + (newQty * newPurchasePrice)) / totalQuantity
       : newPurchasePrice;
 
+    // 1. Update public stock
     await updateDoc(doc(db, `shops/${shopId}/inventory`, id), {
-      stock: totalQuantity,
-      costPrice: Number(weightedAverageCost.toFixed(2))
+      stock: totalQuantity
     });
+
+    // 2. Update private cost
+    await setDoc(doc(db, `shops/${shopId}/inventory_private`, id), {
+      id,
+      costPrice: Number(weightedAverageCost.toFixed(2))
+    }, { merge: true });
   },
 
   upsertStaff: async (staff) => {

@@ -2,7 +2,6 @@ export interface InventoryItem {
   id: string;
   name: string;
   price: number;
-  costPrice?: number;
   sku?: string;
   category: string;
   subcategory?: string;
@@ -11,6 +10,13 @@ export interface InventoryItem {
   stock?: number;
   createdAt: string;
   [key: string]: any; // allow dynamic deletion of undefined keys
+}
+
+export interface InventoryPrivate {
+  id: string;
+  costPrice: number;
+  supplierId?: string;
+  lastPurchaseDate?: string;
 }
 
 export interface Customer {

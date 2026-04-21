@@ -9,7 +9,7 @@ import {
 import { getDeadStock } from '@/lib/analyticsUtils';
 
 export default function Analytics() {
-  const { sales, inventory } = useBusinessStore();
+  const { sales, inventory, inventoryPrivate, role } = useBusinessStore();
   const [period, setPeriod] = useState<'week' | 'month' | 'custom'>('week');
   
   const todayStr = new Date().toISOString().split('T')[0];
@@ -208,22 +208,24 @@ export default function Analytics() {
             value: formatCurrency(totalRevenue),
             change: revChange,
             icon: TrendingUp,
-            sub: `${profitMargin.toFixed(1)}% Margin`
+            sub: role === 'admin' ? `${profitMargin.toFixed(1)}% Margin` : undefined
           },
-          { 
-            label: 'Gross Profit', 
-            value: formatCurrency(grossProfit), 
-            change: null, 
-            icon: Target,
-            className: "border-green-500/10 text-green-500" 
-          },
-          { 
-            label: 'Net Profit (Take Home)', 
-            value: formatCurrency(netProfit), 
-            change: null, 
-            icon: Wallet,
-            className: netProfit < 0 ? "border-red-500/10 text-red-500" : "border-primary/10 text-primary"
-          },
+          ...(role === 'admin' ? [
+            { 
+              label: 'Gross Profit', 
+              value: formatCurrency(grossProfit), 
+              change: null, 
+              icon: Target,
+              className: "border-green-500/10 text-green-500" 
+            },
+            { 
+              label: 'Net Profit (Take Home)', 
+              value: formatCurrency(netProfit), 
+              change: null, 
+              icon: Wallet,
+              className: netProfit < 0 ? "border-red-500/10 text-red-500" : "border-primary/10 text-primary"
+            },
+          ] : []),
           { label: 'Avg Order Value', value: formatCurrency(avgOrderValue), change: null, icon: Target },
         ].map((stat, idx) => (
           <div key={idx} className={cn("glass-card p-5 rounded-2xl border", stat.className)}>
@@ -418,10 +420,13 @@ export default function Analytics() {
             </h3>
             <p className="text-[10px] font-bold text-muted-foreground uppercase mt-1">Zero sales in the last 30 days — recover your capital now.</p>
           </div>
-          {deadStockItems.length > 0 && (
+          {deadStockItems.length > 0 && role === 'admin' && (
             <div className="bg-amber-500/10 border border-amber-500/20 px-4 py-2 rounded-xl">
               <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">
-                Stuck Capital: {formatCurrency(deadStockItems.reduce((s, i) => s + (i.costPrice || 0) * (i.stock || 0), 0))}
+                Stuck Capital: {formatCurrency(deadStockItems.reduce((s, i) => {
+                  const p = inventoryPrivate.find(pi => pi.id === i.id);
+                  return s + (p?.costPrice || 0) * (i.stock || 0);
+                }, 0))}
               </p>
             </div>
           )}
@@ -435,7 +440,8 @@ export default function Analytics() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {deadStockItems.slice(0, 6).map((item) => {
-              const clearancePrice = (item.costPrice || 0) * 1.15; // 15% margin for clearance
+              const privateData = role === 'admin' ? inventoryPrivate.find(pi => pi.id === item.id) : null;
+              const clearancePrice = (privateData?.costPrice || 0) * 1.15; // 15% margin for clearance
               return (
                 <div key={item.id} className="p-4 rounded-2xl bg-accent/20 border border-border/50 hover:border-amber-500/30 transition-all group">
                   <div className="flex justify-between items-start mb-3">
@@ -453,15 +459,17 @@ export default function Analytics() {
                       <span>Cur. Price</span>
                       <span>{formatCurrency(item.price)}</span>
                     </div>
-                    <div className="flex justify-between items-center p-2 bg-amber-500/10 rounded-xl border border-amber-500/10">
-                      <div className="flex flex-col">
-                        <span className="text-[8px] font-black text-amber-600 uppercase">Clearance Target</span>
-                        <span className="text-xs font-black text-amber-600">{formatCurrency(clearancePrice)}</span>
+                    {role === 'admin' && (
+                      <div className="flex justify-between items-center p-2 bg-amber-500/10 rounded-xl border border-amber-500/10">
+                        <div className="flex flex-col">
+                          <span className="text-[8px] font-black text-amber-600 uppercase">Clearance Target</span>
+                          <span className="text-xs font-black text-amber-600">{formatCurrency(clearancePrice)}</span>
+                        </div>
+                        <span className="text-[10px] font-black px-2 py-1 bg-amber-600 text-white rounded-lg animate-pulse">
+                          -{(100 - (clearancePrice/item.price)*100).toFixed(0)}% OFF
+                        </span>
                       </div>
-                      <span className="text-[10px] font-black px-2 py-1 bg-amber-600 text-white rounded-lg animate-pulse">
-                        -{(100 - (clearancePrice/item.price)*100).toFixed(0)}% OFF
-                      </span>
-                    </div>
+                    )}
                   </div>
                 </div>
               );

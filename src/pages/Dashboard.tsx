@@ -72,18 +72,9 @@ function KPICard({
 }
 
 export default function Dashboard() {
-  const { 
-    inventory, 
-    sales, 
-    staff,
-    attendance,
-    setActiveTab, 
-    setInventorySearchTerm, 
-    lastBackupDate, 
-    addExpense,
-    recordAttendance,
     role,
-    shop
+    shop,
+    inventoryPrivate
   } = useBusinessStore();
   const { user } = useAuthStore();
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
@@ -127,10 +118,10 @@ export default function Dashboard() {
   const backupStatus = getBackupStatus();
 
   // KPI calculations from real data
-  const totalStockValue = inventory.reduce(
-    (sum, i) => sum + (i.costPrice || 0) * (i.stock || 0),
-    0
-  );
+  const totalStockValue = inventory.reduce((sum, i) => {
+    const p = role === 'admin' ? inventoryPrivate.find(pi => pi.id === i.id) : null;
+    return sum + (p?.costPrice || 0) * (i.stock || 0);
+  }, 0);
   const potentialRevenue = inventory.reduce(
     (sum, i) => sum + i.price * (i.stock || 0),
     0
