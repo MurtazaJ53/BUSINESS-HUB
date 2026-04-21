@@ -729,65 +729,64 @@ export default function POS() {
                 <Package className="h-16 w-16 mx-auto mb-3" />
                 <p className="font-bold">No matches found for "{search}"</p>
               </div>
-            ) : (
-              filtered.map((product) => {
-                const outOfStock = product.stock !== undefined && product.stock <= 0;
-                return (
-                  <div
-                    key={product.id}
-                    onClick={() => {
-                      if (outOfStock) setToast("Warning: Adding out-of-stock item!");
-                      addToCart(product);
-                    }}
-                    className={`glass-card p-4 rounded-3xl text-left transition-all duration-300 group relative cursor-pointer active:scale-95 ${
-                      outOfStock ? 'opacity-80 hover:border-red-500/30' : 'hover:shadow-2xl hover:-translate-y-1 hover:border-primary/30'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="h-10 w-10 premium-gradient rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
-                        <Package className="h-5 w-5 text-white" />
-                      </div>
-                      <div className="flex gap-1.5 grayscale group-hover:grayscale-0 transition-all">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); addToCart(product, true); }}
-                          className="h-8 w-8 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm"
-                          title="Add as Return"
-                        >
-                          <RotateCcw className="h-4 w-4" />
-                        </button>
-                      </div>
+            ) : filtered.map((product) => {
+              const outOfStock = product.stock !== undefined && product.stock <= 0;
+              return (
+                <div
+                  key={product.id}
+                  onClick={() => {
+                    if (outOfStock) setToast("Warning: Adding out-of-stock item!");
+                    addToCart(product);
+                  }}
+                  className={`glass-card p-4 rounded-3xl text-left transition-all duration-300 group relative cursor-pointer active:scale-95 ${
+                    outOfStock ? 'opacity-80 hover:border-red-500/30' : 'hover:shadow-2xl hover:-translate-y-1 hover:border-primary/30'
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="h-10 w-10 premium-gradient rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
+                      <Package className="h-5 w-5 text-white" />
                     </div>
-
-                    <div className="space-y-1.5 mt-1">
-                      <h3 className="font-extrabold text-[12px] uppercase tracking-tight truncate leading-tight">{product.name}</h3>
-                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                        <span className="px-2 py-0.5 bg-accent/50 text-zinc-400 text-[9px] font-black uppercase rounded-lg border border-border/50">
-                          {product.categoryShort || product.category.slice(0, 4)}
-                        </span>
-                        {product.size && (
-                          <span className="px-3 py-1 bg-purple-500/10 text-purple-500 text-[10px] font-black uppercase rounded-lg border border-purple-500/20 shadow-sm leading-none">
-                            {product.size}
-                          </span>
-                        )}
-                        <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-lg border ${
-                          outOfStock ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                        }`}>
-                          Stk: {product.stock || 0}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-between items-end mt-4 pt-2 border-t border-border/10">
-                      <p className="font-black text-xl tracking-tighter text-foreground leading-none">
-                        {formatCurrency(product.price)}
-                      </p>
-                      <div className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
-                        <Plus className="h-4 w-4" />
-                      </div>
+                    <div className="flex gap-1.5 grayscale group-hover:grayscale-0 transition-all">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); addToCart(product, true); }}
+                        className="h-8 w-8 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                        title="Add as Return"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
-                );
-              })}
+
+                  <div className="space-y-1.5 mt-1">
+                    <h3 className="font-extrabold text-[12px] uppercase tracking-tight truncate leading-tight">{product.name}</h3>
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="px-2 py-0.5 bg-accent/50 text-zinc-400 text-[9px] font-black uppercase rounded-lg border border-border/50">
+                        {product.categoryShort || product.category.slice(0, 4)}
+                      </span>
+                      {product.size && (
+                        <span className="px-3 py-1 bg-purple-500/10 text-purple-500 text-[10px] font-black uppercase rounded-lg border border-purple-500/20 shadow-sm leading-none">
+                          {product.size}
+                        </span>
+                      )}
+                      <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-lg border ${
+                        outOfStock ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                      }`}>
+                        Stk: {product.stock || 0}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-between items-end mt-4 pt-2 border-t border-border/10">
+                    <p className="font-black text-xl tracking-tighter text-foreground leading-none">
+                      {formatCurrency(product.price)}
+                    </p>
+                    <div className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
+                      <Plus className="h-4 w-4" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

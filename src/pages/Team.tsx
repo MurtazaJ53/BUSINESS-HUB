@@ -36,7 +36,7 @@ import { db } from '@/lib/firebase';
 import { doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Staff, StaffPermission } from '@/lib/types';
+import { Staff, StaffPermission, Attendance } from '@/lib/types';
 import { sendStaffInvite } from '@/lib/mail';
 import { sendWhatsAppInvite, shareInviteWhatsApp } from '@/lib/whatsapp';
 import { showToast } from '@/lib/toast';
@@ -422,7 +422,14 @@ export default function Team() {
                 <button
                   onClick={() => {
                     setManualEntryStaff(staff[0] || null);
-                    setManualTimes({ date: today, clockIn: '09:00', clockOut: '18:00' });
+                    setManualTimes({ 
+                      date: today, 
+                      clockIn: '09:00', 
+                      clockOut: '18:00',
+                      status: 'PRESENT',
+                      overtime: 0,
+                      bonus: 0
+                    });
                   }}
                   className="h-10 px-4 bg-primary text-white rounded-xl flex items-center gap-2 hover:bg-primary/90 transition-all text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 active:scale-95"
                 >
@@ -531,7 +538,7 @@ export default function Team() {
                               </button>
                                 {role === 'admin' && (
                                   <button
-                                    onClick={() => { setManualEntryStaff(s); setManualTimes({ date: today, clockIn: '09:00', clockOut: '18:00' }); }}
+                                    onClick={() => { setManualEntryStaff(s); setManualTimes({ date: today, clockIn: '09:00', clockOut: '18:00', status: 'PRESENT', overtime: 0, bonus: 0 }); }}
                                     className="px-3 py-1.5 bg-accent text-muted-foreground text-[9px] font-black uppercase tracking-widest rounded-lg border border-border/50 hover:bg-primary hover:text-white transition-all"
                                   >
                                     Manual
@@ -550,7 +557,7 @@ export default function Team() {
                                 Auto Out
                               </button>
                               <button
-                                onClick={() => { setManualEntryStaff(s); setManualTimes({ date: today, clockIn: record.clockIn || '09:00', clockOut: '18:00' }); }}
+                                onClick={() => { setManualEntryStaff(s); setManualTimes({ date: today, clockIn: record.clockIn || '09:00', clockOut: '18:00', status: record.status || 'PRESENT', overtime: record.overtime || 0, bonus: record.bonus || 0 }); }}
                                 className="px-3 py-1.5 bg-accent text-muted-foreground text-[9px] font-black uppercase tracking-widest rounded-lg border border-border/50 hover:bg-primary hover:text-white transition-all"
                               >
                                 Manual
