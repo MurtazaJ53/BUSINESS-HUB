@@ -788,11 +788,19 @@ export default function Inventory() {
                   key={item.id} 
                   item={item} 
                   role={role || 'staff'} 
-                  onRestock={setRestockOpen} 
-                  setRestockForm={setRestockForm}
-                  onEdit={setEditingItem}
-                  setEditForm={setEditForm}
+                  onRestock={() => {
+                    setRestockOpen(item);
+                    setRestockForm({ qty: '', cost: item.costPrice?.toString() || '', newSellPrice: '' });
+                  }}
+                  onEdit={(it) => {
+                    setEditingItem(it);
+                    setEditForm({ ...it, price: it.price.toString(), costPrice: it.costPrice.toString(), stock: it.stock.toString() });
+                  }}
                   onDelete={deleteInventoryItem}
+                  sales={sales}
+                />
+              ))}
+            </div>
           )}
         </div>
       )}

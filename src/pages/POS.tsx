@@ -758,33 +758,6 @@ export default function POS() {
                       </div>
                     </div>
 
-                        </span>
-                      )}
-                      {product.size && (
-                        <span className="px-3 py-1 bg-purple-500/10 text-purple-500 text-[10px] font-black uppercase rounded-lg border border-purple-500/20 shadow-sm leading-none">
-                          {product.size}
-                        </span>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className={`px-2 py-0.5 text-[10px] font-black uppercase rounded-lg border flex items-center gap-1 ${
-                        outOfStock ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                      }`}>
-                        <Database className="h-3 w-3" /> STK: {product.stock || 0}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-between items-end mt-5 pt-3 border-t border-border/20">
-                    <p className="font-black text-2xl tracking-tighter text-foreground leading-none group-hover:scale-105 transition-transform origin-left">
-                      {formatCurrency(product.price)}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-=======
                     <div className="space-y-1.5 mt-1">
                       <h3 className="font-extrabold text-[12px] uppercase tracking-tight truncate leading-tight">{product.name}</h3>
                       <div className="flex flex-wrap items-center gap-1.5 pt-1">
@@ -792,7 +765,7 @@ export default function POS() {
                           {product.categoryShort || product.category.slice(0, 4)}
                         </span>
                         {product.size && (
-                          <span className="px-3 py-1 bg-purple-500/10 text-purple-500 text-[12px] font-black uppercase rounded-lg border border-purple-500/20 shadow-sm leading-none">
+                          <span className="px-3 py-1 bg-purple-500/10 text-purple-500 text-[10px] font-black uppercase rounded-lg border border-purple-500/20 shadow-sm leading-none">
                             {product.size}
                           </span>
                         )}
@@ -814,9 +787,7 @@ export default function POS() {
                     </div>
                   </div>
                 );
-              })
-            )}
->>>>>>> a8881a8 (feat: security & authentication hardening)
+              })}
           </div>
         )}
       </div>
