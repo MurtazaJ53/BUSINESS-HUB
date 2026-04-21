@@ -163,16 +163,39 @@ export default function AuthPage() {
           createdAt: new Date().toISOString()
         });
 
-        // 2. Create Staff Record in Shop
-        await setDoc(doc(db, `shops/${foundShopId}/staff`, currentUser.uid), {
-          id: currentUser.uid,
-          name: staffName || currentUser.email?.split('@')[0] || 'Staff',
-          phone: staffPhone || '-',
+        // 2. SMART MERGE: Check for existing placeholder record
+        const staffQuery = query(collection(db, `shops/${foundShopId}/staff`), where('phone', '==', staffPhone || '-'));
+        const staffSnapshot = await getDocs(staffQuery);
+        let existingData = {
           role: 'Sales',
           salary: 0,
+          permissions: ['dashboard', 'inventory', 'sell', 'customers', 'history']
+        };
+
+        if (!staffSnapshot.empty) {
+          const oldDoc = staffSnapshot.docs[0];
+          const oldData = oldDoc.data();
+          existingData = {
+            role: oldData.role || 'Sales',
+            salary: oldData.salary || 0,
+            permissions: oldData.permissions || existingData.permissions
+          };
+          // Purge the placeholder to prevent duplicates
+          if (oldDoc.id !== currentUser.uid) {
+            await deleteDoc(doc(db, `shops/${foundShopId}/staff`, oldDoc.id));
+          }
+        }
+
+        // 3. Create/Update Permanent Staff Record
+        await setDoc(doc(db, `shops/${foundShopId}/staff`, currentUser.uid), {
+          id: currentUser.uid,
+          name: staffName || currentUser.displayName || currentUser.email?.split('@')[0] || 'Staff',
+          phone: staffPhone || '-',
+          role: existingData.role,
+          salary: existingData.salary,
           joinedAt: new Date().toISOString(),
           status: 'active',
-          permissions: ['dashboard', 'inventory', 'sell', 'customers', 'history']
+          permissions: existingData.permissions
         });
       }
 
@@ -198,22 +221,46 @@ export default function AuthPage() {
       }
 
       const foundShopId = querySnapshot.docs[0].id;
+      
+      // 2. SMART MERGE: Check for existing placeholder record
+      const staffQuery = query(collection(db, `shops/${foundShopId}/staff`), where('phone', '==', staffPhone || '-'));
+      const staffSnapshot = await getDocs(staffQuery);
+      let existingData = {
+        role: 'Sales',
+        salary: 0,
+        permissions: ['dashboard', 'inventory', 'sell', 'customers', 'history']
+      };
+
+      if (!staffSnapshot.empty) {
+        const oldDoc = staffSnapshot.docs[0];
+        const oldData = oldDoc.data();
+        existingData = {
+          role: oldData.role || 'Sales',
+          salary: oldData.salary || 0,
+          permissions: oldData.permissions || existingData.permissions
+        };
+        // Purge the placeholder to prevent duplicates
+        if (oldDoc.id !== user.uid) {
+          await deleteDoc(doc(db, `shops/${foundShopId}/staff`, oldDoc.id));
+        }
+      }
+
       await setDoc(doc(db, 'users', user.uid), {
         email: user.email,
         shopId: foundShopId,
         createdAt: new Date().toISOString()
       });
 
-      // 2. IMPORTANT: Create the staff record here too for one-step joining
+      // 3. Create/Update Permanent Staff Record
       await setDoc(doc(db, `shops/${foundShopId}/staff`, user.uid), {
         id: user.uid,
         name: staffName || user.displayName || user.email?.split('@')[0] || 'Staff',
         phone: staffPhone || '-',
-        role: 'Sales',
-        salary: 0,
+        role: existingData.role,
+        salary: existingData.salary,
         joinedAt: new Date().toISOString(),
         status: 'active',
-        permissions: ['dashboard', 'inventory', 'sell', 'customers', 'history']
+        permissions: existingData.permissions
       });
 
       window.location.reload();

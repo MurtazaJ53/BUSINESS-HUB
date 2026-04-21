@@ -696,10 +696,18 @@ export default function Team() {
             <form className="space-y-6" onSubmit={(e) => {
               e.preventDefault();
               const formData = new FormData(e.currentTarget);
+              const phone = formData.get('phone') as string;
+              
+              // DUPLICATE CHECK: Prevent adding the same staff phone twice
+              if (staff.some(s => s.phone === phone)) {
+                showToast("A staff member with this phone number already exists!");
+                return;
+              }
+
               upsertStaff({
                 id: `staff-${Date.now()}`,
                 name: formData.get('name') as string,
-                phone: formData.get('phone') as string,
+                phone,
                 email: formData.get('email') as string,
                 salary: Number(formData.get('salary')),
                 role: formData.get('role') as string,
@@ -807,30 +815,34 @@ export default function Team() {
                       <option value="LEAVE">Leave</option>
                     </select>
                   </div>
+                  {role === 'admin' && (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Overtime (Hrs)</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        value={manualTimes.overtime}
+                        onChange={(e) => setManualTimes({ ...manualTimes, overtime: Number(e.target.value) })}
+                        className="w-full bg-accent/30 border border-border/50 rounded-2xl px-5 py-4 font-bold text-sm outline-none"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {role === 'admin' && (
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Overtime (Hrs)</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Bonus Amount ({shop?.currency || '₹'})</label>
                     <input
                       type="number"
-                      step="0.5"
                       min="0"
-                      value={manualTimes.overtime}
-                      onChange={(e) => setManualTimes({ ...manualTimes, overtime: Number(e.target.value) })}
+                      placeholder="Enter bonus if any..."
+                      value={manualTimes.bonus}
+                      onChange={(e) => setManualTimes({ ...manualTimes, bonus: Number(e.target.value) })}
                       className="w-full bg-accent/30 border border-border/50 rounded-2xl px-5 py-4 font-bold text-sm outline-none"
                     />
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Bonus Amount ({shop?.currency || '₹'})</label>
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="Enter bonus if any..."
-                    value={manualTimes.bonus}
-                    onChange={(e) => setManualTimes({ ...manualTimes, bonus: Number(e.target.value) })}
-                    className="w-full bg-accent/30 border border-border/50 rounded-2xl px-5 py-4 font-bold text-sm outline-none"
-                  />
-                </div>
+                )}
 
                 {/* Preview calculated hours */}
                 {manualTimes.clockIn && manualTimes.clockOut && (() => {
@@ -849,7 +861,7 @@ export default function Team() {
                           <p className="text-[10px] text-muted-foreground font-bold italic">Currently setting to: <span className="text-foreground">{manualTimes.status}</span></p>
                         </div>
                       </div>
-                      {(manualTimes.overtime > 0 || manualTimes.bonus > 0) && (
+                      {role === 'admin' && (manualTimes.overtime > 0 || manualTimes.bonus > 0) && (
                         <div className="flex items-center gap-3 p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl">
                           <TrendingUp className="h-4 w-4 text-amber-500" />
                           <div>
