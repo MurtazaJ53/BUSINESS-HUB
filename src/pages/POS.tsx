@@ -15,7 +15,7 @@ type PayMode = 'CASH' | 'UPI' | 'CARD' | 'CREDIT' | 'ONLINE' | 'OTHERS';
 const PAY_MODES: PayMode[] = ['CASH', 'UPI', 'CARD', 'CREDIT', 'ONLINE', 'OTHERS'];
 
 export default function POS() {
-  const { inventory, customers, addSale, updateInventoryItem, shop, role } = useBusinessStore();
+  const { inventory, inventoryPrivate, customers, addSale, updateInventoryItem, shop, role } = useBusinessStore();
 
   const [cart, setCart] = useState<SaleItem[]>([]);
   const [search, setSearch] = useState('');
@@ -200,12 +200,16 @@ export default function POS() {
   }, [customers, customerName, selectedCustomerId]);
 
   const addToCart = (product: typeof inventory[0], isReturn: boolean = false) => {
+    // Find costPrice from private collection for admins
+    const privateData = role === 'admin' ? inventoryPrivate.find(pi => pi.id === product.id) : null;
+    const costPrice = privateData?.costPrice;
+
     setCart((prev) => {
       const existing = prev.find((c) => c.itemId === product.id && c.isReturn === isReturn);
       if (existing) {
         // If it exists, pull it to the TOP and increment
         const others = prev.filter((c) => !(c.itemId === product.id && c.isReturn === isReturn));
-        return [{ ...existing, quantity: existing.quantity + 1 }, ...others];
+        return [{ ...existing, quantity: existing.quantity + 1, costPrice }, ...others];
       }
       // New items always go to the TOP for high-visibility
       return [{
@@ -213,7 +217,7 @@ export default function POS() {
         name: product.name,
         quantity: 1,
         price: product.price,
-        costPrice: product.costPrice,
+        costPrice,
         size: product.size,
         isReturn
       }, ...prev];
