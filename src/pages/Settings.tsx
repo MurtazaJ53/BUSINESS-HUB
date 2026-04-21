@@ -37,7 +37,8 @@ import { formatCurrency, cn, isValidIndianPhone, sanitizePhone } from '@/lib/uti
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { loadShopSettings } from '@/lib/shopSettings';
 import { useAuthStore } from '@/lib/useAuthStore';
-import { MigrationResult, parseZobazeExcel } from '@/lib/migrationEngine';
+import { MigrationResult } from '@/lib/migrationEngine';
+import { InventoryItem, Staff } from '@/lib/types';
 import { sendStaffInvite } from '@/lib/mail';
 import { shareInviteWhatsApp } from '@/lib/whatsapp';
 

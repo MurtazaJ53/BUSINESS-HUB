@@ -22,7 +22,7 @@ import {
   fetchSignInMethodsForEmail,
   linkWithPopup
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { useAuthStore } from '@/lib/useAuthStore';
 import { cn } from '@/lib/utils';
 

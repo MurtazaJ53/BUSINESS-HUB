@@ -711,9 +711,24 @@ export default function Inventory() {
                 key={item.id} 
                 item={item} 
                 role={role || 'staff'} 
-                onRestock={restockItem} 
+                onRestock={(item) => {
+                  setRestockOpen(item);
+                  setRestockForm({ qty: '', cost: (item.costPrice || 0).toString(), newSellPrice: '' });
+                }}
                 setRestockForm={setRestockForm}
-                onEdit={setEditingItem}
+                onEdit={(it) => {
+                  setEditingItem(it);
+                  setEditForm({ 
+                    ...it, 
+                    price: (it.price ?? 0).toString(), 
+                    costPrice: (it.costPrice ?? 0).toString(), 
+                    stock: (it.stock ?? 0).toString(),
+                    sku: it.sku || '',
+                    subcategory: it.subcategory || '',
+                    size: it.size || '',
+                    description: it.description || ''
+                  });
+                }}
                 setEditForm={setEditForm}
                 onDelete={deleteInventoryItem}
                 sales={sales}
@@ -790,12 +805,23 @@ export default function Inventory() {
                   role={role || 'staff'} 
                   onRestock={() => {
                     setRestockOpen(item);
-                    setRestockForm({ qty: '', cost: item.costPrice?.toString() || '', newSellPrice: '' });
+                    setRestockForm({ qty: '', cost: (item.costPrice || 0).toString(), newSellPrice: '' });
                   }}
+                  setRestockForm={setRestockForm}
                   onEdit={(it) => {
                     setEditingItem(it);
-                    setEditForm({ ...it, price: it.price.toString(), costPrice: it.costPrice.toString(), stock: it.stock.toString() });
+                    setEditForm({ 
+                      ...it, 
+                      price: (it.price ?? 0).toString(), 
+                      costPrice: (it.costPrice ?? 0).toString(), 
+                      stock: (it.stock ?? 0).toString(),
+                      sku: it.sku || '',
+                      subcategory: it.subcategory || '',
+                      size: it.size || '',
+                      description: it.description || ''
+                    });
                   }}
+                  setEditForm={setEditForm}
                   onDelete={deleteInventoryItem}
                   sales={sales}
                 />
