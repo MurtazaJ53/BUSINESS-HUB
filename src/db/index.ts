@@ -1,10 +1,8 @@
 /**
  * Database Module — Barrel Export
- * 
- * Single import point for all database operations.
  */
 
-export { initDatabase, getDb, execQuery, execRun, execTransaction, saveToStore, closeDatabase } from './connection';
+export { Database } from './sqlite';
 export { inventoryRepo, inventoryPrivateRepo } from './repositories/inventoryRepo';
 export { salesRepo } from './repositories/salesRepo';
 export { customersRepo, customerPaymentsRepo } from './repositories/customersRepo';
