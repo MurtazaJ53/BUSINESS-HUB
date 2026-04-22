@@ -163,39 +163,55 @@ export default function AuthPage() {
           createdAt: new Date().toISOString()
         });
 
-        // 2. SMART MERGE: Check for existing placeholder record
-        const staffQuery = query(collection(db, `shops/${foundShopId}/staff`), where('phone', '==', staffPhone || '-'));
-        const staffSnapshot = await getDocs(staffQuery);
+        // 2. SMART MERGE: Check for existing placeholder record by phone or email
+        const staffByPhoneQuery = query(collection(db, `shops/${foundShopId}/staff`), where('phone', '==', staffPhone || '-'));
+        const staffByEmailQuery = query(collection(db, `shops/${foundShopId}/staff`), where('email', '==', currentUser.email || ''));
+        
+        const [phoneSnapshot, emailSnapshot] = await Promise.all([
+          getDocs(staffByPhoneQuery),
+          getDocs(staffByEmailQuery)
+        ]);
+
+        let existingDoc = !phoneSnapshot.empty ? phoneSnapshot.docs[0] : (!emailSnapshot.empty ? emailSnapshot.docs[0] : null);
+        
         let existingData = {
           role: 'Sales',
           salary: 0,
           permissions: ['dashboard', 'inventory', 'sell', 'customers', 'history']
         };
 
-        if (!staffSnapshot.empty) {
-          const oldDoc = staffSnapshot.docs[0];
-          const oldData = oldDoc.data();
+        if (existingDoc) {
+          const oldData = existingDoc.data();
           existingData = {
             role: oldData.role || 'Sales',
             salary: oldData.salary || 0,
             permissions: oldData.permissions || existingData.permissions
           };
-          // Purge the placeholder to prevent duplicates
-          if (oldDoc.id !== currentUser.uid) {
-            await deleteDoc(doc(db, `shops/${foundShopId}/staff`, oldDoc.id));
+          // Purge the old placeholder IF it's a different UID to merge into the new verified UID
+          if (existingDoc.id !== currentUser.uid) {
+            await deleteDoc(doc(db, `shops/${foundShopId}/staff`, existingDoc.id));
           }
         }
 
         // 3. Create/Update Permanent Staff Record
-        await setDoc(doc(db, `shops/${foundShopId}/staff`, currentUser.uid), {
+        const { salary, ...publicStaffData } = {
           id: currentUser.uid,
           name: staffName || currentUser.displayName || currentUser.email?.split('@')[0] || 'Staff',
+          email: currentUser.email || '',
           phone: staffPhone || '-',
           role: existingData.role,
           salary: existingData.salary,
           joinedAt: new Date().toISOString(),
           status: 'active',
           permissions: existingData.permissions
+        };
+
+        await setDoc(doc(db, `shops/${foundShopId}/staff`, currentUser.uid), publicStaffData);
+        
+        // 4. Secure Private Data
+        await setDoc(doc(db, `shops/${foundShopId}/staff_private`, currentUser.uid), {
+          id: currentUser.uid,
+          salary: existingData.salary
         });
       }
 
@@ -252,7 +268,7 @@ export default function AuthPage() {
       });
 
       // 3. Create/Update Permanent Staff Record
-      await setDoc(doc(db, `shops/${foundShopId}/staff`, user.uid), {
+      const { salary, ...publicStaffData } = {
         id: user.uid,
         name: staffName || user.displayName || user.email?.split('@')[0] || 'Staff',
         phone: staffPhone || '-',
@@ -261,6 +277,14 @@ export default function AuthPage() {
         joinedAt: new Date().toISOString(),
         status: 'active',
         permissions: existingData.permissions
+      };
+
+      await setDoc(doc(db, `shops/${foundShopId}/staff`, user.uid), publicStaffData);
+
+      // 4. Secure Private Data
+      await setDoc(doc(db, `shops/${foundShopId}/staff_private`, user.uid), {
+        id: user.uid,
+        salary: existingData.salary
       });
 
       window.location.reload();
@@ -329,8 +353,11 @@ export default function AuthPage() {
               {resetSent ? (
                 <div className="p-6 rounded-3xl bg-green-500/10 border border-green-500/20 text-center animate-in zoom-in">
                   <Mail className="h-10 w-10 text-green-500 mx-auto mb-4" />
-                  <p className="text-xs font-black text-green-500 uppercase tracking-widest mb-1">Link Transmitted!</p>
-                  <p className="text-[10px] text-zinc-400 font-bold">Check your inbox (and spam) for instructions.</p>
+                  <p className="text-xs font-black text-green-500 uppercase tracking-widest mb-1">Transmission Successful!</p>
+                  <p className="text-[10px] text-zinc-400 font-bold leading-relaxed px-4">
+                    If an account exists for <span className="text-white">{email}</span>, a reset link has been dispatched. 
+                    Please check your inbox and spam folder.
+                  </p>
                   <button 
                     onClick={() => { setMode('login'); setResetSent(false); }}
                     className="mt-6 text-[10px] font-black uppercase tracking-widest text-white hover:text-primary transition-colors"
@@ -533,14 +560,20 @@ export default function AuthPage() {
                     <Globe className="h-4 w-4 text-zinc-400 group-hover:text-white transition-colors" />
                     <span className="text-[10px] font-black uppercase tracking-widest">Google</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleAnonymousAuth}
-                    className="flex items-center justify-center gap-3 py-4 bg-white/5 border border-white/10 rounded-[1.2rem] hover:bg-white/10 transition-all group"
-                  >
-                    <LogIn className="h-4 w-4 text-zinc-400 group-hover:text-white transition-colors" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Guest</span>
-                  </button>
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={handleAnonymousAuth}
+                      className="w-full flex items-center justify-center gap-3 py-4 bg-white/5 border border-white/10 rounded-[1.2rem] hover:bg-white/10 transition-all group"
+                    >
+                      <LogIn className="h-4 w-4 text-zinc-400 group-hover:text-white transition-colors" />
+                      <span className="text-[10px] font-black uppercase tracking-widest">Guest</span>
+                    </button>
+                    <p className="text-[8px] text-center text-red-500/60 font-black uppercase tracking-tighter leading-tight">
+                      ⚠️ CRITICAL: Guest sessions are non-persistent. <br/>
+                      Data will be PERMANENTLY ERASED if you log out or clear browser cache without linking to Google/Email.
+                    </p>
+                  </div>
                 </div>
               </>
             )}

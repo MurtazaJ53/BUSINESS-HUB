@@ -183,10 +183,10 @@ export default function Inventory() {
 
   const inventoryWithPrivate = useMemo(() => {
     if (role !== 'admin') return inventory;
-    return inventory.map(item => {
-      const p = inventoryPrivate.find(pi => pi.id === item.id);
-      return { ...item, costPrice: p?.costPrice };
-    });
+    return inventory.map((item: InventoryItem) => ({
+      ...item,
+      costPrice: inventoryPrivate.find((pi: any) => pi.id === item.id)?.costPrice
+    }));
   }, [inventory, inventoryPrivate, role]);
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -245,10 +245,10 @@ export default function Inventory() {
   // ── Autocomplete data ──
   const uniqueCategoriesSummary = useMemo(() => {
     const counts: Record<string, number> = {};
-    inventoryWithPrivate.forEach(item => {
+    inventoryWithPrivate.forEach((item: InventoryItem) => {
       const cat = item.category || 'General';
       if (!counts[cat]) counts[cat] = 0;
-      const productNamesInCategory = new Set(inventoryWithPrivate.filter(i => (i.category || 'General') === cat).map(i => i.name));
+      const productNamesInCategory = new Set(inventoryWithPrivate.filter((i: InventoryItem) => (i.category || 'General') === cat).map((i: InventoryItem) => i.name));
       counts[cat] = productNamesInCategory.size;
     });
     return counts;
@@ -268,7 +268,7 @@ export default function Inventory() {
   const productNamesInCategory = useMemo(() => {
     if (!activeCategory) return {};
     const groups: Record<string, { items: InventoryItem[], totalStock: number, totalCost: number, totalValue: number }> = {};
-    inventoryWithPrivate.filter(i => (i.category || 'General') === activeCategory).forEach(item => {
+    inventoryWithPrivate.filter((i: InventoryItem) => (i.category || 'General') === activeCategory).forEach((item: InventoryItem) => {
       if (!groups[item.name]) groups[item.name] = { items: [], totalStock: 0, totalCost: 0, totalValue: 0 };
       groups[item.name].items.push(item);
       groups[item.name].totalStock += (item.stock || 0);
@@ -291,12 +291,12 @@ export default function Inventory() {
 
   const itemsInSelectedProduct = useMemo(() => {
     if (!activeCategory || !activeProductName) return [];
-    return inventoryWithPrivate.filter(i => (i.category || 'General') === activeCategory && i.name === activeProductName);
+    return inventoryWithPrivate.filter((i: any) => (i.category || 'General') === activeCategory && i.name === activeProductName);
   }, [inventoryWithPrivate, activeCategory, activeProductName]);
 
   const filteredItemsInSelectedProduct = useMemo(() => {
     if (!localSearch) return itemsInSelectedProduct;
-    return itemsInSelectedProduct.filter(i => 
+    return itemsInSelectedProduct.filter((i: any) => 
       i.name.toLowerCase().includes(localSearch.toLowerCase()) || 
       (i.sku?.toLowerCase() ?? '').includes(localSearch.toLowerCase()) ||
       (i.size?.toLowerCase() ?? '').includes(localSearch.toLowerCase())
@@ -343,6 +343,11 @@ export default function Inventory() {
 
   // ── Filtered list ──
   const filtered = useMemo(() =>
+    inventoryWithPrivate.filter((i: any) => {
+      const matchesSearch = i.name.toLowerCase().includes(search.toLowerCase()) || 
+                           i.sku?.toLowerCase().includes(search.toLowerCase());
+      const matchesCategory = selectedCategory === 'all' || i.category === selectedCategory;
+      const matchesSubcategory = selectedSubcategory === 'all' || i.subcategory === selectedSubcategory;
       return matchesSearch && matchesCategory && matchesSubcategory;
     }),
     [inventoryWithPrivate, search, selectedCategory, selectedSubcategory]
@@ -351,13 +356,13 @@ export default function Inventory() {
   // ── Stats ──
   const stats = useMemo(() => ({
     totalItems: inventoryWithPrivate.length,
-    totalStock: inventoryWithPrivate.reduce((s, i) => s + (i.stock || 0), 0),
-    inventoryValue: inventoryWithPrivate.reduce((s, i) => s + i.price * (i.stock || 0), 0),
-    potentialProfit: inventoryWithPrivate.reduce((s, i) => {
+    totalStock: inventoryWithPrivate.reduce((s: number, i: any) => s + (i.stock || 0), 0),
+    inventoryValue: inventoryWithPrivate.reduce((s: number, i: any) => s + i.price * (i.stock || 0), 0),
+    potentialProfit: inventoryWithPrivate.reduce((s: number, i: any) => {
       if (i.costPrice !== undefined && i.stock !== undefined) return s + (i.price - i.costPrice) * i.stock;
       return s;
     }, 0),
-    lowStock: inventoryWithPrivate.filter((i) => i.stock !== undefined && i.stock <= 5).length,
+    lowStock: inventoryWithPrivate.filter((i: any) => i.stock !== undefined && i.stock <= 5).length,
   }), [inventoryWithPrivate]);
 
   // ── Add (single / variant) ──
@@ -704,7 +709,7 @@ export default function Inventory() {
         <div className="space-y-4">
           <p className="text-[10px] font-black uppercase tracking-widest text-primary">Search Results</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filtered.map((item) => (
+            {filtered.map((item: InventoryItem) => (
               <InventoryCard 
                 key={item.id} 
                 item={item} 
@@ -739,7 +744,7 @@ export default function Inventory() {
           {/* LEVEL 0: Category Selection */}
           {drillDepth === 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {Object.entries(filteredCategoriesSummary).map(([cat, count]) => (
+              {Object.entries(filteredCategoriesSummary).map(([cat, count]: [string, any]) => (
                 <button
                   key={cat}
                   onClick={() => navigateTo(1, cat)}
@@ -768,7 +773,7 @@ export default function Inventory() {
           {/* LEVEL 1: Product Name Selection */}
           {drillDepth === 1 && activeCategory && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {Object.entries(filteredProductNamesInCategory).map(([name, data]) => (
+              {Object.entries(filteredProductNamesInCategory).map(([name, data]: [string, any]) => (
                 <button
                   key={name}
                   onClick={() => navigateTo(2, activeCategory, name)}
@@ -796,7 +801,7 @@ export default function Inventory() {
           {/* LEVEL 2: Variant Details */}
           {drillDepth === 2 && activeCategory && activeProductName && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredItemsInSelectedProduct.map((item) => (
+              {filteredItemsInSelectedProduct.map((item: InventoryItem) => (
                 <InventoryCard 
                   key={item.id} 
                   item={item} 
@@ -907,7 +912,7 @@ export default function Inventory() {
                           <td key={field} className="px-1 py-1">
                             <input
                               type="number"
-                              value={row[field as any]}
+                              value={(row as any)[field]}
                               className="w-full px-2 py-1 bg-background border border-border rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-primary/30"
                               onChange={(e) => {
                                 const nm = [...variantMatrix];
@@ -1114,21 +1119,21 @@ export default function Inventory() {
                           <div className="relative">
                             <input
                               type="text"
-                              value={row[field as any]}
+                              value={(row as any)[field]}
                               placeholder="e.g. S,M,L or 11,12,32"
                               onChange={(e) => handleRowChange(idx, field as any, e.target.value)}
                               className="w-full h-8 px-2 bg-transparent border-transparent focus:border-primary/30 focus:bg-background border rounded-lg text-[11px] focus:outline-none transition-all min-w-[100px]"
                             />
-                            {row[field as any].includes(',') && (
+                            {(row as any)[field].includes(',') && (
                               <span className="absolute -top-2.5 right-0 text-[9px] font-black uppercase bg-primary text-white px-1.5 py-0.5 rounded-full leading-none">
-                                ×{row[field as any].split(',').filter((s: string) => s.trim()).length} variants
+                                ×{(row as any)[field].split(',').filter((s: string) => s.trim()).length} variants
                               </span>
                             )}
                           </div>
                         ) : (
                           <input
                             type={['price', 'costPrice', 'stock'].includes(field) ? 'number' : 'text'}
-                            value={row[field as any]}
+                            value={(row as any)[field]}
                             placeholder={field === 'name' ? 'Product Name' : field === 'price' ? '0.00' : field === 'stock' ? '∞' : ''}
                             onChange={(e) => handleRowChange(idx, field as any, e.target.value)}
                             className="w-full h-8 px-2 bg-transparent border-transparent focus:border-primary/30 focus:bg-background border rounded-lg text-[11px] focus:outline-none transition-all min-w-[80px]"

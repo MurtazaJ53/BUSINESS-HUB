@@ -1,51 +1,45 @@
 import React, { useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import AppLayout from './components/AppLayout';
-import Dashboard from './pages/Dashboard';
-import Inventory from './pages/Inventory';
-import POS from './pages/POS';
-import Analytics from './pages/Analytics';
-import Settings from './pages/Settings';
-import History from './pages/History';
-import Customers from './pages/Customers';
-import Expenses from './pages/Expenses';
-import StockAlerts from './pages/StockAlerts';
-import Team from './pages/Team';
-import AuthPage from './pages/Auth';
-import { useAuthStore } from './lib/useAuthStore';
-import { useBusinessStore } from './lib/useBusinessStore';
-import { Sparkles } from 'lucide-react';
-import { App as CapacitorApp } from '@capacitor/app';
 import { useUpdateCheck } from './hooks/useUpdateCheck';
 import UpdateBanner from './components/UpdateBanner';
+import { useAuthStore } from './lib/useAuthStore';
+import { useBusinessStore } from './lib/useBusinessStore';
+import AuthPage from './pages/Auth';
+import { Sparkles } from 'lucide-react';
+import { App as CapacitorApp } from '@capacitor/app';
 
-const PAGES: Record<string, React.ReactNode> = {
-  dashboard: <Dashboard />,
-  inventory: <Inventory />,
-  sell: <POS />,
-  analytics: <Analytics />,
-  history: <History />,
-  customers: <Customers />,
-  expenses: <Expenses />,
-  'stock-alerts': <StockAlerts />,
-  settings: <Settings />,
-  team: <Team />,
-};
+// Lazy load components outside the component to prevent re-creation
+const Dashboard = React.lazy(() => import('@/pages/Dashboard'));
+const Inventory = React.lazy(() => import('@/pages/Inventory'));
+const POS = React.lazy(() => import('@/pages/POS'));
+const Customers = React.lazy(() => import('@/pages/Customers'));
+const History = React.lazy(() => import('@/pages/History'));
+const Expenses = React.lazy(() => import('@/pages/Expenses'));
+const StockAlerts = React.lazy(() => import('@/pages/StockAlerts'));
+const Analytics = React.lazy(() => import('@/pages/Analytics'));
+const Team = React.lazy(() => import('@/pages/Team'));
+const Settings = React.lazy(() => import('@/pages/Settings'));
+const MigrationTool = React.lazy(() => import('@/pages/MigrationTool'));
 
 export default function App() {
-  const { user, shopId, role, loading, initialize } = useAuthStore();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user, shopId, role, loading } = useAuthStore();
   const { initStore } = useBusinessStore();
   const { updateAvailable } = useUpdateCheck();
   const [showUpdate, setShowUpdate] = React.useState(true);
 
   useEffect(() => {
+    const { initialize, cleanup } = useAuthStore.getState();
     initialize();
-  }, [initialize]);
+    return () => cleanup();
+  }, []);
 
   useEffect(() => {
     const backListener = CapacitorApp.addListener('backButton', () => {
-      const { activeTab, setActiveTab } = useBusinessStore.getState();
-      if (activeTab !== 'dashboard') {
-        setActiveTab('dashboard');
+      if (location.pathname !== '/' && location.pathname !== '/dashboard') {
+        navigate(-1);
       } else {
         CapacitorApp.exitApp();
       }
@@ -53,7 +47,7 @@ export default function App() {
     return () => {
       backListener.then((l: any) => l.remove());
     };
-  }, []);
+  }, [location, navigate]);
 
   useEffect(() => {
     if (shopId && role) {
@@ -88,7 +82,7 @@ export default function App() {
           onClose={() => setShowUpdate(false)} 
         />
       )}
-      <AppLayout pages={PAGES} />
+      <AppLayout />
     </>
   );
 }

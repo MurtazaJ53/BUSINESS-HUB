@@ -7,9 +7,10 @@ import {
   ResponsiveContainer, LineChart, Line
 } from 'recharts';
 import { getDeadStock } from '@/lib/analyticsUtils';
+import type { Sale, InventoryItem, InventoryPrivate, CustomerPayment, Expense, SaleItem } from '@/lib/types';
 
 export default function Analytics() {
-  const { sales, inventory, inventoryPrivate, role } = useBusinessStore();
+  const { sales, inventory, inventoryPrivate, customerPayments, role } = useBusinessStore();
   const [period, setPeriod] = useState<'week' | 'month' | 'custom'>('week');
   
   const todayStr = new Date().toISOString().split('T')[0];
@@ -18,19 +19,20 @@ export default function Analytics() {
   const [startDate, setStartDate] = useState(lastWeekStr);
   const [endDate, setEndDate] = useState(todayStr);
 
-  const getFilteredSales = () => {
+  const getFilteredData = (data: any[]) => {
     if (period === 'week') {
       const cut = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
-      return sales.filter(s => s.date >= cut);
+      return data.filter((s: any) => s.date >= cut);
     }
     if (period === 'month') {
       const cut = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
-      return sales.filter(s => s.date >= cut);
+      return data.filter((s: any) => s.date >= cut);
     }
-    return sales.filter(s => s.date >= startDate && s.date <= endDate);
+    return data.filter((s: any) => s.date >= startDate && s.date <= endDate);
   };
 
-  const filteredSalesData = getFilteredSales();
+  const filteredSalesData = getFilteredData(sales).filter(s => !s.id.startsWith('PAY-'));
+  const filteredPayments = getFilteredData(customerPayments);
 
   const getDateRange = () => {
     const rangeSize = period === 'week' ? 7 : (period === 'month' ? 30 : 0);
@@ -54,10 +56,14 @@ export default function Analytics() {
 
   const currentRange = getDateRange();
   const chartData = currentRange.map((date) => {
-    const daySales = filteredSalesData.filter((s) => s.date === date);
-    const dayRevenue = daySales.reduce((sum, s) => sum + s.total, 0);
-    const dayCost = daySales.reduce((sum, s) => {
-      return sum + s.items.reduce((itemSum, item) => itemSum + (item.costPrice || 0) * item.quantity, 0);
+    const daySales = filteredSalesData.filter((s: Sale) => s.date === date);
+    const dayRevenue = daySales.reduce((sum: number, s: Sale) => sum + s.total, 0);
+    const dayCost = daySales.reduce((sum: number, s: Sale) => {
+      return sum + s.items.reduce((itemSum: number, item: SaleItem) => {
+        const privateData = inventoryPrivate.find((p: InventoryPrivate) => p.id === item.itemId);
+        const costPrice = privateData?.costPrice || 0;
+        return itemSum + costPrice * item.quantity;
+      }, 0);
     }, 0);
 
     return {
@@ -74,11 +80,15 @@ export default function Analytics() {
 
   // ── KPI Stats ─────────────────────────────────────────────────────────────
   const { expenses } = useBusinessStore();
-  const totalRevenue = sales.reduce((sum, s) => sum + s.total, 0);
-  const totalCost = sales.reduce((sum, s) => {
-    return sum + s.items.reduce((itemSum, item) => itemSum + (item.costPrice || 0) * item.quantity, 0);
+  const totalRevenue = sales.reduce((sum: number, s: Sale) => sum + s.total, 0);
+  const totalCost = sales.reduce((sum: number, s: Sale) => {
+    return sum + s.items.reduce((itemSum: number, item: SaleItem) => {
+      const privateData = inventoryPrivate.find((p: InventoryPrivate) => p.id === item.itemId);
+      const costPrice = privateData?.costPrice || 0;
+      return itemSum + costPrice * item.quantity;
+    }, 0);
   }, 0);
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalExpenses = expenses.reduce((sum: number, e: Expense) => sum + e.amount, 0);
   
   const grossProfit = totalRevenue - totalCost;
   const netProfit = grossProfit - totalExpenses;
@@ -95,14 +105,18 @@ export default function Analytics() {
   const halfPoint = new Date();
   halfPoint.setDate(now.getDate() - days * 2);
 
-  const currentPeriodSales = sales.filter((s) => new Date(s.date) >= midPoint);
-  const prevPeriodSales = sales.filter((s) => {
+  const currentPeriodSales = sales.filter((s: Sale) => new Date(s.date) >= midPoint);
+  const prevPeriodSales = sales.filter((s: Sale) => {
     const d = new Date(s.date);
     return d >= halfPoint && d < midPoint;
   });
 
-  const currentRev = currentPeriodSales.reduce((sum, s) => sum + s.total, 0);
-  const prevRev = prevPeriodSales.reduce((sum, s) => sum + s.total, 0);
+  const currentRev = (() => {
+    const salesAmount = filteredSalesData.reduce((sum: number, s: Sale) => sum + s.total, 0);
+    const paymentsAmount = filteredPayments.reduce((sum: number, p: CustomerPayment) => sum + p.amount, 0);
+    return salesAmount + paymentsAmount;
+  })();
+  const prevRev = prevPeriodSales.reduce((sum: number, s: Sale) => sum + s.total, 0);
   const revChange = prevRev > 0 ? ((currentRev - prevRev) / prevRev) * 100 : null;
 
   // ── Top Products & Dead Stock ─────────────────────────────────────────────────────────
@@ -119,7 +133,7 @@ export default function Analytics() {
   }
   
   const allProducts = Object.values(productSales);
-  inventory.forEach(invItem => {
+  inventory.forEach((invItem: InventoryItem) => {
     if (!productSales[invItem.name]) {
       allProducts.push({ name: invItem.name, qty: 0, revenue: 0 });
     }
@@ -136,20 +150,21 @@ export default function Analytics() {
     
   const maxRevenue = Math.max(...topProducts.map((p) => p.revenue), 1);
 
-  // ── Payment mode breakdown ────────────────────────────────────────────────
   const payModes: Record<string, number> = {};
+  
+  // Repayments are always CASH in this system
+  payModes['REPAYMENT'] = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
+
   for (const sale of filteredSalesData) {
     if (sale.payments && sale.payments.length > 0) {
-      // Split payment logic: add each mode's amount separately
       for (const p of sale.payments) {
         payModes[p.mode] = (payModes[p.mode] || 0) + p.amount;
       }
     } else {
-      // Legacy fallback: count the whole total for the primary mode
       payModes[sale.paymentMode] = (payModes[sale.paymentMode] || 0) + sale.total;
     }
   }
-  const payModeSorted = Object.entries(payModes).sort((a, b) => b[1] - a[1]);
+  const payModeSorted = Object.entries(payModes).filter(entry => entry[1] > 0).sort((a, b) => b[1] - a[1]);
 
   const bestDay = chartData.reduce((best, d) => (d.sales > best.sales ? d : best), chartData[0] ?? { day: '—', sales: 0 });
 
@@ -423,8 +438,8 @@ export default function Analytics() {
           {deadStockItems.length > 0 && role === 'admin' && (
             <div className="bg-amber-500/10 border border-amber-500/20 px-4 py-2 rounded-xl">
               <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">
-                Stuck Capital: {formatCurrency(deadStockItems.reduce((s, i) => {
-                  const p = inventoryPrivate.find(pi => pi.id === i.id);
+                Stuck Capital: {formatCurrency(deadStockItems.reduce((s: number, i: InventoryItem) => {
+                  const p = inventoryPrivate.find((pi: InventoryPrivate) => pi.id === i.id);
                   return s + (p?.costPrice || 0) * (i.stock || 0);
                 }, 0))}
               </p>
@@ -439,8 +454,8 @@ export default function Analytics() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {deadStockItems.slice(0, 6).map((item) => {
-              const privateData = role === 'admin' ? inventoryPrivate.find(pi => pi.id === item.id) : null;
+            {deadStockItems.slice(0, 6).map((item: InventoryItem) => {
+              const privateData = role === 'admin' ? inventoryPrivate.find((pi: InventoryPrivate) => pi.id === item.id) : null;
               const clearancePrice = (privateData?.costPrice || 0) * 1.15; // 15% margin for clearance
               return (
                 <div key={item.id} className="p-4 rounded-2xl bg-accent/20 border border-border/50 hover:border-amber-500/30 transition-all group">

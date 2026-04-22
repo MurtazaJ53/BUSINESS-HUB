@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // HELPER: Check if the user is a logged-in member of the shop
+    function isMember(shopId) {
+      return request.auth != null && 
+             exists(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid));
+    }
+    
+    // HELPER: Check if the user is an administrator of the shop
+    function isAdmin(shopId) {
+      return isMember(shopId) && 
+             get(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // HELPER: Check for granular staff permissions (Array based)
+    function can(shopId, permission) {
+      let staff = get(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid)).data;
+      return staff.role == 'admin' || (permission in staff.get('permissions', []));
+    }
+
+    // --- RULES MAPPING ---
+
+    match /shops/{shopId} {
+      
+      // Public-ish Metadata (Read by members)
+      allow read: if isMember(shopId);
+      allow write: if isAdmin(shopId);
+
+      // Inventory
+      match /inventory/{item} {
+        allow read: if can(shopId, 'inventory');
+        allow write: if can(shopId, 'inventory');
+      }
+      
+      // Private Inventory Cost Data
+      match /inventory_private/{item} {
+        allow read, write: if isAdmin(shopId);
+      }
+      
+      // Sales Records
+      match /sales/{sale} {
+        allow read: if isMember(shopId);
+        allow create: if can(shopId, 'sell');
+        allow update: if isAdmin(shopId);
+        allow delete: if can(shopId, 'history') || isAdmin(shopId);
+      }
+      
+      // Customers
+      match /customers/{customer} {
+        allow read: if can(shopId, 'customers');
+        allow write: if can(shopId, 'customers');
+      }
+
+      // Expenses
+      match /expenses/{expense} {
+        allow read, write: if can(shopId, 'expenses');
+      }
+
+      // Staff Management
+      match /staff/{member} {
+        allow read: if isMember(shopId);
+        allow write: if isAdmin(shopId);
+      }
+      
+      // Staff Private (Salary/Internal PINs)
+      match /staff_private/{member} {
+        allow read, write: if isAdmin(shopId);
+      }
+
+      // Attendance
+      match /attendance/{at} {
+        allow read: if isMember(shopId);
+        allow write: if isAdmin(shopId) || (request.auth.uid == resource.data.staffId);
+      }
+
+      // Invitations
+      match /invitations/{invite} {
+        allow read, write: if isAdmin(shopId);
+      }
+
+      // Private Vault (Hashed PINs, Security Keys)
+      match /private/{document=**} {
+        // PIN Verification Pivot: Staff must read the hash to verify locally
+        allow read: if isMember(shopId);
+        allow write: if isAdmin(shopId);
+      }
+    }
+
+    // Global User Profiles
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == userId;
+    }
+  }
+}

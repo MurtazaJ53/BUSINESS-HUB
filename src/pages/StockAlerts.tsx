@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { 
   AlertTriangle, 
   Package, 
@@ -8,14 +9,16 @@ import {
   Plus
 } from 'lucide-react';
 import { useBusinessStore } from '@/lib/useBusinessStore';
+import type { InventoryItem } from '@/lib/types';
 
 export default function StockAlerts() {
-  const { inventory, updateStock, setActiveTab } = useBusinessStore();
+  const navigate = useNavigate();
+  const { inventory, updateStock } = useBusinessStore();
 
   const lowStockThreshold = 5;
-  const criticalItems = inventory.filter(p => (p.stock ?? 0) <= lowStockThreshold);
-  const outOfStock = criticalItems.filter(p => (p.stock ?? 0) <= 0);
-  const lowStock = criticalItems.filter(p => (p.stock ?? 0) > 0);
+  const lowStock = inventory.filter((p: InventoryItem) => (p.stock ?? 0) > 0 && (p.stock ?? 0) <= lowStockThreshold);
+  const outOfStock = inventory.filter((p: InventoryItem) => (p.stock ?? 0) <= 0);
+  const criticalItems = inventory.filter((p: InventoryItem) => (p.stock ?? 0) <= lowStockThreshold);
 
   const handleRestock = async (id: string, amount: number) => {
     await updateStock(id, amount);
@@ -59,7 +62,7 @@ export default function StockAlerts() {
           <p className="text-3xl font-black mt-1">{lowStock.length}</p>
         </div>
 
-        <div className="glass-card p-6 rounded-3xl flex flex-col justify-center border-primary/20 bg-primary/5 cursor-pointer hover:bg-primary/10 transition-all group" onClick={() => setActiveTab('inventory')}>
+        <div className="glass-card p-6 rounded-3xl flex flex-col justify-center border-primary/20 bg-primary/5 cursor-pointer hover:bg-primary/10 transition-all group" onClick={() => navigate('/inventory')}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-bold text-primary uppercase tracking-widest mb-1">Full Inventory</p>
@@ -84,7 +87,7 @@ export default function StockAlerts() {
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Zero items out of stock</p>
               </div>
             ) : (
-              outOfStock.map(product => (
+              outOfStock.map((product: InventoryItem) => (
                 <div key={product.id} className="glass-card p-5 rounded-2xl border-red-500/10 flex items-center gap-4 group">
                   <div className="h-12 w-12 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500 shrink-0">
                     <Package className="h-6 w-6" />
@@ -115,7 +118,7 @@ export default function StockAlerts() {
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Stock levels healthy</p>
               </div>
             ) : (
-              lowStock.map(product => (
+              lowStock.map((product: InventoryItem) => (
                 <div key={product.id} className="glass-card p-5 rounded-2xl border-amber-500/10 flex items-center gap-4 group">
                   <div className="h-12 w-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 shrink-0">
                     <Package className="h-6 w-6" />
@@ -132,7 +135,7 @@ export default function StockAlerts() {
                   <div className="flex gap-2">
                     <button onClick={() => handleRestock(product.id, 10)} className="p-2.5 bg-accent hover:bg-amber-500 hover:text-white rounded-xl transition-all"><Plus className="h-4 w-4" /></button>
                     <button 
-                      onClick={() => setActiveTab('pos')}
+                      onClick={() => navigate('/sell')}
                       className="p-2.5 bg-accent hover:bg-primary hover:text-white rounded-xl transition-all"
                       title="Sell remaining"
                     >

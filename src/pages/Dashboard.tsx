@@ -25,7 +25,7 @@ import { formatCurrency, cn } from '@/lib/utils';
 import Modal from '@/components/Modal';
 import Label from '@/components/Label';
 import Input from '@/components/Input';
-import type { Expense } from '@/lib/types';
+import type { Expense, Sale, InventoryItem, InventoryPrivate, Attendance } from '@/lib/types';
 import { useState } from 'react';
 import {
   BarChart,
@@ -72,9 +72,19 @@ function KPICard({
 }
 
 export default function Dashboard() {
+  const { 
+    sales, 
+    inventory, 
+    expenses, 
+    attendance, 
+    addExpense,
+    recordAttendance,
     role,
     shop,
-    inventoryPrivate
+    inventoryPrivate,
+    lastBackupDate,
+    setActiveTab,
+    setInventorySearchTerm
   } = useBusinessStore();
   const { user } = useAuthStore();
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
@@ -82,8 +92,8 @@ export default function Dashboard() {
   const [isSavingExpense, setIsSavingExpense] = useState(false);
 
   const today = new Date().toISOString().split('T')[0];
-  const myAttendance = attendance.find(a => a.staffId === user?.uid && a.date === today);
-  const presentStaffCount = attendance.filter(a => a.date === today && a.status === 'PRESENT').length;
+  const myAttendance = attendance.find((a: Attendance) => a.staffId === user?.uid && a.date === today);
+  const presentStaffCount = attendance.filter((a: Attendance) => a.date === today && a.status === 'PRESENT').length;
 
   const handleQuickExpense = async () => {
     if (!expenseForm.amount) return;
@@ -118,17 +128,17 @@ export default function Dashboard() {
   const backupStatus = getBackupStatus();
 
   // KPI calculations from real data
-  const totalStockValue = inventory.reduce((sum, i) => {
-    const p = role === 'admin' ? inventoryPrivate.find(pi => pi.id === i.id) : null;
+  const totalStockValue = inventory.reduce((sum: number, i: InventoryItem) => {
+    const p = role === 'admin' ? inventoryPrivate.find((pi: InventoryPrivate) => pi.id === i.id) : null;
     return sum + (p?.costPrice || 0) * (i.stock || 0);
   }, 0);
   const potentialRevenue = inventory.reduce(
-    (sum, i) => sum + i.price * (i.stock || 0),
+    (sum: number, i: InventoryItem) => sum + i.price * (i.stock || 0),
     0
   );
-  const lowStockItems = inventory.filter((i) => i.stock !== undefined && i.stock <= 5);
+  const lowStockItems = inventory.filter((i: InventoryItem) => i.stock !== undefined && i.stock <= 5);
 
-  const totalSalesRevenue = sales.reduce((sum, s) => sum + s.total, 0);
+  const totalSalesRevenue = sales.reduce((sum: number, s: Sale) => sum + s.total, 0);
   const totalSalesCount = sales.length;
 
   // Last 7 days sales chart data
@@ -140,8 +150,8 @@ export default function Dashboard() {
 
   const chartData = last7Days.map((date) => {
     const daySales = sales
-      .filter((s) => s.date === date)
-      .reduce((sum, s) => sum + s.total, 0);
+      .filter((s: Sale) => s.date === date)
+      .reduce((sum: number, s: Sale) => sum + s.total, 0);
     return {
       day: new Date(date).toLocaleDateString('en-IN', { weekday: 'short' }),
       sales: daySales,
@@ -371,7 +381,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
-              {lowStockItems.map((item) => (
+              {lowStockItems.map((item: InventoryItem) => (
                 <button
                   key={item.id}
                   onClick={() => {
