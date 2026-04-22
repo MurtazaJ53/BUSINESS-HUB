@@ -15,7 +15,7 @@ import { auth } from './firebase';
 
 // Database imports
 import {
-  initDatabase, saveToStore,
+  Database,
   inventoryRepo, inventoryPrivateRepo,
   salesRepo,
   customersRepo, customerPaymentsRepo,
@@ -24,7 +24,6 @@ import {
   outboxRepo,
   startSync, stopSync, onDataChange,
 } from '../db';
-import { execQuery } from '../db/connection';
 
 const SHOP_DEFAULTS: ShopMetadata = {
   name: 'Business Hub Pro',
@@ -139,7 +138,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     set({ shopId, role });
 
     // 1. Initialize SQLite database
-    initDatabase()
+    Database.boot()
       .then(async () => {
         // 2. Load cached data from SQLite immediately (INSTANT UI)
         const [inv, invPriv, salesData, custs, custPay, exps, staffData, staffPriv, att, shopMeta] = await Promise.all([
@@ -152,7 +151,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
           staffRepo.getAll(),
           role === 'admin' ? staffPrivateRepo.getAll() : Promise.resolve([]),
           attendanceRepo.getAll(getMonthStart()),
-          execQuery<{ value: string }>('SELECT value FROM shop_metadata WHERE key = ?;', ['settings']),
+          Database.query<{ value: string }>('SELECT value FROM shop_metadata WHERE key = ?;', ['settings']),
         ]);
 
         // Parse shop metadata from KV store
@@ -256,10 +255,9 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     set({ shop: newShop });
 
     // Write to SQLite
-    const ts = new Date().toISOString();
-    const { execRun } = await import('../db/connection');
-    await execRun(
-      'INSERT OR REPLACE INTO shop_metadata (key, value, updated_at, is_dirty) VALUES (?, ?, ?, 1);',
+    const ts = Date.now();
+    await Database.run(
+      'INSERT OR REPLACE INTO shop_metadata (key, value, updated_at, dirty) VALUES (?, ?, ?, 1);',
       ['settings', JSON.stringify(newShop), ts]
     );
 
@@ -287,7 +285,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     if (!shopId) return;
 
     const { costPrice, ...publicData } = item as any;
-    const ts = new Date().toISOString();
+    const ts = Date.now();
 
     // 1. Write to SQLite (instant)
     await inventoryRepo.upsert(item);
@@ -324,7 +322,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     if (!shopId) return;
 
     const { costPrice, ...publicData } = item as any;
-    const ts = new Date().toISOString();
+    const ts = Date.now();
 
     await inventoryRepo.upsert(item);
     set({ inventory: inventory.map(i => i.id === item.id ? item : i) });
@@ -357,7 +355,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const { shopId, inventory } = get();
     if (!shopId) return;
 
-    const ts = new Date().toISOString();
+    const ts = Date.now();
     await inventoryRepo.updateStock(id, delta);
 
     // Optimistic update
@@ -385,7 +383,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const { shopId, inventory } = get();
     if (!shopId) return;
 
-    const ts = new Date().toISOString();
+    const ts = Date.now();
     await inventoryRepo.softDelete(id);
     set({ inventory: inventory.filter(i => i.id !== id) });
 
@@ -403,7 +401,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const { shopId, inventory } = get();
     if (!shopId) return;
 
-    const ts = new Date().toISOString();
+    const ts = Date.now();
     await inventoryRepo.clearAll();
     
     // Enqueue delete for each item
@@ -427,7 +425,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const { shopId, customers, sales } = get();
     if (!shopId) return;
 
-    const ts = new Date().toISOString();
+    const ts = Date.now();
     let finalSale = { ...sale };
 
     const creditPayment = sale.payments.find((p: any) => p.mode === 'CREDIT');
@@ -467,7 +465,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
           phone: finalSale.customerPhone || '-',
           totalSpent: finalSale.total,
           balance: creditAmount,
-          createdAt: ts,
+          createdAt: new Date(ts).toISOString(),
         };
         await customersRepo.upsert(newCust);
         
@@ -531,7 +529,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
 
     const oldSale = sales.find((s: Sale) => s.id === newSale.id);
     if (!oldSale) return;
-    const ts = new Date().toISOString();
+    const ts = Date.now();
 
     // 1. Reconcile stock deltas locally
     const itemIds = new Set([
@@ -592,7 +590,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
 
     const sale = sales.find((s: Sale) => s.id === id);
     if (!sale) return;
-    const ts = new Date().toISOString();
+    const ts = Date.now();
 
     const creditPayment = sale.payments.find((p: any) => p.mode === 'CREDIT');
     const creditAmount = creditPayment ? creditPayment.amount : 0;
@@ -635,7 +633,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const { shopId, customers } = get();
     if (!shopId) return;
 
-    const ts = new Date().toISOString();
+    const ts = Date.now();
     await customersRepo.upsert(customer);
 
     const exists = customers.find(c => c.id === customer.id);
@@ -659,7 +657,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const { shopId, customers } = get();
     if (!shopId) return;
 
-    const ts = new Date().toISOString();
+    const ts = Date.now();
     await customersRepo.softDelete(id);
     set({ customers: customers.filter(c => c.id !== id) });
 
@@ -677,14 +675,14 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const { shopId } = get();
     if (!shopId) return;
 
-    const ts = new Date().toISOString();
+    const ts = Date.now();
     const paymentId = `PAY-${Date.now()}`;
     const payment: CustomerPayment = {
       id: paymentId,
       customerId,
       amount,
-      date: ts.split('T')[0],
-      createdAt: ts,
+      date: new Date(ts).toISOString().split('T')[0],
+      createdAt: new Date(ts).toISOString(),
     };
 
     // 1. Write payment to SQLite
@@ -729,7 +727,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const { shopId, expenses } = get();
     if (!shopId) return;
 
-    const ts = new Date().toISOString();
+    const ts = Date.now();
     await expensesRepo.upsert(expense);
     set({ expenses: [...expenses, expense] });
 
@@ -747,7 +745,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const { shopId, expenses } = get();
     if (!shopId) return;
 
-    const ts = new Date().toISOString();
+    const ts = Date.now();
     await expensesRepo.softDelete(id);
     set({ expenses: expenses.filter(e => e.id !== id) });
 
@@ -785,7 +783,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const { shopId, inventory, inventoryPrivate } = get();
     if (!shopId) return;
 
-    const ts = new Date().toISOString();
+    const ts = Date.now();
 
     // Local calculation (mirrors the old Firestore transaction logic)
     const currentItem = inventory.find(i => i.id === id);
@@ -807,7 +805,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const privData: InventoryPrivate = {
       id,
       costPrice: Number(weightedAverageCost.toFixed(2)),
-      lastPurchaseDate: ts.split('T')[0],
+      lastPurchaseDate: new Date(ts).toISOString().split('T')[0],
     };
     await inventoryPrivateRepo.upsert(privData);
 
@@ -849,7 +847,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     if (!shopId) return;
 
     const { salary, pin, ...publicData } = staffMember as any;
-    const ts = new Date().toISOString();
+    const ts = Date.now();
 
     await staffRepo.upsert(staffMember);
 
@@ -891,8 +889,8 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const { shopId, staff } = get();
     if (!shopId) return;
 
-    const ts = new Date().toISOString();
-    await staffRepo.delete(id);
+    const ts = Date.now();
+    await staffRepo.remove(id);
     set({ staff: staff.filter(s => s.id !== id) });
 
     await outboxRepo.enqueue({
@@ -909,7 +907,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const { shopId, shop, attendance } = get();
     if (!shopId) return;
 
-    const ts = new Date().toISOString();
+    const ts = Date.now();
     let finalEntry = { ...entry };
 
     // Smart logic for clock-out: Calculate hours

@@ -1,86 +1,54 @@
 /**
- * Outbox Repository — Sync mutation queue
- * 
- * Manages the sync_outbox table which stores pending local mutations
- * that need to be pushed to Firestore.
+ * Outbox Repository → sync_queue
  */
 
-import { execQuery, execRun } from '../connection';
+import { Database } from '../sqlite';
 
-export interface OutboxEntry {
+export interface QueueEntry {
   opId: string;
   entityType: string;
   entityId: string;
   operation: 'CREATE' | 'UPDATE' | 'DELETE';
-  payload: string; // JSON
-  createdAt: string;
+  payload: string;
+  createdAt: number; // ms epoch
   retries: number;
 }
 
 export const outboxRepo = {
-  /**
-   * Enqueue a new mutation for sync.
-   */
-  async enqueue(entry: Omit<OutboxEntry, 'retries'>): Promise<void> {
-    await execRun(
-      `INSERT OR REPLACE INTO sync_outbox (op_id, entity_type, entity_id, operation, payload, created_at, retries)
+  async enqueue(entry: Omit<QueueEntry, 'retries'>): Promise<void> {
+    await Database.run(
+      `INSERT OR REPLACE INTO sync_queue (op_id, entity_type, entity_id, operation, payload, created_at, retries)
        VALUES (?, ?, ?, ?, ?, ?, 0);`,
-      [entry.opId, entry.entityType, entry.entityId, entry.operation, entry.payload, entry.createdAt]
+      [entry.opId, entry.entityType, entry.entityId, entry.operation, entry.payload, entry.createdAt],
     );
   },
 
-  /**
-   * Get all pending outbox entries, ordered by creation time.
-   */
-  async getAll(): Promise<OutboxEntry[]> {
-    return execQuery<OutboxEntry>(
-      'SELECT op_id as opId, entity_type as entityType, entity_id as entityId, operation, payload, created_at as createdAt, retries FROM sync_outbox ORDER BY created_at ASC;'
+  async getAll(): Promise<QueueEntry[]> {
+    return Database.query<QueueEntry>(
+      `SELECT op_id as opId, entity_type as entityType, entity_id as entityId,
+              operation, payload, created_at as createdAt, retries
+       FROM sync_queue ORDER BY created_at ASC;`,
     );
   },
 
-  /**
-   * Get pending entries for a specific entity type.
-   */
-  async getByType(entityType: string): Promise<OutboxEntry[]> {
-    return execQuery<OutboxEntry>(
-      'SELECT op_id as opId, entity_type as entityType, entity_id as entityId, operation, payload, created_at as createdAt, retries FROM sync_outbox WHERE entity_type = ? ORDER BY created_at ASC;',
-      [entityType]
-    );
-  },
-
-  /**
-   * Remove a successfully synced entry.
-   */
   async remove(opId: string): Promise<void> {
-    await execRun('DELETE FROM sync_outbox WHERE op_id = ?;', [opId]);
+    await Database.run('DELETE FROM sync_queue WHERE op_id = ?;', [opId]);
   },
 
-  /**
-   * Increment retry count for failed sync attempt.
-   */
   async incrementRetries(opId: string): Promise<void> {
-    await execRun('UPDATE sync_outbox SET retries = retries + 1 WHERE op_id = ?;', [opId]);
+    await Database.run('UPDATE sync_queue SET retries = retries + 1 WHERE op_id = ?;', [opId]);
   },
 
-  /**
-   * Remove all entries for a specific entity (used when entity is deleted).
-   */
   async removeForEntity(entityType: string, entityId: string): Promise<void> {
-    await execRun('DELETE FROM sync_outbox WHERE entity_type = ? AND entity_id = ?;', [entityType, entityId]);
+    await Database.run('DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?;', [entityType, entityId]);
   },
 
-  /**
-   * Get the count of pending mutations.
-   */
   async count(): Promise<number> {
-    const result = await execQuery<{ cnt: number }>('SELECT COUNT(*) as cnt FROM sync_outbox;');
-    return result[0]?.cnt ?? 0;
+    const r = await Database.query<{ cnt: number }>('SELECT COUNT(*) as cnt FROM sync_queue;');
+    return r[0]?.cnt ?? 0;
   },
 
-  /**
-   * Clear all outbox entries (used after full sync reset).
-   */
   async clear(): Promise<void> {
-    await execRun('DELETE FROM sync_outbox;');
+    await Database.run('DELETE FROM sync_queue;');
   },
 };
