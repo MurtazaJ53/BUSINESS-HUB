@@ -1,27 +1,30 @@
+/**
+ * useBusinessStore — Phase 2 Local-First Architecture
+ * 
+ * All reads come from SQLite (instant, synchronous-feeling via cached state).
+ * All writes go to SQLite + outbox, then sync to Firestore in the background.
+ * The sync engine's pull listener updates SQLite AND pushes new state into Zustand.
+ */
+
 import type { 
   InventoryItem, InventoryPrivate, Sale, Customer, ShopMetadata, ShopPrivate, 
   Expense, Staff, StaffPrivate, Attendance, Invitation, CustomerPayment, SaleItem
 } from './types';
 import { create } from 'zustand';
-import { db, auth } from './firebase';
-import { 
-  getDocs,
-  doc, 
-  onSnapshot, 
-  setDoc, 
-  collection, 
-  updateDoc, 
-  deleteDoc, 
-  arrayUnion, 
-  query, 
-  where,
-  writeBatch,
-  runTransaction,
-  increment,
-  limit,
-  orderBy,
-  startAfter,
-} from 'firebase/firestore';
+import { auth } from './firebase';
+
+// Database imports
+import {
+  initDatabase, saveToStore,
+  inventoryRepo, inventoryPrivateRepo,
+  salesRepo,
+  customersRepo, customerPaymentsRepo,
+  expensesRepo,
+  staffRepo, staffPrivateRepo, attendanceRepo,
+  outboxRepo,
+  startSync, stopSync, onDataChange,
+} from '../db';
+import { execQuery } from '../db/connection';
 
 const SHOP_DEFAULTS: ShopMetadata = {
   name: 'Business Hub Pro',
@@ -58,6 +61,7 @@ interface BusinessState {
   lastBackupDate: string | null;
   invitations: Invitation[];
   currentStaff: Staff | null;
+  dbReady: boolean;
 
   // Initialization
   initStore: (shopId: string, role: 'admin' | 'staff') => () => void;
@@ -129,161 +133,144 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
   lastBackupDate: null,
   invitations: [],
   currentStaff: null,
+  dbReady: false,
 
   initStore: (shopId: string, role: 'admin' | 'staff') => {
     set({ shopId, role });
 
-    // 1. Subscribe to Shop Metadata
-    const unsubShop = onSnapshot(doc(db, 'shops', shopId), (s) => {
-      if (s.exists()) {
-        const data = s.data();
-        // CLEANUP: Ensure no sensitive keys leak into public shop metadata
-        const metadata = { ...data.settings, name: data.name };
-        if (metadata.adminPin) delete metadata.adminPin;
-        if (metadata.staffPin) delete metadata.staffPin;
-        
-        set({ shop: { ...SHOP_DEFAULTS, ...metadata } });
-      }
-    });
+    // 1. Initialize SQLite database
+    initDatabase()
+      .then(async () => {
+        // 2. Load cached data from SQLite immediately (INSTANT UI)
+        const [inv, invPriv, salesData, custs, custPay, exps, staffData, staffPriv, att, shopMeta] = await Promise.all([
+          inventoryRepo.getAll(),
+          role === 'admin' ? inventoryPrivateRepo.getAll() : Promise.resolve([]),
+          salesRepo.getAll(100),
+          customersRepo.getAll(),
+          customerPaymentsRepo.getAll(),
+          expensesRepo.getAll(),
+          staffRepo.getAll(),
+          role === 'admin' ? staffPrivateRepo.getAll() : Promise.resolve([]),
+          attendanceRepo.getAll(getMonthStart()),
+          execQuery<{ value: string }>('SELECT value FROM shop_metadata WHERE key = ?;', ['settings']),
+        ]);
 
-    // 1.5 Subscribe to Shop Private Settings (Admin Only)
-    let unsubShopPrivate = () => {};
-    if (role === 'admin') {
-      unsubShopPrivate = onSnapshot(doc(db, `shops/${shopId}/private`, 'settings'), (s) => {
-        if (s.exists()) {
-          set({ shopPrivate: s.data() as ShopPrivate });
+        // Parse shop metadata from KV store
+        let shopData = SHOP_DEFAULTS;
+        if (shopMeta.length > 0) {
+          try {
+            shopData = { ...SHOP_DEFAULTS, ...JSON.parse(shopMeta[0].value) };
+          } catch (_) { /* use defaults */ }
         }
-      });
-    }
 
-    // 2. Subscribe to Inventory
-    const unsubInv = onSnapshot(collection(db, `shops/${shopId}/inventory`), (snap) => {
-      const items = snap.docs.map(d => {
-        const data = d.data();
-        // CLEANUP: Ensure no leaked costPrice in public collection
-        if (data.costPrice !== undefined) delete data.costPrice;
-        return { id: d.id, ...data } as InventoryItem;
-      });
-      set({ inventory: items });
-    });
-
-    // 2.5 Subscribe to Private Inventory (Admin Only)
-    let unsubInvPrivate = () => {};
-    if (role === 'admin') {
-      unsubInvPrivate = onSnapshot(collection(db, `shops/${shopId}/inventory_private`), (snap) => {
-        const privateItems = snap.docs.map(d => ({ id: d.id, ...d.data() } as InventoryPrivate));
-        set({ inventoryPrivate: privateItems });
-      });
-    }
-
-    // 3. Subscribe to Sales (Recent 100 - Paginated)
-    const unsubSales = onSnapshot(query(collection(db, `shops/${shopId}/sales`), orderBy('createdAt', 'desc'), limit(100)), (snap) => {
-      const sales = snap.docs.map(d => ({ id: d.id, ...d.data() } as Sale));
-      set({ sales });
-    });
-
-    // 3.5 Subscribe to Customer Payments
-    const unsubPayments = onSnapshot(collection(db, `shops/${shopId}/customer_payments`), (snap) => {
-      const payments = snap.docs.map(d => ({ id: d.id, ...d.data() } as CustomerPayment));
-      set({ customerPayments: payments });
-    });
-
-    // 4. Subscribe to Customers
-    const unsubCust = onSnapshot(collection(db, `shops/${shopId}/customers`), (snap) => {
-      const customers = snap.docs.map(d => ({ id: d.id, ...d.data() } as Customer));
-      set({ customers });
-    });
-
-    // 5. Subscribe to Expenses
-    const unsubExp = onSnapshot(collection(db, `shops/${shopId}/expenses`), (snap) => {
-      const expenses = snap.docs.map(d => ({ id: d.id, ...d.data() } as Expense));
-      set({ expenses });
-    });
-
-    // 6. Subscribe to Staff
-    const unsubStaff = onSnapshot(collection(db, `shops/${shopId}/staff`), (snap) => {
-      const staff = snap.docs.map(d => {
-        const data = d.data();
-        // CLEANUP: Ensure no sensitive data leaks if legacy fields still exist
-        if (data.salary !== undefined) delete data.salary;
-        if (data.pin !== undefined) delete data.pin;
-        return { id: d.id, ...data } as Staff;
-      });
-      set({ staff });
-    });
-
-    // 6.5 Subscribe to Staff Private Data (Admin Only)
-    let unsubStaffPrivate = () => {};
-    if (role === 'admin') {
-      unsubStaffPrivate = onSnapshot(collection(db, `shops/${shopId}/staff_private`), (snap) => {
-        const privateItems = snap.docs.map(d => ({ id: d.id, ...d.data() } as StaffPrivate));
-        set({ staffPrivate: privateItems });
-      });
-    }
-
-    // 6. Subscribe to Attendance (Current Month only for performance)
-    const firstOfMonth = new Date();
-    firstOfMonth.setDate(1);
-    firstOfMonth.setHours(0,0,0,0);
-    const startStr = firstOfMonth.toISOString().split('T')[0];
-
-    const unsubAtt = onSnapshot(
-      query(collection(db, `shops/${shopId}/attendance`), where('date', '>=', startStr)), 
-      (snap) => {
-        const attendance = snap.docs.map(d => ({ id: d.id, ...d.data() } as Attendance));
-        set({ attendance });
-      }
-    );
-
-    // 8. Subscribe to Invitations
-    const unsubInvites = onSnapshot(collection(db, `shops/${shopId}/invitations`), (snap) => {
-      const invitations = snap.docs.map(d => ({ id: d.id, ...d.data() } as Invitation));
-      set({ invitations });
-    });
-
-    // 9. Subscribe to Current Staff Object (if role is staff)
-    let unsubCurrentStaff = () => {};
-    if (role === 'staff' && auth.currentUser) {
-      unsubCurrentStaff = onSnapshot(doc(db, `shops/${shopId}/staff`, auth.currentUser.uid), (docSnap) => {
-        if (docSnap.exists()) {
-          set({ currentStaff: { id: docSnap.id, ...docSnap.data() } as Staff });
+        // Resolve current staff for staff role
+        let currentStaffObj: Staff | null = null;
+        if (role === 'staff' && auth.currentUser) {
+          currentStaffObj = await staffRepo.getById(auth.currentUser.uid);
         }
-      });
-    }
 
+        set({
+          inventory: inv,
+          inventoryPrivate: invPriv,
+          sales: salesData,
+          customers: custs,
+          customerPayments: custPay,
+          expenses: exps,
+          staff: staffData,
+          staffPrivate: staffPriv,
+          attendance: att,
+          shop: shopData,
+          currentStaff: currentStaffObj,
+          dbReady: true,
+        });
+
+        // 3. Start the sync engine (Firestore ↔ SQLite background synchronization)
+        const unsubData = onDataChange((entityType: string, data: any[]) => {
+          // When the sync engine merges remote data, update Zustand state
+          switch (entityType) {
+            case 'inventory': set({ inventory: data as InventoryItem[] }); break;
+            case 'inventoryPrivate': set({ inventoryPrivate: data as InventoryPrivate[] }); break;
+            case 'sales': set({ sales: data as Sale[] }); break;
+            case 'customerPayments': set({ customerPayments: data as CustomerPayment[] }); break;
+            case 'customers': set({ customers: data as Customer[] }); break;
+            case 'expenses': set({ expenses: data as Expense[] }); break;
+            case 'staff': {
+              set({ staff: data as Staff[] });
+              // Update currentStaff if role is staff
+              if (get().role === 'staff' && auth.currentUser) {
+                const me = (data as Staff[]).find(s => s.id === auth.currentUser?.uid);
+                if (me) set({ currentStaff: me });
+              }
+              break;
+            }
+            case 'staffPrivate': set({ staffPrivate: data as StaffPrivate[] }); break;
+            case 'attendance': set({ attendance: data as Attendance[] }); break;
+            case 'shop': {
+              if (data.length > 0) {
+                set({ shop: { ...SHOP_DEFAULTS, ...data[0] } as ShopMetadata });
+              }
+              break;
+            }
+          }
+        });
+
+        await startSync(shopId, role);
+
+        // Store cleanup function
+        (window as any).__syncCleanup = () => {
+          unsubData();
+          stopSync();
+        };
+      })
+      .catch((err) => {
+        console.error('[Store] Failed to initialize database:', err);
+        set({ dbReady: true }); // Allow UI to render even if DB fails
+      });
+
+    // Return cleanup function
     return () => {
-      unsubShop();
-      unsubShopPrivate();
-      unsubInv();
-      unsubInvPrivate();
-      unsubSales();
-      unsubPayments();
-      unsubCust();
-      unsubExp();
-      unsubStaff();
-      unsubStaffPrivate();
-      unsubAtt();
-      unsubInvites();
-      unsubCurrentStaff();
+      if ((window as any).__syncCleanup) {
+        (window as any).__syncCleanup();
+        delete (window as any).__syncCleanup;
+      }
     };
   },
 
   setRole: (role: 'admin' | 'staff' | null) => set({ role }),
-  logout: () => set({ role: null, shopId: null }),
+  logout: () => {
+    stopSync();
+    set({ role: null, shopId: null, dbReady: false });
+  },
 
   setActiveTab: (tab: string) => set({ activeTab: tab }),
   setInventorySearchTerm: (term: string) => set({ inventorySearchTerm: term }),
 
+  // ─── SHOP ──────────────────────────────────────────────────
+
   updateShop: async (data: Partial<ShopMetadata>) => {
-    const { shopId } = get();
+    const { shopId, shop } = get();
     if (!shopId) return;
-    
+
     const { adminPin, staffPin, ...metadata } = data as any;
-    
-    // Write public metadata
-    await updateDoc(doc(db, 'shops', shopId), {
-      settings: metadata,
-      name: metadata.name || get().shop.name
+    const newShop = { ...shop, ...metadata };
+    set({ shop: newShop });
+
+    // Write to SQLite
+    const ts = new Date().toISOString();
+    const { execRun } = await import('../db/connection');
+    await execRun(
+      'INSERT OR REPLACE INTO shop_metadata (key, value, updated_at, is_dirty) VALUES (?, ?, ?, 1);',
+      ['settings', JSON.stringify(newShop), ts]
+    );
+
+    // Enqueue for sync
+    await outboxRepo.enqueue({
+      opId: `shop_${ts}`,
+      entityType: 'shop',
+      entityId: shopId,
+      operation: 'UPDATE',
+      payload: JSON.stringify({ settings: metadata, name: metadata.name || shop.name }),
+      createdAt: ts,
     });
   },
 
@@ -293,81 +280,154 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     else document.documentElement.classList.remove('dark');
   },
 
+  // ─── INVENTORY ─────────────────────────────────────────────
+
   addInventoryItem: async (item: InventoryItem) => {
-    const { shopId } = get();
-    if (!shopId) throw new Error('Sync Error: Shop ID not found. Please refresh.');
-    
+    const { shopId, inventory } = get();
+    if (!shopId) return;
+
     const { costPrice, ...publicData } = item as any;
-    
-    // Write public data
-    await setDoc(doc(db, `shops/${shopId}/inventory`, item.id), publicData);
-    
-    // Write private data if costPrice exists
+    const ts = new Date().toISOString();
+
+    // 1. Write to SQLite (instant)
+    await inventoryRepo.upsert(item);
+    set({ inventory: [...inventory, item] });
+
+    // 2. Enqueue public data for sync
+    await outboxRepo.enqueue({
+      opId: `inv_${item.id}_${ts}`,
+      entityType: 'inventory',
+      entityId: item.id,
+      operation: 'CREATE',
+      payload: JSON.stringify({ ...publicData, updatedAt: ts }),
+      createdAt: ts,
+    });
+
+    // 3. If costPrice exists, write private data too
     if (costPrice !== undefined) {
-      await setDoc(doc(db, `shops/${shopId}/inventory_private`, item.id), {
-        id: item.id,
-        costPrice: Number(costPrice)
+      const privData = { id: item.id, costPrice: Number(costPrice) };
+      await inventoryPrivateRepo.upsert(privData as InventoryPrivate);
+
+      await outboxRepo.enqueue({
+        opId: `invp_${item.id}_${ts}`,
+        entityType: 'inventory_private',
+        entityId: item.id,
+        operation: 'CREATE',
+        payload: JSON.stringify({ ...privData, updatedAt: ts }),
+        createdAt: ts,
       });
     }
   },
 
   updateInventoryItem: async (item: InventoryItem) => {
-    const { shopId } = get();
+    const { shopId, inventory } = get();
     if (!shopId) return;
-    
+
     const { costPrice, ...publicData } = item as any;
-    
-    // Write public data
-    await setDoc(doc(db, `shops/${shopId}/inventory`, item.id), publicData);
-    
-    // Write private data if costPrice exists
+    const ts = new Date().toISOString();
+
+    await inventoryRepo.upsert(item);
+    set({ inventory: inventory.map(i => i.id === item.id ? item : i) });
+
+    await outboxRepo.enqueue({
+      opId: `inv_${item.id}_${ts}`,
+      entityType: 'inventory',
+      entityId: item.id,
+      operation: 'UPDATE',
+      payload: JSON.stringify({ ...publicData, updatedAt: ts }),
+      createdAt: ts,
+    });
+
     if (costPrice !== undefined) {
-      await setDoc(doc(db, `shops/${shopId}/inventory_private`, item.id), {
-        id: item.id,
-        costPrice: Number(costPrice)
+      const privData = { id: item.id, costPrice: Number(costPrice) };
+      await inventoryPrivateRepo.upsert(privData as InventoryPrivate);
+
+      await outboxRepo.enqueue({
+        opId: `invp_${item.id}_${ts}`,
+        entityType: 'inventory_private',
+        entityId: item.id,
+        operation: 'UPDATE',
+        payload: JSON.stringify({ ...privData, updatedAt: ts }),
+        createdAt: ts,
       });
     }
   },
 
   updateStock: async (id: string, delta: number) => {
-    const { shopId } = get();
+    const { shopId, inventory } = get();
     if (!shopId) return;
-    await updateDoc(doc(db, `shops/${shopId}/inventory`, id), {
-      stock: increment(delta)
+
+    const ts = new Date().toISOString();
+    await inventoryRepo.updateStock(id, delta);
+
+    // Optimistic update
+    set({
+      inventory: inventory.map(i => 
+        i.id === id ? { ...i, stock: (i.stock ?? 0) + delta } : i
+      ),
     });
+
+    // Read updated stock for sync payload
+    const updated = await inventoryRepo.getById(id);
+    if (updated) {
+      await outboxRepo.enqueue({
+        opId: `stock_${id}_${ts}`,
+        entityType: 'inventory',
+        entityId: id,
+        operation: 'UPDATE',
+        payload: JSON.stringify({ ...updated, updatedAt: ts }),
+        createdAt: ts,
+      });
+    }
   },
 
   deleteInventoryItem: async (id: string) => {
-    const { shopId } = get();
+    const { shopId, inventory } = get();
     if (!shopId) return;
-    await deleteDoc(doc(db, `shops/${shopId}/inventory`, id));
+
+    const ts = new Date().toISOString();
+    await inventoryRepo.softDelete(id);
+    set({ inventory: inventory.filter(i => i.id !== id) });
+
+    await outboxRepo.enqueue({
+      opId: `invdel_${id}_${ts}`,
+      entityType: 'inventory',
+      entityId: id,
+      operation: 'DELETE',
+      payload: '{}',
+      createdAt: ts,
+    });
   },
 
   clearInventory: async () => {
     const { shopId, inventory } = get();
     if (!shopId) return;
-    
-    // Chunked Batch Deletion (max 500 per batch)
-    const chunks = [];
-    for (let i = 0; i < inventory.length; i += 500) {
-      chunks.push(inventory.slice(i, i + 500));
-    }
 
-    for (const chunk of chunks) {
-      const batch = writeBatch(db);
-      for (const item of chunk) {
-        batch.delete(doc(db, `shops/${shopId}/inventory`, item.id));
-        batch.delete(doc(db, `shops/${shopId}/inventory_private`, item.id));
-      }
-      await batch.commit();
+    const ts = new Date().toISOString();
+    await inventoryRepo.clearAll();
+    
+    // Enqueue delete for each item
+    for (const item of inventory) {
+      await outboxRepo.enqueue({
+        opId: `invclr_${item.id}_${ts}`,
+        entityType: 'inventory',
+        entityId: item.id,
+        operation: 'DELETE',
+        payload: '{}',
+        createdAt: ts,
+      });
     }
+    
+    set({ inventory: [] });
   },
 
+  // ─── SALES ─────────────────────────────────────────────────
+
   addSale: async (sale: Sale) => {
-    const { shopId, customers } = get();
+    const { shopId, customers, sales } = get();
     if (!shopId) return;
 
-    const batch = writeBatch(db);
+    const ts = new Date().toISOString();
     let finalSale = { ...sale };
 
     const creditPayment = sale.payments.find((p: any) => p.mode === 'CREDIT');
@@ -377,64 +437,106 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     if (creditAmount > 0 && finalSale.customerName && !finalSale.customerId) {
       const phoneToMatch = finalSale.customerPhone?.trim();
       const nameToMatch = finalSale.customerName?.trim().toLowerCase();
-      
+
       const existing = customers.find((c: Customer) => 
-        (phoneToMatch && c.phone === phoneToMatch) || 
+        (phoneToMatch && c.phone === phoneToMatch) ||
         (nameToMatch && c.name.toLowerCase() === nameToMatch)
       );
 
       if (existing) {
         finalSale.customerId = existing.id;
-        batch.update(doc(db, `shops/${shopId}/customers`, existing.id), {
-          totalSpent: increment(finalSale.total),
-          balance: increment(creditAmount)
+        await customersRepo.updateBalance(existing.id, finalSale.total, creditAmount);
+        
+        await outboxRepo.enqueue({
+          opId: `custbal_${existing.id}_${ts}`,
+          entityType: 'customers',
+          entityId: existing.id,
+          operation: 'UPDATE',
+          payload: JSON.stringify({
+            ...(await customersRepo.getById(existing.id)),
+            updatedAt: ts,
+          }),
+          createdAt: ts,
         });
       } else {
         const newCustomerId = `cust-${Date.now()}`;
         finalSale.customerId = newCustomerId;
-        batch.set(doc(db, `shops/${shopId}/customers`, newCustomerId), {
+        const newCust: Customer = {
           id: newCustomerId,
           name: finalSale.customerName,
           phone: finalSale.customerPhone || '-',
           totalSpent: finalSale.total,
           balance: creditAmount,
-          createdAt: new Date().toISOString()
+          createdAt: ts,
+        };
+        await customersRepo.upsert(newCust);
+        
+        await outboxRepo.enqueue({
+          opId: `custnew_${newCustomerId}_${ts}`,
+          entityType: 'customers',
+          entityId: newCustomerId,
+          operation: 'CREATE',
+          payload: JSON.stringify({ ...newCust, updatedAt: ts }),
+          createdAt: ts,
         });
       }
     } else if (finalSale.customerId) {
-      batch.update(doc(db, `shops/${shopId}/customers`, finalSale.customerId), {
-        totalSpent: increment(finalSale.total),
-        balance: increment(creditAmount)
+      await customersRepo.updateBalance(finalSale.customerId, finalSale.total, creditAmount);
+      
+      await outboxRepo.enqueue({
+        opId: `custbal_${finalSale.customerId}_${ts}`,
+        entityType: 'customers',
+        entityId: finalSale.customerId,
+        operation: 'UPDATE',
+        payload: JSON.stringify({
+          ...(await customersRepo.getById(finalSale.customerId)),
+          updatedAt: ts,
+        }),
+        createdAt: ts,
       });
     }
 
-    // 2. Set Sale doc
-    batch.set(doc(db, `shops/${shopId}/sales`, finalSale.id), finalSale);
+    // 2. Write sale to SQLite
+    await salesRepo.upsert(finalSale);
+    set({ sales: [finalSale, ...sales] });
 
-    // 3. Deduct stock using increment (atomic)
+    // 3. Deduct stock locally
     for (const item of finalSale.items) {
       if (!item.itemId.startsWith('custom-') && item.itemId !== 'payment-received') {
-        batch.update(doc(db, `shops/${shopId}/inventory`, item.itemId), {
-          stock: increment(-item.quantity)
-        });
+        await inventoryRepo.updateStock(item.itemId, -item.quantity);
       }
     }
+    // Refresh inventory state
+    const updatedInv = await inventoryRepo.getAll();
+    set({ inventory: updatedInv });
 
-    await batch.commit();
+    // 4. Enqueue sale for sync (Firestore format: items + payments as arrays)
+    await outboxRepo.enqueue({
+      opId: `sale_${finalSale.id}_${ts}`,
+      entityType: 'sales',
+      entityId: finalSale.id,
+      operation: 'CREATE',
+      payload: JSON.stringify({ ...finalSale, updatedAt: ts }),
+      createdAt: ts,
+    });
+
+    // Refresh customers
+    const updatedCusts = await customersRepo.getAll();
+    set({ customers: updatedCusts });
   },
 
   updateSale: async (newSale: Sale) => {
     const { shopId, sales } = get();
     if (!shopId) return;
+
     const oldSale = sales.find((s: Sale) => s.id === newSale.id);
     if (!oldSale) return;
+    const ts = new Date().toISOString();
 
-    const batch = writeBatch(db);
-
-    // 1. Reconcile Stock Deltas
+    // 1. Reconcile stock deltas locally
     const itemIds = new Set([
       ...oldSale.items.map((i: SaleItem) => i.itemId),
-      ...newSale.items.map((i: SaleItem) => i.itemId)
+      ...newSale.items.map((i: SaleItem) => i.itemId),
     ]);
 
     for (const itemId of itemIds) {
@@ -442,149 +544,234 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
       const oldQty = oldSale.items.find((i: SaleItem) => i.itemId === itemId)?.quantity || 0;
       const newQty = newSale.items.find((i: SaleItem) => i.itemId === itemId)?.quantity || 0;
       const delta = newQty - oldQty;
-
       if (delta !== 0) {
-        batch.update(doc(db, `shops/${shopId}/inventory`, itemId), {
-          stock: increment(-delta)
-        });
+        await inventoryRepo.updateStock(itemId, -delta);
       }
     }
 
-    // 2. Reconcile Customer Balance & Spending
+    // 2. Reconcile customer balance
     const oldCredit = oldSale.payments.find((p: any) => p.mode === 'CREDIT')?.amount || 0;
     const newCredit = newSale.payments.find((p: any) => p.mode === 'CREDIT')?.amount || 0;
 
-    if (oldSale.customerId === newSale.customerId) {
-      if (newSale.customerId) {
-        batch.update(doc(db, `shops/${shopId}/customers`, newSale.customerId), {
-          totalSpent: increment(newSale.total - oldSale.total),
-          balance: increment(newCredit - oldCredit)
-        });
-      }
+    if (oldSale.customerId === newSale.customerId && newSale.customerId) {
+      await customersRepo.updateBalance(newSale.customerId, newSale.total - oldSale.total, newCredit - oldCredit);
     } else {
       if (oldSale.customerId) {
-        batch.update(doc(db, `shops/${shopId}/customers`, oldSale.customerId), {
-          totalSpent: increment(-oldSale.total),
-          balance: increment(-oldCredit)
-        });
+        await customersRepo.updateBalance(oldSale.customerId, -oldSale.total, -oldCredit);
       }
       if (newSale.customerId) {
-        batch.update(doc(db, `shops/${shopId}/customers`, newSale.customerId), {
-          totalSpent: increment(newSale.total),
-          balance: increment(newCredit)
-        });
+        await customersRepo.updateBalance(newSale.customerId, newSale.total, newCredit);
       }
     }
 
-    // 3. Update Sale Doc
-    batch.set(doc(db, `shops/${shopId}/sales`, newSale.id), newSale);
-    await batch.commit();
+    // 3. Update sale in SQLite
+    await salesRepo.upsert(newSale);
+    set({ sales: sales.map(s => s.id === newSale.id ? newSale : s) });
+
+    // 4. Enqueue for sync
+    await outboxRepo.enqueue({
+      opId: `sale_${newSale.id}_${ts}`,
+      entityType: 'sales',
+      entityId: newSale.id,
+      operation: 'UPDATE',
+      payload: JSON.stringify({ ...newSale, updatedAt: ts }),
+      createdAt: ts,
+    });
+
+    // Refresh derived state
+    const [updatedInv, updatedCusts] = await Promise.all([
+      inventoryRepo.getAll(),
+      customersRepo.getAll(),
+    ]);
+    set({ inventory: updatedInv, customers: updatedCusts });
   },
 
   deleteSale: async (id: string) => {
     const { shopId, sales } = get();
     if (!shopId) return;
+
     const sale = sales.find((s: Sale) => s.id === id);
     if (!sale) return;
+    const ts = new Date().toISOString();
 
-    const batch = writeBatch(db);
     const creditPayment = sale.payments.find((p: any) => p.mode === 'CREDIT');
     const creditAmount = creditPayment ? creditPayment.amount : 0;
 
-    // 1. Restore Stock
+    // 1. Restore stock locally
     for (const item of sale.items) {
       if (!item.itemId.startsWith('custom-') && item.itemId !== 'payment-received') {
-        batch.update(doc(db, `shops/${shopId}/inventory`, item.itemId), {
-          stock: increment(item.quantity)
-        });
+        await inventoryRepo.updateStock(item.itemId, item.quantity);
       }
     }
 
-    // 2. Revert Customer Stats
+    // 2. Revert customer stats
     if (sale.customerId) {
-      batch.update(doc(db, `shops/${shopId}/customers`, sale.customerId), {
-        totalSpent: increment(-sale.total),
-        balance: increment(-creditAmount)
-      });
+      await customersRepo.updateBalance(sale.customerId, -sale.total, -creditAmount);
     }
 
-    // 3. Delete doc
-    batch.delete(doc(db, `shops/${shopId}/sales`, id));
+    // 3. Soft-delete sale
+    await salesRepo.softDelete(id);
+    set({ sales: sales.filter(s => s.id !== id) });
 
-    await batch.commit();
+    await outboxRepo.enqueue({
+      opId: `saledel_${id}_${ts}`,
+      entityType: 'sales',
+      entityId: id,
+      operation: 'DELETE',
+      payload: '{}',
+      createdAt: ts,
+    });
+
+    const [updatedInv, updatedCusts] = await Promise.all([
+      inventoryRepo.getAll(),
+      customersRepo.getAll(),
+    ]);
+    set({ inventory: updatedInv, customers: updatedCusts });
   },
 
+  // ─── CUSTOMERS ─────────────────────────────────────────────
+
   upsertCustomer: async (customer: Customer) => {
-    const { shopId } = get();
+    const { shopId, customers } = get();
     if (!shopId) return;
-    await setDoc(doc(db, `shops/${shopId}/customers`, customer.id), customer);
+
+    const ts = new Date().toISOString();
+    await customersRepo.upsert(customer);
+
+    const exists = customers.find(c => c.id === customer.id);
+    set({
+      customers: exists
+        ? customers.map(c => c.id === customer.id ? customer : c)
+        : [...customers, customer],
+    });
+
+    await outboxRepo.enqueue({
+      opId: `cust_${customer.id}_${ts}`,
+      entityType: 'customers',
+      entityId: customer.id,
+      operation: exists ? 'UPDATE' : 'CREATE',
+      payload: JSON.stringify({ ...customer, updatedAt: ts }),
+      createdAt: ts,
+    });
   },
 
   deleteCustomer: async (id: string) => {
-    const { shopId } = get();
+    const { shopId, customers } = get();
     if (!shopId) return;
-    await deleteDoc(doc(db, `shops/${shopId}/customers`, id));
+
+    const ts = new Date().toISOString();
+    await customersRepo.softDelete(id);
+    set({ customers: customers.filter(c => c.id !== id) });
+
+    await outboxRepo.enqueue({
+      opId: `custdel_${id}_${ts}`,
+      entityType: 'customers',
+      entityId: id,
+      operation: 'DELETE',
+      payload: '{}',
+      createdAt: ts,
+    });
   },
 
   addCustomerPayment: async (customerId: string, amount: number) => {
     const { shopId } = get();
     if (!shopId) return;
 
-    const batch = writeBatch(db);
+    const ts = new Date().toISOString();
     const paymentId = `PAY-${Date.now()}`;
-    
-    // 1. Record payment in the new collection
-    batch.set(doc(db, `shops/${shopId}/customer_payments`, paymentId), {
+    const payment: CustomerPayment = {
       id: paymentId,
       customerId,
       amount,
-      date: new Date().toISOString().split('T')[0],
-      createdAt: new Date().toISOString()
+      date: ts.split('T')[0],
+      createdAt: ts,
+    };
+
+    // 1. Write payment to SQLite
+    await customerPaymentsRepo.upsert(payment);
+
+    // 2. Reduce customer balance
+    await customersRepo.updateBalance(customerId, 0, -amount);
+
+    // 3. Enqueue both for sync
+    await outboxRepo.enqueue({
+      opId: `pay_${paymentId}_${ts}`,
+      entityType: 'customer_payments',
+      entityId: paymentId,
+      operation: 'CREATE',
+      payload: JSON.stringify({ ...payment, updatedAt: ts }),
+      createdAt: ts,
     });
 
-    // 2. Reduce customer Udhaar balance
-    batch.update(doc(db, `shops/${shopId}/customers`, customerId), {
-      balance: increment(-amount)
-    });
+    const updatedCust = await customersRepo.getById(customerId);
+    if (updatedCust) {
+      await outboxRepo.enqueue({
+        opId: `custpay_${customerId}_${ts}`,
+        entityType: 'customers',
+        entityId: customerId,
+        operation: 'UPDATE',
+        payload: JSON.stringify({ ...updatedCust, updatedAt: ts }),
+        createdAt: ts,
+      });
+    }
 
-    await batch.commit();
+    // Refresh state
+    const [custs, payments] = await Promise.all([
+      customersRepo.getAll(),
+      customerPaymentsRepo.getAll(),
+    ]);
+    set({ customers: custs, customerPayments: payments });
   },
 
+  // ─── EXPENSES ──────────────────────────────────────────────
+
   addExpense: async (expense: Expense) => {
-    const { shopId } = get();
+    const { shopId, expenses } = get();
     if (!shopId) return;
-    await setDoc(doc(db, `shops/${shopId}/expenses`, expense.id), expense);
+
+    const ts = new Date().toISOString();
+    await expensesRepo.upsert(expense);
+    set({ expenses: [...expenses, expense] });
+
+    await outboxRepo.enqueue({
+      opId: `exp_${expense.id}_${ts}`,
+      entityType: 'expenses',
+      entityId: expense.id,
+      operation: 'CREATE',
+      payload: JSON.stringify({ ...expense, updatedAt: ts }),
+      createdAt: ts,
+    });
   },
 
   deleteExpense: async (id: string) => {
-    const { shopId } = get();
+    const { shopId, expenses } = get();
     if (!shopId) return;
-    await deleteDoc(doc(db, `shops/${shopId}/expenses`, id));
+
+    const ts = new Date().toISOString();
+    await expensesRepo.softDelete(id);
+    set({ expenses: expenses.filter(e => e.id !== id) });
+
+    await outboxRepo.enqueue({
+      opId: `expdel_${id}_${ts}`,
+      entityType: 'expenses',
+      entityId: id,
+      operation: 'DELETE',
+      payload: '{}',
+      createdAt: ts,
+    });
   },
 
+  // ─── SALES PAGINATION ─────────────────────────────────────
+
   loadMoreSales: async () => {
-    const { shopId, sales, loadingMore } = get();
-    if (!shopId || loadingMore) return;
+    const { loadingMore } = get();
+    if (loadingMore) return;
 
     set({ loadingMore: true });
     try {
-      const lastSale = sales[sales.length - 1];
-      if (!lastSale) return;
-
-      const q = query(
-        collection(db, `shops/${shopId}/sales`),
-        orderBy('createdAt', 'desc'),
-        startAfter(lastSale.createdAt),
-        limit(100)
-      );
-
-      const snap = await getDocs(q);
-      const newSales = snap.docs.map(d => ({ id: d.id, ...d.data() } as Sale));
-      
-      set((state: BusinessState) => ({ 
-        sales: [...state.sales, ...newSales],
-        canLoadMore: newSales.length === 100 
-      }));
+      // Load all from SQLite (no pagination needed locally — it's instant)
+      const allSales = await salesRepo.getAll(10000);
+      set({ sales: allSales, canLoadMore: false });
     } catch (e) {
       console.error('Pagination Error:', e);
     } finally {
@@ -592,85 +779,140 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     }
   },
 
+  // ─── RESTOCK ─────────────────────────────────────────────
+
   restockItem: async (id: string, newQty: number, newPurchasePrice: number) => {
-    const { shopId } = get();
+    const { shopId, inventory, inventoryPrivate } = get();
     if (!shopId) return;
 
-    await runTransaction(db, async (transaction) => {
-      const invRef = doc(db, `shops/${shopId}/inventory`, id);
-      const privRef = doc(db, `shops/${shopId}/inventory_private`, id);
+    const ts = new Date().toISOString();
 
-      const [invSnap, privSnap] = await Promise.all([
-        transaction.get(invRef),
-        transaction.get(privRef)
-      ]);
+    // Local calculation (mirrors the old Firestore transaction logic)
+    const currentItem = inventory.find(i => i.id === id);
+    if (!currentItem) return;
 
-      if (!invSnap.exists()) return;
+    const currentStock = currentItem.stock ?? 0;
+    const currentPriv = inventoryPrivate.find(p => p.id === id);
+    const currentCost = currentPriv?.costPrice ?? 0;
 
-      const currentStock = invSnap.data().stock || 0;
-      const currentCost = privSnap.exists() ? (privSnap.data().costPrice || 0) : 0;
-      
-      const totalQuantity = currentStock + newQty;
-      const weightedAverageCost = totalQuantity > 0 
-        ? ((currentStock * currentCost) + (newQty * newPurchasePrice)) / totalQuantity
-        : newPurchasePrice;
+    const totalQuantity = currentStock + newQty;
+    const weightedAverageCost = totalQuantity > 0
+      ? ((currentStock * currentCost) + (newQty * newPurchasePrice)) / totalQuantity
+      : newPurchasePrice;
 
-      transaction.update(invRef, {
-        stock: totalQuantity
+    // Update inventory stock locally
+    await inventoryRepo.updateStock(id, newQty);
+
+    // Update private cost data
+    const privData: InventoryPrivate = {
+      id,
+      costPrice: Number(weightedAverageCost.toFixed(2)),
+      lastPurchaseDate: ts.split('T')[0],
+    };
+    await inventoryPrivateRepo.upsert(privData);
+
+    // Optimistic state update
+    set({
+      inventory: inventory.map(i => i.id === id ? { ...i, stock: totalQuantity } : i),
+      inventoryPrivate: inventoryPrivate.map(p =>
+        p.id === id ? privData : p
+      ).concat(currentPriv ? [] : [privData]),
+    });
+
+    // Enqueue for sync
+    const updatedItem = await inventoryRepo.getById(id);
+    if (updatedItem) {
+      await outboxRepo.enqueue({
+        opId: `restock_${id}_${ts}`,
+        entityType: 'inventory',
+        entityId: id,
+        operation: 'UPDATE',
+        payload: JSON.stringify({ ...updatedItem, updatedAt: ts }),
+        createdAt: ts,
       });
+    }
 
-      transaction.set(privRef, {
-        id,
-        costPrice: Number(weightedAverageCost.toFixed(2)),
-        lastPurchaseDate: new Date().toISOString().split('T')[0]
-      }, { merge: true });
+    await outboxRepo.enqueue({
+      opId: `restockp_${id}_${ts}`,
+      entityType: 'inventory_private',
+      entityId: id,
+      operation: 'UPDATE',
+      payload: JSON.stringify({ ...privData, updatedAt: ts }),
+      createdAt: ts,
     });
   },
 
-  upsertStaff: async (staff: Staff) => {
-    const { shopId } = get();
+  // ─── STAFF ─────────────────────────────────────────────────
+
+  upsertStaff: async (staffMember: Staff) => {
+    const { shopId, staff } = get();
     if (!shopId) return;
 
-    const { salary, pin, ...publicData } = staff as any;
+    const { salary, pin, ...publicData } = staffMember as any;
+    const ts = new Date().toISOString();
 
-    // Write public data
-    await setDoc(doc(db, `shops/${shopId}/staff`, staff.id), publicData);
+    await staffRepo.upsert(staffMember);
 
-    // Write private data if salary or pin exists
+    const exists = staff.find(s => s.id === staffMember.id);
+    set({
+      staff: exists
+        ? staff.map(s => s.id === staffMember.id ? staffMember : s)
+        : [...staff, staffMember],
+    });
+
+    await outboxRepo.enqueue({
+      opId: `staff_${staffMember.id}_${ts}`,
+      entityType: 'staff',
+      entityId: staffMember.id,
+      operation: exists ? 'UPDATE' : 'CREATE',
+      payload: JSON.stringify({ ...publicData, updatedAt: ts }),
+      createdAt: ts,
+    });
+
     if (salary !== undefined || pin !== undefined) {
-      const privateData: any = { id: staff.id };
+      const privateData: any = { id: staffMember.id };
       if (salary !== undefined) privateData.salary = Number(salary);
       if (pin !== undefined) privateData.pin = pin;
 
-      await setDoc(doc(db, `shops/${shopId}/staff_private`, staff.id), privateData, { merge: true });
+      await staffPrivateRepo.upsert(privateData as StaffPrivate);
+
+      await outboxRepo.enqueue({
+        opId: `staffp_${staffMember.id}_${ts}`,
+        entityType: 'staff_private',
+        entityId: staffMember.id,
+        operation: exists ? 'UPDATE' : 'CREATE',
+        payload: JSON.stringify({ ...privateData, updatedAt: ts }),
+        createdAt: ts,
+      });
     }
   },
 
   deleteStaff: async (id: string) => {
-    const { shopId } = get();
+    const { shopId, staff } = get();
     if (!shopId) return;
-    
-    // 1. Remove from shop roster
-    await deleteDoc(doc(db, `shops/${shopId}/staff`, id));
-    
-    // 2. Clear global user profile if they are a logged-in user (prevents ghost access)
-    try {
-      await updateDoc(doc(db, 'users', id), {
-        shopId: null,
-        role: null
-      });
-    } catch (e) {
-      // It's possible the id was a custom 'staff-xxx' ID for someone not yet joined, ignore errors
-      console.log('No global user to clear for staff:', id);
-    }
+
+    const ts = new Date().toISOString();
+    await staffRepo.delete(id);
+    set({ staff: staff.filter(s => s.id !== id) });
+
+    await outboxRepo.enqueue({
+      opId: `staffdel_${id}_${ts}`,
+      entityType: 'staff',
+      entityId: id,
+      operation: 'DELETE',
+      payload: '{}',
+      createdAt: ts,
+    });
   },
 
   recordAttendance: async (entry: Attendance) => {
     const { shopId, shop, attendance } = get();
     if (!shopId) return;
 
-    // Smart logic for clock-out: Calculate hours
+    const ts = new Date().toISOString();
     let finalEntry = { ...entry };
+
+    // Smart logic for clock-out: Calculate hours
     if (entry.clockIn && entry.clockOut) {
       try {
         const [inH, inM] = entry.clockIn.split(':').map(Number);
@@ -678,7 +920,6 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
         const durationHours = (outH + outM / 60) - (inH + inM / 60);
         finalEntry.totalHours = Number(durationHours.toFixed(2));
 
-        // Auto-suggest status based on hours if not already explicitly set
         if (!finalEntry.status) {
           const standard = shop.standardWorkingHours || 9;
           if (durationHours >= standard) {
@@ -694,6 +935,30 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
       }
     }
 
-    await setDoc(doc(db, `shops/${shopId}/attendance`, finalEntry.id), finalEntry);
+    await attendanceRepo.upsert(finalEntry);
+
+    set({
+      attendance: attendance.some(a => a.id === finalEntry.id)
+        ? attendance.map(a => a.id === finalEntry.id ? finalEntry : a)
+        : [...attendance, finalEntry],
+    });
+
+    await outboxRepo.enqueue({
+      opId: `att_${finalEntry.id}_${ts}`,
+      entityType: 'attendance',
+      entityId: finalEntry.id,
+      operation: 'UPDATE',
+      payload: JSON.stringify({ ...finalEntry, updatedAt: ts }),
+      createdAt: ts,
+    });
   },
 }));
+
+// ─── HELPERS ────────────────────────────────────────────────
+
+function getMonthStart(): string {
+  const d = new Date();
+  d.setDate(1);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString().split('T')[0];
+}

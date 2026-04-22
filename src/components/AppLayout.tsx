@@ -35,6 +35,7 @@ import { auth, db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import bcrypt from 'bcryptjs';
 import { formatCurrency, cn } from '@/lib/utils';
+import SyncStatusBadge from './SyncStatusBadge';
 
 interface NavItemProps {
   icon: React.ElementType;
@@ -374,6 +375,9 @@ export default function AppLayout() {
               {PAGE_TITLES[activeTab] ?? 'Business Hub'}
             </span>
           </div>
+
+          {/* Sync Status Badge */}
+          <SyncStatusBadge />
 
           {/* Topbar right */}
           <div className="flex items-center gap-3 ml-auto">
