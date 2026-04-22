@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Printer
 } from 'lucide-react';
+import { useSqlQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn } from '@/lib/utils';
 import { printReceipt } from '@/lib/printerService';
@@ -26,7 +27,9 @@ import ReceiptModal from '@/components/ReceiptModal';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
 export default function History() {
-  const { sales, expenses, deleteSale, deleteExpense, updateSale, role } = useBusinessStore();
+  const { deleteSale, deleteExpense, updateSale, role } = useBusinessStore();
+  const sales = useSqlQuery<Sale>('SELECT * FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC', [], ['sales']);
+  const expenses = useSqlQuery<Expense>('SELECT * FROM expenses WHERE tombstone = 0 ORDER BY date DESC', [], ['expenses']);
   const [tab, setTab] = useState<'sales' | 'expenses'>('sales');
   const [search, setSearch] = useState('');
   const [viewingSale, setViewingSale] = useState<Sale | null>(null);
@@ -521,3 +524,4 @@ export default function History() {
     </div>
   );
 }
+

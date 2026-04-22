@@ -13,6 +13,7 @@ import {
   Wallet,
   PieChart
 } from 'lucide-react';
+import { useSqlQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn } from '@/lib/utils';
 import type { Expense } from '@/lib/types';
@@ -30,7 +31,8 @@ const CATEGORIES = [
 ];
 
 export default function Expenses() {
-  const { expenses, addExpense, deleteExpense } = useBusinessStore();
+  const { addExpense, deleteExpense } = useBusinessStore();
+  const expenses = useSqlQuery<Expense>('SELECT * FROM expenses WHERE tombstone = 0 ORDER BY date DESC', [], ['expenses']);
   const [isAdding, setIsAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [errorModal, setErrorModal] = useState({ show: false, title: '', message: '' });
@@ -293,3 +295,4 @@ export default function Expenses() {
     </div>
   );
 }
+

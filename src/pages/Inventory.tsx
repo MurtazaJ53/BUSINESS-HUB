@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { calculateSalesVelocity, calculateDaysRemaining } from '@/lib/analyticsUtils';
 import ErrorModal from '@/components/ErrorModal';
+import { useSqlQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn } from '@/lib/utils';
 import type { InventoryItem, Sale } from '@/lib/types';
@@ -166,20 +167,10 @@ const InventoryCard = ({
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 export default function Inventory() {
-  const { 
-    inventory, 
-    inventoryPrivate,
-    addInventoryItem, 
-    updateInventoryItem, 
-    updateStock,
-    deleteInventoryItem, 
-    clearInventory,
-    inventorySearchTerm,
-    setInventorySearchTerm,
-    restockItem,
-    role,
-    sales
-  } = useBusinessStore();
+  const { addInventoryItem, updateInventoryItem, updateStock, deleteInventoryItem, clearInventory, inventorySearchTerm, setInventorySearchTerm, restockItem, role } = useBusinessStore();
+  const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
+  const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
+  const sales = useSqlQuery<Sale>('SELECT * FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC', [], ['sales']);
 
   const inventoryWithPrivate = useMemo(() => {
     if (role !== 'admin') return inventory;
@@ -1204,3 +1195,4 @@ export default function Inventory() {
     </div>
   );
 }
+
