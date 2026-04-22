@@ -29,7 +29,7 @@ export const parseGenericExcel = async (file: File, type: 'inventory' | 'custome
         const data = e.target?.result;
         if (!data) throw new Error("File reading failed.");
 
-        const workbook = XLSX.read(data, { type: 'binary' });
+        const workbook = XLSX.read(data, { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
         const rawRows: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
@@ -84,6 +84,6 @@ export const parseGenericExcel = async (file: File, type: 'inventory' | 'custome
         resolve({ success: false, totalParsed: 0, validItems: [], errors: [`Critical Parsing Error: ${err.message}`], type });
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   });
 };

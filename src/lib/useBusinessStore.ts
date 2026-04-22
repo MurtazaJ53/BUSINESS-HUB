@@ -1,7 +1,11 @@
+import type { 
+  InventoryItem, InventoryPrivate, Sale, Customer, ShopMetadata, ShopPrivate, 
+  Expense, Staff, StaffPrivate, Attendance, Invitation, CustomerPayment, SaleItem
+} from './types';
 import { create } from 'zustand';
-import type { InventoryItem, InventoryPrivate, Sale, Customer, ShopMetadata, Expense, Staff, Attendance, Invitation } from './types';
 import { db, auth } from './firebase';
 import { 
+  getDocs,
   doc, 
   onSnapshot, 
   setDoc, 
@@ -10,7 +14,13 @@ import {
   deleteDoc, 
   arrayUnion, 
   query, 
-  where 
+  where,
+  writeBatch,
+  runTransaction,
+  increment,
+  limit,
+  orderBy,
+  startAfter,
 } from 'firebase/firestore';
 
 const SHOP_DEFAULTS: ShopMetadata = {
@@ -22,8 +32,6 @@ const SHOP_DEFAULTS: ShopMetadata = {
   gst: '',
   footer: 'Thank you for your business! 😊',
   currency: 'INR',
-  adminPin: '9999',
-  staffPin: '0000',
   standardWorkingHours: 9,
   allowStaffAttendance: true,
 };
@@ -32,11 +40,16 @@ interface BusinessState {
   inventory: InventoryItem[];
   inventoryPrivate: InventoryPrivate[];
   sales: Sale[];
+  customerPayments: CustomerPayment[];
   customers: Customer[];
   expenses: Expense[];
   staff: Staff[];
+  staffPrivate: StaffPrivate[];
   attendance: Attendance[];
+  loadingMore: boolean;
+  canLoadMore: boolean;
   shop: ShopMetadata;
+  shopPrivate: ShopPrivate | null;
   theme: 'dark' | 'light';
   activeTab: string;
   inventorySearchTerm: string;
@@ -72,8 +85,11 @@ interface BusinessState {
   addSale: (sale: Sale) => Promise<void>;
   updateSale: (sale: Sale) => Promise<void>;
   deleteSale: (id: string) => Promise<void>;
-
-  // Customers
+  
+  // Sales Pagination
+  loadMoreSales: () => Promise<void>;
+  
+  // Financial Utilities
   upsertCustomer: (customer: Customer) => Promise<void>;
   deleteCustomer: (id: string) => Promise<void>;
   addCustomerPayment: (customerId: string, amount: number) => Promise<void>;
@@ -95,11 +111,16 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
   inventory: [],
   inventoryPrivate: [],
   sales: [],
+  customerPayments: [],
   customers: [],
   expenses: [],
   staff: [],
+  staffPrivate: [],
   attendance: [],
+  loadingMore: false,
+  canLoadMore: true,
   shop: SHOP_DEFAULTS,
+  shopPrivate: null,
   theme: 'dark',
   activeTab: 'dashboard',
   inventorySearchTerm: '',
@@ -109,16 +130,31 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
   invitations: [],
   currentStaff: null,
 
-  initStore: (shopId, role) => {
+  initStore: (shopId: string, role: 'admin' | 'staff') => {
     set({ shopId, role });
 
     // 1. Subscribe to Shop Metadata
     const unsubShop = onSnapshot(doc(db, 'shops', shopId), (s) => {
       if (s.exists()) {
         const data = s.data();
-        set({ shop: { ...SHOP_DEFAULTS, ...data.settings, name: data.name } });
+        // CLEANUP: Ensure no sensitive keys leak into public shop metadata
+        const metadata = { ...data.settings, name: data.name };
+        if (metadata.adminPin) delete metadata.adminPin;
+        if (metadata.staffPin) delete metadata.staffPin;
+        
+        set({ shop: { ...SHOP_DEFAULTS, ...metadata } });
       }
     });
+
+    // 1.5 Subscribe to Shop Private Settings (Admin Only)
+    let unsubShopPrivate = () => {};
+    if (role === 'admin') {
+      unsubShopPrivate = onSnapshot(doc(db, `shops/${shopId}/private`, 'settings'), (s) => {
+        if (s.exists()) {
+          set({ shopPrivate: s.data() as ShopPrivate });
+        }
+      });
+    }
 
     // 2. Subscribe to Inventory
     const unsubInv = onSnapshot(collection(db, `shops/${shopId}/inventory`), (snap) => {
@@ -140,12 +176,16 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
       });
     }
 
-    // 3. Subscribe to Sales (Recent 100)
-    const unsubSales = onSnapshot(collection(db, `shops/${shopId}/sales`), (snap) => {
-      const sales = snap.docs
-        .map(d => ({ id: d.id, ...d.data() } as Sale))
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    // 3. Subscribe to Sales (Recent 100 - Paginated)
+    const unsubSales = onSnapshot(query(collection(db, `shops/${shopId}/sales`), orderBy('createdAt', 'desc'), limit(100)), (snap) => {
+      const sales = snap.docs.map(d => ({ id: d.id, ...d.data() } as Sale));
       set({ sales });
+    });
+
+    // 3.5 Subscribe to Customer Payments
+    const unsubPayments = onSnapshot(collection(db, `shops/${shopId}/customer_payments`), (snap) => {
+      const payments = snap.docs.map(d => ({ id: d.id, ...d.data() } as CustomerPayment));
+      set({ customerPayments: payments });
     });
 
     // 4. Subscribe to Customers
@@ -162,15 +202,38 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
 
     // 6. Subscribe to Staff
     const unsubStaff = onSnapshot(collection(db, `shops/${shopId}/staff`), (snap) => {
-      const staff = snap.docs.map(d => ({ id: d.id, ...d.data() } as Staff));
+      const staff = snap.docs.map(d => {
+        const data = d.data();
+        // CLEANUP: Ensure no sensitive data leaks if legacy fields still exist
+        if (data.salary !== undefined) delete data.salary;
+        if (data.pin !== undefined) delete data.pin;
+        return { id: d.id, ...data } as Staff;
+      });
       set({ staff });
     });
 
-    // 7. Subscribe to Attendance (Current Month)
-    const unsubAtt = onSnapshot(collection(db, `shops/${shopId}/attendance`), (snap) => {
-      const attendance = snap.docs.map(d => ({ id: d.id, ...d.data() } as Attendance));
-      set({ attendance });
-    });
+    // 6.5 Subscribe to Staff Private Data (Admin Only)
+    let unsubStaffPrivate = () => {};
+    if (role === 'admin') {
+      unsubStaffPrivate = onSnapshot(collection(db, `shops/${shopId}/staff_private`), (snap) => {
+        const privateItems = snap.docs.map(d => ({ id: d.id, ...d.data() } as StaffPrivate));
+        set({ staffPrivate: privateItems });
+      });
+    }
+
+    // 6. Subscribe to Attendance (Current Month only for performance)
+    const firstOfMonth = new Date();
+    firstOfMonth.setDate(1);
+    firstOfMonth.setHours(0,0,0,0);
+    const startStr = firstOfMonth.toISOString().split('T')[0];
+
+    const unsubAtt = onSnapshot(
+      query(collection(db, `shops/${shopId}/attendance`), where('date', '>=', startStr)), 
+      (snap) => {
+        const attendance = snap.docs.map(d => ({ id: d.id, ...d.data() } as Attendance));
+        set({ attendance });
+      }
+    );
 
     // 8. Subscribe to Invitations
     const unsubInvites = onSnapshot(collection(db, `shops/${shopId}/invitations`), (snap) => {
@@ -190,40 +253,47 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
 
     return () => {
       unsubShop();
+      unsubShopPrivate();
       unsubInv();
       unsubInvPrivate();
       unsubSales();
+      unsubPayments();
       unsubCust();
       unsubExp();
       unsubStaff();
+      unsubStaffPrivate();
       unsubAtt();
       unsubInvites();
       unsubCurrentStaff();
     };
   },
 
-  setRole: (role) => set({ role }),
+  setRole: (role: 'admin' | 'staff' | null) => set({ role }),
   logout: () => set({ role: null, shopId: null }),
 
-  setActiveTab: (tab) => set({ activeTab: tab }),
-  setInventorySearchTerm: (term) => set({ inventorySearchTerm: term }),
+  setActiveTab: (tab: string) => set({ activeTab: tab }),
+  setInventorySearchTerm: (term: string) => set({ inventorySearchTerm: term }),
 
-  updateShop: async (data) => {
+  updateShop: async (data: Partial<ShopMetadata>) => {
     const { shopId } = get();
     if (!shopId) return;
+    
+    const { adminPin, staffPin, ...metadata } = data as any;
+    
+    // Write public metadata
     await updateDoc(doc(db, 'shops', shopId), {
-      settings: data,
-      name: data.name || get().shop.name
+      settings: metadata,
+      name: metadata.name || get().shop.name
     });
   },
 
-  setTheme: (theme) => {
+  setTheme: (theme: 'dark' | 'light') => {
     set({ theme });
     if (theme === 'dark') document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
   },
 
-  addInventoryItem: async (item) => {
+  addInventoryItem: async (item: InventoryItem) => {
     const { shopId } = get();
     if (!shopId) throw new Error('Sync Error: Shop ID not found. Please refresh.');
     
@@ -241,7 +311,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     }
   },
 
-  updateInventoryItem: async (item) => {
+  updateInventoryItem: async (item: InventoryItem) => {
     const { shopId } = get();
     if (!shopId) return;
     
@@ -259,62 +329,70 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     }
   },
 
-  updateStock: async (id, delta) => {
-    const { shopId, inventory } = get();
+  updateStock: async (id: string, delta: number) => {
+    const { shopId } = get();
     if (!shopId) return;
-    const item = inventory.find(i => i.id === id);
-    if (!item) return;
     await updateDoc(doc(db, `shops/${shopId}/inventory`, id), {
-      stock: Math.max(0, (item.stock || 0) + delta)
+      stock: increment(delta)
     });
   },
 
-  deleteInventoryItem: async (id) => {
+  deleteInventoryItem: async (id: string) => {
     const { shopId } = get();
     if (!shopId) return;
     await deleteDoc(doc(db, `shops/${shopId}/inventory`, id));
   },
 
   clearInventory: async () => {
-    // Note: Batch deletion would be better, but for now simple clear
     const { shopId, inventory } = get();
     if (!shopId) return;
-    for (const item of inventory) {
-      await deleteDoc(doc(db, `shops/${shopId}/inventory`, item.id));
+    
+    // Chunked Batch Deletion (max 500 per batch)
+    const chunks = [];
+    for (let i = 0; i < inventory.length; i += 500) {
+      chunks.push(inventory.slice(i, i + 500));
+    }
+
+    for (const chunk of chunks) {
+      const batch = writeBatch(db);
+      for (const item of chunk) {
+        batch.delete(doc(db, `shops/${shopId}/inventory`, item.id));
+        batch.delete(doc(db, `shops/${shopId}/inventory_private`, item.id));
+      }
+      await batch.commit();
     }
   },
 
-  addSale: async (sale) => {
+  addSale: async (sale: Sale) => {
     const { shopId, customers } = get();
     if (!shopId) return;
 
+    const batch = writeBatch(db);
     let finalSale = { ...sale };
-    let customerAction: Promise<any> | null = null;
 
-    const creditPayment = finalSale.payments.find(p => p.mode === 'CREDIT');
+    const creditPayment = sale.payments.find((p: any) => p.mode === 'CREDIT');
     const creditAmount = creditPayment ? creditPayment.amount : 0;
 
+    // 1. Resolve Customer linking
     if (creditAmount > 0 && finalSale.customerName && !finalSale.customerId) {
-      // SMART MATCH: Try Phone first, then Name
       const phoneToMatch = finalSale.customerPhone?.trim();
       const nameToMatch = finalSale.customerName?.trim().toLowerCase();
       
-      const existing = customers.find(c => 
+      const existing = customers.find((c: Customer) => 
         (phoneToMatch && c.phone === phoneToMatch) || 
         (nameToMatch && c.name.toLowerCase() === nameToMatch)
       );
 
       if (existing) {
         finalSale.customerId = existing.id;
-        // If they matching but name/phone was slightly different, keep current for the sale but link them
-        customerAction = updateDoc(doc(db, `shops/${get().shopId}/customers`, existing.id), {
-          totalSpent: existing.totalSpent + finalSale.total,
-          balance: existing.balance + creditAmount
+        batch.update(doc(db, `shops/${shopId}/customers`, existing.id), {
+          totalSpent: increment(finalSale.total),
+          balance: increment(creditAmount)
         });
       } else {
         const newCustomerId = `cust-${Date.now()}`;
         finalSale.customerId = newCustomerId;
-        customerAction = setDoc(doc(db, `shops/${get().shopId}/customers`, newCustomerId), {
+        batch.set(doc(db, `shops/${shopId}/customers`, newCustomerId), {
           id: newCustomerId,
           name: finalSale.customerName,
           phone: finalSale.customerPhone || '-',
@@ -324,137 +402,251 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
         });
       }
     } else if (finalSale.customerId) {
-      const customer = customers.find(c => c.id === finalSale.customerId);
-      if (customer) {
-        customerAction = updateDoc(doc(db, `shops/${shopId}/customers`, customer.id), {
-          totalSpent: customer.totalSpent + finalSale.total,
-          balance: customer.balance + creditAmount
+      batch.update(doc(db, `shops/${shopId}/customers`, finalSale.customerId), {
+        totalSpent: increment(finalSale.total),
+        balance: increment(creditAmount)
+      });
+    }
+
+    // 2. Set Sale doc
+    batch.set(doc(db, `shops/${shopId}/sales`, finalSale.id), finalSale);
+
+    // 3. Deduct stock using increment (atomic)
+    for (const item of finalSale.items) {
+      if (!item.itemId.startsWith('custom-') && item.itemId !== 'payment-received') {
+        batch.update(doc(db, `shops/${shopId}/inventory`, item.itemId), {
+          stock: increment(-item.quantity)
         });
       }
     }
 
-    await setDoc(doc(db, `shops/${shopId}/sales`, finalSale.id), finalSale);
-    if (customerAction) await customerAction;
+    await batch.commit();
+  },
 
-    // Deduct stock
-    for (const item of finalSale.items) {
-      if (!item.itemId.startsWith('custom-') && item.itemId !== 'payment-received') {
-        await get().updateStock(item.itemId, -item.quantity);
+  updateSale: async (newSale: Sale) => {
+    const { shopId, sales } = get();
+    if (!shopId) return;
+    const oldSale = sales.find((s: Sale) => s.id === newSale.id);
+    if (!oldSale) return;
+
+    const batch = writeBatch(db);
+
+    // 1. Reconcile Stock Deltas
+    const itemIds = new Set([
+      ...oldSale.items.map((i: SaleItem) => i.itemId),
+      ...newSale.items.map((i: SaleItem) => i.itemId)
+    ]);
+
+    for (const itemId of itemIds) {
+      if (itemId.startsWith('custom-') || itemId === 'payment-received') continue;
+      const oldQty = oldSale.items.find((i: SaleItem) => i.itemId === itemId)?.quantity || 0;
+      const newQty = newSale.items.find((i: SaleItem) => i.itemId === itemId)?.quantity || 0;
+      const delta = newQty - oldQty;
+
+      if (delta !== 0) {
+        batch.update(doc(db, `shops/${shopId}/inventory`, itemId), {
+          stock: increment(-delta)
+        });
       }
     }
+
+    // 2. Reconcile Customer Balance & Spending
+    const oldCredit = oldSale.payments.find((p: any) => p.mode === 'CREDIT')?.amount || 0;
+    const newCredit = newSale.payments.find((p: any) => p.mode === 'CREDIT')?.amount || 0;
+
+    if (oldSale.customerId === newSale.customerId) {
+      if (newSale.customerId) {
+        batch.update(doc(db, `shops/${shopId}/customers`, newSale.customerId), {
+          totalSpent: increment(newSale.total - oldSale.total),
+          balance: increment(newCredit - oldCredit)
+        });
+      }
+    } else {
+      if (oldSale.customerId) {
+        batch.update(doc(db, `shops/${shopId}/customers`, oldSale.customerId), {
+          totalSpent: increment(-oldSale.total),
+          balance: increment(-oldCredit)
+        });
+      }
+      if (newSale.customerId) {
+        batch.update(doc(db, `shops/${shopId}/customers`, newSale.customerId), {
+          totalSpent: increment(newSale.total),
+          balance: increment(newCredit)
+        });
+      }
+    }
+
+    // 3. Update Sale Doc
+    batch.set(doc(db, `shops/${shopId}/sales`, newSale.id), newSale);
+    await batch.commit();
   },
 
-  updateSale: async (sale) => {
-    const { shopId } = get();
+  deleteSale: async (id: string) => {
+    const { shopId, sales } = get();
     if (!shopId) return;
-    await setDoc(doc(db, `shops/${shopId}/sales`, sale.id), sale);
-  },
-
-  deleteSale: async (id) => {
-    const { shopId, sales, inventory } = get();
-    if (!shopId) return;
-    const sale = sales.find(s => s.id === id);
+    const sale = sales.find((s: Sale) => s.id === id);
     if (!sale) return;
 
-    // Restore stock
+    const batch = writeBatch(db);
+    const creditPayment = sale.payments.find((p: any) => p.mode === 'CREDIT');
+    const creditAmount = creditPayment ? creditPayment.amount : 0;
+
+    // 1. Restore Stock
     for (const item of sale.items) {
       if (!item.itemId.startsWith('custom-') && item.itemId !== 'payment-received') {
-        await get().updateStock(item.itemId, item.quantity);
+        batch.update(doc(db, `shops/${shopId}/inventory`, item.itemId), {
+          stock: increment(item.quantity)
+        });
       }
     }
 
-    await deleteDoc(doc(db, `shops/${shopId}/sales`, id));
+    // 2. Revert Customer Stats
+    if (sale.customerId) {
+      batch.update(doc(db, `shops/${shopId}/customers`, sale.customerId), {
+        totalSpent: increment(-sale.total),
+        balance: increment(-creditAmount)
+      });
+    }
+
+    // 3. Delete doc
+    batch.delete(doc(db, `shops/${shopId}/sales`, id));
+
+    await batch.commit();
   },
 
-  upsertCustomer: async (customer) => {
+  upsertCustomer: async (customer: Customer) => {
     const { shopId } = get();
     if (!shopId) return;
     await setDoc(doc(db, `shops/${shopId}/customers`, customer.id), customer);
   },
 
-  deleteCustomer: async (id) => {
+  deleteCustomer: async (id: string) => {
     const { shopId } = get();
     if (!shopId) return;
     await deleteDoc(doc(db, `shops/${shopId}/customers`, id));
   },
 
-  addCustomerPayment: async (customerId, amount) => {
-    const { customers } = get();
-    const customer = customers.find(c => c.id === customerId);
-    if (!customer) return;
+  addCustomerPayment: async (customerId: string, amount: number) => {
+    const { shopId } = get();
+    if (!shopId) return;
 
-    const today = new Date().toISOString().split('T')[0];
-    const newPaymentSale: Sale = {
-      id: `PAY-${Date.now()}`,
-      items: [{
-        itemId: 'payment-received',
-        name: `Udhaar Payment: ${customer.name}`,
-        quantity: 1,
-        price: amount
-      }],
-      total: amount,
-      discount: 0,
-      discountType: 'fixed',
-      discountValue: '0',
-      paymentMode: 'CASH',
-      payments: [{ mode: 'CASH', amount: amount }],
-      customerId: customer.id,
-      customerName: customer.name,
-      date: today,
+    const batch = writeBatch(db);
+    const paymentId = `PAY-${Date.now()}`;
+    
+    // 1. Record payment in the new collection
+    batch.set(doc(db, `shops/${shopId}/customer_payments`, paymentId), {
+      id: paymentId,
+      customerId,
+      amount,
+      date: new Date().toISOString().split('T')[0],
       createdAt: new Date().toISOString()
-    };
+    });
 
-    await get().addSale(newPaymentSale);
+    // 2. Reduce customer Udhaar balance
+    batch.update(doc(db, `shops/${shopId}/customers`, customerId), {
+      balance: increment(-amount)
+    });
+
+    await batch.commit();
   },
 
-  addExpense: async (expense) => {
+  addExpense: async (expense: Expense) => {
     const { shopId } = get();
     if (!shopId) return;
     await setDoc(doc(db, `shops/${shopId}/expenses`, expense.id), expense);
   },
 
-  deleteExpense: async (id) => {
+  deleteExpense: async (id: string) => {
     const { shopId } = get();
     if (!shopId) return;
     await deleteDoc(doc(db, `shops/${shopId}/expenses`, id));
   },
 
-  restockItem: async (id, newQty, newPurchasePrice) => {
-    const { shopId, inventory, inventoryPrivate } = get();
-    if (!shopId) return;
+  loadMoreSales: async () => {
+    const { shopId, sales, loadingMore } = get();
+    if (!shopId || loadingMore) return;
 
-    const item = inventory.find(i => i.id === id);
-    const privateItem = inventoryPrivate.find(i => i.id === id);
-    if (!item) return;
+    set({ loadingMore: true });
+    try {
+      const lastSale = sales[sales.length - 1];
+      if (!lastSale) return;
 
-    const currentStock = item.stock || 0;
-    const currentCost = privateItem?.costPrice || 0;
-    
-    // Formula: (Current Value + New Value) / Total Quantity
-    const totalQuantity = currentStock + newQty;
-    const weightedAverageCost = totalQuantity > 0 
-      ? ((currentStock * currentCost) + (newQty * newPurchasePrice)) / totalQuantity
-      : newPurchasePrice;
+      const q = query(
+        collection(db, `shops/${shopId}/sales`),
+        orderBy('createdAt', 'desc'),
+        startAfter(lastSale.createdAt),
+        limit(100)
+      );
 
-    // 1. Update public stock
-    await updateDoc(doc(db, `shops/${shopId}/inventory`, id), {
-      stock: totalQuantity
-    });
-
-    // 2. Update private cost
-    await setDoc(doc(db, `shops/${shopId}/inventory_private`, id), {
-      id,
-      costPrice: Number(weightedAverageCost.toFixed(2))
-    }, { merge: true });
+      const snap = await getDocs(q);
+      const newSales = snap.docs.map(d => ({ id: d.id, ...d.data() } as Sale));
+      
+      set((state: BusinessState) => ({ 
+        sales: [...state.sales, ...newSales],
+        canLoadMore: newSales.length === 100 
+      }));
+    } catch (e) {
+      console.error('Pagination Error:', e);
+    } finally {
+      set({ loadingMore: false });
+    }
   },
 
-  upsertStaff: async (staff) => {
+  restockItem: async (id: string, newQty: number, newPurchasePrice: number) => {
     const { shopId } = get();
     if (!shopId) return;
-    await setDoc(doc(db, `shops/${shopId}/staff`, staff.id), staff);
+
+    await runTransaction(db, async (transaction) => {
+      const invRef = doc(db, `shops/${shopId}/inventory`, id);
+      const privRef = doc(db, `shops/${shopId}/inventory_private`, id);
+
+      const [invSnap, privSnap] = await Promise.all([
+        transaction.get(invRef),
+        transaction.get(privRef)
+      ]);
+
+      if (!invSnap.exists()) return;
+
+      const currentStock = invSnap.data().stock || 0;
+      const currentCost = privSnap.exists() ? (privSnap.data().costPrice || 0) : 0;
+      
+      const totalQuantity = currentStock + newQty;
+      const weightedAverageCost = totalQuantity > 0 
+        ? ((currentStock * currentCost) + (newQty * newPurchasePrice)) / totalQuantity
+        : newPurchasePrice;
+
+      transaction.update(invRef, {
+        stock: totalQuantity
+      });
+
+      transaction.set(privRef, {
+        id,
+        costPrice: Number(weightedAverageCost.toFixed(2)),
+        lastPurchaseDate: new Date().toISOString().split('T')[0]
+      }, { merge: true });
+    });
   },
 
-  deleteStaff: async (id) => {
+  upsertStaff: async (staff: Staff) => {
+    const { shopId } = get();
+    if (!shopId) return;
+
+    const { salary, pin, ...publicData } = staff as any;
+
+    // Write public data
+    await setDoc(doc(db, `shops/${shopId}/staff`, staff.id), publicData);
+
+    // Write private data if salary or pin exists
+    if (salary !== undefined || pin !== undefined) {
+      const privateData: any = { id: staff.id };
+      if (salary !== undefined) privateData.salary = Number(salary);
+      if (pin !== undefined) privateData.pin = pin;
+
+      await setDoc(doc(db, `shops/${shopId}/staff_private`, staff.id), privateData, { merge: true });
+    }
+  },
+
+  deleteStaff: async (id: string) => {
     const { shopId } = get();
     if (!shopId) return;
     
@@ -473,7 +665,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     }
   },
 
-  recordAttendance: async (entry) => {
+  recordAttendance: async (entry: Attendance) => {
     const { shopId, shop, attendance } = get();
     if (!shopId) return;
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Search, 
   Trash2, 
@@ -21,7 +21,7 @@ import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn } from '@/lib/utils';
 import { printReceipt } from '@/lib/printerService';
 import { loadShopSettings } from '@/lib/shopSettings';
-import type { Sale } from '@/lib/types';
+import type { Sale, Expense } from '@/lib/types';
 import ReceiptModal from '@/components/ReceiptModal';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
@@ -40,6 +40,14 @@ export default function History() {
     paymentMode: '' as Sale['paymentMode'],
     date: ''
   });
+
+  const dailyCustomers = useMemo(() => {
+    return new Set(sales.filter((s: Sale) => s.date === new Date().toISOString().split('T')[0]).map((s: Sale) => s.customerName || 'Walk-in')).size;
+  }, [sales]);
+
+  const dailyRevenue = useMemo(() => {
+    return sales.filter((s: Sale) => s.date === new Date().toISOString().split('T')[0]).reduce((sum: number, s: Sale) => sum + (s.total || 0), 0);
+  }, [sales]);
 
   const handleEditOpen = (sale: Sale) => {
     setEditingSale(sale);
@@ -66,7 +74,7 @@ export default function History() {
   const last7Days = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
 
   const filteredSales = sales
-    .filter(s => {
+    .filter((s: Sale) => {
       const matchSearch = s.id.toLowerCase().includes(search.toLowerCase()) || 
                           (s.customerName?.toLowerCase() ?? '').includes(search.toLowerCase());
       
@@ -77,10 +85,10 @@ export default function History() {
 
       return matchSearch && matchDate;
     })
-    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+    .sort((a: Sale, b: Sale) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
 
   const filteredExpenses = expenses
-    .filter(e => {
+    .filter((e: Expense) => {
       const matchSearch = e.category.toLowerCase().includes(search.toLowerCase()) || 
                           e.description.toLowerCase().includes(search.toLowerCase());
       
@@ -91,7 +99,7 @@ export default function History() {
 
       return matchSearch && matchDate;
     })
-    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+    .sort((a: Expense, b: Expense) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
 
   const handleDelete = () => {
     if (deletingId) {
@@ -101,8 +109,8 @@ export default function History() {
     }
   };
 
-  const totalSalesAmount = filteredSales.reduce((sum, s) => sum + s.total, 0);
-  const totalExpensesAmount = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalSalesAmount = filteredSales.reduce((sum: number, s: Sale) => sum + s.total, 0);
+  const totalExpensesAmount = filteredExpenses.reduce((sum: number, e: Expense) => sum + e.amount, 0);
 
   const dateFilters = ['All Time', 'Today', 'Yesterday', 'Last 7 Days'];
   const paymentModes = ['CASH', 'UPI', 'CARD', 'CREDIT', 'ONLINE', 'OTHERS'];
@@ -239,7 +247,7 @@ export default function History() {
                     </td>
                   </tr>
                 ) : (
-                  filteredSales.map((sale) => (
+                  filteredSales.map((sale: Sale) => (
                     <tr key={sale.id} className="group hover:bg-primary/[0.02] transition-colors">
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
@@ -366,7 +374,7 @@ export default function History() {
                     </td>
                   </tr>
                 ) : (
-                  filteredExpenses.map((exp) => (
+                  filteredExpenses.map((exp: Expense) => (
                     <tr key={exp.id} className="group hover:bg-red-500/[0.02] transition-colors">
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">

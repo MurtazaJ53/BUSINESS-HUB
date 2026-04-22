@@ -3,36 +3,46 @@ import { auth, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
+let alreadyAttachedBeforeUnload = false;
+
 interface AuthState {
   user: User | null;
   shopId: string | null;
   role: 'admin' | 'staff' | null;
   loading: boolean;
   initialized: boolean;
+  unsubscribe: (() => void) | null;
 
   setUser: (user: User | null) => void;
   setShopContext: (shopId: string, role: 'admin' | 'staff') => void;
   initialize: () => void;
+  cleanup: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   shopId: null,
   role: null,
   loading: true,
   initialized: false,
+  unsubscribe: null,
 
   setUser: (user) => set({ user, loading: false }),
   
   setShopContext: (shopId, role) => set({ shopId, role }),
 
   initialize: () => {
-    onAuthStateChanged(auth, async (user) => {
+    // 1. CLEANUP PREVIOUS: If an initialize is called again, kill the old listener first
+    const existingUnsub = get().unsubscribe;
+    if (existingUnsub) existingUnsub();
+
+    const unsub = onAuthStateChanged(auth, async (user) => {
       set({ loading: true });
       try {
         if (user) {
-          // GUEST SESSION PROTECTION: If user is anonymous, setup "Wipe on Close"
-          if (user.isAnonymous) {
+          // GUEST SESSION PROTECTION: Setup "Wipe on Close" one-shot
+          if (user.isAnonymous && !alreadyAttachedBeforeUnload) {
+            alreadyAttachedBeforeUnload = true;
             window.addEventListener('beforeunload', () => {
               auth.signOut();
             });
@@ -73,5 +83,15 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ loading: false });
       }
     });
+
+    set({ unsubscribe: unsub });
   },
+
+  cleanup: () => {
+    const unsub = get().unsubscribe;
+    if (unsub) {
+      unsub();
+      set({ unsubscribe: null });
+    }
+  }
 }));

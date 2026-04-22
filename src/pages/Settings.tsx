@@ -26,10 +26,11 @@ import {
   Building,
   AlertCircle,
   Upload,
-  Send
+  ArrowRight
 } from 'lucide-react';
 import { db, auth } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, query, setDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, setDoc, doc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import bcrypt from 'bcryptjs';
 import { UserPlus, Ticket, LogOut, X, MessageCircle } from 'lucide-react';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { downloadFile, convertToCSV, exportSalesReport } from '@/lib/exportUtils';
@@ -43,8 +44,9 @@ import { sendStaffInvite } from '@/lib/mail';
 import { shareInviteWhatsApp } from '@/lib/whatsapp';
 
 export default function Settings() {
-    inventory, inventoryPrivate, sales, customers, shop, updateShop, 
-    clearInventory, theme, setTheme, shopId, 
+  const { 
+    inventory, inventoryPrivate, sales, customers, shop, shopPrivate, updateShop, 
+    clearInventory, theme, setTheme, shopId, setActiveTab,
     addInventoryItem, upsertCustomer, addSale, invitations 
   } = useBusinessStore();
 
@@ -65,7 +67,18 @@ export default function Settings() {
   const [migrationData, setMigrationData] = useState<MigrationResult | null>(null);
   const [generatingInvite, setGeneratingInvite] = useState(false);
   
-  const [editForm, setEditForm] = useState(shop);
+  const [editForm, setEditForm] = useState<any>({ 
+    ...shop
+  });
+  const [newAdminPin, setNewAdminPin] = useState('');
+  const [pinRotating, setPinRotating] = useState(false);
+
+  // Sync editForm when shop or shopPrivate changes (e.g. on load)
+  React.useEffect(() => {
+    setEditForm({
+      ...shop
+    });
+  }, [shop]);
 
   const handleSaveShop = async () => {
     try {
@@ -77,11 +90,38 @@ export default function Settings() {
     }
   };
 
+  const handleRotatePin = async () => {
+    if (newAdminPin.length < 4) return;
+    setPinRotating(true);
+    try {
+      const { shopId } = useBusinessStore.getState();
+      if (!shopId) throw new Error("Shop ID not identified.");
+      
+      // 1. Hash locally
+      const salt = bcrypt.genSaltSync(10);
+      const hash = bcrypt.hashSync(newAdminPin, salt);
+      
+      // 2. Save to private vault
+      await setDoc(doc(db, `shops/${shopId}/private`, 'auth'), {
+        adminPinHash: hash,
+        updatedAt: serverTimestamp(),
+        updatedBy: auth.currentUser?.uid
+      }, { merge: true });
+      
+      showToast('Master PIN Updated Successfully');
+      setNewAdminPin('');
+    } catch (err: any) {
+      showToast(`Security Error: ${err.message}`);
+    } finally {
+      setPinRotating(false);
+    }
+  };
+
   const handleInventoryCSV = () => {
     setExporting('inv-csv');
     // Sanitize for CSV
     const csvData = inventory.map((i: InventoryItem) => {
-      const privateData = role === 'admin' ? inventoryPrivate.find(pi => pi.id === i.id) : null;
+      const privateData = role === 'admin' ? inventoryPrivate.find((pi: any) => pi.id === i.id) : null;
       return {
         Name: i.name,
         SKU: i.sku || 'N/A',
@@ -393,68 +433,104 @@ export default function Settings() {
         </div>
 
         {/* Security & Maintenance */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 mb-2">
-            <HardDrive className="h-5 w-5 text-destructive" />
-            <h3 className="text-lg font-black tracking-tight">System Maintenance</h3>
-          </div>
-          
-          <div className="glass-card rounded-3xl p-6 space-y-4">
-            <div className="space-y-3">
-              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Pin Security Control</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase tracking-widest ml-1 text-primary">Master Admin PIN</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                    <input 
-                      type="password"
-                      maxLength={4}
-                      className="w-full pl-8 pr-4 py-2 bg-accent/30 border border-border rounded-xl text-xs font-black tracking-[0.5em] focus:ring-2 focus:ring-primary/20"
-                      value={editForm.adminPin}
-                      onChange={e => setEditForm({...editForm, adminPin: e.target.value.replace(/[^0-9]/g, '')})}
-                    />
+        {role === 'admin' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <HardDrive className="h-5 w-5 text-destructive" />
+              <h3 className="text-lg font-black tracking-tight">System Maintenance</h3>
+            </div>
+            
+            <div className="glass-card rounded-3xl p-6 space-y-4">
+              <div className="space-y-3">
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Pin Security Control</p>
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase tracking-widest ml-1 text-primary">New Master Admin PIN</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                      <input 
+                        type="password"
+                        maxLength={4}
+                        placeholder="Enter 4-digit PIN"
+                        className="w-full pl-8 pr-4 py-2 bg-accent/30 border border-border rounded-xl text-xs font-black tracking-[0.5em] focus:ring-2 focus:ring-primary/20"
+                        value={newAdminPin}
+                        onChange={e => setNewAdminPin(e.target.value.replace(/[^0-9]/g, ''))}
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase tracking-widest ml-1 text-blue-500">Staff Access PIN</label>
-                  <div className="relative">
-                    <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                    <input 
-                      type="password"
-                      maxLength={4}
-                      className="w-full pl-8 pr-4 py-2 bg-accent/30 border border-border rounded-xl text-xs font-black tracking-[0.5em] focus:ring-2 focus:ring-blue-500/20"
-                      value={editForm.staffPin}
-                      onChange={e => setEditForm({...editForm, staffPin: e.target.value.replace(/[^0-9]/g, '')})}
-                    />
-                  </div>
+                  
+                  <button 
+                    onClick={handleRotatePin}
+                    disabled={pinRotating || newAdminPin.length < 4}
+                    className={cn(
+                      "w-full py-3 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-2",
+                      newAdminPin.length === 4 
+                        ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary hover:text-white" 
+                        : "bg-accent/50 text-muted-foreground border-transparent opacity-50"
+                    )}
+                  >
+                    {pinRotating ? (
+                      <>
+                        <RefreshCcw className="h-3 w-3 animate-spin" />
+                        Encrypting...
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="h-3 w-3" />
+                        Rotate Master PIN
+                      </>
+                    )}
+                  </button>
+                  <p className="text-[9px] text-muted-foreground italic text-center px-4">
+                    Security: PINs are hashed using bcrypt before being stored in the digital vault.
+                  </p>
                 </div>
               </div>
-              <button 
-                onClick={handleSaveShop}
-                className="w-full py-2 bg-primary/10 text-primary rounded-xl text-[9px] font-black uppercase tracking-widest border border-primary/20 hover:bg-primary hover:text-white transition-all"
-              >
-                Sync Security Keys
-              </button>
-            </div>
 
-            <div className="p-4 bg-destructive/5 border border-destructive/10 rounded-2xl">
-              <div className="flex items-center gap-3 text-destructive mb-2">
-                <AlertTriangle className="h-4 w-4" />
-                <p className="text-xs font-black uppercase tracking-widest">Danger Zone</p>
+              <div className="p-4 bg-destructive/5 border border-destructive/10 rounded-2xl">
+                <div className="flex items-center gap-3 text-destructive mb-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  <p className="text-xs font-black uppercase tracking-widest">Danger Zone</p>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Resetting the inventory will delete every product, SKU, and stock count permanently. This cannot be undone!
+                </p>
+                <button 
+                  onClick={() => setResetConfirmOpen(true)}
+                  className="w-full mt-4 py-3 bg-destructive text-white rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all hover:bg-destructive/90 hover:shadow-lg hover:shadow-destructive/20"
+                >
+                  Reset Inventory Data
+                </button>
               </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Resetting the inventory will delete every product, SKU, and stock count permanently. This cannot be undone!
-              </p>
-              <button 
-                onClick={() => setResetConfirmOpen(true)}
-                className="w-full mt-4 py-3 bg-destructive text-white rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all hover:bg-destructive/90 hover:shadow-lg hover:shadow-destructive/20"
-              >
-                Reset Inventory Data
-              </button>
+
+              {/* Security Advancement (Admin Only) */}
+              <div className="glass-card p-8 rounded-[2.5rem] border border-white/5 space-y-6 mt-6">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 bg-primary/10 rounded-2xl flex items-center justify-center">
+                    <Database className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black">Security Advancement</h2>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mt-1">Data Sequestration & Vault</p>
+                  </div>
+                </div>
+                
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Upgrade your shop to use the new sequestered data architecture. This moves sensitive salaries, PINs, and cost prices into a restricted private vault.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('sequestration')}
+                  className="w-full py-4 rounded-2xl border border-white/10 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all flex items-center justify-center gap-2 group"
+                >
+                  Open Security Vault
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Shop Editor Modal */}

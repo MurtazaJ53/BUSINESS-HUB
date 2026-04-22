@@ -47,10 +47,12 @@ export interface ShopMetadata {
   gst: string;
   footer: string;
   currency: string;
-  adminPin: string;
-  staffPin: string;
   standardWorkingHours: number;
   allowStaffAttendance: boolean;
+}
+
+export interface ShopPrivate {
+  [key: string]: any;
 }
 
 export interface SaleItem {
@@ -97,11 +99,15 @@ export interface Staff {
   phone: string;
   email?: string;
   role: string;
-  salary: number; // Base monthly salary
   joinedAt: string;
-  pin?: string;
   status: 'active' | 'inactive';
   permissions?: StaffPermission[];
+}
+
+export interface StaffPrivate {
+  id: string;
+  salary: number;
+  pin?: string;
 }
 
 export interface Attendance {
@@ -123,4 +129,12 @@ export interface Invitation {
   createdAt: string;
   expiresAt?: string;
   usedBy?: string[];
+}
+
+export interface CustomerPayment {
+  id: string;
+  customerId: string;
+  amount: number;
+  date: string;
+  createdAt: string;
 }

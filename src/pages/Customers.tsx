@@ -17,11 +17,11 @@ import {
 } from 'lucide-react';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, isValidIndianPhone, sanitizePhone } from '@/lib/utils';
-import type { Customer } from '@/lib/types';
+import type { Customer, Sale, CustomerPayment } from '@/lib/types';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
 export default function Customers() {
-  const { customers, upsertCustomer, deleteCustomer, addCustomerPayment, sales } = useBusinessStore();
+  const { customers, upsertCustomer, deleteCustomer, addCustomerPayment, sales, customerPayments } = useBusinessStore();
   const [search, setSearch] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null);
@@ -35,20 +35,25 @@ export default function Customers() {
     email: ''
   });
 
-  const filtered = customers.filter(c => 
+  const filtered = customers.filter((c: Customer) => 
     c.name.toLowerCase().includes(search.toLowerCase()) || 
     c.phone.includes(search)
-  ).sort((a, b) => b.balance - a.balance);
+  ).sort((a: Customer, b: Customer) => b.balance - a.balance);
 
   const getCustomerHistory = (customerId: string) => {
-    return sales.filter(s => s.customerId === customerId)
-               .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const customerSales = sales.filter((s: Sale) => s.customerId === customerId)
+                               .map((s: Sale) => ({ ...s, type: 'SALE' as const }));
+    const payments = customerPayments.filter((p: CustomerPayment) => p.customerId === customerId)
+                                     .map((p: CustomerPayment) => ({ ...p, type: 'PAYMENT' as const }));
+    
+    return [...customerSales, ...payments]
+           .sort((a: any, b: any) => b.createdAt.localeCompare(a.createdAt));
   };
 
   const stats = {
     total: customers.length,
-    activeCredits: customers.filter(c => c.balance > 0).length,
-    totalCreditAmount: customers.reduce((sum, c) => sum + c.balance, 0)
+    activeCredits: customers.filter((c: Customer) => c.balance > 0).length,
+    totalCreditAmount: customers.reduce((sum: number, c: Customer) => sum + c.balance, 0)
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -150,15 +155,19 @@ export default function Customers() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
-              {filtered.map(customer => {
+              {filtered.map((customer: Customer) => {
                 const hasCredit = customer.balance > 0;
                 
                 // Aging Logic
                 let agingTag = null;
                 if (hasCredit) {
-                  const customerSales = sales.filter(s => s.customerId === customer.id && s.paymentMode === 'CREDIT');
+                  // Check for Udhaar sales in the multi-payment array
+                  const customerSales = sales.filter((s: Sale) => 
+                    s.customerId === customer.id && 
+                    s.payments?.some((p: any) => p.mode === 'CREDIT')
+                  );
                   if (customerSales.length > 0) {
-                    const oldestCredit = customerSales.sort((a,b) => a.date.localeCompare(b.date))[0];
+                    const oldestCredit = customerSales.sort((a: Sale, b: Sale) => a.date.localeCompare(b.date))[0];
                     const days = Math.floor((Date.now() - new Date(oldestCredit.date).getTime()) / (1000 * 60 * 60 * 24));
                     if (days >= 30) agingTag = { label: '30d+', color: 'bg-red-500/20 text-red-600' };
                     else if (days >= 15) agingTag = { label: '15d+', color: 'bg-amber-500/20 text-amber-600' };
@@ -336,31 +345,48 @@ export default function Customers() {
                   <p className="text-sm font-bold uppercase tracking-widest">No history found</p>
                 </div>
               ) : (
-                getCustomerHistory(historyCustomer.id).map(sale => (
-                  <div key={sale.id} className="p-4 bg-accent/30 rounded-2xl border border-border/50 group hover:border-primary/30 transition-all">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <p className="text-xs font-black uppercase tracking-tighter opacity-60">INV-{sale.id.toUpperCase()}</p>
-                        <p className="text-xs font-bold">{new Date(sale.createdAt).toLocaleDateString()}</p>
-                      </div>
-                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${sale.paymentMode === 'CREDIT' ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
-                        {sale.paymentMode}
-                      </span>
-                    </div>
-                    <div className="space-y-1 my-3">
-                      {sale.items.map((item, i) => (
-                        <div key={i} className="flex justify-between text-[11px] font-medium">
-                          <span className="opacity-70">{item.name} × {item.quantity}</span>
-                          <span>{formatCurrency(item.price * item.quantity)}</span>
+                getCustomerHistory(historyCustomer.id).map((item, idx) => {
+                  const isSale = 'type' in item && item.type === 'SALE';
+                  const sale = item as any; // Cast for simplicity in render
+                  
+                  return (
+                    <div key={sale.id || idx} className="p-4 bg-accent/30 rounded-2xl border border-border/50 group hover:border-primary/30 transition-all">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-tighter opacity-60">
+                            {isSale ? `INV-${sale.id.toUpperCase()}` : `PAY-${sale.id.toUpperCase()}`}
+                          </p>
+                          <p className="text-xs font-bold">{new Date(sale.createdAt).toLocaleDateString()}</p>
                         </div>
-                      ))}
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${isSale && sale.payments?.some((p: any) => p.mode === 'CREDIT') ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
+                          {isSale ? 'SALE' : 'PAYMENT'}
+                        </span>
+                      </div>
+                      
+                      {isSale ? (
+                        <>
+                          <div className="space-y-1 my-3">
+                            {sale.items.map((it: any, i: number) => (
+                              <div key={i} className="flex justify-between text-[11px] font-medium">
+                                <span className="opacity-70">{it.name} × {it.quantity}</span>
+                                <span>{formatCurrency(it.price * it.quantity)}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex justify-between items-center pt-2 border-t border-border/30">
+                            <span className="text-xs font-black uppercase tracking-widest opacity-50">Total Amount</span>
+                            <span className="text-sm font-black text-primary">{formatCurrency(sale.total)}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex justify-between items-center py-2">
+                          <span className="text-xs font-black uppercase tracking-widest text-green-600">Credit Repayment</span>
+                          <span className="text-sm font-black text-green-600">{formatCurrency(sale.amount)}</span>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex justify-between items-center pt-2 border-t border-border/30">
-                      <span className="text-xs font-black uppercase tracking-widest opacity-50">Total Paid</span>
-                      <span className="text-sm font-black text-primary">{formatCurrency(sale.total)}</span>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

@@ -8,14 +8,23 @@ import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn, isValidIndianPhone, sanitizePhone } from '@/lib/utils';
 import ReceiptModal from '@/components/ReceiptModal';
 import ErrorModal from '@/components/ErrorModal';
-import type { Sale, SaleItem } from '@/lib/types';
+import type { Sale, SaleItem, InventoryItem } from '@/lib/types';
 
 type PayMode = 'CASH' | 'UPI' | 'CARD' | 'CREDIT' | 'ONLINE' | 'OTHERS';
 
 const PAY_MODES: PayMode[] = ['CASH', 'UPI', 'CARD', 'CREDIT', 'ONLINE', 'OTHERS'];
 
 export default function POS() {
-  const { inventory, inventoryPrivate, customers, addSale, updateInventoryItem, shop, role } = useBusinessStore();
+  const { 
+    inventory, 
+    inventoryPrivate, 
+    customers, 
+    addSale, 
+    updateInventoryItem, 
+    shop, 
+    shopPrivate,
+    role 
+  } = useBusinessStore();
 
   const [cart, setCart] = useState<SaleItem[]>([]);
   const [search, setSearch] = useState('');
@@ -118,10 +127,10 @@ export default function POS() {
 
   const uniqueCategoriesSummary = useMemo(() => {
     const counts: Record<string, number> = {};
-    inventory.forEach(item => {
+    inventory.forEach((item: InventoryItem) => {
       const cat = item.category || 'General';
       if (!counts[cat]) counts[cat] = 0;
-      const productNamesInCategory = new Set(inventory.filter(i => (i.category || 'General') === cat).map(i => i.name));
+      const productNamesInCategory = new Set(inventory.filter((i: InventoryItem) => (i.category || 'General') === cat).map((i: InventoryItem) => i.name));
       counts[cat] = productNamesInCategory.size;
     });
     return counts;
@@ -140,19 +149,21 @@ export default function POS() {
 
   const productNamesInCategory = useMemo(() => {
     if (!activeCategory) return {};
-    const groups: Record<string, { items: typeof inventory, totalStock: number }> = {};
-    inventory.filter(i => (i.category || 'General') === activeCategory).forEach(item => {
-      if (!groups[item.name]) groups[item.name] = { items: [], totalStock: 0 };
+    const groups: Record<string, { items: InventoryItem[], totalStock: number, count: number, inStock: number }> = {};
+    inventory.filter((i: InventoryItem) => (i.category || 'General') === activeCategory).forEach((item: InventoryItem) => {
+      if (!groups[item.name]) groups[item.name] = { items: [], totalStock: 0, count: 0, inStock: 0 };
       groups[item.name].items.push(item);
       groups[item.name].totalStock += (item.stock || 0);
+      groups[item.name].count += 1;
+      groups[item.name].inStock += (item.stock || 0);
     });
     return groups;
   }, [inventory, activeCategory]);
 
   const filteredProductNamesInCategory = useMemo(() => {
     if (!localSearch) return productNamesInCategory;
-    const filtered: Record<string, { items: typeof inventory, totalStock: number }> = {};
-    Object.entries(productNamesInCategory).forEach(([name, data]) => {
+    const filtered: Record<string, any> = {};
+    Object.entries(productNamesInCategory).forEach(([name, data]: [string, any]) => {
       if (name.toLowerCase().includes(localSearch.toLowerCase())) {
         filtered[name] = data;
       }
@@ -162,12 +173,12 @@ export default function POS() {
 
   const itemsInSelectedProduct = useMemo(() => {
     if (!activeCategory || !activeProductName) return [];
-    return inventory.filter(i => (i.category || 'General') === activeCategory && i.name === activeProductName);
+    return inventory.filter((i: InventoryItem) => (i.category || 'General') === activeCategory && i.name === activeProductName);
   }, [inventory, activeCategory, activeProductName]);
 
   const filteredItemsInSelectedProduct = useMemo(() => {
     if (!localSearch) return itemsInSelectedProduct;
-    return itemsInSelectedProduct.filter(i => 
+    return itemsInSelectedProduct.filter((i: InventoryItem) => 
       i.name.toLowerCase().includes(localSearch.toLowerCase()) || 
       (i.sku?.toLowerCase() ?? '').includes(localSearch.toLowerCase()) ||
       (i.size?.toLowerCase() ?? '').includes(localSearch.toLowerCase())
@@ -175,7 +186,7 @@ export default function POS() {
   }, [itemsInSelectedProduct, localSearch]);
 
   const filtered = useMemo(() =>
-    inventory.filter((p) => {
+    inventory.filter((p: InventoryItem) => {
       const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
         p.category.toLowerCase().includes(search.toLowerCase()) ||
         (p.sku?.toLowerCase() ?? '').includes(search.toLowerCase());
@@ -186,14 +197,14 @@ export default function POS() {
 
   const latestProducts = useMemo(() => {
     return [...inventory]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .sort((a: InventoryItem, b: InventoryItem) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 10); // Show top 10 newest arrivals
   }, [inventory]);
   
   // CUSTOMER AUTOCOMPLETE ENGINE
   const filteredCustomers = useMemo(() => {
     if (!customerName || selectedCustomerId) return [];
-    return customers.filter(c => 
+    return customers.filter((c: any) => 
       c.name.toLowerCase().includes(customerName.toLowerCase()) ||
       c.phone.includes(customerName)
     ).slice(0, 5);
@@ -201,14 +212,14 @@ export default function POS() {
 
   const addToCart = (product: typeof inventory[0], isReturn: boolean = false) => {
     // Find costPrice from private collection for admins
-    const privateData = role === 'admin' ? inventoryPrivate.find(pi => pi.id === product.id) : null;
+    const privateData = role === 'admin' ? inventoryPrivate.find((pi: any) => pi.id === product.id) : null;
     const costPrice = privateData?.costPrice;
 
     setCart((prev) => {
       const existing = prev.find((c) => c.itemId === product.id && c.isReturn === isReturn);
       if (existing) {
         // If it exists, pull it to the TOP and increment
-        const others = prev.filter((c) => !(c.itemId === product.id && c.isReturn === isReturn));
+        const others = prev.filter((c: SaleItem) => !(c.itemId === product.id && c.isReturn === isReturn));
         return [{ ...existing, quantity: existing.quantity + 1, costPrice }, ...others];
       }
       // New items always go to the TOP for high-visibility
@@ -313,7 +324,7 @@ export default function POS() {
       const warnings: {item: SaleItem, stock: number}[] = [];
       for (const cartItem of cart) {
         if (cartItem.itemId.startsWith('custom-') || cartItem.isReturn) continue;
-        const invItem = inventory.find((i) => i.id === cartItem.itemId);
+        const invItem = inventory.find((i: any) => i.id === cartItem.itemId);
         if (invItem && (invItem.stock ?? 0) < cartItem.quantity) {
           warnings.push({ item: cartItem, stock: invItem.stock ?? 0 });
         }
@@ -328,7 +339,8 @@ export default function POS() {
 
     // PIN Verification for Force Sale
     if (force) {
-      if (pinInput !== shop.adminPin) {
+      const pinToVerify = shopPrivate?.adminPin || '';
+      if (pinInput !== pinToVerify) {
         setToast("❌ Invalid Manager PIN");
         setIsProcessing(false);
         return;
@@ -375,7 +387,7 @@ export default function POS() {
 
       // Perform single update per item ID
       for (const [itemId, netChange] of Object.entries(stockDeltas)) {
-        const invItem = inventory.find((i) => i.id === itemId);
+        const invItem = inventory.find((i: InventoryItem) => i.id === itemId);
         if (invItem && invItem.stock !== undefined) {
           await updateInventoryItem({
             ...invItem,
@@ -622,7 +634,7 @@ export default function POS() {
             {/* LEVEL 0: CATEGORIES */}
             {drillDepth === 0 && (
               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-                {Object.entries(filteredCategoriesSummary).map(([cat, count]) => (
+                {Object.entries(filteredCategoriesSummary).map(([cat, count]: [string, any]) => (
                   <button
                     key={cat}
                     onClick={() => navigateTo(1, cat)}
@@ -641,7 +653,7 @@ export default function POS() {
             {/* LEVEL 1: PRODUCT NAMES IN CATEGORY */}
             {drillDepth === 1 && activeCategory && (
               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-                {Object.entries(filteredProductNamesInCategory).map(([name, data]) => (
+                {Object.entries(filteredProductNamesInCategory).map(([name, data]: [string, any]) => (
                   <button
                     key={name}
                     onClick={() => navigateTo(2, activeCategory, name)}
@@ -667,7 +679,7 @@ export default function POS() {
             {/* LEVEL 2: VARIANTS OF SELECTED PRODUCT */}
             {drillDepth === 2 && activeCategory && activeProductName && (
               <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {filteredItemsInSelectedProduct.map((product) => {
+                {filteredItemsInSelectedProduct.map((product: InventoryItem) => {
                   const outOfStock = product.stock !== undefined && product.stock <= 0;
                   return (
                     <div
@@ -733,7 +745,7 @@ export default function POS() {
                 <Package className="h-16 w-16 mx-auto mb-3" />
                 <p className="font-bold">No matches found for "{search}"</p>
               </div>
-            ) : filtered.map((product) => {
+            ) : filtered.map((product: InventoryItem) => {
               const outOfStock = product.stock !== undefined && product.stock <= 0;
               return (
                 <div
@@ -840,7 +852,7 @@ export default function POS() {
               {/* Autocomplete Dropdown */}
               {isSearchingCustomer && filteredCustomers.length > 0 && (
                 <div className="absolute top-full left-0 right-0 z-[100] mt-1 bg-background border border-border rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2">
-                  {filteredCustomers.map(c => (
+                  {filteredCustomers.map((c: any) => (
                     <button
                       key={c.id}
                       onClick={() => {
@@ -891,7 +903,7 @@ export default function POS() {
           {cart.length > 0 && (
             <>
               <div className="space-y-2.5 max-h-52 overflow-y-auto pr-1">
-                {cart.map((c) => (
+                {cart.map((c: SaleItem) => (
                   <div key={`${c.itemId}-${!!c.isReturn}`} className="flex items-center gap-2 p-1.5 rounded-xl">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -959,13 +971,13 @@ export default function POS() {
                 </div>
                 
                 <div className="space-y-4">
-                  {payments.map((p, idx) => (
+                  {payments.map((p: any, idx: number) => (
                     <div key={idx} className="glass-card rounded-2xl p-4 border-border/40 animate-in fade-in slide-in-from-bottom-2 duration-300">
                       <div className="flex items-center justify-between mb-3">
                         <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Payment {idx + 1}</p>
                         {payments.length > 1 && (
                           <button 
-                            onClick={() => setPayments(payments.filter((_, i) => i !== idx))}
+                            onClick={() => setPayments(payments.filter((_: any, i: number) => i !== idx))}
                             className="text-red-500/60 hover:text-red-500 transition-colors"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -975,7 +987,7 @@ export default function POS() {
 
                       {/* Mode Grid */}
                       <div className="grid grid-cols-3 gap-1.5 mb-3">
-                        {PAY_MODES.map((mode) => (
+                        {PAY_MODES.map((mode: string) => (
                           <button
                             key={mode}
                             onClick={() => {
@@ -1114,7 +1126,7 @@ export default function POS() {
             </div>
 
             <div className="space-y-3 mb-8">
-              {stockWarningItems.map(({ item, stock }, i) => {
+              {stockWarningItems.map(({ item, stock }: any, i: number) => {
                 const shortage = item.quantity - stock;
                 return (
                   <div key={i} className="flex justify-between items-center p-4 bg-red-500/5 border border-red-500/10 rounded-2xl group hover:bg-red-500/10 transition-colors">

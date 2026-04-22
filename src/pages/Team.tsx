@@ -55,7 +55,20 @@ const APP_MODULES: { id: StaffPermission; label: string; icon: any }[] = [
 ];
 
 export default function Team() {
-  const { staff, attendance, addExpense, upsertStaff, recordAttendance, role, shop, updateShop, deleteStaff, invitations } = useBusinessStore();
+  const { 
+    staff, 
+    staffPrivate, 
+    attendance, 
+    addExpense, 
+    upsertStaff, 
+    recordAttendance, 
+    role, 
+    shop, 
+    updateShop, 
+    deleteStaff, 
+    invitations,
+    shopPrivate
+  } = useBusinessStore();
   const today = new Date().toISOString().split('T')[0];
   const currentMonth = new Date().toISOString().slice(0, 7);
 
@@ -93,18 +106,21 @@ export default function Team() {
 
   // --- Payroll Calculation ---
   const calculateStaffSalary = (staffMember: Staff, monthStr: string) => {
-    const monthAtt = attendance.filter(a => a.staffId === staffMember.id && a.date.startsWith(monthStr));
-    const fullDays = monthAtt.filter(a => a.status === 'PRESENT').length;
-    const halfDays = monthAtt.filter(a => a.status === 'HALF_DAY').length;
+    const monthAtt = attendance.filter((a: Attendance) => a.staffId === staffMember.id && a.date.startsWith(monthStr));
+    const fullDays = monthAtt.filter((a: Attendance) => a.status === 'PRESENT').length;
+    const halfDays = monthAtt.filter((a: Attendance) => a.status === 'HALF_DAY').length;
     const effectiveDays = fullDays + (halfDays * 0.5);
     
     // Financial components
-    const dailyRate = staffMember.salary / 30;
+    const privateData = staffPrivate.find((p: any) => p.id === staffMember.id);
+    const salary = privateData?.salary || 0;
+    
+    const dailyRate = salary / 30;
     const hourlyRate = dailyRate / (shop?.standardWorkingHours || 9);
     
     const baseEarned = effectiveDays * dailyRate;
-    const overtimePay = monthAtt.reduce((sum, a) => sum + ((a.overtime || 0) * hourlyRate), 0);
-    const totalBonus = monthAtt.reduce((sum, a) => sum + (a.bonus || 0), 0);
+    const overtimePay = monthAtt.reduce((sum: number, a: Attendance) => sum + ((a.overtime || 0) * hourlyRate), 0);
+    const totalBonus = monthAtt.reduce((sum: number, a: Attendance) => sum + (a.bonus || 0), 0);
     
     const finalEarned = baseEarned + overtimePay + totalBonus;
 
@@ -113,13 +129,14 @@ export default function Team() {
       days: effectiveDays, 
       present: fullDays, 
       half: halfDays,
-      overtimeHrs: monthAtt.reduce((sum, a) => sum + (a.overtime || 0), 0),
+      overtimeHrs: monthAtt.reduce((sum: number, a: Attendance) => sum + (a.overtime || 0), 0),
       overtimePay: Math.round(overtimePay),
-      bonusTotal: Math.round(totalBonus)
+      bonusTotal: Math.round(totalBonus),
+      baseSalary: salary
     };
   };
 
-  const filteredStaff = staff.filter(s => {
+  const filteredStaff = staff.filter((s: Staff) => {
     if (role === 'staff' && currentStaff) {
       return s.id === currentStaff.id;
     }
@@ -129,11 +146,10 @@ export default function Team() {
     );
   });
 
-  const totalPayroll = staff.reduce((sum, s) => sum + calculateStaffSalary(s, currentMonth).earned, 0);
+  const totalPayroll = staff.reduce((sum: number, s: Staff) => sum + calculateStaffSalary(s, currentMonth).earned, 0);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-3xl font-black tracking-tight mb-2">Team Management</h1>
@@ -161,13 +177,12 @@ export default function Team() {
         </div>
       </div>
 
-      {/* Sub-tabs */}
       <div className="flex bg-accent/30 p-1.5 rounded-2xl w-fit">
         {[
           { id: 'roster', label: 'Staff Roster', icon: Users, hideForStaff: true },
           { id: 'attendance', label: 'Daily Log', icon: Calendar },
           { id: 'payroll', label: role === 'admin' ? 'Payroll Center' : 'My Earnings', icon: CreditCard }
-        ].filter(t => role === 'admin' || !t.hideForStaff).map((t) => (
+        ].filter((t: any) => role === 'admin' || !t.hideForStaff).map((t: any) => (
           <button
             key={t.id}
             onClick={() => setActiveSubTab(t.id as any)}
@@ -184,7 +199,6 @@ export default function Team() {
         ))}
       </div>
 
-      {/* Staff Invitation Engine - Admin only */}
       {role === 'admin' && (
         <div className="glass-card p-6 rounded-[2rem] border-primary/20 bg-primary/5">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
@@ -211,13 +225,11 @@ export default function Team() {
                   if (!storeShopId) return;
                   setGeneratingInvite(true);
                   try {
-                    // 1. Clear old codes
-                    const deletePromises = invitations.map(inv => 
+                    const deletePromises = invitations.map((inv: any) => 
                       deleteDoc(doc(db, `shops/${storeShopId}/invitations`, inv.id))
                     );
                     await Promise.all(deletePromises);
 
-                    // 2. Add new code
                     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
                     await setDoc(doc(db, `shops/${storeShopId}/invitations`, code), {
                       code,
@@ -264,7 +276,6 @@ export default function Team() {
         </div>
       )}
 
-      {/* Search & Filters */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-1 group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
@@ -282,7 +293,6 @@ export default function Team() {
         </button>
       </div>
 
-      {/* ── ROSTER ── */}
       {activeSubTab === 'roster' && role === 'admin' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredStaff.length === 0 ? (
@@ -291,7 +301,7 @@ export default function Team() {
               <p className="text-muted-foreground font-bold italic">No staff members found matching your search.</p>
             </div>
           ) : (
-            filteredStaff.map((s) => (
+            filteredStaff.map((s: Staff) => (
               <div
                 key={s.id}
                 onClick={() => role === 'admin' && setEditingStaff(s)}
@@ -320,7 +330,9 @@ export default function Team() {
                   {role === 'admin' && (
                     <div className="bg-accent/20 p-3 rounded-2xl">
                       <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">Monthly Salary</p>
-                      <p className="text-sm font-black text-primary">{formatCurrency(s.salary)}</p>
+                      <p className="text-sm font-black text-primary">
+                        {formatCurrency(staffPrivate.find((p: any) => p.id === s.id)?.salary || 0)}
+                      </p>
                     </div>
                   )}
                   <div className="bg-accent/20 p-3 rounded-2xl">
@@ -335,7 +347,6 @@ export default function Team() {
                    </div>
                    
                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                     {/* Email Logic - LOCKED (Requires Domain) */}
                      {s.email && (
                        <button 
                          onClick={() => showToast('Email Automation: Coming Soon (Requires Domain Verification)')}
@@ -345,7 +356,6 @@ export default function Team() {
                        </button>
                      )}
 
-                     {/* WhatsApp Always Available */}
                      {s.phone && s.phone !== '-' && (
                        <button 
                          onClick={() => sendWhatsAppInvite({
@@ -360,7 +370,6 @@ export default function Team() {
                        </button>
                      )}
 
-                     {/* Admin Controls */}
                      {role === 'admin' && (
                        <>
                          <button 
@@ -382,10 +391,8 @@ export default function Team() {
         </div>
       )}
 
-      {/* ── DAILY LOG ── */}
       {activeSubTab === 'attendance' && (
         <div className="glass-card rounded-[2.5rem] overflow-hidden border border-border/50 bg-card">
-          {/* Attendance Header with Admin Controls */}
           <div className="px-8 py-6 border-b border-border/50 flex flex-wrap items-center justify-between gap-4 bg-accent/20">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
@@ -398,7 +405,6 @@ export default function Team() {
             </div>
 
             <div className="flex items-center gap-3 flex-wrap">
-              {/* Staff Access Toggle */}
               {role === 'admin' && (
                 <div className="flex items-center gap-2 bg-accent/40 px-3 py-2 rounded-xl border border-border/50">
                   <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Staff Access</p>
@@ -417,7 +423,6 @@ export default function Team() {
                 </div>
               )}
 
-              {/* Manual Log Button - Admin Only */}
               {role === 'admin' && (
                 <button
                   onClick={() => {
@@ -438,7 +443,6 @@ export default function Team() {
                 </button>
               )}
 
-              {/* Export - Admin Only */}
               {role === 'admin' && (
                 <button
                   onClick={() => window.print()}
@@ -450,7 +454,6 @@ export default function Team() {
             </div>
           </div>
 
-          {/* Attendance Table */}
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-accent/10">
@@ -464,8 +467,8 @@ export default function Team() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/30">
-                {filteredStaff.map(s => {
-                  const record = attendance.find(a => a.staffId === s.id && a.date === today);
+                {filteredStaff.map((s: Staff) => {
+                  const record = attendance.find((a: Attendance) => a.staffId === s.id && a.date === today);
                   return (
                     <tr key={s.id} className="hover:bg-accent/10 transition-colors">
                       <td className="px-8 py-5">
@@ -595,7 +598,6 @@ export default function Team() {
         </div>
       )}
 
-      {/* ── PAYROLL CENTER ── */}
       {activeSubTab === 'payroll' && (
         <div className="space-y-6">
           {role === 'admin' && (
@@ -616,9 +618,9 @@ export default function Team() {
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {filteredStaff.map(s => {
+            {filteredStaff.map((s: Staff) => {
               const payroll = calculateStaffSalary(s, currentMonth);
-              const isPaid = expenses.some(e => 
+              const isPaid = expenses.some((e: any) => 
                 (e.category === 'Staff Salary' || e.category === 'Advance Salary') && 
                 e.description.includes(s.name) && 
                 e.description.includes(currentMonth)
@@ -638,14 +640,18 @@ export default function Team() {
                       <div className="h-12 w-12 rounded-2xl bg-accent flex items-center justify-center text-lg font-black">{s.name.charAt(0)}</div>
                       <div>
                         <h3 className="text-base font-black tracking-tight">{s.name}</h3>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-primary">{formatCurrency(s.salary)}/mo Base</p>
+                        {role === 'admin' && (
+                          <p className="text-[10px] font-black uppercase tracking-widest text-primary">
+                            {formatCurrency(payroll.baseSalary)}/mo Base
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
                       <p className="text-xl font-black text-foreground">{formatCurrency(payroll.earned)}</p>
                       {role === 'admin' && (payroll.overtimePay > 0 || payroll.bonusTotal > 0) && (
                         <p className="text-[9px] font-black text-muted-foreground mt-0.5">
-                          {formatCurrency(Math.round(payroll.days * (s.salary / 30)))} + {formatCurrency(payroll.overtimePay)} OT + {formatCurrency(payroll.bonusTotal)} B
+                          {formatCurrency(Math.round(payroll.days * (payroll.baseSalary / 30)))} + {formatCurrency(payroll.overtimePay)} OT + {formatCurrency(payroll.bonusTotal)} B
                         </p>
                       )}
                       <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground italic">Current Payout</p>
@@ -691,7 +697,6 @@ export default function Team() {
         </div>
       )}
 
-      {/* ── MODAL: Add Staff ── */}
       {isAddingStaff && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setIsAddingStaff(false)} />
@@ -705,8 +710,7 @@ export default function Team() {
               const formData = new FormData(e.currentTarget);
               const phone = formData.get('phone') as string;
               
-              // DUPLICATE CHECK: Prevent adding the same staff phone twice
-              if (staff.some(s => s.phone === phone)) {
+              if (staff.some((s: Staff) => s.phone === phone)) {
                 showToast("A staff member with this phone number already exists!");
                 return;
               }
@@ -716,11 +720,11 @@ export default function Team() {
                 name: formData.get('name') as string,
                 phone,
                 email: formData.get('email') as string,
-                salary: Number(formData.get('salary')),
                 role: formData.get('role') as string,
                 joinedAt: new Date().toISOString(),
-                status: 'active'
-              });
+                status: 'active',
+                salary: Number(formData.get('salary')) 
+              } as any);
               setIsAddingStaff(false);
             }}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -761,7 +765,6 @@ export default function Team() {
         </div>
       )}
 
-      {/* ── MODAL: Manual Attendance Entry ── */}
       {manualEntryStaff && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setManualEntryStaff(null)} />
@@ -791,10 +794,10 @@ export default function Team() {
                   <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Staff Member</label>
                   <select
                     value={manualEntryStaff.id}
-                    onChange={(e) => setManualEntryStaff(staff.find(s => s.id === e.target.value) || null)}
+                    onChange={(e) => setManualEntryStaff(staff.find((s: Staff) => s.id === e.target.value) || null)}
                     className="w-full bg-accent/30 border border-border/50 rounded-2xl px-5 py-4 font-bold text-sm outline-none"
                   >
-                    {staff.map(s => <option key={s.id} value={s.id}>{s.name} — {s.role}</option>)}
+                    {staff.map((s: Staff) => <option key={s.id} value={s.id}>{s.name} — {s.role}</option>)}
                   </select>
                 </div>
 
@@ -851,7 +854,6 @@ export default function Team() {
                   </div>
                 )}
 
-                {/* Preview calculated hours */}
                 {manualTimes.clockIn && manualTimes.clockOut && (() => {
                   const [ih, im] = manualTimes.clockIn.split(':').map(Number);
                   const [oh, om] = manualTimes.clockOut.split(':').map(Number);
@@ -890,7 +892,7 @@ export default function Team() {
           </div>
         </div>
       )}
-      {/* ── MODAL: Edit Staff ── */}
+
       {editingStaff && role === 'admin' && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setEditingStaff(null)} />
@@ -907,9 +909,9 @@ export default function Team() {
                 name: formData.get('name') as string,
                 phone: formData.get('phone') as string,
                 email: formData.get('email') as string,
-                salary: Number(formData.get('salary')),
                 role: formData.get('role') as string,
-              });
+                salary: Number(formData.get('salary')), 
+              } as any);
               showToast('Profile Updated!');
               setEditingStaff(null);
             }}>
@@ -924,7 +926,13 @@ export default function Team() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Base Monthly Salary</label>
-                  <input name="salary" type="number" defaultValue={editingStaff.salary} required className="w-full bg-accent/30 border border-border/50 rounded-2xl px-5 py-4 font-bold text-sm outline-none shadow-inner" />
+                  <input 
+                    name="salary" 
+                    type="number" 
+                    defaultValue={staffPrivate.find((p: any) => p.id === editingStaff.id)?.salary} 
+                    required 
+                    className="w-full bg-accent/30 border border-border/50 rounded-2xl px-5 py-4 font-bold text-sm outline-none shadow-inner" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Staff Designation</label>
@@ -942,7 +950,6 @@ export default function Team() {
                 </div>
               </div>
 
-              {/* PERMISSIONS SECTION */}
               <div className="space-y-4 pt-6 border-t border-white/10">
                 <div className="flex items-center gap-2 mb-2">
                   <ShieldAlert className="h-5 w-5 text-primary" />
@@ -999,7 +1006,7 @@ export default function Team() {
           open={!!confirmRemoveStaff}
           onClose={() => { setConfirmRemoveStaff(null); setPinInput(''); }}
           onConfirm={() => {
-            if (pinInput === shop.adminPin) {
+            if (pinInput === shopPrivate?.adminPin) {
               deleteStaff(confirmRemoveStaff.id);
               showToast(`${confirmRemoveStaff.name} removed permanently.`);
               setConfirmRemoveStaff(null);

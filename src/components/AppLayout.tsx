@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { 
   LayoutDashboard, 
   Package, 
   ShoppingCart, 
   BarChart3, 
-  Settings, 
+  Settings as SettingsIcon, 
   Menu, 
   X,
   Store,
@@ -26,8 +27,13 @@ import {
   Activity,
   ChevronLeft
 } from 'lucide-react';
-import { useRef } from 'react';
+import { useRef, lazy } from 'react';
+import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { useBusinessStore } from '@/lib/useBusinessStore';
+import type { InventoryItem } from '@/lib/types';
+import { auth, db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import bcrypt from 'bcryptjs';
 import { formatCurrency, cn } from '@/lib/utils';
 
 interface NavItemProps {
@@ -52,9 +58,7 @@ const NavItem = ({ icon: Icon, label, active, onClick }: NavItemProps) => (
   </button>
 );
 
-interface AppLayoutProps {
-  pages: Record<string, React.ReactNode>;
-}
+interface AppLayoutProps {}
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
@@ -80,9 +84,35 @@ const PAGE_TITLES: Record<string, string> = {
   team: 'Team Hub',
   settings: 'Control Center',
 };
-export default function AppLayout({ pages }: AppLayoutProps) {
+
+// Lazy loaded page components
+const Dashboard = lazy(() => import('@/pages/Dashboard'));
+const Inventory = lazy(() => import('@/pages/Inventory'));
+const POS = lazy(() => import('@/pages/POS'));
+const Customers = lazy(() => import('@/pages/Customers'));
+const History = lazy(() => import('@/pages/History'));
+const Expenses = lazy(() => import('@/pages/Expenses'));
+const StockAlerts = lazy(() => import('@/pages/StockAlerts'));
+const Analytics = lazy(() => import('@/pages/Analytics'));
+const Team = lazy(() => import('@/pages/Team'));
+const Settings = lazy(() => import('@/pages/Settings'));
+const MigrationTool = lazy(() => import('@/pages/MigrationTool'));
+export default function AppLayout() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activeTab = location.pathname.substring(1) || 'dashboard';
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { sales, inventory, activeTab, setActiveTab, shop, theme, setTheme, role, currentStaff } = useBusinessStore();
+  const { sales, inventory, shop, theme, setTheme, role, currentStaff, setActiveTab } = useBusinessStore(useShallow(state => ({
+    sales: state.sales,
+    inventory: state.inventory,
+    shop: state.shop,
+    theme: state.theme,
+    setTheme: state.setTheme,
+    role: state.role,
+    currentStaff: state.currentStaff,
+    setActiveTab: state.setActiveTab
+  })));
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
@@ -130,7 +160,7 @@ export default function AppLayout({ pages }: AppLayoutProps) {
 
   useEffect(() => {
     setSidebarOpen(false);
-  }, [activeTab]);
+  }, [location.pathname]);
 
   // Low stock notifications
   const lowStockItems = inventory.filter(p => p.stock !== undefined && p.stock <= 5);
@@ -153,7 +183,7 @@ export default function AppLayout({ pages }: AppLayoutProps) {
     }
   }, [role, currentStaff, activeTab, setActiveTab]);
 
-  const navigate = (tab: string) => {
+  const goToTab = (tab: string) => {
     setActiveTab(tab);
     setSidebarOpen(false); // close mobile sidebar on nav
   };
@@ -188,19 +218,43 @@ export default function AppLayout({ pages }: AppLayoutProps) {
     }
   };
 
-  const verifyAdminPin = (code: string) => {
+  const verifyAdminPin = async (code: string) => {
     setPinLoading(true);
-    setTimeout(() => {
-      if (code === shop.adminPin) {
-        useBusinessStore.getState().setRole('admin');
-        setShowUnlockModal(false);
-        setPinEntry('');
-      } else {
-        setPinError(true);
-        setPinEntry('');
+    try {
+      const { shopId } = useBusinessStore.getState();
+      if (!shopId) throw new Error("Shop ID not identified.");
+      
+      // 1. Fetch the stored hash from the private vault
+      const authSnap = await getDoc(doc(db, `shops/${shopId}/private`, 'auth'));
+      
+      if (!authSnap.exists()) {
+        throw new Error("Admin PIN not initialized. Please set it in Settings.");
       }
+      
+      const { adminPinHash } = authSnap.data();
+      
+      if (!adminPinHash) {
+        throw new Error("Security keys missing. Please reset in Settings.");
+      }
+      
+      // 2. Verify PIN locally using bcrypt
+      const isMatch = bcrypt.compareSync(code, adminPinHash);
+      
+      if (!isMatch) {
+        throw new Error("Incorrect Admin PIN.");
+      }
+      
+      // 3. Grant access
+      useBusinessStore.getState().setRole('admin');
+      setShowUnlockModal(false);
+      setPinEntry('');
+    } catch (error: any) {
+      console.error('PIN Verification Failed:', error);
+      setPinError(true);
+      setPinEntry('');
+    } finally {
       setPinLoading(false);
-    }, 600);
+    }
   };
 
   return (
@@ -385,10 +439,10 @@ export default function AppLayout({ pages }: AppLayoutProps) {
                         <p className="text-xs font-bold text-muted-foreground">System healthy. No stock alerts.</p>
                       </div>
                     ) : (
-                      lowStockItems.map(item => (
+                      lowStockItems.map((item: InventoryItem) => (
                         <button 
                           key={item.id}
-                          onClick={() => { navigate('inventory'); setNotifOpen(false); }}
+                          onClick={() => { goToTab('inventory'); setNotifOpen(false); }}
                           className="w-full flex items-start gap-3 p-3 rounded-2xl bg-accent/30 hover:bg-primary/5 border border-transparent hover:border-primary/10 transition-all group"
                         >
                           <div className="h-8 w-8 rounded-lg bg-red-500/10 flex items-center justify-center text-red-500 shrink-0">
@@ -406,7 +460,7 @@ export default function AppLayout({ pages }: AppLayoutProps) {
 
                   <div className="mt-4 pt-3 border-t border-border/50">
                     <button 
-                      onClick={() => navigate('analytics')}
+                      onClick={() => goToTab('analytics')}
                       className="w-full py-2 text-[10px] font-black uppercase tracking-widest text-primary hover:text-primary/70 transition-colors flex items-center justify-center gap-2"
                     >
                       View Full Performance Reports <ExternalLink className="h-3 w-3" />
@@ -465,14 +519,14 @@ export default function AppLayout({ pages }: AppLayoutProps) {
                     {role === 'admin' && (
                       <>
                         <button 
-                          onClick={() => { navigate('settings'); setProfileOpen(false); }}
+                          onClick={() => { navigate('/settings'); setProfileOpen(false); }}
                           className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all group"
                         >
-                          <Settings className="h-4 w-4" />
+                          <SettingsIcon className="h-4 w-4" />
                           <span className="text-xs font-bold">Shop Profile</span>
                         </button>
                         <button 
-                          onClick={() => { navigate('analytics'); setProfileOpen(false); }}
+                          onClick={() => { navigate('/analytics'); setProfileOpen(false); }}
                           className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all group"
                         >
                           <Activity className="h-4 w-4" />
@@ -574,7 +628,28 @@ export default function AppLayout({ pages }: AppLayoutProps) {
         {/* Page content */}
         <div className="flex-1 overflow-y-auto no-print">
           <div className="max-w-7xl mx-auto p-6 md:p-8">
-            {pages[activeTab] ?? <div className="text-muted-foreground text-center py-20">Page not found</div>}
+            <Suspense fallback={
+              <div className="flex flex-col items-center justify-center py-20 gap-4 animate-pulse">
+                <Loader2 className="h-10 w-10 text-primary animate-spin" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Loading Module...</p>
+              </div>
+            }>
+              <Routes>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/inventory" element={<Inventory />} />
+                <Route path="/sell" element={<POS />} />
+                <Route path="/customers" element={<Customers />} />
+                <Route path="/history" element={<History />} />
+                <Route path="/expenses" element={<Expenses />} />
+                <Route path="/stock-alerts" element={<StockAlerts />} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/team" element={<Team />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/sequestration" element={<MigrationTool />} />
+                <Route path="*" element={<div className="text-muted-foreground text-center py-20">Page not found</div>} />
+              </Routes>
+            </Suspense>
           </div>
         </div>
       </main>

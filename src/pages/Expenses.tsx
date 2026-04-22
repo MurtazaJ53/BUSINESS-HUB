@@ -79,13 +79,13 @@ export default function Expenses() {
 
   const currentMonth = new Date().toISOString().split('-').slice(0, 2).join('-');
   const monthTotal = expenses
-    .filter(e => e.date.startsWith(currentMonth))
-    .reduce((sum, e) => sum + e.amount, 0);
+    .filter((e: Expense) => e.date.startsWith(currentMonth))
+    .reduce((sum: number, e: Expense) => sum + e.amount, 0);
 
   const categoryTotals = CATEGORIES.map(cat => ({
     ...cat,
-    total: expenses.filter(e => e.category === cat.name).reduce((sum, e) => sum + e.amount, 0)
-  })).sort((a, b) => b.total - a.total);
+    total: expenses.filter((e: Expense) => e.category === cat.name).reduce((sum: number, e: Expense) => sum + e.amount, 0)
+  })).sort((a: any, b: any) => b.total - a.total);
 
   return (
     <div className="space-y-10 pb-20">
@@ -154,8 +154,8 @@ export default function Expenses() {
                 </tr>
             ) : (
               expenses
-                .sort((a, b) => b.date.localeCompare(a.date))
-                .map(exp => {
+                .sort((a: Expense, b: Expense) => b.date.localeCompare(a.date))
+                .map((exp: Expense) => {
                   const CategoryIcon = CATEGORIES.find(c => c.name === exp.category)?.icon || MoreHorizontal;
                   return (
                     <tr key={exp.id} className="group hover:bg-red-500/[0.02] transition-colors">

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 const VERSION_URL = 'https://raw.githubusercontent.com/MurtazaJ53/BUSINESS-HUB/main/version.json';
-const CURRENT_VERSION = '1.0.1';
+const CURRENT_VERSION = import.meta.env.VITE_APP_VERSION || '1.0.1';
 
 export interface UpdateMetadata {
   version: string;
