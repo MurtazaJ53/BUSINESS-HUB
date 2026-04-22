@@ -7,15 +7,20 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "backfill": "tsx scripts/backfill-aggregates.ts && tsx scripts/backfill-velocity.ts"
   },
   "dependencies": {
+    "@capacitor-community/bluetooth-le": "^8.1.3",
     "@capacitor-community/sqlite": "^8.1.0",
+    "@capacitor-mlkit/barcode-scanning": "^8.0.1",
     "@capacitor/android": "^8.3.0",
     "@capacitor/app": "^8.1.0",
     "@capacitor/cli": "^8.3.0",
     "@capacitor/core": "^8.3.0",
     "@capacitor/network": "^8.0.1",
+    "@capacitor/push-notifications": "^8.0.3",
+    "@capgo/capacitor-native-biometric": "^8.4.2",
     "@tailwindcss/vite": "^4.2.2",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
@@ -34,6 +39,7 @@
     "sql.js": "^1.14.1",
     "tailwind-merge": "^3.5.0",
     "tailwindcss-animate": "^1.0.7",
+    "vite-plugin-pwa": "^1.2.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zustand": "^5.0.12"
   },
@@ -52,6 +58,7 @@
     "globals": "^17.4.0",
     "postcss": "^8.5.9",
     "tailwindcss": "^4.2.2",
+    "tsx": "^4.19.2",
     "typescript": "~5.9.2",
     "typescript-eslint": "^8.58.0",
     "vite": "^8.0.4"

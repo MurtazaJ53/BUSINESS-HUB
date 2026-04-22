@@ -8,6 +8,7 @@ import { useBusinessStore } from './lib/useBusinessStore';
 import AuthPage from './pages/Auth';
 import { Sparkles } from 'lucide-react';
 import { App as CapacitorApp } from '@capacitor/app';
+import { usePushNotifications } from './hooks/usePushNotifications';
 
 // Lazy load components outside the component to prevent re-creation
 const Dashboard = React.lazy(() => import('@/pages/Dashboard'));
@@ -29,6 +30,8 @@ export default function App() {
   const { initStore } = useBusinessStore();
   const { updateAvailable } = useUpdateCheck();
   const [showUpdate, setShowUpdate] = React.useState(true);
+
+  usePushNotifications(shopId);
 
   useEffect(() => {
     const { initialize, cleanup } = useAuthStore.getState();

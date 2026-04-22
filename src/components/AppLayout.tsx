@@ -25,11 +25,15 @@ import {
   Delete,
   LogOut,
   Activity,
-  ChevronLeft
+  ChevronLeft,
+  Bot,
+  Fingerprint
 } from 'lucide-react';
+import { NativeBiometric } from '@capgo/capacitor-native-biometric';
 import { useRef, lazy } from 'react';
 import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { useBusinessStore } from '@/lib/useBusinessStore';
+import { usePermission } from '@/hooks/usePermission';
 import type { InventoryItem } from '@/lib/types';
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -70,6 +74,8 @@ const NAV_ITEMS = [
   { id: 'expenses', label: 'Expenses', icon: TrendingUp },
   { id: 'stock-alerts', label: 'Stock Alerts', icon: AlertTriangle },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'reconciliation', label: 'Reconciliation', icon: ShieldCheck },
+    { id: 'agents', label: 'AI Agents', icon: Bot },
     { id: 'team', label: 'Team Hub', icon: Users },
   ];
 
@@ -83,6 +89,8 @@ const PAGE_TITLES: Record<string, string> = {
   analytics: 'Analytics',
   history: 'History Log',
   team: 'Team Hub',
+  reconciliation: 'Cash Reconciliation',
+  agents: 'AI AI Command',
   settings: 'Control Center',
 };
 
@@ -98,6 +106,8 @@ const Analytics = lazy(() => import('@/pages/Analytics'));
 const Team = lazy(() => import('@/pages/Team'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const MigrationTool = lazy(() => import('@/pages/MigrationTool'));
+const Reconciliation = lazy(() => import('@/pages/Reconciliation'));
+const Agents = lazy(() => import('@/pages/Agents'));
 export default function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -114,6 +124,10 @@ export default function AppLayout() {
     currentStaff: state.currentStaff,
     setActiveTab: state.setActiveTab
   })));
+  const canViewCost = usePermission('inventory', 'view_cost');
+  const canViewProfit = usePermission('sales', 'view_profit');
+  const canViewAnalytics = usePermission('analytics', 'view');
+  const canManageTeam = usePermission('team', 'edit');
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
@@ -174,15 +188,27 @@ export default function AppLayout() {
 
   // --- ACCESS CONTROL GUARD ---
   useEffect(() => {
-    if (role === 'staff' && currentStaff) {
-      const allowed = [...(currentStaff.permissions || []), 'team'];
-      // If current tab is NOT in allowed list AND it's not settings, redirect
-      if (activeTab !== 'settings' && !allowed.includes(activeTab as any)) {
-        const firstAvailable = NAV_ITEMS.find(item => allowed.includes(item.id as any))?.id || 'dashboard';
+    if (role === 'staff' && currentStaff?.permissions) {
+      const p = currentStaff.permissions;
+      
+      const hasAccess = (tab: string) => {
+        if (tab === 'team') return true;
+        if (tab === 'dashboard' || tab === 'analytics') return canViewAnalytics;
+        if (tab === 'inventory' || tab === 'stock-alerts') return !!p.inventory?.view;
+        if (tab === 'sell' || tab === 'history') return !!p.sales?.view;
+        if (tab === 'reconciliation') return false;
+        if (tab === 'customers') return !!p.customers?.view;
+        if (tab === 'expenses') return !!p.expenses?.view;
+        if (tab === 'agents') return true; // Accessible to all for now, but tools will fail
+        return false;
+      };
+
+      if (activeTab !== 'settings' && !hasAccess(activeTab)) {
+        const firstAvailable = NAV_ITEMS.find(item => hasAccess(item.id))?.id || 'dashboard';
         setActiveTab(firstAvailable);
       }
     }
-  }, [role, currentStaff, activeTab, setActiveTab]);
+  }, [role, currentStaff, activeTab, setActiveTab, canViewAnalytics]);
 
   const goToTab = (tab: string) => {
     setActiveTab(tab);
@@ -194,7 +220,7 @@ export default function AppLayout() {
     logout();
   };
 
-  const handleRoleSwitch = (newRole: 'admin' | 'staff') => {
+  const handleRoleSwitch = async (newRole: 'admin' | 'staff') => {
     const { setRole } = useBusinessStore.getState();
     if (newRole === 'staff') {
       setRole('staff');
@@ -205,8 +231,27 @@ export default function AppLayout() {
         setActiveTab('dashboard');
       }
     } else {
-      setShowUnlockModal(true);
       setProfileOpen(false);
+      // Try Biometric First
+      try {
+        const result = await NativeBiometric.isAvailable();
+        if (result.isAvailable) {
+          await NativeBiometric.verifyIdentity({
+            reason: "Authorize Admin Access",
+            title: "Security Check",
+            subtitle: "Use biometrics to unlock admin features",
+            description: "Accessing sensitive business data",
+          });
+          
+          useBusinessStore.getState().setRole('admin');
+          return;
+        }
+      } catch (e) {
+        console.warn('Biometric failed or cancelled', e);
+      }
+      
+      // Fallback to PIN
+      setShowUnlockModal(true);
     }
   };
 
@@ -298,13 +343,21 @@ export default function AppLayout() {
           <nav className="flex-1 space-y-1">
             {NAV_ITEMS
               .filter(item => {
+                const { role, currentStaff } = useBusinessStore.getState();
                 if (role === 'admin') return true;
-                if (role === 'staff' && currentStaff) {
-                  // Staff always see Team/Presence by default to see their own logs
-                  if (item.id === 'team') return true;
-                  return currentStaff?.permissions?.includes(item.id as any);
-                }
-                // DEFAULT DENY: Show nothing if role is null or not recognized
+                if (!currentStaff?.permissions) return false;
+                
+                const p = currentStaff.permissions;
+                const tabId = item.id;
+                
+                if (tabId === 'team') return true;
+                if (tabId === 'dashboard' || tabId === 'analytics') return !!p.analytics?.view;
+                if (tabId === 'inventory' || tabId === 'stock-alerts') return !!p.inventory?.view;
+                if (tabId === 'history') return !!p.sales?.view;
+                if (tabId === 'agents') return true;
+                if (tabId === 'customers') return !!p.customers?.view;
+                if (tabId === 'expenses') return !!p.expenses?.view;
+
                 return false;
               })
               .map(item => {
@@ -394,7 +447,7 @@ export default function AppLayout() {
               )}
             </button>
             {/* Today's revenue badge - ADMIN ONLY */}
-            {role === 'admin' && (
+            {canViewProfit && (
               <div className="flex items-center gap-2 bg-primary/5 px-4 py-2 rounded-2xl border border-primary/20" title="Today's Revenue">
                 <TrendingUp className="h-4 w-4 text-primary" />
                 <span className="text-sm font-black text-foreground">{formatCurrency(todayRevenue)}</span>
@@ -520,23 +573,23 @@ export default function AppLayout() {
                       </button>
                     )}
                     
-                    {role === 'admin' && (
-                      <>
-                        <button 
-                          onClick={() => { navigate('/settings'); setProfileOpen(false); }}
-                          className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all group"
-                        >
-                          <SettingsIcon className="h-4 w-4" />
-                          <span className="text-xs font-bold">Shop Profile</span>
-                        </button>
-                        <button 
-                          onClick={() => { navigate('/analytics'); setProfileOpen(false); }}
-                          className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all group"
-                        >
-                          <Activity className="h-4 w-4" />
-                          <span className="text-xs font-bold">Live Performance</span>
-                        </button>
-                      </>
+                    {(role === 'admin' || canManageTeam) && (
+                      <button 
+                        onClick={() => { navigate('/settings'); setProfileOpen(false); }}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all group"
+                      >
+                        <SettingsIcon className="h-4 w-4" />
+                        <span className="text-xs font-bold">Shop Profile</span>
+                      </button>
+                    )}
+                    {canViewAnalytics && (
+                      <button 
+                        onClick={() => { navigate('/analytics'); setProfileOpen(false); }}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all group"
+                      >
+                        <Activity className="h-4 w-4" />
+                        <span className="text-xs font-bold">Live Performance</span>
+                      </button>
                     )}
                   </div>
 
@@ -575,6 +628,12 @@ export default function AppLayout() {
                 </div>
                 <h2 className="text-2xl font-black mb-1">Admin Unlock</h2>
                 <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest opacity-60">Enter Master PIN</p>
+                <button 
+                  onClick={() => handleRoleSwitch('admin')}
+                  className="mt-4 flex items-center gap-2 mx-auto px-4 py-2 bg-primary/10 text-primary rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-primary hover:text-white transition-all active:scale-95"
+                >
+                  <Fingerprint className="h-4 w-4" /> Try Biometric Again
+                </button>
               </div>
 
               {/* PIN Display */}
@@ -649,6 +708,8 @@ export default function AppLayout() {
                 <Route path="/stock-alerts" element={<StockAlerts />} />
                 <Route path="/analytics" element={<Analytics />} />
                 <Route path="/team" element={<Team />} />
+                <Route path="/reconciliation" element={<Reconciliation />} />
+                <Route path="/agents" element={<Agents />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/sequestration" element={<MigrationTool />} />
                 <Route path="*" element={<div className="text-muted-foreground text-center py-20">Page not found</div>} />

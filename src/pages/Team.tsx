@@ -30,30 +30,147 @@ import {
   TrendingUp,
   AlertTriangle,
   BarChart3,
-  ShieldAlert
+  ShieldAlert,
+  Check,
+  X
 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { useSqlQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Staff, StaffPermission, Attendance } from '@/lib/types';
+import { Staff, Action, Module, PermissionMatrix, Attendance } from '@/lib/types';
 import { sendStaffInvite } from '@/lib/mail';
 import { sendWhatsAppInvite, shareInviteWhatsApp } from '@/lib/whatsapp';
 import { showToast } from '@/lib/toast';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import { usePermission } from '@/hooks/usePermission';
 
-const APP_MODULES: { id: StaffPermission; label: string; icon: any }[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'inventory', label: 'Inventory', icon: Package },
-  { id: 'sell', label: 'Sales Hub', icon: ShoppingCart },
-  { id: 'customers', label: 'Customers', icon: Users },
-  { id: 'history', label: 'History Logs', icon: Clock },
-  { id: 'expenses', label: 'Expenses', icon: TrendingUp },
-  { id: 'stock-alerts', label: 'Stock Alerts', icon: AlertTriangle },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-  { id: 'team', label: 'Team Portal', icon: Users },
+const APP_MODULES: { id: Module; label: string; icon: any; actions: Action[] }[] = [
+  { id: 'inventory', label: 'Inventory', icon: Package, actions: ['view', 'create', 'edit', 'delete', 'view_cost'] },
+  { id: 'sales', label: 'Sales Hub', icon: ShoppingCart, actions: ['view', 'create', 'void_sale', 'override_price', 'view_profit'] },
+  { id: 'customers', label: 'Customers', icon: Users, actions: ['view', 'create', 'edit', 'delete', 'approve_credit'] },
+  { id: 'expenses', label: 'Expenses', icon: TrendingUp, actions: ['view', 'create', 'delete'] },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3, actions: ['view', 'export'] },
+  { id: 'team', label: 'Team Portal', icon: Users, actions: ['view', 'edit', 'view_cost'] },
+  { id: 'settings', label: 'Settings', icon: ShieldAlert, actions: ['view', 'edit'] },
 ];
+
+const PermissionTable = ({ permissions = {}, onChange }: { permissions: PermissionMatrix, onChange: (p: PermissionMatrix) => void }) => {
+  const columns: { id: Action; label: string }[] = [
+    { id: 'view', label: 'View' },
+    { id: 'create', label: 'Add' },
+    { id: 'edit', label: 'Edit' },
+    { id: 'delete', label: 'Delete' },
+    { id: 'void_sale', label: 'Void' },
+    { id: 'override_price', label: 'Price' },
+    { id: 'export', label: 'Export' },
+    { id: 'view_cost', label: 'Cost' },
+    { id: 'view_profit', label: 'Profit' },
+    { id: 'approve_credit', label: 'Credit' }
+  ];
+
+  const handleToggle = (modId: Module, actId: Action) => {
+    const next = { ...permissions };
+    const mod = { ...(next[modId] || {}) };
+    
+    if (mod[actId]) {
+      delete mod[actId];
+    } else {
+      if (actId === 'override_price') {
+        mod[actId] = { max: 1000 };
+      } else {
+        mod[actId] = true;
+      }
+    }
+    
+    next[modId] = mod;
+    onChange(next);
+  };
+
+  const handleLimitChange = (modId: Module, limit: number) => {
+    const next = { ...permissions };
+    const mod = { ...(next[modId] || {}) };
+    mod.override_price = { max: limit };
+    next[modId] = mod;
+    onChange(next);
+  };
+
+  return (
+    <div className="overflow-x-auto -mx-10 px-10">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="border-b border-border/50">
+            <th className="py-4 px-2 text-left text-[10px] font-black uppercase tracking-widest text-muted-foreground w-32">Module</th>
+            {columns.map(col => (
+              <th key={col.id} className="py-4 px-2 text-center text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                {col.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {APP_MODULES.map(mod => (
+            <tr key={mod.id} className="border-b border-border/30 hover:bg-accent/5 transition-colors group">
+              <td className="py-4 px-2">
+                <div className="flex items-center gap-2">
+                  <div className="h-6 w-6 rounded-md bg-accent/50 flex items-center justify-center text-primary group-hover:bg-primary/20 transition-colors">
+                    <mod.icon className="h-3.5 w-3.5" />
+                  </div>
+                  <span className="text-[11px] font-bold text-foreground">{mod.label}</span>
+                </div>
+              </td>
+              {columns.map(col => {
+                const isSupported = mod.actions.includes(col.id);
+                const modPerms = permissions[mod.id] || {};
+                const val = modPerms[col.id];
+                const isActive = !!val;
+                
+                return (
+                  <td key={col.id} className="py-4 px-2">
+                    <div className="flex flex-col items-center gap-1.5">
+                      {isSupported ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleToggle(mod.id, col.id)}
+                            className={cn(
+                              "h-5 w-5 rounded-md border flex items-center justify-center transition-all",
+                              isActive
+                                ? "bg-primary border-primary text-white scale-110 shadow-lg shadow-primary/20"
+                                : "bg-accent/30 border-border/50 text-muted-foreground hover:bg-accent hover:border-primary/30"
+                            )}
+                          >
+                            {isActive && <Check className="h-3 w-3 stroke-[4px]" />}
+                          </button>
+                          
+                          {col.id === 'override_price' && isActive && (
+                            <div className="relative group/limit">
+                              <input 
+                                type="number"
+                                value={typeof val === 'object' ? val.max : 1000}
+                                onChange={(e) => handleLimitChange(mod.id, Number(e.target.value))}
+                                className="w-16 bg-accent/50 border border-border/50 rounded-md px-1 py-0.5 text-[8px] font-black text-center focus:outline-none focus:border-primary transition-all pr-4"
+                              />
+                              <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[7px] font-bold text-muted-foreground">₹</span>
+                              <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-[7px] px-1.5 py-0.5 rounded opacity-0 group-hover/limit:opacity-100 transition-opacity whitespace-nowrap border pointer-events-none">Limit ₹</div>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="h-0.5 w-2 bg-muted-foreground/10 rounded-full" />
+                      )}
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
 
 export default function Team() {
   const { addExpense, upsertStaff, recordAttendance, role, shop, updateShop, deleteStaff, invitations, shopPrivate } = useBusinessStore();
@@ -66,6 +183,7 @@ export default function Team() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeSubTab, setActiveSubTab] = useState<'roster' | 'attendance' | 'payroll'>('roster');
   const [isAddingStaff, setIsAddingStaff] = useState(false);
+  const [newStaffPermissions, setNewStaffPermissions] = useState<PermissionMatrix>({});
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [confirmRemoveStaff, setConfirmRemoveStaff] = useState<Staff | null>(null);
   const [pinInput, setPinInput] = useState('');
@@ -127,8 +245,12 @@ export default function Team() {
     };
   };
 
+  const canViewPayroll = usePermission('team', 'view_cost');
+  const canEditTeam = usePermission('team', 'edit');
+
   const filteredStaff = staff.filter((s: Staff) => {
-    if (role === 'staff' && currentStaff) {
+    // If not admin and doesn't have edit perms, can only see self
+    if (!canEditTeam && currentStaff) {
       return s.id === currentStaff.id;
     }
     return (
@@ -147,7 +269,7 @@ export default function Team() {
           <p className="text-muted-foreground font-medium">Coordinate staff, track presence, and automate payroll.</p>
         </div>
         <div className="flex items-center gap-3">
-          {role === 'admin' && (
+          {canViewPayroll && (
             <div className="bg-primary/10 border border-primary/20 px-4 py-3 rounded-2xl flex items-center gap-3">
               <DollarSign className="h-5 w-5 text-primary" />
               <div>
@@ -156,7 +278,7 @@ export default function Team() {
               </div>
             </div>
           )}
-          {role === 'admin' && (
+          {canEditTeam && (
             <button
               onClick={() => setIsAddingStaff(true)}
               className="premium-gradient text-white px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-95"
@@ -170,10 +292,10 @@ export default function Team() {
 
       <div className="flex bg-accent/30 p-1.5 rounded-2xl w-fit">
         {[
-          { id: 'roster', label: 'Staff Roster', icon: Users, hideForStaff: true },
+          { id: 'roster', label: 'Staff Roster', icon: Users, hideForStaff: !canEditTeam },
           { id: 'attendance', label: 'Daily Log', icon: Calendar },
-          { id: 'payroll', label: role === 'admin' ? 'Payroll Center' : 'My Earnings', icon: CreditCard }
-        ].filter((t: any) => role === 'admin' || !t.hideForStaff).map((t: any) => (
+          { id: 'payroll', label: canViewPayroll ? 'Payroll Center' : 'My Earnings', icon: CreditCard }
+        ].filter((t: any) => !t.hideForStaff).map((t: any) => (
           <button
             key={t.id}
             onClick={() => setActiveSubTab(t.id as any)}
@@ -190,7 +312,7 @@ export default function Team() {
         ))}
       </div>
 
-      {role === 'admin' && (
+      {canEditTeam && (
         <div className="glass-card p-6 rounded-[2rem] border-primary/20 bg-primary/5">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-4">
@@ -284,7 +406,7 @@ export default function Team() {
         </button>
       </div>
 
-      {activeSubTab === 'roster' && role === 'admin' && (
+      {activeSubTab === 'roster' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredStaff.length === 0 ? (
             <div className="col-span-full py-20 text-center glass-card rounded-[2.5rem]">
@@ -295,10 +417,10 @@ export default function Team() {
             filteredStaff.map((s: Staff) => (
               <div
                 key={s.id}
-                onClick={() => role === 'admin' && setEditingStaff(s)}
+                onClick={() => canEditTeam && setEditingStaff(s)}
                 className={cn(
                   "glass-card rounded-[2.5rem] p-6 border border-border/50 transition-all group relative overflow-hidden",
-                  role === 'admin' ? "hover:border-primary/30 cursor-pointer" : "cursor-default"
+                  canEditTeam ? "hover:border-primary/30 cursor-pointer" : "cursor-default"
                 )}
               >
                 <div className="absolute top-0 right-0 p-6 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -318,7 +440,7 @@ export default function Team() {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3 mb-6">
-                  {role === 'admin' && (
+                  {canViewPayroll && (
                     <div className="bg-accent/20 p-3 rounded-2xl">
                       <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">Monthly Salary</p>
                       <p className="text-sm font-black text-primary">
@@ -361,7 +483,7 @@ export default function Team() {
                        </button>
                      )}
 
-                     {role === 'admin' && (
+                     {canEditTeam && (
                        <>
                          <button 
                            onClick={() => {
@@ -396,7 +518,7 @@ export default function Team() {
             </div>
 
             <div className="flex items-center gap-3 flex-wrap">
-              {role === 'admin' && (
+              {canEditTeam && (
                 <div className="flex items-center gap-2 bg-accent/40 px-3 py-2 rounded-xl border border-border/50">
                   <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Staff Access</p>
                   <button
@@ -414,7 +536,7 @@ export default function Team() {
                 </div>
               )}
 
-              {role === 'admin' && (
+              {canEditTeam && (
                 <button
                   onClick={() => {
                     setManualEntryStaff(staff[0] || null);
@@ -434,7 +556,7 @@ export default function Team() {
                 </button>
               )}
 
-              {role === 'admin' && (
+              {canEditTeam && (
                 <button
                   onClick={() => window.print()}
                   className="h-10 w-10 bg-accent rounded-xl flex items-center justify-center hover:bg-accent/80 transition-all text-muted-foreground"
@@ -503,7 +625,7 @@ export default function Team() {
                             )}>
                               {record.status === 'PRESENT' ? 'Full Day' : record.status === 'HALF_DAY' ? 'Half Day' : record.status}
                             </div>
-                            {role === 'admin' && ((record.overtime || 0) > 0 || (record.bonus || 0) > 0) && (
+                            {canViewPayroll && ((record.overtime || 0) > 0 || (record.bonus || 0) > 0) && (
                               <div className="flex gap-2">
                                 {record.overtime && record.overtime > 0 && <span className="text-[8px] font-black uppercase text-amber-500/80">OT: +{record.overtime}h</span>}
                                 {record.bonus && record.bonus > 0 && <span className="text-[8px] font-black uppercase text-primary/80">Bonus: +{formatCurrency(record.bonus)}</span>}
@@ -530,7 +652,7 @@ export default function Team() {
                               >
                                 Auto In
                               </button>
-                                {role === 'admin' && (
+                                {canEditTeam && (
                                   <button
                                     onClick={() => { setManualEntryStaff(s); setManualTimes({ date: today, clockIn: '09:00', clockOut: '18:00', status: 'PRESENT', overtime: 0, bonus: 0 }); }}
                                     className="px-3 py-1.5 bg-accent text-muted-foreground text-[9px] font-black uppercase tracking-widest rounded-lg border border-border/50 hover:bg-primary hover:text-white transition-all"
@@ -558,7 +680,7 @@ export default function Team() {
                               </button>
                             </>
                           ) : (
-                            role === 'admin' ? (
+                            canEditTeam ? (
                               <select
                                 value={record.status}
                                 onChange={(e) => recordAttendance({ ...record, status: e.target.value as any })}
@@ -591,7 +713,7 @@ export default function Team() {
 
       {activeSubTab === 'payroll' && (
         <div className="space-y-6">
-          {role === 'admin' && (
+          {canViewPayroll && (
             <div className="p-8 glass-card rounded-[3rem] border border-primary/20 bg-primary/5 flex flex-col md:flex-row items-center gap-8">
               <div className="h-20 w-20 rounded-[2rem] premium-gradient flex items-center justify-center text-white shadow-2xl shadow-primary/40">
                 <DollarSign className="h-10 w-10 text-white" />
@@ -631,7 +753,7 @@ export default function Team() {
                       <div className="h-12 w-12 rounded-2xl bg-accent flex items-center justify-center text-lg font-black">{s.name.charAt(0)}</div>
                       <div>
                         <h3 className="text-base font-black tracking-tight">{s.name}</h3>
-                        {role === 'admin' && (
+                        {canViewPayroll && (
                           <p className="text-[10px] font-black uppercase tracking-widest text-primary">
                             {formatCurrency(payroll.baseSalary)}/mo Base
                           </p>
@@ -640,7 +762,7 @@ export default function Team() {
                     </div>
                     <div className="text-right">
                       <p className="text-xl font-black text-foreground">{formatCurrency(payroll.earned)}</p>
-                      {role === 'admin' && (payroll.overtimePay > 0 || payroll.bonusTotal > 0) && (
+                      {canViewPayroll && (payroll.overtimePay > 0 || payroll.bonusTotal > 0) && (
                         <p className="text-[9px] font-black text-muted-foreground mt-0.5">
                           {formatCurrency(Math.round(payroll.days * (payroll.baseSalary / 30)))} + {formatCurrency(payroll.overtimePay)} OT + {formatCurrency(payroll.bonusTotal)} B
                         </p>
@@ -664,7 +786,7 @@ export default function Team() {
                     </div>
                   </div>
 
-                  {role === 'admin' && (
+                  {canViewPayroll && (
                     <button
                       onClick={() => {
                         setPayoutStaff(s);
@@ -714,9 +836,11 @@ export default function Team() {
                 role: formData.get('role') as string,
                 joinedAt: new Date().toISOString(),
                 status: 'active',
-                salary: Number(formData.get('salary')) 
+                salary: Number(formData.get('salary')),
+                permissions: newStaffPermissions
               } as any);
               setIsAddingStaff(false);
+              setNewStaffPermissions({});
             }}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
@@ -741,10 +865,19 @@ export default function Team() {
                     <option>General Staff</option>
                   </select>
                 </div>
-                <div className="space-y-2 md:col-span-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Email Address (Optional)</label>
-                  <input name="email" type="email" className="w-full bg-accent/30 border border-border/50 rounded-2xl px-5 py-4 font-bold text-sm outline-none shadow-inner" placeholder="staff@example.com" />
-                  <p className="text-[9px] text-primary mt-1 ml-1 uppercase font-black tracking-widest opacity-80">Primary channel for professional WhatsApp boarding.</p>
+                <div className="space-y-4 pt-6 border-t border-white/10 md:col-span-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <ShieldAlert className="h-5 w-5 text-primary" />
+                    <h3 className="text-lg font-black tracking-tight">App Access & Permissions</h3>
+                  </div>
+                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4">Set which modules the new member can access</p>
+                  
+                  <div className="space-y-6 pt-2">
+                    <PermissionTable 
+                      permissions={newStaffPermissions} 
+                      onChange={setNewStaffPermissions} 
+                    />
+                  </div>
                 </div>
               </div>
               <div className="pt-4 flex gap-4">
@@ -816,7 +949,7 @@ export default function Team() {
                       <option value="LEAVE">Leave</option>
                     </select>
                   </div>
-                  {role === 'admin' && (
+                  {canViewPayroll && (
                     <div className="space-y-2">
                       <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Overtime (Hrs)</label>
                       <input
@@ -825,13 +958,13 @@ export default function Team() {
                         min="0"
                         value={manualTimes.overtime}
                         onChange={(e) => setManualTimes({ ...manualTimes, overtime: Number(e.target.value) })}
-                        className="w-full bg-accent/30 border border-border/50 rounded-2xl px-5 py-4 font-bold text-sm outline-none"
+                        className="w-full bg-accent/30 border border-border/50 rounded-2xl px-5 py-4 font-bold text-sm outline-none shadow-inner"
                       />
                     </div>
                   )}
                 </div>
 
-                {role === 'admin' && (
+                {canViewPayroll && (
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Bonus Amount ({shop?.currency || '₹'})</label>
                     <input
@@ -840,7 +973,7 @@ export default function Team() {
                       placeholder="Enter bonus if any..."
                       value={manualTimes.bonus}
                       onChange={(e) => setManualTimes({ ...manualTimes, bonus: Number(e.target.value) })}
-                      className="w-full bg-accent/30 border border-border/50 rounded-2xl px-5 py-4 font-bold text-sm outline-none"
+                      className="w-full bg-accent/30 border border-border/50 rounded-2xl px-5 py-4 font-bold text-sm outline-none shadow-inner"
                     />
                   </div>
                 )}
@@ -861,7 +994,7 @@ export default function Team() {
                           <p className="text-[10px] text-muted-foreground font-bold italic">Currently setting to: <span className="text-foreground">{manualTimes.status}</span></p>
                         </div>
                       </div>
-                      {role === 'admin' && (manualTimes.overtime > 0 || manualTimes.bonus > 0) && (
+                      {canViewPayroll && (manualTimes.overtime > 0 || manualTimes.bonus > 0) && (
                         <div className="flex items-center gap-3 p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl">
                           <TrendingUp className="h-4 w-4 text-amber-500" />
                           <div>
@@ -884,7 +1017,7 @@ export default function Team() {
         </div>
       )}
 
-      {editingStaff && role === 'admin' && (
+      {editingStaff && canEditTeam && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setEditingStaff(null)} />
           <div className="relative z-10 w-full max-w-2xl glass-card rounded-[3rem] p-10 border border-white/10 shadow-2xl animate-in zoom-in slide-in-from-bottom-4 duration-300 max-h-[90vh] overflow-y-auto custom-scrollbar">
@@ -948,37 +1081,11 @@ export default function Team() {
                 </div>
                 <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4">Toggle modules this staff member can access</p>
                 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {APP_MODULES.map((module) => {
-                    const hasPermission = (editingStaff.permissions || []).includes(module.id);
-                    return (
-                      <button
-                        key={module.id}
-                        type="button"
-                        onClick={() => {
-                          const currentPerms = editingStaff.permissions || [];
-                          const newPerms = currentPerms.includes(module.id)
-                            ? currentPerms.filter(p => p !== module.id)
-                            : [...currentPerms, module.id];
-                          setEditingStaff({ ...editingStaff, permissions: newPerms as StaffPermission[] });
-                        }}
-                        className={cn(
-                          "flex items-center gap-3 p-3 rounded-2xl transition-all border text-left group",
-                          hasPermission 
-                            ? "bg-primary/10 border-primary/30 text-foreground" 
-                            : "bg-accent/20 border-border/50 text-muted-foreground grayscale opacity-60"
-                        )}
-                      >
-                        <div className={cn(
-                          "h-8 w-8 rounded-xl flex items-center justify-center transition-colors",
-                          hasPermission ? "bg-primary text-white" : "bg-accent text-zinc-500"
-                        )}>
-                          <module.icon className="h-4 w-4" />
-                        </div>
-                        <span className="text-[10px] font-black uppercase tracking-tight leading-tight">{module.label}</span>
-                      </button>
-                    );
-                  })}
+                <div className="space-y-6 pt-2">
+                  <PermissionTable 
+                    permissions={editingStaff.permissions || {}} 
+                    onChange={(p) => setEditingStaff({ ...editingStaff, permissions: p })} 
+                  />
                 </div>
               </div>
 

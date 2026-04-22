@@ -34,15 +34,16 @@ import bcrypt from 'bcryptjs';
 import { UserPlus, Ticket, LogOut, X, MessageCircle } from 'lucide-react';
 import { useSqlQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
-import { downloadFile, convertToCSV, exportSalesReport } from '@/lib/exportUtils';
+import { downloadFile, convertToCSV, exportSalesReport, generateGSTR1, generateGSTR3B } from '@/lib/exportUtils';
 import { formatCurrency, cn, isValidIndianPhone, sanitizePhone } from '@/lib/utils';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { loadShopSettings } from '@/lib/shopSettings';
 import { useAuthStore } from '@/lib/useAuthStore';
 import { MigrationResult } from '@/lib/migrationEngine';
-import { InventoryItem, Staff } from '@/lib/types';
+import { InventoryItem, Staff, Sale, Customer } from '@/lib/types';
 import { sendStaffInvite } from '@/lib/mail';
 import { shareInviteWhatsApp } from '@/lib/whatsapp';
+import { usePermission } from '@/hooks/usePermission';
 
 export default function Settings() {
   const { shop, shopPrivate, updateShop, clearInventory, theme, setTheme, shopId, setActiveTab, addInventoryItem, upsertCustomer, addSale, invitations } = useBusinessStore();
@@ -52,6 +53,8 @@ export default function Settings() {
   const customers = useSqlQuery<Customer>('SELECT * FROM customers WHERE tombstone = 0 ORDER BY name ASC', [], ['customers']);
 
   const { role, user } = useAuthStore();
+  const canEditSettings = usePermission('settings', 'edit');
+  const canViewInventoryCost = usePermission('inventory', 'view_cost');
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
@@ -122,7 +125,7 @@ export default function Settings() {
     setExporting('inv-csv');
     // Sanitize for CSV
     const csvData = inventory.map((i: InventoryItem) => {
-      const privateData = role === 'admin' ? inventoryPrivate.find((pi: any) => pi.id === i.id) : null;
+      const privateData = canViewInventoryCost ? inventoryPrivate.find((pi: any) => pi.id === i.id) : null;
       return {
         Name: i.name,
         SKU: i.sku || 'N/A',
@@ -228,12 +231,14 @@ export default function Settings() {
             <div>
               <div className="flex items-center gap-3">
                 <h2 className="text-2xl font-black tracking-tight">{shop.name}</h2>
-                <button 
-                  onClick={() => { setEditForm(shop); setEditOpen(true); }}
-                  className="px-3 py-1 bg-primary/10 text-primary rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-sm border border-primary/20"
-                >
-                  Edit Profile
-                </button>
+                {canEditSettings && (
+                  <button 
+                    onClick={() => { setEditForm(shop); setEditOpen(true); }}
+                    className="px-3 py-1 bg-primary/10 text-primary rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-sm border border-primary/20"
+                  >
+                    Edit Profile
+                  </button>
+                )}
               </div>
               <p className="text-sm font-bold text-muted-foreground uppercase tracking-[0.2em]">{shop.tagline}</p>
               <p className="text-xs text-muted-foreground mt-1 opacity-60">{shop.address || 'No address set'}</p>
@@ -378,6 +383,27 @@ export default function Settings() {
               </div>
               <Download className="h-4 w-4 text-muted-foreground group-hover:text-blue-500 transition-colors" />
             </button>
+
+            <div className="pt-2 grid grid-cols-2 gap-3">
+              <button 
+                onClick={() => generateGSTR1(sales, shop.gst)}
+                className="flex items-center gap-2 p-3 bg-primary/5 hover:bg-primary/10 text-primary rounded-xl transition-all border border-primary/10 text-[10px] font-black uppercase tracking-widest"
+              >
+                <div className="p-1.5 bg-primary/10 rounded-lg">
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                </div>
+                GSTR-1 Export
+              </button>
+              <button 
+                onClick={() => generateGSTR3B(sales)}
+                className="flex items-center gap-2 p-3 bg-purple-500/5 hover:bg-purple-500/10 text-purple-500 rounded-xl transition-all border border-purple-500/10 text-[10px] font-black uppercase tracking-widest"
+              >
+                <div className="p-1.5 bg-purple-500/10 rounded-lg">
+                  <Database className="h-3.5 w-3.5" />
+                </div>
+                GSTR-3B Summary
+              </button>
+            </div>
             
             {/* Zobaze Migration Button */}
             <div className="pt-4 border-t border-border/50">
@@ -392,7 +418,7 @@ export default function Settings() {
               <div className="grid grid-cols-2 gap-2">
                 <button 
                   onClick={() => { setImportType('inventory'); setTimeout(() => fileInputRef.current?.click(), 10); }}
-                  disabled={migrationStatus !== null || role !== 'admin'}
+                  disabled={migrationStatus !== null || !canEditSettings}
                   className="flex flex-col items-center gap-2 p-4 bg-orange-500/5 hover:bg-orange-500/10 text-orange-500 rounded-2xl transition-all border border-orange-500/10 opacity-70 hover:opacity-100"
                 >
                   <Database className="h-5 w-5" />
@@ -400,7 +426,7 @@ export default function Settings() {
                 </button>
                 <button 
                   onClick={() => { setImportType('customer'); setTimeout(() => fileInputRef.current?.click(), 10); }}
-                  disabled={migrationStatus !== null || role !== 'admin'}
+                  disabled={migrationStatus !== null || !canEditSettings}
                   className="flex flex-col items-center gap-2 p-4 bg-blue-600/5 hover:bg-blue-600/10 text-blue-600 rounded-2xl transition-all border border-blue-600/10 opacity-70 hover:opacity-100"
                 >
                   <Users className="h-5 w-5" />
@@ -408,7 +434,7 @@ export default function Settings() {
                 </button>
                 <button 
                   onClick={() => { setImportType('sale'); setTimeout(() => fileInputRef.current?.click(), 10); }}
-                  disabled={migrationStatus !== null || role !== 'admin'}
+                  disabled={migrationStatus !== null || !canEditSettings}
                   className="flex flex-col items-center gap-2 p-4 bg-emerald-600/5 hover:bg-emerald-600/10 text-emerald-600 rounded-2xl transition-all border border-emerald-600/10 opacity-70 hover:opacity-100"
                 >
                   <RefreshCcw className="h-5 w-5" />
@@ -416,7 +442,7 @@ export default function Settings() {
                 </button>
                 <button 
                   onClick={() => { setImportType('inventory'); setTimeout(() => fileInputRef.current?.click(), 10); }}
-                  disabled={migrationStatus !== null || role !== 'admin'}
+                  disabled={migrationStatus !== null || !canEditSettings}
                   className="flex flex-col items-center gap-2 p-4 bg-purple-600/5 hover:bg-purple-600/10 text-purple-600 rounded-2xl transition-all border border-purple-600/10 opacity-70 hover:opacity-100"
                 >
                   <Sparkles className="h-5 w-5" />
@@ -434,7 +460,7 @@ export default function Settings() {
         </div>
 
         {/* Security & Maintenance */}
-        {role === 'admin' && (
+        {canEditSettings && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 mb-2">
               <HardDrive className="h-5 w-5 text-destructive" />

@@ -132,8 +132,7 @@ class DatabaseSingleton {
 
     // Load WASM from CDN (sql.js ships its own)
     const SQL = await initSqlJs({
-      locateFile: (file: string) =>
-        `https://sql.js.org/dist/${file}`,
+      locateFile: (file: string) => `/${file}`,
     });
 
     // Try to restore a previously persisted database

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   TrendingUp,
   Package,
@@ -17,17 +17,20 @@ import {
   X,
   CreditCard,
   History,
-  UserCheck
+  UserCheck,
+  Bot,
+  Sparkles,
+  ChevronRight
 } from 'lucide-react';
 import { useSqlQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { useAuthStore } from '@/lib/useAuthStore';
+import { usePermission } from '@/hooks/usePermission';
 import { formatCurrency, cn } from '@/lib/utils';
 import Modal from '@/components/Modal';
 import Label from '@/components/Label';
 import Input from '@/components/Input';
-import type { Expense, Sale, InventoryItem, InventoryPrivate, Attendance } from '@/lib/types';
-import { useState } from 'react';
+import type { Expense, Sale, InventoryItem, InventoryPrivate, Attendance, SaleItem } from '@/lib/types';
 import {
   BarChart,
   Bar,
@@ -36,7 +39,11 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ComposedChart,
+  Line,
+  Area
 } from 'recharts';
+import { calculateForecast } from '@/lib/forecast';
 
 function KPICard({
   title,
@@ -79,7 +86,14 @@ export default function Dashboard() {
   const expenses = useSqlQuery<Expense>('SELECT * FROM expenses WHERE tombstone = 0 ORDER BY date DESC', [], ['expenses']);
   const attendance = useSqlQuery<Attendance>('SELECT * FROM attendance WHERE tombstone = 0', [], ['attendance']);
   const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
+  const briefings = useSqlQuery<any>('SELECT * FROM daily_briefings ORDER BY id DESC LIMIT 1', [], ['daily_briefings']);
+  const briefing = briefings[0];
   const { user } = useAuthStore();
+  const canViewInventoryCost = usePermission('inventory', 'view_cost');
+  const canViewAnalytics = usePermission('analytics', 'view');
+  const canViewTeam = usePermission('team', 'view');
+  const canCreateSales = usePermission('sales', 'create');
+  const canCreateCustomers = usePermission('customers', 'create');
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
   const [expenseForm, setExpenseForm] = useState({ amount: '', category: 'General', description: '' });
   const [isSavingExpense, setIsSavingExpense] = useState(false);
@@ -111,18 +125,16 @@ export default function Dashboard() {
   };
 
   // Backup Sentinel Logic
-  const getBackupStatus = () => {
+  const backupStatus = useMemo(() => {
     if (!lastBackupDate) return { label: 'Action Required!', color: 'text-red-500', icon: ShieldAlert, sub: 'Initial backup needed' };
     const daysSince = Math.floor((Date.now() - new Date(lastBackupDate).getTime()) / (1000 * 60 * 60 * 24));
     if (daysSince >= 7) return { label: 'Backup Overdue', color: 'text-amber-500', icon: ShieldAlert, sub: `${daysSince} days since last backup` };
     return { label: 'Data Secure', color: 'text-green-500', icon: ShieldCheck, sub: 'Weekly backup healthy' };
-  };
-
-  const backupStatus = getBackupStatus();
+  }, [lastBackupDate]);
 
   // KPI calculations from real data
   const totalStockValue = inventory.reduce((sum: number, i: InventoryItem) => {
-    const p = role === 'admin' ? inventoryPrivate.find((pi: InventoryPrivate) => pi.id === i.id) : null;
+    const p = canViewInventoryCost ? inventoryPrivate.find((pi: InventoryPrivate) => pi.id === i.id) : null;
     return sum + (p?.costPrice || 0) * (i.stock || 0);
   }, 0);
   const potentialRevenue = inventory.reduce(
@@ -134,28 +146,85 @@ export default function Dashboard() {
   const totalSalesRevenue = sales.reduce((sum: number, s: Sale) => sum + s.total, 0);
   const totalSalesCount = sales.length;
 
-  // Last 7 days sales chart data
-  const last7Days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    return d.toISOString().split('T')[0];
-  });
+  // Last 7 days sales + Forecast
+  const chartDataCombined = useMemo(() => {
+    const historyDays = 21; // More data for better forecast
+    const dates = Array.from({ length: historyDays }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (historyDays - 1 - i));
+      return d.toISOString().split('T')[0];
+    });
 
-  const chartData = last7Days.map((date) => {
-    const daySales = sales
-      .filter((s: Sale) => s.date === date)
-      .reduce((sum: number, s: Sale) => sum + s.total, 0);
-    return {
+    const historicalSeries = dates.map(date => {
+      return sales
+        .filter((s: Sale) => s.date === date)
+        .reduce((sum, s) => sum + s.total, 0);
+    });
+
+    // Main display data (last 7 days of historical)
+    const historyData = dates.slice(-7).map((date, i) => ({
       day: new Date(date).toLocaleDateString('en-IN', { weekday: 'short' }),
-      sales: daySales,
-    };
-  });
+      sales: historicalSeries[historyDays - 7 + i],
+    }));
 
-  const maxSales = Math.max(...chartData.map((d) => d.sales), 1);
+    // Forecast next 7 days
+    if (historicalSeries.filter(v => v > 0).length >= 7) {
+      try {
+        const forecast = calculateForecast(historicalSeries, 7);
+        const forecastPoints = forecast.next7.map((val, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() + i + 1);
+          return {
+            day: d.toLocaleDateString('en-IN', { weekday: 'short' }),
+            forecast: val,
+            low: forecast.confidenceBand.low[i],
+            high: forecast.confidenceBand.high[i],
+            isForecast: true
+          };
+        });
+        return [...historyData, ...forecastPoints];
+      } catch (e) {
+        return historyData;
+      }
+    }
+    return historyData;
+  }, [sales]);
 
   return (
     <div className="space-y-10 pb-20">
-      {/* Header */}
+      {/* Daily Briefing Agent Widget */}
+      {role === 'admin' && briefing && (
+        <div className="glass-card p-8 rounded-[2.5rem] border-primary/20 bg-primary/[0.02] relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-700">
+            <Sparkles className="h-24 w-24 text-primary" />
+          </div>
+          <div className="flex flex-col md:flex-row gap-8 items-start relative z-10">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-8 w-8 rounded-xl bg-primary/20 flex items-center justify-center">
+                  <Bot className="h-5 w-5 text-primary" />
+                </div>
+                <h2 className="text-sm font-black uppercase tracking-[0.3em] text-primary">Intelligence Briefing</h2>
+                <span className="text-[10px] font-bold text-muted-foreground bg-accent px-2 py-0.5 rounded-full">8:00 AM IST</span>
+              </div>
+              <p className="text-xl md:text-2xl font-black tracking-tight mb-4 leading-tight">
+                {briefing.summary}
+              </p>
+              <div className="grid md:grid-cols-3 gap-4">
+                {briefing.bullets.map((bullet: string, i: number) => (
+                  <div key={i} className="flex gap-3 items-start group/bullet">
+                    <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5 group-hover/bullet:bg-primary transition-colors">
+                      <ChevronRight className="h-3 w-3 text-primary group-hover/bullet:text-white" />
+                    </div>
+                    <p className="text-sm font-medium text-muted-foreground leading-snug">{bullet}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-border/50">
         <div>
@@ -206,7 +275,7 @@ export default function Dashboard() {
         </button>
 
         {/* METRICS START HERE - ADMIN ONLY */}
-        {role === 'admin' && (
+        {canViewAnalytics && (
           <>
             <div className="glass-card flex flex-col items-center justify-center aspect-square p-4 rounded-3xl group transition-all duration-500">
               <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
@@ -296,12 +365,12 @@ export default function Dashboard() {
           </div>
           <p className="text-[8px] text-muted-foreground font-black uppercase tracking-[0.2em] opacity-80 text-center">Attendance</p>
           <p className={cn("text-lg font-black mt-0.5 tracking-tighter text-center", role === 'staff' && (!myAttendance || !myAttendance.clockOut) ? "text-amber-600" : "text-foreground")}>
-            {role === 'admin' ? `${presentStaffCount} In` : 
+            {canViewTeam ? `${presentStaffCount} In` : 
              (!shop?.allowStaffAttendance && role === 'staff' && !myAttendance ? 'Locked' :
              (myAttendance?.clockOut ? 'Shift Done' : (myAttendance ? 'Clock Out' : 'Sign In')))}
           </p>
           <p className="text-[8px] text-muted-foreground/60 mt-1 font-bold text-center">
-             {role === 'admin' ? 'Team Present' : 
+             {canViewTeam ? 'Team Present' : 
               (!shop?.allowStaffAttendance && role === 'staff' && !myAttendance ? 'Admin Log Only' :
               (myAttendance?.clockOut ? `${myAttendance.totalHours}h Worked` : (myAttendance?.clockIn || 'Arrived?')))}
           </p>
@@ -310,26 +379,41 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
         {/* Bar Chart - ADMIN ONLY */}
-        {role === 'admin' && (
+        {canViewAnalytics && (
           <div className="lg:col-span-4 glass-card rounded-3xl p-8">
-            <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-2 mb-6">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              Weekly Sales Performance
-            </h3>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                7-Day Revenue Pulse
+              </h3>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-2 w-2 rounded-full bg-primary" />
+                  <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">Actual</span>
+                </div>
+                <div className="flex items-center gap-1.5 border-l border-border pl-3">
+                  <div className="h-2 w-2 rounded-full bg-purple-500" />
+                  <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">AI Forecast</span>
+                </div>
+              </div>
+            </div>
             {totalSalesRevenue === 0 ? (
               <div className="h-[260px] flex flex-col items-center justify-center text-center text-muted-foreground opacity-40">
                 <BarChart3 className="h-12 w-12 mb-3" />
                 <p className="text-sm font-bold">No sales recorded yet</p>
-                <p className="text-xs mt-1">Use the POS to record your first sale</p>
               </div>
             ) : (
               <div className="h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData}>
+                  <ComposedChart data={chartDataCombined}>
                     <defs>
                       <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="hsl(199,89%,48%)" stopOpacity={1} />
                         <stop offset="100%" stopColor="hsl(199,89%,48%)" stopOpacity={0.5} />
+                      </linearGradient>
+                      <linearGradient id="forecastArea" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#a855f7" stopOpacity={0.2} />
+                        <stop offset="100%" stopColor="#a855f7" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
@@ -350,11 +434,13 @@ export default function Dashboard() {
                         color: 'hsl(var(--foreground))',
                         boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
                       }}
-                      formatter={(v: any) => [formatCurrency(Number(v)), 'Sales']}
+                      formatter={(v: any, name: any) => [formatCurrency(Number(v)), name]}
                       cursor={{ fill: 'rgba(14,165,233,0.08)' }}
                     />
-                    <Bar dataKey="sales" fill="url(#barGrad)" radius={[6, 6, 0, 0]} />
-                  </BarChart>
+                    <Bar dataKey="sales" name="Actual Sales" fill="url(#barGrad)" radius={[6, 6, 0, 0]} barSize={35} />
+                    <Area dataKey="forecast" name="AI Forecast" fill="url(#forecastArea)" stroke="#a855f7" strokeWidth={2} strokeDasharray="5 5" />
+                    <Area dataKey="high" name="Confidence Band" fill="#a855f7" stroke="none" fillOpacity={0.05} />
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
             )}
@@ -401,7 +487,7 @@ export default function Dashboard() {
       </div>
 
       {/* Recent Sales - ADMIN ONLY */}
-      {role === 'admin' && (
+      {usePermission('sales', 'view') && (
         <div className="glass-card rounded-3xl p-8">
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
@@ -418,7 +504,7 @@ export default function Dashboard() {
           {sales.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground opacity-40">
               <ShoppingCart className="h-10 w-10 mx-auto mb-3" />
-              <p className="text-sm font-bold">No sales yet. Use the Sales Hub to record your first sale!</p>
+              <p className="text-sm font-bold">No sales yet.</p>
             </div>
           ) : (
             <div className="divide-y divide-border/50">
@@ -524,4 +610,3 @@ export default function Dashboard() {
     </div>
   );
 }
-
