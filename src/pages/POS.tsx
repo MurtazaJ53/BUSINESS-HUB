@@ -4,27 +4,22 @@ import {
   Printer, RotateCcw, Package, User, Phone, Percent, AlertCircle, AlertTriangle, Calendar,
   ArrowRight, CheckCircle2, Sparkles, PlusCircle, X, Database
 } from 'lucide-react';
+import { useSqlQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn, isValidIndianPhone, sanitizePhone } from '@/lib/utils';
 import ReceiptModal from '@/components/ReceiptModal';
 import ErrorModal from '@/components/ErrorModal';
-import type { Sale, SaleItem, InventoryItem } from '@/lib/types';
+import type { Sale, Customer, SaleItem, InventoryItem } from '@/lib/types';
 
 type PayMode = 'CASH' | 'UPI' | 'CARD' | 'CREDIT' | 'ONLINE' | 'OTHERS';
 
 const PAY_MODES: PayMode[] = ['CASH', 'UPI', 'CARD', 'CREDIT', 'ONLINE', 'OTHERS'];
 
 export default function POS() {
-  const { 
-    inventory, 
-    inventoryPrivate, 
-    customers, 
-    addSale, 
-    updateInventoryItem, 
-    shop, 
-    shopPrivate,
-    role 
-  } = useBusinessStore();
+  const { addSale, updateInventoryItem, shop, shopPrivate, role } = useBusinessStore();
+  const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
+  const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
+  const customers = useSqlQuery<Customer>('SELECT * FROM customers WHERE tombstone = 0 ORDER BY name ASC', [], ['customers']);
 
   const [cart, setCart] = useState<SaleItem[]>([]);
   const [search, setSearch] = useState('');
@@ -1196,4 +1191,5 @@ export default function POS() {
     </div>
   );
 }
+
 

@@ -8,12 +8,14 @@ import {
   ShieldCheck,
   Plus
 } from 'lucide-react';
+import { useSqlQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import type { InventoryItem } from '@/lib/types';
 
 export default function StockAlerts() {
   const navigate = useNavigate();
-  const { inventory, updateStock } = useBusinessStore();
+  const { updateStock } = useBusinessStore();
+  const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
 
   const lowStockThreshold = 5;
   const lowStock = inventory.filter((p: InventoryItem) => (p.stock ?? 0) > 0 && (p.stock ?? 0) <= lowStockThreshold);
@@ -151,3 +153,4 @@ export default function StockAlerts() {
     </div>
   );
 }
+

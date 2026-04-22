@@ -19,6 +19,7 @@ import {
   History,
   UserCheck
 } from 'lucide-react';
+import { useSqlQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { useAuthStore } from '@/lib/useAuthStore';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -72,20 +73,12 @@ function KPICard({
 }
 
 export default function Dashboard() {
-  const { 
-    sales, 
-    inventory, 
-    expenses, 
-    attendance, 
-    addExpense,
-    recordAttendance,
-    role,
-    shop,
-    inventoryPrivate,
-    lastBackupDate,
-    setActiveTab,
-    setInventorySearchTerm
-  } = useBusinessStore();
+  const { addExpense, recordAttendance, role, shop, lastBackupDate, setActiveTab, setInventorySearchTerm } = useBusinessStore();
+  const sales = useSqlQuery<Sale>('SELECT * FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC', [], ['sales']);
+  const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
+  const expenses = useSqlQuery<Expense>('SELECT * FROM expenses WHERE tombstone = 0 ORDER BY date DESC', [], ['expenses']);
+  const attendance = useSqlQuery<Attendance>('SELECT * FROM attendance WHERE tombstone = 0', [], ['attendance']);
+  const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
   const { user } = useAuthStore();
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
   const [expenseForm, setExpenseForm] = useState({ amount: '', category: 'General', description: '' });
@@ -531,3 +524,4 @@ export default function Dashboard() {
     </div>
   );
 }
+

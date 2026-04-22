@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { TrendingUp, TrendingDown, BarChart3, Target, Calendar, ShoppingCart, Wallet, CheckCircle2 } from 'lucide-react';
+import { useSqlQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn } from '@/lib/utils';
 import {
@@ -10,7 +11,10 @@ import { getDeadStock } from '@/lib/analyticsUtils';
 import type { Sale, InventoryItem, InventoryPrivate, CustomerPayment, Expense, SaleItem } from '@/lib/types';
 
 export default function Analytics() {
-  const { sales, inventory, inventoryPrivate, customerPayments, role } = useBusinessStore();
+  const { customerPayments, role } = useBusinessStore();
+  const sales = useSqlQuery<Sale>('SELECT * FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC', [], ['sales']);
+  const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
+  const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
   const [period, setPeriod] = useState<'week' | 'month' | 'custom'>('week');
   
   const todayStr = new Date().toISOString().split('T')[0];
@@ -495,3 +499,4 @@ export default function Analytics() {
     </div>
   );
 }
+

@@ -22,12 +22,15 @@ import {
   where,
   deleteDoc 
 } from 'firebase/firestore';
+import { useSqlQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn } from '@/lib/utils';
 import type { InventoryItem, Staff } from '@/lib/types';
 
 export default function MigrationTool() {
-  const { shop, shopId, inventory, staff, role, shopPrivate } = useBusinessStore();
+  const { shop, shopId, role, shopPrivate } = useBusinessStore();
+  const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
+  const staff = useSqlQuery<Staff>('SELECT * FROM staff WHERE tombstone = 0 ORDER BY name ASC', [], ['staff']);
   const [status, setStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [progress, setProgress] = useState<{ total: number; current: number; step: string }>({ total: 0, current: 0, step: '' });
   const [errorLogs, setErrorLogs] = useState<string[]>([]);
@@ -270,3 +273,4 @@ export default function MigrationTool() {
     </div>
   );
 }
+

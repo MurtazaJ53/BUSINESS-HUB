@@ -32,6 +32,7 @@ import { db, auth } from '@/lib/firebase';
 import { collection, addDoc, onSnapshot, query, setDoc, doc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import bcrypt from 'bcryptjs';
 import { UserPlus, Ticket, LogOut, X, MessageCircle } from 'lucide-react';
+import { useSqlQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { downloadFile, convertToCSV, exportSalesReport } from '@/lib/exportUtils';
 import { formatCurrency, cn, isValidIndianPhone, sanitizePhone } from '@/lib/utils';
@@ -44,11 +45,11 @@ import { sendStaffInvite } from '@/lib/mail';
 import { shareInviteWhatsApp } from '@/lib/whatsapp';
 
 export default function Settings() {
-  const { 
-    inventory, inventoryPrivate, sales, customers, shop, shopPrivate, updateShop, 
-    clearInventory, theme, setTheme, shopId, setActiveTab,
-    addInventoryItem, upsertCustomer, addSale, invitations 
-  } = useBusinessStore();
+  const { shop, shopPrivate, updateShop, clearInventory, theme, setTheme, shopId, setActiveTab, addInventoryItem, upsertCustomer, addSale, invitations } = useBusinessStore();
+  const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
+  const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
+  const sales = useSqlQuery<Sale>('SELECT * FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC', [], ['sales']);
+  const customers = useSqlQuery<Customer>('SELECT * FROM customers WHERE tombstone = 0 ORDER BY name ASC', [], ['customers']);
 
   const { role, user } = useAuthStore();
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
@@ -689,3 +690,4 @@ export default function Settings() {
     </div>
   );
 }
+

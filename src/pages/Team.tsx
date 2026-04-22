@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { useSqlQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Staff, StaffPermission, Attendance } from '@/lib/types';
@@ -55,20 +56,10 @@ const APP_MODULES: { id: StaffPermission; label: string; icon: any }[] = [
 ];
 
 export default function Team() {
-  const { 
-    staff, 
-    staffPrivate, 
-    attendance, 
-    addExpense, 
-    upsertStaff, 
-    recordAttendance, 
-    role, 
-    shop, 
-    updateShop, 
-    deleteStaff, 
-    invitations,
-    shopPrivate
-  } = useBusinessStore();
+  const { addExpense, upsertStaff, recordAttendance, role, shop, updateShop, deleteStaff, invitations, shopPrivate } = useBusinessStore();
+  const staff = useSqlQuery<Staff>('SELECT * FROM staff WHERE tombstone = 0 ORDER BY name ASC', [], ['staff']);
+  const staffPrivate = useSqlQuery<any>('SELECT * FROM staff_private WHERE tombstone = 0', [], ['staff_private']);
+  const attendance = useSqlQuery<Attendance>('SELECT * FROM attendance WHERE tombstone = 0', [], ['attendance']);
   const today = new Date().toISOString().split('T')[0];
   const currentMonth = new Date().toISOString().slice(0, 7);
 
@@ -1131,3 +1122,4 @@ export default function Team() {
     </div>
   );
 }
+
