@@ -15,6 +15,7 @@ import { useAuthStore } from '@/lib/useAuthStore';
 import Modal from '@/components/Modal';
 import Label from '@/components/Label';
 import Input from '@/components/Input';
+import { usePermission } from '@/hooks/usePermission';
 
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -78,11 +79,13 @@ const InventoryCard = ({
       }`}
     >
       <div className="space-y-2">
-        <div className={`flex items-center justify-between gap-2 overflow-hidden ${role === 'admin' ? 'pr-12' : ''}`}>
+        <div className={`flex items-center justify-between gap-2 overflow-hidden ${usePermission('inventory', 'edit') || usePermission('inventory', 'delete') ? 'pr-12' : ''}`}>
           <p className="font-extrabold text-lg uppercase tracking-tight truncate flex-1">{item.name}</p>
           
-          {role === 'admin' && (
+          {(usePermission('inventory', 'edit') || usePermission('inventory', 'delete')) && (
             <div className="absolute top-2 right-2 flex gap-1.5 opacity-100 transition-all">
+              {usePermission('inventory', 'edit') && (
+                <>
               <button 
                 onClick={(e) => { 
                   e.stopPropagation(); 
@@ -115,13 +118,17 @@ const InventoryCard = ({
               >
                 <Pencil className="h-4 w-4" />
               </button>
-              <button 
-                onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
-                className="p-3 rounded-xl bg-destructive text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
-                title="Delete Product"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              </>
+              )}
+              {usePermission('inventory', 'delete') && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
+                  className="p-3 rounded-xl bg-destructive text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
+                  title="Delete Product"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -133,6 +140,23 @@ const InventoryCard = ({
           {item.size && (
             <span className="px-2.5 py-1 bg-purple-500/10 text-purple-500 text-xs font-black uppercase rounded-lg border border-purple-500/20">
               {item.size}
+            </span>
+          )}
+          {item.velocity?.status && (
+            <span className={cn(
+              "px-2.5 py-1 text-[9px] font-black uppercase rounded-lg border flex items-center gap-1.5",
+              item.velocity.status === 'fast' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" :
+              item.velocity.status === 'medium' ? "bg-amber-500/10 text-amber-500 border-amber-500/30" :
+              item.velocity.status === 'slow' ? "bg-orange-500/10 text-orange-500 border-orange-500/30" :
+              "bg-red-500/10 text-red-500 border-red-500/30"
+            )}>
+              <span className={cn(
+                "h-1 w-1 rounded-full",
+                item.velocity.status === 'fast' ? "bg-emerald-500 animate-pulse" :
+                item.velocity.status === 'medium' ? "bg-amber-500" :
+                item.velocity.status === 'slow' ? "bg-orange-500" : "bg-red-500"
+              )} />
+              {item.velocity.status}
             </span>
           )}
         </div>
@@ -172,13 +196,15 @@ export default function Inventory() {
   const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
   const sales = useSqlQuery<Sale>('SELECT * FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC', [], ['sales']);
 
+  const canViewCost = usePermission('inventory', 'view_cost');
+
   const inventoryWithPrivate = useMemo(() => {
-    if (role !== 'admin') return inventory;
+    if (!canViewCost) return inventory;
     return inventory.map((item: InventoryItem) => ({
       ...item,
       costPrice: inventoryPrivate.find((pi: any) => pi.id === item.id)?.costPrice
     }));
-  }, [inventory, inventoryPrivate, role]);
+  }, [inventory, inventoryPrivate, canViewCost]);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [search, setSearch] = useState('');
@@ -576,7 +602,7 @@ export default function Inventory() {
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          ...(role === 'admin' ? [
+          ...(usePermission('inventory', 'view_cost') ? [
             { label: 'Inventory Value', value: formatCurrency(stats.inventoryValue || 0), color: 'text-primary' },
             { label: 'Potential Profit', value: formatCurrency(stats.potentialProfit || 0), color: 'text-green-400' },
           ] : []),
@@ -856,7 +882,7 @@ export default function Inventory() {
               <Label className="block min-h-[1.25rem]">Sell Price (₹) *</Label>
               <Input type="number" placeholder="0.00" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
             </div>
-            {role === 'admin' && (
+            {usePermission('inventory', 'view_cost') && (
               <div className="space-y-1.5">
                 <Label className="block min-h-[1.25rem]">Cost Price (₹)</Label>
                 <Input type="number" placeholder="0.00" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: e.target.value })} />
@@ -888,7 +914,7 @@ export default function Inventory() {
                 <table className="w-full text-xs">
                   <thead className="bg-accent/50">
                     <tr>
-                      {['Variation', 'Sell Price', ...(role === 'admin' ? ['Cost Price'] : []), 'Stock'].map((h) => (
+                      {['Variation', 'Sell Price', ...(usePermission('inventory', 'view_cost') ? ['Cost Price'] : []), 'Stock'].map((h) => (
                         <th key={h} className="px-3 py-2 text-left font-bold text-muted-foreground">{h}</th>
                       ))}
                     </tr>
@@ -899,7 +925,7 @@ export default function Inventory() {
                         <td className="px-3 py-1.5 font-semibold">
                           {row.sub && row.size ? `${row.sub} / ${row.size}` : row.sub || row.size || 'Default'}
                         </td>
-                        {(['price', ...(role === 'admin' ? ['costPrice'] as const : []), 'stock'] as const).map((field) => (
+                        {(['price', ...(usePermission('inventory', 'view_cost') ? ['costPrice'] as const : []), 'stock'] as const).map((field) => (
                           <td key={field} className="px-1 py-1">
                             <input
                               type="number"
@@ -940,7 +966,7 @@ export default function Inventory() {
                 <span className="text-[10px] uppercase font-black text-muted-foreground">Original Stock</span>
                 <p className="text-lg font-black">{restockOpen?.stock || 0} units</p>
               </div>
-              {role === 'admin' && (
+              {usePermission('inventory', 'view_cost') && (
                 <div className="space-y-0.5">
                   <span className="text-[10px] uppercase font-black text-muted-foreground">Current Cost</span>
                   <p className="text-lg font-black text-amber-500">{formatCurrency(restockOpen?.costPrice || 0)}</p>
@@ -960,7 +986,7 @@ export default function Inventory() {
                 onChange={(e) => setRestockForm({ ...restockForm, qty: e.target.value })} 
               />
             </div>
-            {role === 'admin' && (
+            {usePermission('inventory', 'view_cost') && (
               <div className="space-y-1.5">
                 <Label className="text-[10px] uppercase font-black text-amber-500">New Purchase Price</Label>
                 <Input 
@@ -984,7 +1010,7 @@ export default function Inventory() {
             <p className="text-[9px] text-muted-foreground font-bold">Leave blank to keep current price</p>
           </div>
 
-          {restockForm.qty && restockForm.cost && restockOpen && role === 'admin' && (
+          {restockForm.qty && restockForm.cost && restockOpen && usePermission('inventory', 'view_cost') && (
             <div className="space-y-3">
               <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <div className="flex justify-between items-center">
@@ -1059,7 +1085,7 @@ export default function Inventory() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-muted-foreground">Sell Price</Label><Input type="number" value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: e.target.value })} /></div>
-            {role === 'admin' && (
+            {usePermission('inventory', 'view_cost') && (
               <div className="space-y-1.5"><Label className="text-[10px] uppercase font-black text-amber-500">Cost Price</Label><Input type="number" value={editForm.costPrice} onChange={(e) => setEditForm({ ...editForm, costPrice: e.target.value })} /></div>
             )}
           </div>
@@ -1095,7 +1121,7 @@ export default function Inventory() {
             <table className="w-full text-xs">
               <thead className="bg-accent/50 sticky top-0">
                 <tr>
-                  {['#', 'Product Name *', 'Category', 'Sub-cat', 'Size (comma = variants)', 'Sell Price *', ...(role === 'admin' ? ['Cost Price'] : []), 'Stock', ''].map((h, i) => (
+                  {['#', 'Product Name *', 'Category', 'Sub-cat', 'Size (comma = variants)', 'Sell Price *', ...(usePermission('inventory', 'view_cost') ? ['Cost Price'] : []), 'Stock', ''].map((h, i) => (
                     <th key={i} className="px-3 py-3 text-left font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -1104,7 +1130,7 @@ export default function Inventory() {
                 {bulkRows.map((row, idx) => (
                   <tr key={idx} className="group border-t border-border/50 hover:bg-accent/10 transition-colors">
                     <td className="px-3 py-1 text-muted-foreground font-mono text-center">{idx + 1}</td>
-                    {(['name', 'category', 'subcategory', 'size', 'price', ...(role === 'admin' ? ['costPrice'] as const : []), 'stock'] as const).map((field) => (
+                    {(['name', 'category', 'subcategory', 'size', 'price', ...(usePermission('inventory', 'view_cost') ? ['costPrice'] as const : []), 'stock'] as const).map((field) => (
                       <td key={field} className="p-1">
                         {field === 'size' ? (
                           <div className="relative">

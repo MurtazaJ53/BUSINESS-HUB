@@ -1,17 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { TrendingUp, TrendingDown, BarChart3, Target, Calendar, ShoppingCart, Wallet, CheckCircle2 } from 'lucide-react';
 import { useSqlQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
+import { usePermission } from '@/hooks/usePermission';
 import { formatCurrency, cn } from '@/lib/utils';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, LineChart, Line
+  ResponsiveContainer, LineChart, Line, Area, ComposedChart
 } from 'recharts';
 import { getDeadStock } from '@/lib/analyticsUtils';
+import { calculateForecast } from '@/lib/forecast';
 import type { Sale, InventoryItem, InventoryPrivate, CustomerPayment, Expense, SaleItem } from '@/lib/types';
 
 export default function Analytics() {
-  const { customerPayments, role } = useBusinessStore();
+  const { customerPayments, expenses: storeExpenses, role } = useBusinessStore();
+  const canViewCost = usePermission('inventory', 'view_cost');
+  const canViewProfit = usePermission('sales', 'view_profit');
   const sales = useSqlQuery<Sale>('SELECT * FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC', [], ['sales']);
   const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
   const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
@@ -62,13 +66,13 @@ export default function Analytics() {
   const chartData = currentRange.map((date) => {
     const daySales = filteredSalesData.filter((s: Sale) => s.date === date);
     const dayRevenue = daySales.reduce((sum: number, s: Sale) => sum + s.total, 0);
-    const dayCost = daySales.reduce((sum: number, s: Sale) => {
+    const dayCost = canViewCost ? daySales.reduce((sum: number, s: Sale) => {
       return sum + s.items.reduce((itemSum: number, item: SaleItem) => {
         const privateData = inventoryPrivate.find((p: InventoryPrivate) => p.id === item.itemId);
         const costPrice = privateData?.costPrice || 0;
         return itemSum + costPrice * item.quantity;
       }, 0);
-    }, 0);
+    }, 0) : 0;
 
     return {
       day: new Date(date + 'T00:00:00').toLocaleDateString('en-IN', {
@@ -77,26 +81,62 @@ export default function Analytics() {
         month: period === 'month' || period === 'custom' ? 'short' : undefined,
       }),
       sales: dayRevenue,
-      profit: dayRevenue - dayCost,
+      profit: canViewProfit ? dayRevenue - dayCost : 0,
       orders: daySales.length,
     };
   });
 
+  // ── Forecast Calculation ────────────────────────────────────────────────
+  const forecastData = useMemo(() => {
+    const historyDays = 30;
+    const historyDates = Array.from({ length: historyDays }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (historyDays - i));
+      return d.toISOString().split('T')[0];
+    });
+
+    const historicalSeries = historyDates.map(date => {
+      return sales
+        .filter((s: Sale) => s.date === date)
+        .reduce((sum, s) => sum + s.total, 0);
+    });
+
+    if (historicalSeries.filter(v => v > 0).length < 7) return [];
+
+    try {
+      const forecast = calculateForecast(historicalSeries, 7);
+      return forecast.next7.map((val, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() + i + 1);
+        return {
+          day: d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric' }),
+          forecast: val,
+          low: forecast.confidenceBand.low[i],
+          high: forecast.confidenceBand.high[i],
+          isForecast: true
+        };
+      });
+    } catch (e) {
+      return [];
+    }
+  }, [sales]);
+
+  const combinedChartData = [...chartData, ...forecastData];
+
   // ── KPI Stats ─────────────────────────────────────────────────────────────
-  const { expenses } = useBusinessStore();
   const totalRevenue = sales.reduce((sum: number, s: Sale) => sum + s.total, 0);
-  const totalCost = sales.reduce((sum: number, s: Sale) => {
+  const totalCost = canViewCost ? sales.reduce((sum: number, s: Sale) => {
     return sum + s.items.reduce((itemSum: number, item: SaleItem) => {
       const privateData = inventoryPrivate.find((p: InventoryPrivate) => p.id === item.itemId);
       const costPrice = privateData?.costPrice || 0;
       return itemSum + costPrice * item.quantity;
     }, 0);
-  }, 0);
-  const totalExpenses = expenses.reduce((sum: number, e: Expense) => sum + e.amount, 0);
+  }, 0) : 0;
+  const totalExpenses = storeExpenses.reduce((sum: number, e: Expense) => sum + e.amount, 0);
   
-  const grossProfit = totalRevenue - totalCost;
-  const netProfit = grossProfit - totalExpenses;
-  const profitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+  const grossProfit = canViewProfit ? totalRevenue - totalCost : 0;
+  const netProfit = canViewProfit ? grossProfit - totalExpenses : 0;
+  const profitMargin = totalRevenue > 0 && canViewProfit ? (grossProfit / totalRevenue) * 100 : 0;
 
   const totalOrders = sales.length;
   const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
@@ -156,7 +196,6 @@ export default function Analytics() {
 
   const payModes: Record<string, number> = {};
   
-  // Repayments are always CASH in this system
   payModes['REPAYMENT'] = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
 
   for (const sale of filteredSalesData) {
@@ -227,9 +266,9 @@ export default function Analytics() {
             value: formatCurrency(totalRevenue),
             change: revChange,
             icon: TrendingUp,
-            sub: role === 'admin' ? `${profitMargin.toFixed(1)}% Margin` : undefined
+            sub: canViewProfit ? `${profitMargin.toFixed(1)}% Margin` : undefined
           },
-          ...(role === 'admin' ? [
+          ...(canViewProfit ? [
             { 
               label: 'Gross Profit', 
               value: formatCurrency(grossProfit), 
@@ -271,24 +310,34 @@ export default function Analytics() {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Sales Bar Chart */}
         <div className="lg:col-span-3 glass-card rounded-3xl p-6">
-          <h3 className="font-bold text-base mb-6 flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-primary" />
-            {period === 'week' ? 'Daily Sales (Last 7 Days)' : 'Daily Sales (Last 30 Days)'}
-          </h3>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-bold text-base flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              {period === 'week' ? 'Daily Sales Performance' : 'Growth Trend'}
+            </h3>
+            {forecastData.length > 0 && (
+              <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 bg-purple-500/10 text-purple-500 rounded-lg animate-pulse border border-purple-500/20">
+                Predictive AI Enabled
+              </span>
+            )}
+          </div>
           {totalRevenue === 0 ? (
-            <div className="h-48 flex flex-col items-center justify-center text-muted-foreground opacity-30">
+            <div className="h-64 flex flex-col items-center justify-center text-muted-foreground opacity-30">
               <BarChart3 className="h-12 w-12 mb-3" />
               <p className="text-sm font-bold">No sales yet</p>
-              <p className="text-xs mt-1">Use the Sales Hub to record your first sale</p>
             </div>
           ) : (
-            <div className="h-48">
+            <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
+                <ComposedChart data={combinedChartData}>
                   <defs>
                     <linearGradient id="anaGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="hsl(199,89%,48%)" stopOpacity={1} />
                       <stop offset="100%" stopColor="hsl(199,89%,48%)" stopOpacity={0.5} />
+                    </linearGradient>
+                    <linearGradient id="forecastGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#a855f7" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="#a855f7" stopOpacity={0.05} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
@@ -301,11 +350,13 @@ export default function Analytics() {
                   />
                   <Tooltip
                     contentStyle={{ backgroundColor: 'rgba(0,0,0,0.85)', border: 'none', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', color: '#fff' }}
-                    formatter={(v: any) => [formatCurrency(Number(v)), 'Revenue']}
+                    formatter={(v: any, name: any) => [formatCurrency(Number(v)), name]}
                     cursor={{ fill: 'rgba(14,165,233,0.06)' }}
                   />
-                  <Bar dataKey="sales" fill="url(#anaGrad)" radius={[5, 5, 0, 0]} />
-                </BarChart>
+                  <Bar dataKey="sales" name="Actual Sales" fill="url(#anaGrad)" radius={[5, 5, 0, 0]} barSize={period === 'week' ? 40 : 15} />
+                  <Area dataKey="forecast" name="Forecast" fill="url(#forecastGrad)" stroke="#a855f7" strokeWidth={2} strokeDasharray="5 5" />
+                  <Area dataKey="high" name="Confidence Range" fill="#a855f7" fillOpacity={0.1} stroke="none" />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           )}
@@ -439,11 +490,11 @@ export default function Analytics() {
             </h3>
             <p className="text-[10px] font-bold text-muted-foreground uppercase mt-1">Zero sales in the last 30 days — recover your capital now.</p>
           </div>
-          {deadStockItems.length > 0 && role === 'admin' && (
+          {deadStockItems.length > 0 && canViewCost && (
             <div className="bg-amber-500/10 border border-amber-500/20 px-4 py-2 rounded-xl">
               <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">
                 Stuck Capital: {formatCurrency(deadStockItems.reduce((s: number, i: InventoryItem) => {
-                  const p = inventoryPrivate.find((pi: InventoryPrivate) => pi.id === i.id);
+                  const p = inventoryPrivate.find((pi: any) => pi.id === i.id);
                   return s + (p?.costPrice || 0) * (i.stock || 0);
                 }, 0))}
               </p>
@@ -459,7 +510,7 @@ export default function Analytics() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {deadStockItems.slice(0, 6).map((item: InventoryItem) => {
-              const privateData = role === 'admin' ? inventoryPrivate.find((pi: InventoryPrivate) => pi.id === item.id) : null;
+              const privateData = canViewCost ? inventoryPrivate.find((pi: any) => pi.id === item.id) : null;
               const clearancePrice = (privateData?.costPrice || 0) * 1.15; // 15% margin for clearance
               return (
                 <div key={item.id} className="p-4 rounded-2xl bg-accent/20 border border-border/50 hover:border-amber-500/30 transition-all group">
@@ -478,7 +529,7 @@ export default function Analytics() {
                       <span>Cur. Price</span>
                       <span>{formatCurrency(item.price)}</span>
                     </div>
-                    {role === 'admin' && (
+                    {canViewCost && (
                       <div className="flex justify-between items-center p-2 bg-amber-500/10 rounded-xl border border-amber-500/10">
                         <div className="flex flex-col">
                           <span className="text-[8px] font-black text-amber-600 uppercase">Clearance Target</span>
@@ -499,4 +550,3 @@ export default function Analytics() {
     </div>
   );
 }
-

@@ -2,14 +2,16 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Plus, Minus, Trash2, ShoppingCart, Search, Check,
   Printer, RotateCcw, Package, User, Phone, Percent, AlertCircle, AlertTriangle, Calendar,
-  ArrowRight, CheckCircle2, Sparkles, PlusCircle, X, Database
+  ArrowRight, CheckCircle2, Sparkles, PlusCircle, X, Database, Scan
 } from 'lucide-react';
+import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 import { useSqlQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn, isValidIndianPhone, sanitizePhone } from '@/lib/utils';
 import ReceiptModal from '@/components/ReceiptModal';
 import ErrorModal from '@/components/ErrorModal';
 import type { Sale, Customer, SaleItem, InventoryItem } from '@/lib/types';
+import { usePermission } from '@/hooks/usePermission';
 
 type PayMode = 'CASH' | 'UPI' | 'CARD' | 'CREDIT' | 'ONLINE' | 'OTHERS';
 
@@ -17,6 +19,11 @@ const PAY_MODES: PayMode[] = ['CASH', 'UPI', 'CARD', 'CREDIT', 'ONLINE', 'OTHERS
 
 export default function POS() {
   const { addSale, updateInventoryItem, shop, shopPrivate, role } = useBusinessStore();
+  
+  const canViewCost = usePermission('inventory', 'view_cost');
+  const canOverridePrice = usePermission('sales', 'override_price');
+  const maxDiscount = canOverridePrice === true ? Infinity : (canOverridePrice ? (canOverridePrice as any).max : 0);
+
   const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
   const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
   const customers = useSqlQuery<Customer>('SELECT * FROM customers WHERE tombstone = 0 ORDER BY name ASC', [], ['customers']);
@@ -206,8 +213,8 @@ export default function POS() {
   }, [customers, customerName, selectedCustomerId]);
 
   const addToCart = (product: typeof inventory[0], isReturn: boolean = false) => {
-    // Find costPrice from private collection for admins
-    const privateData = role === 'admin' ? inventoryPrivate.find((pi: any) => pi.id === product.id) : null;
+    // Find costPrice from private collection if permitted
+    const privateData = canViewCost ? inventoryPrivate.find((pi: any) => pi.id === product.id) : null;
     const costPrice = privateData?.costPrice;
 
     setCart((prev) => {
@@ -277,10 +284,15 @@ export default function POS() {
   }, 0);
   
   const calcTotal = () => {
-    const dv = parseFloat(discountValue) || 0;
+    let dv = parseFloat(discountValue) || 0;
     const sub = subTotal();
-    const disc = discountType === 'fixed' ? dv : (sub * (dv / 100));
-    return sub - disc;
+    
+    let discAmount = discountType === 'fixed' ? dv : (sub * (dv / 100));
+    if (maxDiscount !== Infinity && discAmount > maxDiscount) {
+      discAmount = maxDiscount;
+    }
+    
+    return sub - discAmount;
   };
 
   const totalPayments = payments.reduce((sum, p) => sum + p.amount, 0);
@@ -348,13 +360,20 @@ export default function POS() {
 
     const total = calcTotal();
     const discountAmount = subTotal() - total;
+    
+    if (maxDiscount !== Infinity && discountAmount > maxDiscount) {
+      setToast(`Maximum discount allowed is ₹${maxDiscount}`);
+      setIsProcessing(false);
+      return;
+    }
+
     const finalSale: Sale = {
       id: `sale-${Date.now().toString().slice(-8)}`,
       items: [...cart],
       total,
       discount: discountAmount,
       discountType,
-      discountValue,
+      discountValue: discountType === 'fixed' ? discountAmount.toString() : (discountAmount / subTotal() * 100).toString(),
       paymentMode: payments[0].mode as any,
       payments: [...payments],
       // SANITIZATION: Ensure NO undefined values ever reach Firestore
@@ -416,6 +435,42 @@ export default function POS() {
     setDrillDepth(0);
     setActiveCategory(null);
     setActiveProductName(null);
+  };
+
+  const startScan = async () => {
+    try {
+      const isAvailable = await BarcodeScanner.isSupported();
+      if (!isAvailable) {
+        showToast("Barcode scanning not supported on this device");
+        return;
+      }
+      
+      const permissions = await BarcodeScanner.checkPermissions();
+      if (permissions.camera !== 'granted') {
+        const req = await BarcodeScanner.requestPermissions();
+        if (req.camera !== 'granted') {
+          showToast("Camera permission denied");
+          return;
+        }
+      }
+
+      await BarcodeScanner.removeAllListeners();
+      
+      const { barcodes } = await BarcodeScanner.scan();
+      if (barcodes.length > 0) {
+        const val = barcodes[0].displayValue;
+        const found = inventory.find(i => i.sku === val || i.id === val);
+        if (found) {
+          addToCart(found);
+          showToast(`Added: ${found.name}`);
+        } else {
+          showToast(`No item found for: ${val}`);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      showToast("Scanner failed to start");
+    }
   };
 
   return (
@@ -573,16 +628,25 @@ export default function POS() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search catalog named/barcode..."
-            className="w-full bg-accent/30 border-border/50 text-foreground placeholder:text-muted-foreground/60 rounded-2xl py-4 pl-12 pr-12 focus:ring-2 focus:ring-primary/50 transition-all font-bold text-sm"
+            className="w-full bg-accent/30 border-border/50 text-foreground placeholder:text-muted-foreground/60 rounded-2xl py-4 pl-12 pr-24 focus:ring-2 focus:ring-primary/50 transition-all font-bold text-sm"
           />
-          {search && (
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
             <button
-              onClick={() => setSearch('')}
-              className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-accent rounded-lg transition-all animate-in fade-in zoom-in"
+              onClick={startScan}
+              className="lg:hidden p-2 bg-primary/10 text-primary rounded-xl hover:bg-primary hover:text-white transition-all active:scale-90"
+              title="Scan Barcode"
             >
-              <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+              <Scan className="h-5 w-5" />
             </button>
-          )}
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="p-1 hover:bg-accent rounded-lg transition-all animate-in fade-in zoom-in"
+              >
+                <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Custom Actions Hub */}
@@ -946,15 +1010,24 @@ export default function POS() {
                   placeholder="Discount"
                   value={discountValue}
                   onChange={(e) => setDiscountValue(e.target.value)}
+                  disabled={!canOverridePrice}
                   className="flex-1 px-3 py-2 bg-accent border border-border rounded-xl text-xs"
                 />
                 <button 
                   onClick={() => setDiscountType(prev => prev === 'fixed' ? 'percent' : 'fixed')}
+                  disabled={!canOverridePrice}
                   className="px-3 py-2 bg-accent rounded-xl text-xs font-bold"
                 >
                   {discountType === 'fixed' ? '₹' : '%'}
                 </button>
               </div>
+
+              {maxDiscount !== Infinity && (
+                <p className="text-[9px] text-muted-foreground font-bold">
+                  Max allowed discount: ₹{maxDiscount}
+                </p>
+              )}
+
 
               {/* Payment Ledger Section */}
               <div className="space-y-3 pt-2">

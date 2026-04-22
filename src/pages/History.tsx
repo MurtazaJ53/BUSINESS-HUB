@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useSqlQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
+import { usePermission } from '@/hooks/usePermission';
 import { formatCurrency, cn } from '@/lib/utils';
 import { printReceipt } from '@/lib/printerService';
 import { loadShopSettings } from '@/lib/shopSettings';
@@ -28,6 +29,9 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 
 export default function History() {
   const { deleteSale, deleteExpense, updateSale, role } = useBusinessStore();
+  const canEditSale = usePermission('sales', 'edit');
+  const canVoidSale = usePermission('sales', 'void_sale');
+  const canDeleteExpense = usePermission('expenses', 'delete');
   const sales = useSqlQuery<Sale>('SELECT * FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC', [], ['sales']);
   const expenses = useSqlQuery<Expense>('SELECT * FROM expenses WHERE tombstone = 0 ORDER BY date DESC', [], ['expenses']);
   const [tab, setTab] = useState<'sales' | 'expenses'>('sales');
@@ -192,7 +196,7 @@ export default function History() {
         />
       </div>
       {/* Summary Header - ADMIN ONLY */}
-      {role === 'admin' && (
+      {usePermission('analytics', 'view') && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className={cn(
             "glass-card p-6 rounded-[2rem] border-l-4 transition-all duration-500",
@@ -330,23 +334,23 @@ export default function History() {
                           >
                             <Eye className="h-4 w-4" />
                           </button>
-                          {role === 'admin' && (
-                            <>
-                              <button 
-                                onClick={() => handleEditOpen(sale)}
-                                className="p-2 hover:bg-primary/10 hover:text-primary rounded-xl transition-all"
-                                title="Edit Details"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </button>
-                              <button 
-                                onClick={() => setDeletingId(sale.id)}
-                                className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-all"
-                                title="Delete Sale"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </>
+                          {canEditSale && (
+                            <button 
+                              onClick={() => handleEditOpen(sale)}
+                              className="p-2 hover:bg-primary/10 hover:text-primary rounded-xl transition-all"
+                              title="Edit Details"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                          )}
+                          {canVoidSale && (
+                            <button 
+                              onClick={() => setDeletingId(sale.id)}
+                              className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-all"
+                              title="Delete Sale"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
                           )}
                         </div>
                       </td>
@@ -404,7 +408,7 @@ export default function History() {
                         -{formatCurrency(exp.amount)}
                       </td>
                       <td className="px-6 py-5 text-center">
-                        {role === 'admin' && (
+                        {canDeleteExpense && (
                           <button 
                             onClick={() => setDeletingId(exp.id)}
                             className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-all"

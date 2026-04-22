@@ -1,164 +1,113 @@
-import { Sale } from './types';
-import { formatCurrency } from './utils';
+import { BleClient, numbersToDataView } from '@capacitor-community/bluetooth-le';
+import { Capacitor } from '@capacitor/core';
+import type { Sale } from './types';
 
-/**
- * Universal Mobile Printing Service
- * Optimized for Thermal Printers (58mm/80mm) via Android Print Spooler or RawBT.
- */
-export const printReceipt = (sale: Sale, shop: any) => {
-  const printWindow = window.open('', '_blank', 'width=400,height=600,scrollbars=yes');
-  if (!printWindow) return false;
+// ESC/POS Commands
+const ESC = 0x1B;
+const GS = 0x1D;
+const LF = 0x0A;
 
-  const receiptHtml = `
-    <!DOCTYPE html>
+const PRINTER_SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb';
+const PRINTER_CHARACTERISTIC_UUID = '00002af1-0000-1000-8000-00805f9b34fb';
+
+class NativePrinter {
+  private deviceId: string | null = null;
+
+  async init() {
+    try { await BleClient.initialize(); } catch (e) {}
+  }
+
+  async scanAndConnect(): Promise<boolean> {
+    try {
+      await this.init();
+      const device = await BleClient.requestDevice({ optionalServices: [PRINTER_SERVICE_UUID] });
+      this.deviceId = device.deviceId;
+      await BleClient.connect(this.deviceId);
+      return true;
+    } catch (e) {
+      console.warn('Printer connection failed', e);
+      return false;
+    }
+  }
+
+  async print(sale: Sale, shop: any) {
+    if (!this.deviceId) {
+      const ok = await this.scanAndConnect();
+      if (!ok) throw new Error('Bluetooth printer not found');
+    }
+
+    const encoder = new TextEncoder();
+    let bytes: number[] = [];
+
+    bytes.push(ESC, 0x40); // Init
+    bytes.push(ESC, 0x61, 0x01); // Center
+    bytes.push(ESC, 0x21, 0x30); // Big font
+    bytes.push(...Array.from(encoder.encode((shop.name || 'RECEIPT').toUpperCase() + '\n')));
+    
+    bytes.push(ESC, 0x21, 0x00); // Reset font
+    if (shop.tagline) bytes.push(...Array.from(encoder.encode(shop.tagline + '\n')));
+    bytes.push(...Array.from(encoder.encode('--------------------------------\n')));
+    bytes.push(...Array.from(encoder.encode(`INV: ${sale.id.slice(-8).toUpperCase()} | ${sale.date}\n`)));
+
+    bytes.push(ESC, 0x61, 0x00); // Left
+    sale.items.forEach(item => {
+      const line = `${item.name.slice(0, 18).padEnd(18)} ${item.quantity}x ${item.price}\n`;
+      bytes.push(...Array.from(encoder.encode(line)));
+    });
+
+    bytes.push(...Array.from(encoder.encode('--------------------------------\n')));
+    bytes.push(ESC, 0x61, 0x02); // Right
+    bytes.push(...Array.from(encoder.encode(`TOTAL: RS ${sale.total}\n`)));
+
+    bytes.push(LF, LF, LF, LF);
+    bytes.push(GS, 0x56, 0x42, 0x00); // Cut
+
+    const chunkSize = 20;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      await BleClient.write(this.deviceId!, PRINTER_SERVICE_UUID, PRINTER_CHARACTERISTIC_UUID, numbersToDataView(bytes.slice(i, i + chunkSize)));
+    }
+  }
+}
+
+const nativePrinter = new NativePrinter();
+
+export async function printReceipt(sale: Sale, shop: any) {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await nativePrinter.print(sale, shop);
+      return;
+    } catch (e) {
+      console.error('Native print failed, falling back to web', e);
+    }
+  }
+
+  // WEB FALLBACK (from original printReceipt.ts logic)
+  const invoiceNo = `INV-${sale.id.replace('sale-', '').slice(-6).toUpperCase()}`;
+  const html = `
     <html>
-      <head>
-        <title>Receipt ${sale.id}</title>
-        <style>
-          @page {
-            margin: 0;
-            size: auto;
-          }
-          body {
-            font-family: 'Courier New', Courier, monospace;
-            width: 100%;
-            max-width: 380px; /* Optimized for 80mm, scales for 58mm */
-            margin: 0 auto;
-            padding: 20px;
-            color: #000;
-            font-size: 14px;
-            line-height: 1.2;
-          }
-          .header {
-            text-align: center;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px dashed #000;
-          }
-          .logo {
-            font-weight: 900;
-            font-size: 20px;
-            letter-spacing: -1px;
-            margin-bottom: 4px;
-          }
-          .shop-name {
-            font-size: 16px;
-            font-weight: bold;
-            text-transform: uppercase;
-          }
-          .details {
-            margin-bottom: 15px;
-            font-size: 12px;
-          }
-          .row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 2px;
-          }
-          .items {
-            width: 100%;
-            border-bottom: 1px dashed #000;
-            margin-bottom: 10px;
-            padding-bottom: 10px;
-          }
-          .item-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 4px;
-          }
-          .totals {
-            margin-top: 10px;
-          }
-          .total-big {
-            font-size: 18px;
-            font-weight: 900;
-            border-top: 2px solid #000;
-            margin-top: 5px;
-            padding-top: 5px;
-          }
-          .footer {
-            text-align: center;
-            margin-top: 20px;
-            font-size: 11px;
-            font-style: italic;
-          }
-          .qr-placeholder {
-            margin: 10px 0;
-            text-align: center;
-          }
-          @media print {
-            .no-print { display: none; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="no-print" style="position: fixed; top: 0; left: 0; right: 0; background: #000; color: #fff; padding: 20px; text-align: center; font-family: sans-serif; z-index: 9999;">
-          <a href="/" style="display: block; text-decoration: none; background: #0ea5e9; color: white; padding: 16px 24px; border-radius: 12px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 12px rgba(14,165,233,0.3); border: none; text-transform: uppercase; letter-spacing: 1px;">
-            ← BACK TO BUSINESS HUB
-          </a>
-          <p style="font-size: 10px; margin-top: 10px; opacity: 0.6;">(Tap here to return to your shop if stuck)</p>
+      <body style="font-family: monospace; width: 80mm; padding: 20px;">
+        <div style="text-align: center;">
+          <h2>${shop.name || 'BUSINESS HUB'}</h2>
+          <p>${shop.tagline || ''}</p>
         </div>
-
-        <div class="header">
-          <div class="logo">BH PRO</div>
-          <div class="shop-name">${shop.name}</div>
-          <div style="font-size: 10px;">${shop.address || ''}</div>
-          <div style="font-size: 10px;">Ph: ${shop.phone || ''}</div>
-        </div>
-
-        <div class="details">
-          <div class="row"><span>Order:</span> <span>#${sale.id.slice(-6)}</span></div>
-          <div class="row"><span>Date:</span> <span>${new Date(sale.date).toLocaleDateString()}</span></div>
-          <div class="row"><span>Time:</span> <span>${new Date(sale.createdAt).toLocaleTimeString()}</span></div>
-          <div class="row"><span>Customer:</span> <span>${sale.customerName || 'Walk-in'}</span></div>
-        </div>
-
-        <div class="items">
-          <div class="item-row" style="font-weight:bold; font-size: 10px; border-bottom: 1px solid #000; margin-bottom: 5px;">
-            <span style="flex:2">Item</span>
-            <span style="flex:1; text-align:center">Qty</span>
-            <span style="flex:1; text-align:right">Price</span>
-          </div>
-          ${sale.items.map(item => `
-            <div class="item-row">
-              <span style="flex:2">${item.name}</span>
-              <span style="flex:1; text-align:center">${item.quantity}</span>
-              <span style="flex:1; text-align:right">${formatCurrency(item.price * item.quantity)}</span>
-            </div>
-          `).join('')}
-        </div>
-
-        <div class="totals">
-          <div class="row"><span>Subtotal:</span> <span>${formatCurrency(sale.total + (sale.discount || 0))}</span></div>
-          ${sale.discount ? `<div class="row"><span>Discount:</span> <span>-${formatCurrency(sale.discount)}</span></div>` : ''}
-          <div class="row total-big"><span>TOTAL:</span> <span>${formatCurrency(sale.total)}</span></div>
-          <div class="row" style="font-size:10px; margin-top: 5px;"><span>Paid via:</span> <span style="text-transform:uppercase;">${sale.paymentMode}</span></div>
-        </div>
-
-        <div class="footer">
-          <p>Thank you for shopping with us!</p>
-          <p>Software by Business Hub Pro</p>
-        </div>
-
-        <script>
-          window.onload = () => {
-            setTimeout(() => {
-              window.print();
-            }, 500);
-            
-            // Auto-close when the print dialog is finished
-            window.onfocus = () => {
-              setTimeout(() => {
-                window.close();
-              }, 300);
-            };
-          };
-        </script>
+        <hr/>
+        <p>No: ${invoiceNo}</p>
+        <p>Date: ${sale.date}</p>
+        <hr/>
+        <table style="width: 100%;">
+          ${sale.items.map(i => `<tr><td>${i.name}</td><td>${i.quantity}</td><td>${i.price}</td></tr>`).join('')}
+        </table>
+        <hr/>
+        <div style="text-align: right;"><b>TOTAL: RS ${sale.total}</b></div>
+        <p style="text-align: center; margin-top: 20px;">${shop.footer || 'Thank You!'}</p>
+        <script>window.onload = () => { window.print(); window.onfocus = () => window.close(); }</script>
       </body>
     </html>
   `;
 
-  printWindow.document.write(receiptHtml);
-  printWindow.document.close();
-  return true;
-};
+  const win = window.open('', '_blank', 'width=400,height=600');
+  if (win) {
+    win.document.write(html);
+    win.document.close();
+  }
+}

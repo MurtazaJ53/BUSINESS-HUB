@@ -16,7 +16,7 @@ export const staffRepo = {
        FROM staff WHERE tombstone = 0 ORDER BY name ASC;`,
     );
     return rows.map((r: any) => ({
-      ...r, permissions: r.permissions ? JSON.parse(r.permissions) : [],
+      ...r, permissions: r.permissions ? JSON.parse(r.permissions) : {},
     }));
   },
 
@@ -27,7 +27,7 @@ export const staffRepo = {
     );
     if (!rows.length) return null;
     const r = rows[0];
-    return { ...r, permissions: r.permissions ? JSON.parse(r.permissions) : [] };
+    return { ...r, permissions: r.permissions ? JSON.parse(r.permissions) : {} };
   },
 
   async upsert(s: Staff): Promise<void> {
@@ -35,7 +35,7 @@ export const staffRepo = {
       `INSERT OR REPLACE INTO staff (id, name, phone, email, role, joined_at, status, permissions, updated_at, dirty, tombstone)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0);`,
       [s.id, s.name, s.phone, s.email ?? null, s.role, s.joinedAt, s.status,
-       JSON.stringify(s.permissions || []), now()],
+       JSON.stringify(s.permissions || {}), now()],
     );
   },
 
@@ -57,7 +57,7 @@ export const staffRepo = {
        FROM staff WHERE dirty = 1;`,
     );
     return rows.map((r: any) => ({
-      ...r, permissions: r.permissions ? JSON.parse(r.permissions) : [],
+      ...r, permissions: r.permissions ? JSON.parse(r.permissions) : {},
     }));
   },
 
@@ -76,14 +76,14 @@ export const staffRepo = {
         `INSERT INTO staff (id, name, phone, email, role, joined_at, status, permissions, updated_at, dirty, tombstone)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0);`,
         [s.id, s.name, s.phone, s.email ?? null, s.role, s.joinedAt, s.status,
-         JSON.stringify(s.permissions || []), remoteUpdatedAt],
+         JSON.stringify(s.permissions || {}), remoteUpdatedAt],
       );
     } else if (remoteUpdatedAt > existing[0].updated_at || !existing[0].dirty) {
       await Database.run(
         `UPDATE staff SET name=?, phone=?, email=?, role=?, status=?, permissions=?,
                 updated_at=?, dirty=0, tombstone=0 WHERE id=?;`,
         [s.name, s.phone, s.email ?? null, s.role, s.status,
-         JSON.stringify(s.permissions || []), remoteUpdatedAt, s.id],
+         JSON.stringify(s.permissions || {}), remoteUpdatedAt, s.id],
       );
     }
   },
