@@ -36,9 +36,8 @@ import { useBusinessStore } from '@/lib/useBusinessStore';
 import { usePermission } from '@/hooks/usePermission';
 import type { InventoryItem, Sale } from '@/lib/types';
 import { useSqlQuery } from '@/db/hooks';
-import { auth, db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
-import bcrypt from 'bcryptjs';
+import { auth, db, functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
 import { formatCurrency, cn } from '@/lib/utils';
 import SyncStatusBadge from './SyncStatusBadge';
 
@@ -271,27 +270,17 @@ export default function AppLayout() {
       const { shopId } = useBusinessStore.getState();
       if (!shopId) throw new Error("Shop ID not identified.");
       
-      // 1. Fetch the stored hash from the private vault
-      const authSnap = await getDoc(doc(db, `shops/${shopId}/private`, 'auth'));
+      // 1. Call server-side verification function
+      const redeemPin = httpsCallable(functions, 'redeemAdminPin');
+      const result = await redeemPin({ pin: code, shopId });
       
-      if (!authSnap.exists()) {
-        throw new Error("Admin PIN not initialized. Please set it in Settings.");
+      const { success, error } = result.data as { success: boolean; error?: string };
+      
+      if (!success) {
+        throw new Error(error || "Incorrect Admin PIN.");
       }
       
-      const { adminPinHash } = authSnap.data();
-      
-      if (!adminPinHash) {
-        throw new Error("Security keys missing. Please reset in Settings.");
-      }
-      
-      // 2. Verify PIN locally using bcrypt
-      const isMatch = bcrypt.compareSync(code, adminPinHash);
-      
-      if (!isMatch) {
-        throw new Error("Incorrect Admin PIN.");
-      }
-      
-      // 3. Grant access
+      // 2. Grant access
       useBusinessStore.getState().setRole('admin');
       setShowUnlockModal(false);
       setPinEntry('');
