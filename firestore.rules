@@ -2,70 +2,46 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // HELPER: Check if the user is a logged-in member of the shop
+    // --- 0. HELPERS ---
+    
+    function auth() { return request.auth != null; }
+    
     function isMember(shopId) {
-      return request.auth != null && 
-             exists(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid));
+      return auth() && exists(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid));
     }
     
-    // HELPER: Check if the user is an administrator of the shop
     function isAdmin(shopId) {
-      return isMember(shopId) && 
-             get(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid)).data.role == 'admin';
+      return isMember(shopId) && get(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid)).data.role == 'admin';
     }
-    
-    // HELPER: Check for granular staff permissions (Matrix based)
-    // Prioritizes short-circuiting with Custom Claims for high performance.
+
+    // Granular permission check
     function can(shopId, module, action) {
       let claim = request.auth.token;
+      let hasClaim = claim.shopId == shopId && module in claim.perms && claim.perms[module][action] != null;
+      let staffData = get(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid)).data;
+      let dbPerm = staffData.get('permissions', {}).get(module, {}).get(action, false);
       
-      // 1. Check Custom Claims (Zero-latency short-circuit)
-      let hasClaimAccess = claim.shopId == shopId && 
-                          module in claim.perms && 
-                          (claim.perms[module][action] == true || 
-                           (claim.perms[module][action] is map && claim.perms[module][action].max != null));
-      
-      if (hasClaimAccess) return true;
-
-      // 2. Fallback: Database Check (For fresh syncs or admin elevation)
-      let staffDoc = get(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid));
-      let staff = staffDoc.data;
-      let matrix = staff.get('permissions', {});
-      let modPerms = matrix.get(module, {});
-      let actPerms = modPerms.get(action, false);
-      
-      return staff.role == 'admin' || 
-             actPerms == true || 
-             (actPerms is map && actPerms.max != null);
+      return auth() && (
+        hasClaim || 
+        staffData.role == 'admin' || 
+        dbPerm == true || (dbPerm is map && dbPerm.max != null)
+      );
     }
 
-    // HELPER: Validate 'override_price' discount limits
+    // Validate 'override_price' discount limits
     function isValidDiscount(shopId, discountVal) {
       if (discountVal <= 0) return true;
-      
       let claim = request.auth.token;
-      let hasClaimLimit = claim.shopId == shopId && 
-                          'sales' in claim.perms && 
-                          'override_price' in claim.perms.sales;
+      let staffData = get(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid)).data;
+      let hasClaim = claim.shopId == shopId && 'sales' in claim.perms && 'override_price' in claim.perms.sales;
+      let perm = hasClaim ? claim.perms.sales.override_price : staffData.get('permissions', {}).get('sales', {}).get('override_price', false);
       
-      if (hasClaimLimit) {
-        let perm = claim.perms.sales.override_price;
-        return perm == true || (perm is map && perm.max != null && discountVal <= perm.max);
-      }
-      
-      let staffDoc = get(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid));
-      let staff = staffDoc.data;
-      if (staff.role == 'admin') return true;
-      
-      let perm = staff.get('permissions', {}).get('sales', {}).get('override_price', false);
-      return perm == true || (perm is map && perm.max != null && discountVal <= perm.max);
+      return staffData.role == 'admin' || perm == true || (perm is map && perm.max != null && discountVal <= perm.max);
     }
 
-    // --- RULES MAPPING ---
+    // --- 1. SHOP HIERARCHY ---
 
     match /shops/{shopId} {
-      
-      // Public-ish Metadata (Read by members)
       allow read: if isMember(shopId);
       allow write: if isAdmin(shopId);
 
@@ -77,41 +53,44 @@ service cloud.firestore {
         allow delete: if can(shopId, 'inventory', 'delete');
       }
       
-      // Private Inventory Cost Data
+      // Cost Data
       match /inventory_private/{item} {
-        allow read: if can(shopId, 'inventory', 'view_cost') || isAdmin(shopId);
+        allow read: if can(shopId, 'inventory', 'view_cost');
         allow write: if isAdmin(shopId);
       }
       
-      // Sales Records
+      // Sales
       match /sales/{sale} {
         allow read: if can(shopId, 'sales', 'view');
-        allow create: if can(shopId, 'sales', 'create') && isValidDiscount(shopId, request.resource.data.discount);
+        allow create: if can(shopId, 'sales', 'create') && isValidDiscount(shopId, request.resource.data.get('discount', 0));
         allow update: if isAdmin(shopId);
-        allow delete: if can(shopId, 'sales', 'void_sale') || isAdmin(shopId);
+        allow delete: if can(shopId, 'sales', 'void_sale');
       }
       
       // Customers
-      match /customers/{customer} {
+      match /customers/{cust} {
         allow read: if can(shopId, 'customers', 'view');
-        allow write: if can(shopId, 'customers', 'create') || can(shopId, 'customers', 'edit');
+        allow write: if can(shopId, 'customers', 'edit') || can(shopId, 'customers', 'create');
         allow delete: if can(shopId, 'customers', 'delete');
       }
 
       // Expenses
-      match /expenses/{expense} {
+      match /expenses/{exp} {
         allow read: if can(shopId, 'expenses', 'view');
         allow create: if can(shopId, 'expenses', 'create');
         allow delete: if can(shopId, 'expenses', 'delete');
       }
 
-      // Staff Management
+      // Staff (Split Write: Self-update vs Admin)
       match /staff/{member} {
-        allow read: if can(shopId, 'team', 'view') || isMember(shopId);
-        allow write: if isAdmin(shopId) || can(shopId, 'team', 'edit');
+        allow read: if isMember(shopId) || can(shopId, 'team', 'view');
+        allow create, delete: if isAdmin(shopId);
+        allow update: if isAdmin(shopId) || (
+          auth() && request.auth.uid == member && 
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'permissions', 'salary'])
+        );
       }
       
-      // Staff Private (Salary/Internal PINs)
       match /staff_private/{member} {
         allow read, write: if isAdmin(shopId);
       }
@@ -119,7 +98,7 @@ service cloud.firestore {
       // Attendance
       match /attendance/{at} {
         allow read: if isMember(shopId);
-        allow write: if isAdmin(shopId) || (request.auth.uid == resource.data.staffId);
+        allow write: if isAdmin(shopId) || (auth() && request.auth.uid == request.resource.data.staffId);
       }
 
       // Invitations
@@ -127,18 +106,17 @@ service cloud.firestore {
         allow read, write: if isAdmin(shopId);
       }
 
-      // Private Vault (Hashed PINs, Security Keys)
-      match /private/{document=**} {
-        // PIN Verification Pivot: Staff must read the hash to verify locally
-        allow read: if isMember(shopId);
-        allow write: if isAdmin(shopId);
+      // Private Vault (Strictly blocked for all client direct access)
+      match /private/{doc=**} {
+        allow read, write: if false; 
       }
     }
 
-    // Global User Profiles
+    // --- 2. GLOBAL USER PROFILES ---
+
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId;
+      allow read: if auth();
+      allow write: if auth() && request.auth.uid == userId;
     }
   }
 }

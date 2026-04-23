@@ -10,3 +10,4 @@ export { onSaleWrite } from "./aggregates";
 export { computeVelocity } from "./velocity";
 export { agentTool, runAgent } from "./agents";
 export { onAlertCreated } from "./messaging";
+export { redeemAdminPin } from "./redeemAdminPin";
