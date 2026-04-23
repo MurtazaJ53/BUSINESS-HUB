@@ -10,15 +10,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { Cloud, CloudOff, Loader2, AlertTriangle, Check } from 'lucide-react';
-import { getSyncStatus, onSyncStatusChange, type SyncStatus } from '../db/syncEngine';
+import { SyncWorker, type SyncStatus } from '../sync/SyncWorker';
 import { cn } from '../lib/utils';
 
 export default function SyncStatusBadge() {
-  const [status, setStatus] = useState<SyncStatus>(getSyncStatus());
+  const [status, setStatus] = useState<SyncStatus>(SyncWorker.status);
 
   useEffect(() => {
-    const unsub = onSyncStatusChange(setStatus);
-    return unsub;
+    const unsub = SyncWorker.onStatusChange(setStatus);
+    return () => { unsub(); };
   }, []);
 
   const config: Record<SyncStatus, { icon: React.ElementType; label: string; color: string; bg: string }> = {

@@ -115,6 +115,16 @@ export const inventoryPrivateRepo = {
     );
   },
 
+  async getById(id: string): Promise<InventoryPrivate | null> {
+    const rows = await Database.query<InventoryPrivate>(
+      `SELECT id, cost_price as costPrice, supplier_id as supplierId,
+              last_purchase_date as lastPurchaseDate
+       FROM inventory_private WHERE id = ?;`,
+      [id],
+    );
+    return rows[0] ?? null;
+  },
+
   async upsert(item: InventoryPrivate): Promise<void> {
     await Database.run(
       `INSERT OR REPLACE INTO inventory_private (id, cost_price, supplier_id, last_purchase_date, updated_at, dirty)

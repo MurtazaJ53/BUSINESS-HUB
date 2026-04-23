@@ -9,5 +9,5 @@ export { customersRepo, customerPaymentsRepo } from './repositories/customersRep
 export { expensesRepo } from './repositories/expensesRepo';
 export { staffRepo, staffPrivateRepo, attendanceRepo } from './repositories/staffRepo';
 export { outboxRepo } from './repositories/outboxRepo';
-export { startSync, stopSync, getSyncStatus, onSyncStatusChange, onDataChange } from './syncEngine';
-export type { SyncStatus } from './syncEngine';
+export { SyncWorker } from '../sync/SyncWorker';
+export type { SyncStatus } from '../sync/SyncWorker';

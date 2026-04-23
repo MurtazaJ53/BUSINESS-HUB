@@ -205,7 +205,8 @@ export default function Team() {
   });
   const [generatingInvite, setGeneratingInvite] = useState(false);
   const shopId = shop?.phone; // Consistent with other pages using shopId as primary key or phone identifier if needed, I should check how shopId is handled in useBusinessStore. Actually useBusinessStore has it.
-  const { shopId: storeShopId, currentStaff, expenses } = useBusinessStore(); 
+  const { shopId: storeShopId, currentStaff } = useBusinessStore(); 
+  const expenses = useSqlQuery<any>('SELECT * FROM expenses WHERE tombstone = 0 ORDER BY date DESC', [], ['expenses']);
   
   // --- New Modal State ---
   const [payoutStaff, setPayoutStaff] = useState<Staff | null>(null);
