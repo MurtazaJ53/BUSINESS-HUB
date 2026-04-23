@@ -22,9 +22,10 @@ import type { Customer, Sale, CustomerPayment } from '@/lib/types';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
 export default function Customers() {
-  const { upsertCustomer, deleteCustomer, addCustomerPayment, customerPayments } = useBusinessStore();
+  const { upsertCustomer, deleteCustomer, addCustomerPayment } = useBusinessStore();
   const customers = useSqlQuery<Customer>('SELECT * FROM customers WHERE tombstone = 0 ORDER BY name ASC', [], ['customers']);
   const sales = useSqlQuery<Sale>('SELECT * FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC', [], ['sales']);
+  const customerPayments = useSqlQuery<CustomerPayment>('SELECT * FROM customer_payments WHERE tombstone = 0', [], ['customer_payments']);
   const [search, setSearch] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null);

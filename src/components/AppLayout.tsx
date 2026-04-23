@@ -34,7 +34,8 @@ import { useRef, lazy } from 'react';
 import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { usePermission } from '@/hooks/usePermission';
-import type { InventoryItem } from '@/lib/types';
+import type { InventoryItem, Sale } from '@/lib/types';
+import { useSqlQuery } from '@/db/hooks';
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import bcrypt from 'bcryptjs';
@@ -114,9 +115,7 @@ export default function AppLayout() {
   const activeTab = location.pathname.substring(1) || 'dashboard';
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { sales, inventory, shop, theme, setTheme, role, currentStaff, setActiveTab } = useBusinessStore(useShallow(state => ({
-    sales: state.sales,
-    inventory: state.inventory,
+  const { shop, theme, setTheme, role, currentStaff, setActiveTab } = useBusinessStore(useShallow(state => ({
     shop: state.shop,
     theme: state.theme,
     setTheme: state.setTheme,
@@ -124,6 +123,8 @@ export default function AppLayout() {
     currentStaff: state.currentStaff,
     setActiveTab: state.setActiveTab
   })));
+  const sales = useSqlQuery<Sale>('SELECT * FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC', [], ['sales']);
+  const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
   const canViewCost = usePermission('inventory', 'view_cost');
   const canViewProfit = usePermission('sales', 'view_profit');
   const canViewAnalytics = usePermission('analytics', 'view');

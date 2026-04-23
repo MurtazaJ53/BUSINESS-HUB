@@ -13,12 +13,14 @@ import { calculateForecast } from '@/lib/forecast';
 import type { Sale, InventoryItem, InventoryPrivate, CustomerPayment, Expense, SaleItem } from '@/lib/types';
 
 export default function Analytics() {
-  const { customerPayments, expenses: storeExpenses, role } = useBusinessStore();
+  const { role } = useBusinessStore();
   const canViewCost = usePermission('inventory', 'view_cost');
   const canViewProfit = usePermission('sales', 'view_profit');
   const sales = useSqlQuery<Sale>('SELECT * FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC', [], ['sales']);
   const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
   const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
+  const customerPayments = useSqlQuery<CustomerPayment>('SELECT * FROM customer_payments WHERE tombstone = 0', [], ['customer_payments']);
+  const storeExpenses = useSqlQuery<Expense>('SELECT * FROM expenses WHERE tombstone = 0 ORDER BY date DESC', [], ['expenses']);
   const [period, setPeriod] = useState<'week' | 'month' | 'custom'>('week');
   
   const todayStr = new Date().toISOString().split('T')[0];

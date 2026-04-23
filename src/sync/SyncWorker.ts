@@ -267,7 +267,10 @@ class SyncWorkerEngine {
         );
 
         this.unsubscribers.push(
-          onSnapshot(q, async (snap) => {
+          onSnapshot(q, { includeMetadataChanges: true }, async (snap) => {
+            // IGNORE local optimistic writes from the snapshot to prevent echo loops
+            if (snap.metadata.hasPendingWrites) return;
+
             let latestSeenTimestamp = watermark;
 
             for (const ch of snap.docChanges()) {
