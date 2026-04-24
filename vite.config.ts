@@ -1,6 +1,5 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import fs from "fs";
 
@@ -10,12 +9,12 @@ const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, "package.json"), 
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: './',
   plugins: [
     react(), 
-    tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg', 'sql-wasm.wasm'],
       manifest: {
         name: 'Business Hub ERP',
         short_name: 'BizHub',
@@ -48,14 +47,6 @@ export default defineConfig({
   },
   server: {
     port: 5174,
-  },
-  css: {
-    // Inline empty PostCSS config to prevent inheriting the parent
-    // project's postcss.config.js (which uses Tailwind v3).
-    // Tailwind v4 is handled by the @tailwindcss/vite plugin above.
-    postcss: {
-      plugins: [],
-    },
   },
   build: {
     rollupOptions: {

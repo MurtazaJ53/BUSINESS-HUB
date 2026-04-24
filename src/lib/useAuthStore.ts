@@ -1,97 +1,129 @@
 import { create } from 'zustand';
-import { auth, db } from './firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { devtools } from 'zustand/middleware';
+import { auth } from './firebase';
+import { onIdTokenChanged, User } from 'firebase/auth';
 
-let alreadyAttachedBeforeUnload = false;
+// 1. Strict Type Definitions matching our Backend Claims
+export type AppRole = 'admin' | 'staff' | 'manager' | 'suspended' | null;
 
 interface AuthState {
+  // 📦 State
   user: User | null;
   shopId: string | null;
-  role: 'admin' | 'staff' | null;
+  role: AppRole;
+  permissions: Record<string, any> | null;
+  isElevatedAdmin: boolean; // Tracks if they successfully entered the Admin PIN
   loading: boolean;
   initialized: boolean;
+  error: string | null;
   unsubscribe: (() => void) | null;
 
-  setUser: (user: User | null) => void;
-  setShopContext: (shopId: string, role: 'admin' | 'staff') => void;
+  // 🚀 Actions
   initialize: () => void;
   cleanup: () => void;
+  clearSession: (errorMessage?: string) => void;
+  forceTokenRefresh: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
-  user: null,
-  shopId: null,
-  role: null,
-  loading: true,
-  initialized: false,
-  unsubscribe: null,
+export const useAuthStore = create<AuthState>()(
+  devtools(
+    (set, get) => ({
+      // Initial State
+      user: null,
+      shopId: null,
+      role: null,
+      permissions: null,
+      isElevatedAdmin: false,
+      loading: true, 
+      initialized: false,
+      error: null,
+      unsubscribe: null,
 
-  setUser: (user) => set({ user, loading: false }),
-  
-  setShopContext: (shopId, role) => set({ shopId, role }),
+      clearSession: (errorMessage) => {
+        set({
+          user: null,
+          shopId: null,
+          role: null,
+          permissions: null,
+          isElevatedAdmin: false,
+          error: errorMessage,
+          loading: false,
+          initialized: true,
+        }, false, 'auth/clearSession');
+      },
 
-  initialize: () => {
-    // 1. CLEANUP PREVIOUS: If an initialize is called again, kill the old listener first
-    const existingUnsub = get().unsubscribe;
-    if (existingUnsub) existingUnsub();
-
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      set({ loading: true });
-      try {
+      forceTokenRefresh: async () => {
+        const user = auth.currentUser;
         if (user) {
-          // GUEST SESSION PROTECTION: Setup "Wipe on Close" one-shot
-          if (user.isAnonymous && !alreadyAttachedBeforeUnload) {
-            alreadyAttachedBeforeUnload = true;
-            window.addEventListener('beforeunload', () => {
-              auth.signOut();
-            });
-          }
+          set({ loading: true }, false, 'auth/forcingRefresh');
+          await user.getIdToken(true); // Forces Firebase to fetch the latest claims
+        }
+      },
 
-          // Fetch user profile from Firestore to get shop context
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          if (userDoc.exists()) {
-            const data = userDoc.data();
-            
-            // SECURITY GUARD: If they are a staff member, verify they still exist in the shop's staff roster
-            if (data.role === 'staff' && data.shopId) {
-              const staffDoc = await getDoc(doc(db, `shops/${data.shopId}/staff`, user.uid));
-              if (!staffDoc.exists()) {
-                console.warn('RECURSIVE SECURITY: Staff member no longer exists in shop roster. Revoking access.');
-                set({ user, shopId: null, role: null, initialized: true });
-                return;
-              }
+      initialize: () => {
+        const { unsubscribe: existingUnsub, clearSession } = get();
+        if (existingUnsub) existingUnsub();
+
+        const unsub = onIdTokenChanged(auth, async (user) => {
+          if (!get().initialized) set({ loading: true }, false, 'auth/loading');
+
+          try {
+            if (!user) {
+              clearSession();
+              return;
             }
 
-            set({ 
-              user, 
-              shopId: data.shopId, 
-              role: data.role, 
-              initialized: true 
-            });
-          } else {
-            // New user, verified auth but no shop link in Firestore yet
-            set({ user, shopId: null, role: null, initialized: true });
+            const tokenResult = await user.getIdTokenResult();
+            const claims = tokenResult.claims;
+
+            if (claims.role === 'suspended') {
+              console.warn(`[Security] User ${user.uid} is suspended. Access blocked.`);
+              clearSession('Your account has been suspended by management.');
+              return;
+            }
+
+            if (!claims.shopId) {
+              set({ 
+                user, 
+                shopId: null, 
+                role: null,
+                permissions: null,
+                isElevatedAdmin: false,
+                error: null,
+                loading: false, 
+                initialized: true 
+              }, false, 'auth/newProfilePending');
+              return;
+            }
+
+            set({
+              user,
+              shopId: claims.shopId as string,
+              role: claims.role as AppRole,
+              permissions: claims.perms as Record<string, any> || null,
+              isElevatedAdmin: !!claims.shopAdmin,
+              error: null,
+              loading: false,
+              initialized: true,
+            }, false, 'auth/sessionEstablished');
+
+          } catch (error: any) {
+            console.error('[Auth Initialization Error]:', error);
+            clearSession(error.message || 'Failed to initialize secure session.');
           }
-        } else {
-          set({ user: null, shopId: null, role: null, initialized: true });
+        });
+
+        set({ unsubscribe: unsub }, false, 'auth/setUnsubscribe');
+      },
+
+      cleanup: () => {
+        const { unsubscribe } = get();
+        if (unsubscribe) {
+          unsubscribe();
+          set({ unsubscribe: null }, false, 'auth/cleanup');
         }
-      } catch (error) {
-        console.error("Auth initialization error:", error);
-        set({ user: null, shopId: null, role: null, initialized: true });
-      } finally {
-        set({ loading: false });
-      }
-    });
-
-    set({ unsubscribe: unsub });
-  },
-
-  cleanup: () => {
-    const unsub = get().unsubscribe;
-    if (unsub) {
-      unsub();
-      set({ unsubscribe: null });
-    }
-  }
-}));
+      },
+    }),
+    { name: 'AuthStore' }
+  )
+);

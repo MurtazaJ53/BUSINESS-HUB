@@ -33,13 +33,13 @@ import { NativeBiometric } from '@capgo/capacitor-native-biometric';
 import { useRef, lazy } from 'react';
 import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { useBusinessStore } from '@/lib/useBusinessStore';
+import { useAuthStore } from '@/lib/useAuthStore';
 import { usePermission } from '@/hooks/usePermission';
 import type { InventoryItem, Sale } from '@/lib/types';
 import { useSqlQuery } from '@/db/hooks';
 import { auth, db, functions } from '@/lib/firebase';
 import { httpsCallable } from 'firebase/functions';
 import { formatCurrency, cn } from '@/lib/utils';
-import SyncStatusBadge from './SyncStatusBadge';
 
 interface NavItemProps {
   icon: React.ElementType;
@@ -50,12 +50,15 @@ interface NavItemProps {
 
 const NavItem = ({ icon: Icon, label, active, onClick }: NavItemProps) => (
   <button
-    onClick={onClick}
+    onClick={(e) => {
+      e.stopPropagation();
+      onClick();
+    }}
     className={cn(
       "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group w-full text-left",
       active 
         ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" 
-        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+        : "text-sidebar-foreground/60 hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground"
     )}
   >
     <Icon className={cn("h-5 w-5 shrink-0", active ? "scale-110" : "group-hover:scale-110 transition-transform")} />
@@ -113,14 +116,16 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const activeTab = location.pathname.substring(1) || 'dashboard';
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { shop, theme, setTheme, role, currentStaff, setActiveTab } = useBusinessStore(useShallow(state => ({
+  const { shop, shopId, theme, setTheme, role, currentStaff, setActiveTab, sidebarOpen, setSidebarOpen } = useBusinessStore(useShallow(state => ({
     shop: state.shop,
+    shopId: state.shopId,
     theme: state.theme,
     setTheme: state.setTheme,
     role: state.role,
     currentStaff: state.currentStaff,
-    setActiveTab: state.setActiveTab
+    setActiveTab: state.setActiveTab,
+    sidebarOpen: state.sidebarOpen,
+    setSidebarOpen: state.setSidebarOpen
   })));
   const sales = useSqlQuery<Sale>('SELECT * FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC', [], ['sales']);
   const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
@@ -133,6 +138,7 @@ export default function AppLayout() {
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const [pinEntry, setPinEntry] = useState('');
   const [pinError, setPinError] = useState(false);
+  const [pinErrorMsg, setPinErrorMsg] = useState('');
   const [pinLoading, setPinLoading] = useState(false);
   
   const notifRef = useRef<HTMLDivElement>(null);
@@ -157,6 +163,47 @@ export default function AppLayout() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // --- UNIVERSAL ADMIN HEALING ---
+  // Ensure that if a user has the 'admin' role, they exist in the shop's staff roster.
+  useEffect(() => {
+    async function healAdmin() {
+      const { user } = useAuthStore.getState();
+      const { shopId, role } = useBusinessStore.getState();
+      
+      if (user && shopId && role === 'admin') {
+        try {
+          const { db } = await import('@/lib/firebase');
+          const { getDoc, setDoc, doc } = await import('firebase/firestore');
+          const staffRef = doc(db, `shops/${shopId}/staff`, user.uid);
+          const staffSnap = await getDoc(staffRef);
+          
+          if (!staffSnap.exists() || staffSnap.data()?.role !== 'admin') {
+            console.log("[Auto-Heal] Missing or incorrect admin staff record. Repairing roster...");
+            await setDoc(staffRef, {
+              id: user.uid,
+              name: user.displayName || user.email?.split('@')[0] || 'Admin',
+              email: user.email || '',
+              role: 'admin',
+              status: 'active',
+              joinedAt: new Date().toISOString(),
+              permissions: {
+                analytics: { view: true },
+                inventory: { view: true, edit: true, view_cost: true },
+                sales: { view: true, edit: true },
+                customers: { view: true, edit: true },
+                expenses: { view: true, edit: true },
+                settings: { edit: true }
+              }
+            });
+          }
+        } catch (e) {
+          console.error("[Auto-Heal] Failed:", e);
+        }
+      }
+    }
+    healAdmin();
+  }, [role, shopId]);
 
   // SCROLL-LOCK ARMOR: Freeze background when sidebar is open
   useEffect(() => {
@@ -215,15 +262,35 @@ export default function AppLayout() {
     setSidebarOpen(false); // close mobile sidebar on nav
   };
 
-  const handleLogout = () => {
-    const { logout } = useBusinessStore.getState();
-    logout();
+  const handleLogout = async () => {
+    try {
+      const { logout } = useBusinessStore.getState();
+      const { clearSession } = useAuthStore.getState();
+      
+      // 1. Clear UI state
+      logout();
+      clearSession();
+      
+      // 2. Terminate Firebase session
+      await auth.signOut();
+      
+      // 3. Clear any redirect persistence
+      window.localStorage.clear();
+      window.sessionStorage.clear();
+      
+      // 4. Force Hard Reload for total state isolation
+      console.log("Logged out. Redirecting to Entry...");
+      window.location.href = '/';
+    } catch (err) {
+      console.error("Logout failure:", err);
+      window.location.href = '/';
+    }
   };
 
   const handleRoleSwitch = async (newRole: 'admin' | 'staff') => {
     const { setRole } = useBusinessStore.getState();
     if (newRole === 'staff') {
-      setRole('staff');
+      setRole('staff', true);
       setProfileOpen(false);
       // SECURITY REDIRECT: If staff mode is enabled, force them away from sensitive tabs
       const protectedTabs = ['settings', 'inventory', 'analytics', 'expenses', 'stock-alerts'];
@@ -232,22 +299,60 @@ export default function AppLayout() {
       }
     } else {
       setProfileOpen(false);
-      // Try Biometric First
+      // --- SELF-HEALING ADMIN ---
+      // If the user profile says 'admin' but they are missing from staff, heal it.
+      if (useBusinessStore.getState().role === 'admin' && auth.currentUser) {
+        try {
+          const { db } = await import('@/lib/firebase');
+          const { getDoc, setDoc, doc } = await import('firebase/firestore');
+          const uid = auth.currentUser.uid;
+          const { shopId } = useBusinessStore.getState();
+          
+          if (shopId) {
+            const staffDoc = await getDoc(doc(db, `shops/${shopId}/staff`, uid));
+            if (!staffDoc.exists()) {
+              console.log("Heal: Adding admin to shop staff roster...");
+              await setDoc(doc(db, `shops/${shopId}/staff`, uid), {
+                id: uid,
+                name: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || 'Admin',
+                email: auth.currentUser.email || '',
+                role: 'admin',
+                status: 'active',
+                joinedAt: new Date().toISOString(),
+                permissions: {
+                  analytics: { view: true },
+                  inventory: { view: true, edit: true, view_cost: true },
+                  sales: { view: true, edit: true },
+                  customers: { view: true, edit: true },
+                  expenses: { view: true, edit: true },
+                  settings: { edit: true }
+                }
+              });
+            }
+          }
+        } catch (healErr) {
+          console.error("Heal prevented:", healErr);
+        }
+      }
+
+      // Try Biometric First with a fail-fast approach
       try {
         const result = await NativeBiometric.isAvailable();
         if (result.isAvailable) {
-          await NativeBiometric.verifyIdentity({
+          const verified = await NativeBiometric.verifyIdentity({
             reason: "Authorize Admin Access",
             title: "Security Check",
             subtitle: "Use biometrics to unlock admin features",
             description: "Accessing sensitive business data",
-          });
-          
-          useBusinessStore.getState().setRole('admin');
-          return;
+          }).catch(() => false); // Catch failure and return false to trigger PIN
+
+          if (verified) {
+            useBusinessStore.getState().setRole('admin', false);
+            return;
+          }
         }
       } catch (e) {
-        console.warn('Biometric failed or cancelled', e);
+        console.warn('Biometric unavailable, falling back to PIN');
       }
       
       // Fallback to PIN
@@ -264,6 +369,29 @@ export default function AppLayout() {
     }
   };
 
+  // --- ⌨️ KEYBOARD SHORTCUTS FOR MASTER AUTH ---
+  useEffect(() => {
+    if (!showUnlockModal) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 1. PIN Digits (Supports Main Numbers and Numpad)
+      if (e.key >= '0' && e.key <= '9') {
+        handlePinPress(e.key);
+      }
+      // 2. Backspace (Remove last digit)
+      if (e.key === 'Backspace') {
+        setPinEntry(prev => prev.slice(0, -1));
+      }
+      // 3. Escape (Close modal)
+      if (e.key === 'Escape') {
+        setShowUnlockModal(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showUnlockModal, pinEntry]);
+
   const verifyAdminPin = async (code: string) => {
     setPinLoading(true);
     try {
@@ -273,21 +401,46 @@ export default function AppLayout() {
       // 1. Call server-side verification function
       const redeemPin = httpsCallable(functions, 'redeemAdminPin');
       const result = await redeemPin({ pin: code, shopId });
-      
       const { success, error } = result.data as { success: boolean; error?: string };
       
       if (!success) {
         throw new Error(error || "Incorrect Admin PIN.");
       }
       
-      // 2. Grant access
-      useBusinessStore.getState().setRole('admin');
+      const { setRole } = useBusinessStore.getState();
+      const { forceTokenRefresh } = useAuthStore.getState();
+      
+      // Update UI state immediately and CLEAR persistent lock
+      setRole('admin', false);
+      
+      // --- BLOCKER #8 FIX: FORCE TOKEN REFRESH ---
+      // Pick up the new custom claim (shopAdmin) immediately
+      try {
+        await forceTokenRefresh();
+      } catch (tokenErr) {
+        console.error("Token refresh failed, but local state updated:", tokenErr);
+      }
+
       setShowUnlockModal(false);
       setPinEntry('');
-    } catch (error: any) {
-      console.error('PIN Verification Failed:', error);
-      setPinError(true);
-      setPinEntry('');
+      navigate('/settings');
+    } catch (err: any) {
+      console.error("PIN Verification Failed:", err);
+      // DETECT UNINITIALIZED PIN: If it's a new shop, redirect to Settings to set it
+      if (err.message?.includes("not initialized") || err.code === 'not-found') {
+        setPinErrorMsg("Security Master PIN not set yet. Try default '5253' or open Settings...");
+        setTimeout(() => {
+          setShowUnlockModal(false);
+          setPinEntry('');
+          const { setRole } = useBusinessStore.getState();
+          setRole('admin'); // Temporary elevation to allow PIN setup
+          navigate('/settings');
+        }, 2000);
+      } else {
+        setPinError(true);
+        setPinErrorMsg(err.message || 'Verification Error');
+        setPinEntry('');
+      }
     } finally {
       setPinLoading(false);
     }
@@ -298,14 +451,14 @@ export default function AppLayout() {
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-black/85 backdrop-blur-md lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-[60] w-64 bg-card border-r border-border transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 lg:z-auto no-print shadow-2xl lg:shadow-none overflow-hidden flex flex-col",
+        "fixed inset-y-0 left-0 z-[100] w-64 bg-sidebar border-r border-border transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 lg:z-auto no-print shadow-2xl lg:shadow-none overflow-hidden flex flex-col backdrop-blur-3xl",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         {/* Mobile Close Button - Executive Hit-Area */}
@@ -319,13 +472,13 @@ export default function AppLayout() {
 
         <div className="flex flex-col h-full p-4 overflow-y-auto scroll-smooth">
           {/* Logo */}
-          <div className="flex items-center gap-3 px-2 mb-8 mt-2">
-            <div className="h-10 w-10 premium-gradient rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/30">
+          <div className="flex items-center gap-3 px-2 mb-8 mt-2 safe-area-top">
+            <div className="h-10 w-10 premium-gradient rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/30 shrink-0">
               <Store className="h-6 w-6" />
             </div>
-            <div>
-              <h1 className="text-lg font-black tracking-tight text-foreground">Business Hub</h1>
-              <p className="text-[10px] text-foreground/50 font-black uppercase tracking-[0.2em]">Pro Edition</p>
+            <div className="min-w-0">
+              <h1 className="text-lg font-black tracking-tight text-sidebar-foreground truncate">{shop.name}</h1>
+              <p className="text-[10px] text-sidebar-foreground/50 font-black uppercase tracking-[0.2em] truncate">Pro Edition</p>
             </div>
           </div>
 
@@ -333,7 +486,6 @@ export default function AppLayout() {
           <nav className="flex-1 space-y-1">
             {NAV_ITEMS
               .filter(item => {
-                const { role, currentStaff } = useBusinessStore.getState();
                 if (role === 'admin') return true;
                 if (!currentStaff?.permissions) return false;
                 
@@ -361,7 +513,10 @@ export default function AppLayout() {
                     icon={item.icon}
                     label={label}
                     active={activeTab === item.id}
-                    onClick={() => navigate(item.id)}
+                    onClick={() => {
+                      navigate(item.id);
+                      setSidebarOpen(false);
+                    }}
                   />
                 );
               })}
@@ -369,33 +524,26 @@ export default function AppLayout() {
 
           {/* Bottom nav */}
           <div className="pt-4 border-t border-border space-y-1">
-            {useBusinessStore.getState().role === 'admin' && (
-              <NavItem
-                icon={Settings}
-                label="Settings"
-                active={activeTab === 'settings'}
-                onClick={() => navigate('settings')}
-              />
-            )}
+            <NavItem
+              icon={SettingsIcon}
+              label="Settings"
+              active={activeTab === 'settings'}
+              onClick={() => {
+                navigate('settings');
+                setSidebarOpen(false);
+              }}
+            />
             
             {/* INSTANT LOGOUT HUD */}
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all group"
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-500/10 text-sidebar-foreground/60 hover:text-red-500 transition-all group"
               title="Terminate Current Session"
             >
               <LogOut className="h-5 w-5 group-hover:scale-110 transition-transform" />
               <span className="font-semibold text-sm">Instant Logout</span>
             </button>
 
-            {/* User badge */}
-            <div className="flex items-center gap-3 px-4 py-3 mt-1">
-              <div className="h-8 w-8 rounded-full premium-gradient shrink-0" />
-              <div className="min-w-0">
-                <p className="text-sm font-black truncate capitalize text-foreground">{role || 'User'}</p>
-                <p className="text-[10px] text-foreground/40 truncate font-bold uppercase tracking-tighter">Local Standalone Session</p>
-              </div>
-            </div>
           </div>
         </div>
       </aside>
@@ -403,7 +551,7 @@ export default function AppLayout() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-full min-w-0 overflow-hidden relative">
         {/* Topbar */}
-        <header className="h-16 shrink-0 flex items-center justify-between px-6 border-b border-border bg-background/80 backdrop-blur-md z-30 no-print">
+        <header className="shrink-0 flex items-center justify-between px-6 border-b border-border bg-background/80 backdrop-blur-md z-30 no-print app-top-bar pb-3">
           <div className="flex items-center gap-2">
             {/* Sidebar Toggle - ALWAYS VISIBLE */}
             <button
@@ -419,8 +567,6 @@ export default function AppLayout() {
             </span>
           </div>
 
-          {/* Sync Status Badge */}
-          <SyncStatusBadge />
 
           {/* Topbar right */}
           <div className="flex items-center gap-3 ml-auto">
@@ -438,10 +584,10 @@ export default function AppLayout() {
             </button>
             {/* Today's revenue badge - ADMIN ONLY */}
             {canViewProfit && (
-              <div className="flex items-center gap-2 bg-primary/5 px-4 py-2 rounded-2xl border border-primary/20" title="Today's Revenue">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                <span className="text-sm font-black text-foreground">{formatCurrency(todayRevenue)}</span>
-                <span className="text-[9px] text-primary font-black uppercase tracking-widest">today</span>
+              <div className="flex items-center gap-2 bg-primary/5 px-3 py-1.5 rounded-2xl border border-primary/20 shrink-0" title="Today's Revenue">
+                <TrendingUp className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-sm font-black text-foreground whitespace-nowrap">{formatCurrency(todayRevenue)}</span>
+                <span className="hidden xs:block text-[9px] text-primary font-black uppercase tracking-widest">today</span>
               </div>
             )}
 
@@ -626,21 +772,26 @@ export default function AppLayout() {
                 </button>
               </div>
 
-              {/* PIN Display */}
-              <div className="flex justify-center gap-4 mb-10">
-                {[...Array(4)].map((_, i) => (
-                  <div 
-                    key={i}
-                    className={`h-3 w-3 rounded-full border-2 transition-all duration-300 ${
-                      pinEntry.length > i 
-                        ? 'bg-primary border-primary scale-125 shadow-[0_0_10px_rgba(14,165,233,0.5)]' 
-                        : pinError 
-                          ? 'border-red-500/50 animate-shake' 
-                          : 'border-muted-foreground/30'
-                    }`}
-                  />
-                ))}
-              </div>
+                <div className="flex justify-center gap-4 mb-4">
+                  {[...Array(4)].map((_, i) => (
+                    <div 
+                      key={i}
+                      className={`h-3 w-3 rounded-full border-2 transition-all duration-300 ${
+                        pinEntry.length > i 
+                          ? 'bg-primary border-primary scale-125 shadow-[0_0_10px_rgba(14,165,233,0.5)]' 
+                          : pinError 
+                            ? 'border-red-500/50 animate-shake' 
+                            : 'border-muted-foreground/30'
+                      }`}
+                    />
+                  ))}
+                </div>
+
+                {pinErrorMsg && (
+                  <p className="text-center text-[10px] text-red-500 mb-6 font-black uppercase tracking-widest animate-bounce px-4">
+                    {pinErrorMsg}
+                  </p>
+                )}
 
               {/* Pad */}
               <div className="grid grid-cols-3 gap-3">
@@ -679,8 +830,8 @@ export default function AppLayout() {
         )}
 
         {/* Page content */}
-        <div className="flex-1 overflow-y-auto no-print">
-          <div className="max-w-7xl mx-auto p-6 md:p-8">
+        <div className="flex-1 overflow-y-auto no-print pt-4 lg:pt-0">
+          <div className="max-w-7xl mx-auto p-4 md:p-8 pt-6 sm:pt-8 lg:pt-10">
             <Suspense fallback={
               <div className="flex flex-col items-center justify-center py-20 gap-4 animate-pulse">
                 <Loader2 className="h-10 w-10 text-primary animate-spin" />

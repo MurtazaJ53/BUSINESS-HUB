@@ -14,42 +14,49 @@ service cloud.firestore {
       return isMember(shopId) && get(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Granular permission check
+    // Granular permission check - Single return expression version
     function can(shopId, module, action) {
-      let claim = request.auth.token;
-      let hasClaim = claim.shopId == shopId && module in claim.perms && claim.perms[module][action] != null;
-      let staffData = get(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid)).data;
-      let dbPerm = staffData.get('permissions', {}).get(module, {}).get(action, false);
-      
       return auth() && (
-        hasClaim || 
-        staffData.role == 'admin' || 
-        dbPerm == true || (dbPerm is map && dbPerm.max != null)
+        (request.auth.token.get('shopId', '') == shopId && 
+         module in request.auth.token.get('perms', {}) && 
+         request.auth.token.perms[module].get(action, null) != null) ||
+        (get(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid)).data.role == 'admin') ||
+        (get(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid)).data.get('permissions', {}).get(module, {}).get(action, false) == true) ||
+        (get(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid)).data.get('permissions', {}).get(module, {}).get(action, false) is map && 
+         get(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid)).data.get('permissions', {}).get(module, {}).get(action, false).max != null)
       );
     }
 
-    // Validate 'override_price' discount limits
+    // Validate 'override_price' discount limits - Single return expression version
     function isValidDiscount(shopId, discountVal) {
-      if (discountVal <= 0) return true;
-      let claim = request.auth.token;
-      let staffData = get(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid)).data;
-      let hasClaim = claim.shopId == shopId && 'sales' in claim.perms && 'override_price' in claim.perms.sales;
-      let perm = hasClaim ? claim.perms.sales.override_price : staffData.get('permissions', {}).get('sales', {}).get('override_price', false);
-      
-      return staffData.role == 'admin' || perm == true || (perm is map && perm.max != null && discountVal <= perm.max);
+      return discountVal <= 0 || 
+             (get(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid)).data.role == 'admin') ||
+             (request.auth.token.get('shopId', '') == shopId && 
+              'sales' in request.auth.token.get('perms', {}) && 
+              'override_price' in request.auth.token.perms.sales &&
+              (request.auth.token.perms.sales.override_price == true || 
+               (request.auth.token.perms.sales.override_price is map && 
+                request.auth.token.perms.sales.override_price.max != null && 
+                discountVal <= request.auth.token.perms.sales.override_price.max))) ||
+             (get(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid)).data.get('permissions', {}).get('sales', {}).get('override_price', false) == true ||
+              (get(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid)).data.get('permissions', {}).get('sales', {}).get('override_price', false) is map &&
+               get(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid)).data.get('permissions', {}).get('sales', {}).get('override_price', false).max != null &&
+               discountVal <= get(/databases/$(database)/documents/shops/$(shopId)/staff/$(request.auth.uid)).data.get('permissions', {}).get('sales', {}).get('override_price', false).max));
     }
 
     // --- 1. SHOP HIERARCHY ---
 
     match /shops/{shopId} {
-      allow read: if isMember(shopId);
-      allow write: if isAdmin(shopId);
+      allow read: if isMember(shopId) || (auth() && resource.data.ownerId == request.auth.uid);
+      allow create: if auth() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isAdmin(shopId) || (auth() && resource.data.ownerId == request.auth.uid);
+      allow delete: if auth() && resource.data.ownerId == request.auth.uid;
 
       // Inventory
       match /inventory/{item} {
         allow read: if can(shopId, 'inventory', 'view');
         allow create: if can(shopId, 'inventory', 'create');
-        allow update: if can(shopId, 'inventory', 'edit');
+        allow update: if can(shopId, 'inventory', 'edit') && (request.resource.data.get('stock', null) == null || request.resource.data.stock >= 0);
         allow delete: if can(shopId, 'inventory', 'delete');
       }
       
@@ -83,12 +90,8 @@ service cloud.firestore {
 
       // Staff (Split Write: Self-update vs Admin)
       match /staff/{member} {
-        allow read: if isMember(shopId) || can(shopId, 'team', 'view');
-        allow create, delete: if isAdmin(shopId);
-        allow update: if isAdmin(shopId) || (
-          auth() && request.auth.uid == member && 
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'permissions', 'salary'])
-        );
+        allow read: if isMember(shopId) || can(shopId, 'team', 'view') || (auth() && get(/databases/$(database)/documents/shops/$(shopId)).data.ownerId == request.auth.uid);
+        allow write: if isAdmin(shopId) || (auth() && get(/databases/$(database)/documents/shops/$(shopId)).data.ownerId == request.auth.uid);
       }
       
       match /staff_private/{member} {
@@ -98,7 +101,7 @@ service cloud.firestore {
       // Attendance
       match /attendance/{at} {
         allow read: if isMember(shopId);
-        allow write: if isAdmin(shopId) || (auth() && request.auth.uid == request.resource.data.staffId);
+        allow write: if isAdmin(shopId) || (auth() && request.auth.uid == request.resource.data.staffId && at.startsWith(request.auth.uid));
       }
 
       // Invitations
@@ -106,7 +109,11 @@ service cloud.firestore {
         allow read, write: if isAdmin(shopId);
       }
 
-      // Private Vault (Strictly blocked for all client direct access)
+      // Private Vault (Blocked for read, only admins can write auth via client if needed)
+      match /private/auth {
+        allow read: if false;
+        allow write: if isAdmin(shopId);
+      }
       match /private/{doc=**} {
         allow read, write: if false; 
       }

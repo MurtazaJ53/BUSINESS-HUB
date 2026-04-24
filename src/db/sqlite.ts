@@ -17,6 +17,7 @@
 
 import { Capacitor } from '@capacitor/core';
 
+
 // ─── Types ──────────────────────────────────────────────────
 
 export interface QueryResult<T = Record<string, unknown>> {
@@ -86,61 +87,122 @@ class DatabaseSingleton {
   private webDb: SqlJsDatabase | null = null;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
+  private bootingPromise: Promise<void> | null = null;
+
   /** Call once from main.tsx before React renders. */
   async boot(): Promise<void> {
     if (this.ready) return;
+    if (this.bootingPromise) return this.bootingPromise;
 
-    this.platform = Capacitor.getPlatform() === 'web' ? 'web' : 'native';
-    console.log(`[DB] Booting on platform: ${this.platform}`);
+    this.bootingPromise = (async () => {
+      this.platform = Capacitor.getPlatform() === 'web' ? 'web' : 'native';
+      console.log(`[DB] Booting on platform: ${this.platform}`);
 
-    if (this.platform === 'native') {
-      await this.bootNative();
-    } else {
-      await this.bootWeb();
-    }
+      if (this.platform === 'native') {
+        await this.bootNative();
+      } else {
+        await this.bootWeb();
+      }
 
-    // Run migrations
-    await this.runMigrations();
-    this.ready = true;
-    console.log('[DB] Ready');
+      // Set ready BEFORE migrations so they can use run/query methods
+      this.ready = true;
+      await this.runMigrations();
+      console.log('[DB] Ready');
+    })();
+
+    return this.bootingPromise;
   }
 
   // ── Native boot ────────────────────────────────────────────
 
   private async bootNative(): Promise<void> {
-    const { CapacitorSQLite, SQLiteConnection } = await import('@capacitor-community/sqlite');
-    this.nativeSqlite = new SQLiteConnection(CapacitorSQLite);
+    try {
+      const { CapacitorSQLite, SQLiteConnection } = await import('@capacitor-community/sqlite');
+      this.nativeSqlite = new SQLiteConnection(CapacitorSQLite);
 
-    const DB_NAME = 'business_hub';
-    const retCC = await this.nativeSqlite.checkConnectionsConsistency();
-    const isConn = (await this.nativeSqlite.isConnection(DB_NAME, false)).result;
+      const DB_NAME = 'business_hub';
+      const retCC = await this.nativeSqlite.checkConnectionsConsistency();
+      const isConn = (await this.nativeSqlite.isConnection(DB_NAME, false)).result;
 
-    if (retCC.result && isConn) {
-      this.nativeDb = await this.nativeSqlite.retrieveConnection(DB_NAME, false);
-    } else {
-      this.nativeDb = await this.nativeSqlite.createConnection(
-        DB_NAME, false, 'no-encryption', 1, false,
-      );
+      if (retCC.result && isConn) {
+        this.nativeDb = await this.nativeSqlite.retrieveConnection(DB_NAME, false);
+      } else {
+        this.nativeDb = await this.nativeSqlite.createConnection(
+          DB_NAME, false, 'no-encryption', 1, false,
+        );
+      }
+      await this.nativeDb.open();
+    } catch (err) {
+      console.error('[DB] Native boot crash averted:', err);
+      throw new Error(`SQLite Native Boot Failed: ${err}`);
     }
-    await this.nativeDb.open();
   }
 
   // ── Web boot (sql.js + IndexedDB persistence) ─────────────
 
   private async bootWeb(): Promise<void> {
-    const initSqlJs = (await import('sql.js')).default;
+    const logTrace: string[] = [];
+    const trace = (msg: string) => {
+      console.log(`[DB] ${msg}`);
+      logTrace.push(msg);
+    };
 
-    // Load WASM from CDN (sql.js ships its own)
-    const SQL = await initSqlJs({
-      locateFile: (file: string) => `/${file}`,
-    });
+    try {
+      const initSqlJs = (await import('sql.js')).default;
+      trace('SqlJs loader ready');
 
-    // Try to restore a previously persisted database
-    const saved = await idbLoad();
-    this.webDb = saved ? new SQL.Database(saved) : new SQL.Database();
+      const cdns = [
+        '/wasm-binary.txt', // Local Disguised
+        'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.wasm', // Cloudflare
+        'https://cdn.jsdelivr.net/npm/sql.js@1.6.2/dist/sql-wasm.wasm', // jsDelivr
+        'https://unpkg.com/sql.js@1.6.2/dist/sql-wasm.wasm' // unpkg
+      ];
 
-    // Enable WAL-like pragma for better performance
-    this.webDb!.run('PRAGMA journal_mode = MEMORY;');
+      let bytes: Uint8Array | null = null;
+      let lastError: string = '';
+
+      for (const url of cdns) {
+        try {
+          trace(`Attempting fetch: ${url}`);
+          const response = await fetch(url);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          
+          if (url.endsWith('.txt')) {
+             trace('Decoding text module...');
+             const b64 = await response.text();
+             if (b64.trim().startsWith('<')) throw new Error('HTML returned instead of Binary');
+             const binaryString = atob(b64.trim());
+             bytes = new Uint8Array(binaryString.length);
+             for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+          } else {
+             trace('Instantiating remote binary...');
+             const buffer = await response.arrayBuffer();
+             bytes = new Uint8Array(buffer);
+          }
+          
+          if (bytes && bytes[0] === 0x00 && bytes[1] === 0x61) {
+            trace('Magic word 00 61 verified!');
+            break; 
+          }
+          throw new Error('Invalid binary header');
+        } catch (e: any) {
+          trace(`Failed: ${e.message}`);
+          lastError = e.message;
+        }
+      }
+
+      if (!bytes) throw new Error(`Total Network Failure: ${lastError}\n\nTrace:\n${logTrace.join('\n')}`);
+
+      const SQL = await initSqlJs({ wasmBinary: bytes });
+      trace('Engine online');
+
+      const saved = await idbLoad();
+      this.webDb = saved ? new SQL.Database(saved) : new SQL.Database();
+      this.webDb!.run('PRAGMA journal_mode = MEMORY;');
+    } catch (err: any) {
+      console.error('[DB] Ultimate boot failed:', err);
+      throw new Error(err.message || 'Unknown boot error');
+    }
   }
 
   // ── Persistence (web only, debounced) ──────────────────────
@@ -217,7 +279,7 @@ class DatabaseSingleton {
     }
 
     this.webDb!.run(sql, params);
-    const changes = this.webDb!.getChangesCount();
+    const changes = (this.webDb as any).getRowsModified();
     this.scheduleSave();
     return { changes };
   }
@@ -276,19 +338,19 @@ class DatabaseSingleton {
       if (appliedIds.has(m.id)) continue;
       console.log(`[DB] Applying migration: ${m.id}`);
 
-      const stmts = m.sql
-        .split(';')
-        .map(s => s.trim())
-        .filter(s => s.length > 0 && !s.startsWith('--'));
-
-      for (const stmt of stmts) {
-        await this.run(stmt + ';');
+      try {
+        // Execute the entire script at once (atomic block)
+        await this.run(`
+          BEGIN TRANSACTION;
+          ${m.sql}
+          INSERT INTO _migrations (id, applied_at) VALUES ('${m.id}', ${Date.now()});
+          COMMIT;
+        `);
+      } catch (e: any) {
+        await this.run('ROLLBACK;');
+        console.error(`[DB] Migration ${m.id} failed:`, e);
+        throw new Error(`Migration ${m.id} failed: ${e.message}`);
       }
-
-      await this.run(
-        'INSERT INTO _migrations (id, applied_at) VALUES (?, ?);',
-        [m.id, Date.now()],
-      );
       console.log(`[DB] Migration ${m.id} applied`);
     }
   }

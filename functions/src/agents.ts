@@ -29,7 +29,9 @@ async function checkPermission(shopId: string, uid: string, module: string, acti
 /**
  * Agent Tool API: Provides secure, permission-guarded access to business data.
  */
-export const agentTool = onCall(async (request) => {
+export const agentTool = onCall({
+  maxInstances: 2
+}, async (request) => {
   const { shopId, toolName, args } = request.data;
   const uid = request.auth?.uid;
 
@@ -115,7 +117,9 @@ export const agentTool = onCall(async (request) => {
 /**
  * Agent Runner: Orchestrates LLM interaction and tool usage.
  */
-export const runAgent = onCall(async (request) => {
+export const runAgent = onCall({
+  maxInstances: 2
+}, async (request) => {
   const { shopId, agentName } = request.data;
   const uid = request.auth?.uid;
 
@@ -123,12 +127,26 @@ export const runAgent = onCall(async (request) => {
     throw new HttpsError("unauthenticated", "Authentication required");
   }
 
-  // 1. Load Agent Prompt
-  const promptPath = path.join(__dirname, `../agents/${agentName}.md`);
-  if (!fs.existsSync(promptPath)) {
-    throw new HttpsError("not-found", `Agent ${agentName} not found`);
+  // 1. Load Agent Prompt (Check multiple possible paths for production and local dev)
+  const possiblePaths = [
+    path.join(__dirname, `../agents/${agentName}.md`),
+    path.join(__dirname, `../../agents/${agentName}.md`),
+    path.join(process.cwd(), `agents/${agentName}.md`)
+  ];
+
+  let systemPrompt = "";
+  let found = false;
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      systemPrompt = fs.readFileSync(p, "utf-8");
+      found = true;
+      break;
+    }
   }
-  const systemPrompt = fs.readFileSync(promptPath, "utf-8");
+
+  if (!found) {
+    throw new HttpsError("not-found", `Agent ${agentName} definition not found on server.`);
+  }
 
   // 2. Initialize Run Tracking
   const runId = `RUN-${Date.now()}`;

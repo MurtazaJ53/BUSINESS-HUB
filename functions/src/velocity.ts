@@ -5,7 +5,11 @@ import * as admin from "firebase-admin";
  * Daily scheduled task to compute inventory velocity, ABC/XYZ classification, and ROP.
  * Runs at 2:00 AM every day.
  */
-export const computeVelocity = onSchedule("0 2 * * *", async (event) => {
+export const computeVelocity = onSchedule({
+  schedule: "0 2 * * *",
+  memory: "512MiB",
+  maxInstances: 1
+}, async (event) => {
   const db = admin.firestore();
   const shopsSnapshot = await db.collection("shops").get();
 
@@ -86,9 +90,15 @@ async function processShopVelocity(shopId: string) {
     }
   }
 
+interface InventoryItem {
+  id: string;
+  stock?: number;
+  price?: number;
+}
+
   // 4. Fetch Inventory Items
   const inventorySnapshot = await db.collection(`shops/${shopId}/inventory`).get();
-  const items = inventorySnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+  const items = inventorySnapshot.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem));
 
   // 5. ABC Classification (By Revenue)
   const sortedByRevenue = [...items].sort((a, b) => {

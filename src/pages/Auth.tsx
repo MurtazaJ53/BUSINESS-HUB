@@ -1,610 +1,562 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
-  LogIn, 
-  Mail, 
-  Lock, 
-  Store, 
-  ArrowRight, 
-  UserPlus, 
-  ShieldCheck,
-  ShoppingBag,
-  Sparkles,
-  LogOut,
-  Globe
+  LogIn, Mail, Lock, Store, ArrowRight, ShieldCheck,
+  ShoppingBag, Sparkles, LogOut, Globe, AlertCircle
 } from 'lucide-react';
+import { App as CapacitorApp } from '@capacitor/app';
 import { auth, db, googleProvider } from '@/lib/firebase';
+import { FirebaseError } from 'firebase/app';
 import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signInWithPopup,
-  sendPasswordResetEmail,
-  signInAnonymously,
-  fetchSignInMethodsForEmail,
-  linkWithPopup
+  signInWithEmailAndPassword, createUserWithEmailAndPassword, 
+  signInWithPopup, signInWithRedirect, getRedirectResult,
+  sendPasswordResetEmail, User
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { useAuthStore } from '@/lib/useAuthStore';
 import { cn } from '@/lib/utils';
 
+// --- 🛠️ 1. TYPE DEFINITIONS & ERROR MAPPING ---
+type AuthMode = 'login' | 'setup' | 'join' | 'forgot';
+
+const getReadableError = (error: unknown): string => {
+  if (error instanceof FirebaseError) {
+    switch (error.code) {
+      case 'auth/email-already-in-use': return 'This email is already registered. Please Sign In.';
+      case 'auth/invalid-credential': return 'Invalid email or password combination.';
+      case 'auth/user-not-found': return 'No account found with this email.';
+      case 'auth/wrong-password': return 'Incorrect password provided.';
+      case 'auth/network-request-failed': return 'Network error. Please check your connection.';
+      default: return error.message;
+    }
+  }
+  return error instanceof Error ? error.message : 'An unexpected error occurred.';
+};
+
 export default function AuthPage() {
-  const { user, shopId, role } = useAuthStore();
-  const [mode, setMode] = useState<'login' | 'setup' | 'join' | 'forgot'>('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [shopName, setShopName] = useState('');
-  const [joinCode, setJoinCode] = useState('');
-  const [staffName, setStaffName] = useState('');
-  const [staffPhone, setStaffPhone] = useState('');
-  const [error, setError] = useState('');
+  const navigate = useNavigate();
+  const { user, shopId, initialized } = useAuthStore();
+  
+  // UI State
+  const [mode, setMode] = useState<AuthMode>('login');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [resetSent, setResetSent] = useState(false);
 
-  // If user is logged in but has no shop context, force setup
-  const needsShopSetup = user && !shopId;
+  // Form State
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    shopName: '',
+    joinCode: '',
+    staffName: '',
+    staffPhone: ''
+  });
 
-  // Auto-detect invite code from URL
-  React.useEffect(() => {
+  const needsShopSetup = user && !shopId && initialized;
+
+  const updateForm = (field: keyof typeof formData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // --- 🔄 2. LIFECYCLE & CAPACITOR FAIL-SAFES ---
+  useEffect(() => {
+    const handleRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) window.location.reload();
+      } catch (err) {
+        if (err instanceof FirebaseError && err.code !== 'auth/no-auth-event') {
+          setError(getReadableError(err));
+        }
+      }
+    };
+    handleRedirectResult();
+
+    return () => {
+    };
+  }, [loading]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const invite = params.get('invite');
     if (invite) {
       setMode('join');
-      setJoinCode(invite);
+      updateForm('joinCode', invite);
     }
   }, []);
 
+  useEffect(() => {
+    const performRecovery = async () => {
+      if (needsShopSetup && mode === 'login') {
+        // One last check: Does this user have a shop in Firestore?
+        try {
+          const shopsQ = query(collection(db, 'shops'), where('ownerId', '==', user.uid));
+          const shopsSnap = await getDocs(shopsQ);
+          if (!shopsSnap.empty) {
+             const recoveredShopId = shopsSnap.docs[0].id;
+             console.info("Auth: Background recovery found shop:", recoveredShopId);
+             await setDoc(doc(db, 'users', user.uid), { shopId: recoveredShopId, role: 'admin' }, { merge: true });
+             // Wait for claims to propagate or force a refresh
+             return;
+          }
+        } catch (e) {
+          console.error("Recovery check failed:", e);
+        }
+        setMode('setup');
+      }
+    };
+    performRecovery();
+  }, [needsShopSetup, mode, user]);
+
+  // --- 🔒 3. AUTHENTICATION CONTROLLERS ---
   const handleGoogleAuth = async () => {
-    setError('');
+    setError(null);
     setLoading(true);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      // If the email is already in use by password, Firebase might error if "One account per email" is on.
-      // But standard signInWithPopup handles linking or errors based on console settings.
-      window.location.reload();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
+      const isMobile = typeof window !== 'undefined' && (window as any).Capacitor?.getPlatform() !== 'web';
+      let user: User | null = null;
+
+      if (isMobile) {
+        await signInWithRedirect(auth, googleProvider);
+        return; // Redirect will handle the rest
+      } else {
+        const result = await signInWithPopup(auth, googleProvider);
+        user = result.user;
+      }
+
+      if (user) {
+        // Automatic Recovery Check: Did this user already create a shop?
+        // This prevents the "redirection loop" where users get stuck on the setup screen
+        const shopsQ = query(collection(db, 'shops'), where('ownerId', '==', user.uid));
+        const shopsSnap = await getDocs(shopsQ);
+        
+        if (!shopsSnap.empty) {
+          const recoveredShopId = shopsSnap.docs[0].id;
+          console.info("Auth: Found existing shop ownership during login:", recoveredShopId);
+          
+          const timestamp = new Date().toISOString();
+          // Silently update the users doc to point to their existing shop
+          await setDoc(doc(db, 'users', user.uid), {
+            email: user.email,
+            shopId: recoveredShopId,
+            role: 'admin',
+            updatedAt: timestamp
+          }, { merge: true });
+
+          // Note: The useAuthStore will detect the new shopId claim after a short delay or refresh
+          // But to be immediate, we can force a token refresh here if we want.
+          // For now, the existing reload logic in useEffect will handle it.
+          window.location.reload(); 
+        }
+      }
+
+    } catch (err) {
+      setError(getReadableError(err));
       setLoading(false);
     }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
-      setError('Please enter your email address first.');
-      return;
-    }
-    setError('');
+    if (!formData.email) return setError('Please enter your email address first.');
+    
     setLoading(true);
+    setError(null);
     try {
-      await sendPasswordResetEmail(auth, email);
+      await sendPasswordResetEmail(auth, formData.email);
       setResetSent(true);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getReadableError(err));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAnonymousAuth = async () => {
-    setError('');
+  // --- 🏢 4. DATABASE ABSTRACTIONS (Separation of Concerns) ---
+  const provisionNewShop = async (currentUser: User) => {
     setLoading(true);
     try {
-      await signInAnonymously(auth);
-      // Anonymous users start with no shop context
-      window.location.reload();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      // 1. Recovery Check: Did this user already create a shop?
+      const shopsQ = query(collection(db, 'shops'), where('ownerId', '==', currentUser.uid));
+      const shopsSnap = await getDocs(shopsQ);
+      
+      let finalShopId = '';
+      if (!shopsSnap.empty) {
+        finalShopId = shopsSnap.docs[0].id;
+        console.log("Shop Recovery: Found existing shop ownership:", finalShopId);
+      } else {
+        finalShopId = `shop-${Date.now()}`;
+        const timestamp = new Date().toISOString();
+
+        await setDoc(doc(db, 'shops', finalShopId), {
+          name: formData.shopName || 'My Business Hub',
+          ownerId: currentUser.uid,
+          createdAt: timestamp,
+          settings: { currency: 'INR' },
+          shopId: finalShopId
+        });
+      }
+
+      const timestamp = new Date().toISOString();
+      await setDoc(doc(db, 'users', currentUser.uid), {
+        email: currentUser.email,
+        shopId: finalShopId,
+        role: 'admin',
+        createdAt: timestamp
+      }, { merge: true });
+
+      await setDoc(doc(db, `shops/${finalShopId}/staff`, currentUser.uid), {
+        id: currentUser.uid,
+        name: currentUser.displayName || currentUser.email?.split('@')[0] || 'Owner',
+        email: currentUser.email,
+        role: 'admin',
+        status: 'active',
+        joinedAt: timestamp,
+        permissions: {
+          analytics: { view: true }, inventory: { view: true, edit: true, view_cost: true },
+          sales: { view: true, edit: true }, customers: { view: true, edit: true },
+          expenses: { view: true, edit: true }, settings: { edit: true }
+        }
+      }, { merge: true });
+
+      // Ensure the private auth doc exists for future PIN rotations
+      await setDoc(doc(db, `shops/${finalShopId}/private/auth`), {
+        initializedAt: timestamp,
+        initializedBy: currentUser.uid
+      }, { merge: true });
+
+    } catch (err) {
+      console.error("Provisioning failed:", err);
+      throw err;
     }
   };
 
-  const handleAuth = async (e: React.FormEvent) => {
+  const processShopJoin = async (currentUser: User) => {
+    const q = query(collection(db, 'shops'), where('inviteCode', '==', formData.joinCode));
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) throw new Error('Invalid or Expired Shop Code');
+    const foundShopId = querySnapshot.docs[0].id;
+    
+    // Link to User Profile
+    await setDoc(doc(db, 'users', currentUser.uid), {
+      email: currentUser.email,
+      shopId: foundShopId,
+      role: 'staff',
+      createdAt: new Date().toISOString()
+    });
+
+    // Smart Merge Logic
+    const staffByPhoneQ = query(collection(db, `shops/${foundShopId}/staff`), where('phone', '==', formData.staffPhone || '-'));
+    const staffByEmailQ = query(collection(db, `shops/${foundShopId}/staff`), where('email', '==', currentUser.email || ''));
+    
+    const [phoneSnap, emailSnap] = await Promise.all([getDocs(staffByPhoneQ), getDocs(staffByEmailQ)]);
+    const existingDoc = !phoneSnap.empty ? phoneSnap.docs[0] : (!emailSnap.empty ? emailSnap.docs[0] : null);
+    
+    let existingData = { role: 'Sales', salary: 0, permissions: ['dashboard', 'inventory', 'sell', 'customers', 'history'] };
+
+    if (existingDoc) {
+      const oldData = existingDoc.data();
+      existingData = { ...existingData, ...oldData };
+      if (existingDoc.id !== currentUser.uid) await deleteDoc(doc(db, `shops/${foundShopId}/staff`, existingDoc.id));
+    }
+
+    const publicStaffData = {
+      id: currentUser.uid,
+      name: formData.staffName || currentUser.displayName || currentUser.email?.split('@')[0] || 'Staff',
+      email: currentUser.email || '',
+      phone: formData.staffPhone || '-',
+      role: existingData.role,
+      joinedAt: new Date().toISOString(),
+      status: 'active',
+      permissions: existingData.permissions
+    };
+
+    await setDoc(doc(db, `shops/${foundShopId}/staff`, currentUser.uid), publicStaffData);
+    await setDoc(doc(db, `shops/${foundShopId}/staff_private`, currentUser.uid), {
+      id: currentUser.uid,
+      salary: existingData.salary
+    });
+  };
+
+  const handleMasterAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError(null);
     setLoading(true);
 
     try {
       let currentUser = user;
       
-      // 1. Authenticate if not already logged in
+      // Phase 1: Authentication
       if (!user) {
         try {
-          const userCredential = mode === 'login'
-            ? await signInWithEmailAndPassword(auth, email, password)
-            : await createUserWithEmailAndPassword(auth, email, password);
-          currentUser = userCredential.user;
-        } catch (authErr: any) {
-          // STRICT RULE: If email already in use, don't auto-login unless it's a known provider error.
-          // The previous "Smart Logic" could create confusion.
-          if (authErr.code === 'auth/email-already-in-use' && mode !== 'login') {
-             setError("An account with this email already exists. Please Sign In instead.");
-             setLoading(false);
-             return;
+          const credentials = mode === 'login'
+            ? await signInWithEmailAndPassword(auth, formData.email, formData.password)
+            : await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+          currentUser = credentials.user;
+        } catch (authErr: unknown) {
+          if (authErr instanceof FirebaseError && authErr.code === 'auth/email-already-in-use' && mode !== 'login') {
+             throw new Error("Account already exists. Please switch to Sign In.");
           }
-          throw authErr;
+          throw authErr; // Caught by outer try/catch
         }
       }
 
-      if (!currentUser) throw new Error('Authentication failed');
+      if (!currentUser) throw new Error('Authentication integrity failed');
 
-      // 2. Handle Shop Logic
-      if (mode === 'setup') {
-        const newShopId = `shop-${Date.now()}`;
-        await setDoc(doc(db, 'shops', newShopId), {
-          name: shopName || 'My Business Hub',
-          ownerId: currentUser.uid,
-          createdAt: new Date().toISOString(),
-          settings: { currency: 'INR' },
-          shopId: newShopId
-        });
-
-        await setDoc(doc(db, 'users', currentUser.uid), {
-          email: currentUser.email,
-          shopId: newShopId,
+      // Phase 2: Quick Shop Discovery (Prevents "Setup Loop")
+      const shopsQ = query(collection(db, 'shops'), where('ownerId', '==', currentUser.uid));
+      const shopsSnap = await getDocs(shopsQ);
+      
+      if (!shopsSnap.empty) {
+        const recoveredShopId = shopsSnap.docs[0].id;
+        console.info("Auth: Found existing shop ownership:", recoveredShopId);
+        
+        // 1. Link User Profile
+        await setDoc(doc(db, 'users', currentUser.uid), { 
+          shopId: recoveredShopId, 
           role: 'admin',
-          createdAt: new Date().toISOString()
-        });
-      } else if (mode === 'join' || (needsShopSetup && joinCode)) {
-        const q = query(collection(db, 'shops'), where('inviteCode', '==', joinCode));
-        const querySnapshot = await getDocs(q);
-        
-        if (querySnapshot.empty) {
-          throw new Error('Invalid or Expired Shop Code');
-        }
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
 
-        const foundShopId = querySnapshot.docs[0].id;
-        
-        // 1. Link to User Profile
-        await setDoc(doc(db, 'users', currentUser.uid), {
-          email: currentUser.email,
-          shopId: foundShopId,
-          role: 'staff',
-          createdAt: new Date().toISOString()
-        });
-
-        // 2. SMART MERGE: Check for existing placeholder record by phone or email
-        const staffByPhoneQuery = query(collection(db, `shops/${foundShopId}/staff`), where('phone', '==', staffPhone || '-'));
-        const staffByEmailQuery = query(collection(db, `shops/${foundShopId}/staff`), where('email', '==', currentUser.email || ''));
-        
-        const [phoneSnapshot, emailSnapshot] = await Promise.all([
-          getDocs(staffByPhoneQuery),
-          getDocs(staffByEmailQuery)
-        ]);
-
-        let existingDoc = !phoneSnapshot.empty ? phoneSnapshot.docs[0] : (!emailSnapshot.empty ? emailSnapshot.docs[0] : null);
-        
-        let existingData = {
-          role: 'Sales',
-          salary: 0,
-          permissions: ['dashboard', 'inventory', 'sell', 'customers', 'history']
-        };
-
-        if (existingDoc) {
-          const oldData = existingDoc.data();
-          existingData = {
-            role: oldData.role || 'Sales',
-            salary: oldData.salary || 0,
-            permissions: oldData.permissions || existingData.permissions
-          };
-          // Purge the old placeholder IF it's a different UID to merge into the new verified UID
-          if (existingDoc.id !== currentUser.uid) {
-            await deleteDoc(doc(db, `shops/${foundShopId}/staff`, existingDoc.id));
-          }
-        }
-
-        // 3. Create/Update Permanent Staff Record
-        const { salary, ...publicStaffData } = {
+        // 2. TRIGGER CLAIMS: Explicitly touch the staff record to trigger onStaffWrite Cloud Function
+        await setDoc(doc(db, `shops/${recoveredShopId}/staff`, currentUser.uid), {
           id: currentUser.uid,
-          name: staffName || currentUser.displayName || currentUser.email?.split('@')[0] || 'Staff',
-          email: currentUser.email || '',
-          phone: staffPhone || '-',
-          role: existingData.role,
-          salary: existingData.salary,
-          joinedAt: new Date().toISOString(),
+          role: 'admin',
           status: 'active',
-          permissions: existingData.permissions
-        };
-
-        await setDoc(doc(db, `shops/${foundShopId}/staff`, currentUser.uid), publicStaffData);
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
         
-        // 4. Secure Private Data
-        await setDoc(doc(db, `shops/${foundShopId}/staff_private`, currentUser.uid), {
-          id: currentUser.uid,
-          salary: existingData.salary
-        });
+        // 3. FORCE REFRESH: Fetch the new claims immediately
+        const { forceTokenRefresh } = useAuthStore.getState();
+        await forceTokenRefresh();
+
+        // 4. Final jump
+        window.location.reload();
+        return;
+      }
+
+      // Phase 3: Routing Business Logic
+      if (mode === 'setup') {
+        await provisionNewShop(currentUser);
+      } else if (mode === 'join' || (needsShopSetup && formData.joinCode)) {
+        await processShopJoin(currentUser);
       }
 
       window.location.reload();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getReadableError(err));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleJoinShop = async () => {
-    if (!joinCode || !user) return;
-    setLoading(true);
-    try {
-      const q = query(collection(db, 'shops'), where('inviteCode', '==', joinCode));
-      const querySnapshot = await getDocs(q);
-      
-      if (querySnapshot.empty) {
-        setError('Invalid Shop Code');
-        setLoading(false);
-        return;
-      }
-
-      const foundShopId = querySnapshot.docs[0].id;
-      
-      // 2. SMART MERGE: Check for existing placeholder record
-      const staffQuery = query(collection(db, `shops/${foundShopId}/staff`), where('phone', '==', staffPhone || '-'));
-      const staffSnapshot = await getDocs(staffQuery);
-      let existingData = {
-        role: 'Sales',
-        salary: 0,
-        permissions: ['dashboard', 'inventory', 'sell', 'customers', 'history']
-      };
-
-      if (!staffSnapshot.empty) {
-        const oldDoc = staffSnapshot.docs[0];
-        const oldData = oldDoc.data();
-        existingData = {
-          role: oldData.role || 'Sales',
-          salary: oldData.salary || 0,
-          permissions: oldData.permissions || existingData.permissions
-        };
-        // Purge the placeholder to prevent duplicates
-        if (oldDoc.id !== user.uid) {
-          await deleteDoc(doc(db, `shops/${foundShopId}/staff`, oldDoc.id));
-        }
-      }
-
-      await setDoc(doc(db, 'users', user.uid), {
-        email: user.email,
-        shopId: foundShopId,
-        createdAt: new Date().toISOString()
-      });
-
-      // 3. Create/Update Permanent Staff Record
-      const { salary, ...publicStaffData } = {
-        id: user.uid,
-        name: staffName || user.displayName || user.email?.split('@')[0] || 'Staff',
-        phone: staffPhone || '-',
-        role: existingData.role,
-        salary: existingData.salary,
-        joinedAt: new Date().toISOString(),
-        status: 'active',
-        permissions: existingData.permissions
-      };
-
-      await setDoc(doc(db, `shops/${foundShopId}/staff`, user.uid), publicStaffData);
-
-      // 4. Secure Private Data
-      await setDoc(doc(db, `shops/${foundShopId}/staff_private`, user.uid), {
-        id: user.uid,
-        salary: existingData.salary
-      });
-
-      window.location.reload();
-    } catch (err: any) {
-      setError(err.message);
-      setLoading(false);
-    }
-  };
-
+  // --- 🎨 5. RENDER METHODS ---
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-6 selection:bg-primary/30">
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/10 rounded-full blur-[120px] animate-pulse delay-700" />
+    <div className="min-h-screen bg-[#030303] text-white flex flex-col items-center justify-center p-6 selection:bg-primary/30 font-sans">
+      {/* Immersive Background Effects */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[-15%] left-[-10%] w-[50%] h-[50%] bg-primary/10 rounded-full blur-[140px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/10 rounded-full blur-[120px] animate-pulse delay-1000" />
       </div>
 
       <div className="relative z-10 w-full max-w-[440px]">
+        {/* Header */}
         <div className="text-center mb-10 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-          <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-primary to-blue-600 shadow-2xl shadow-primary/20 mb-6 group">
-            <ShoppingBag className="h-8 w-8 text-white transition-transform group-hover:scale-110" />
+          <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-primary to-blue-600 shadow-[0_0_40px_rgba(var(--primary),0.3)] mb-6 group">
+            <ShoppingBag className="h-8 w-8 text-white transition-transform duration-500 group-hover:scale-110" />
           </div>
-          <h1 className="text-4xl font-black tracking-tighter mb-2 bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60">
+          <h1 className="text-4xl font-black tracking-tighter mb-2 text-white drop-shadow-md">
             Business Hub <span className="text-primary italic">Pro</span>
           </h1>
-          <p className="text-sm font-bold text-zinc-500 uppercase tracking-[0.2em]">Next-Gen Shop Management</p>
+          <p className="text-xs font-bold text-zinc-500 uppercase tracking-[0.25em]">Intelligent Management</p>
         </div>
 
-        <div className="glass-card rounded-[2.5rem] p-8 border border-white/5 shadow-2xl animate-in fade-in zoom-in-95 duration-700">
-          <div className="flex bg-white/5 p-1 rounded-2xl mb-8 overflow-hidden">
-            <button 
-              onClick={() => setMode('login')}
-              className={cn(
-                "flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-all",
-                mode === 'login' ? "bg-white text-black rounded-xl shadow-lg" : "text-zinc-500 hover:text-white"
-              )}
-            >
-              Sign In
-            </button>
-            <button 
-              onClick={() => setMode('join')}
-              className={cn(
-                "flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-all",
-                mode === 'join' ? "bg-white text-black rounded-xl shadow-lg" : "text-zinc-500 hover:text-white"
-              )}
-            >
-              Join Team
-            </button>
-            <button 
-              onClick={() => setMode('setup')}
-              className={cn(
-                "flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-all",
-                mode === 'setup' ? "bg-white text-black rounded-xl shadow-lg" : "text-zinc-500 hover:text-white"
-              )}
-            >
-              New Shop
-            </button>
+        {/* Main Card */}
+        <div className="bg-[#0a0a0a]/80 backdrop-blur-2xl rounded-[2.5rem] p-8 border border-white/5 shadow-2xl animate-in fade-in zoom-in-95 duration-700">
+          
+          {/* Mode Selector */}
+          <div className="flex bg-[#141414] p-1.5 rounded-2xl mb-8 overflow-hidden border border-white/5">
+            {['login', 'join', 'setup'].map((m) => (
+              <button 
+                key={m}
+                onClick={() => setMode(m as AuthMode)}
+                className={cn(
+                  "flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-all duration-300 rounded-xl",
+                  mode === m 
+                    ? "bg-white text-black shadow-[0_4px_14px_rgba(255,255,255,0.1)]" 
+                    : "text-zinc-500 hover:text-white hover:bg-white/5"
+                )}
+              >
+                {m === 'login' ? 'Sign In' : m === 'join' ? 'Join Team' : 'New Shop'}
+              </button>
+            ))}
           </div>
 
-          {mode === 'forgot' ? (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-              <div className="text-center">
-                <h3 className="text-lg font-black mb-2">Recover Access</h3>
-                <p className="text-xs text-zinc-500 font-bold">We'll send a high-security reset link to your inbox.</p>
-              </div>
-              
-              {resetSent ? (
-                <div className="p-6 rounded-3xl bg-green-500/10 border border-green-500/20 text-center animate-in zoom-in">
-                  <Mail className="h-10 w-10 text-green-500 mx-auto mb-4" />
-                  <p className="text-xs font-black text-green-500 uppercase tracking-widest mb-1">Transmission Successful!</p>
-                  <p className="text-[10px] text-zinc-400 font-bold leading-relaxed px-4">
-                    If an account exists for <span className="text-white">{email}</span>, a reset link has been dispatched. 
-                    Please check your inbox and spam folder.
-                  </p>
-                  <button 
-                    onClick={() => { setMode('login'); setResetSent(false); }}
-                    className="mt-6 text-[10px] font-black uppercase tracking-widest text-white hover:text-primary transition-colors"
-                  >
-                    Back to Login
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={handleForgotPassword} className="space-y-5">
-                   <div className="space-y-2 group">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Registered Email</label>
-                    <div className="relative">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
-                      <input
-                        type="email"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-bold"
-                        placeholder="your@email.com"
-                      />
-                    </div>
-                  </div>
-                  
-                  {error && (
-                    <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold">
-                      {error}
-                    </div>
-                  )}
-
-                  <button
-                    disabled={loading}
-                    className="w-full premium-gradient text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:shadow-2xl transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                  >
-                    {loading ? <Sparkles className="h-5 w-5 animate-spin" /> : 'Send Reset Link'}
-                  </button>
-                  
-                  <button 
-                    type="button"
-                    onClick={() => setMode('login')}
-                    className="w-full text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-colors py-2"
-                  >
-                    Cancel
-                  </button>
-                </form>
-              )}
+          {/* Error Banner */}
+          {error && (
+            <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+              <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+              <p className="text-red-400 text-xs font-bold leading-relaxed">{error}</p>
             </div>
-          ) : (
-            <form onSubmit={handleAuth} className="space-y-5">
-            {needsShopSetup && (
-               <div className="p-4 rounded-2xl bg-primary/10 border border-primary/20 mb-4">
-                  <p className="text-[10px] font-black text-primary uppercase tracking-widest flex items-center gap-2 mb-1">
-                    <Sparkles className="h-3 w-3" /> Account Active
+          )}
+
+          {/* Active Form Injection */}
+          {mode === 'forgot' ? (
+            <form onSubmit={handleForgotPassword} className="space-y-5 animate-in fade-in slide-in-from-bottom-2">
+              {resetSent ? (
+                <div className="p-6 rounded-3xl bg-green-500/10 border border-green-500/20 text-center">
+                  <Mail className="h-10 w-10 text-green-500 mx-auto mb-4" />
+                  <p className="text-xs font-black text-green-500 uppercase tracking-widest mb-2">Link Dispatched</p>
+                  <p className="text-[10px] text-zinc-400 font-bold px-2 leading-relaxed">
+                    Check <span className="text-white">{formData.email}</span> for secure recovery instructions.
                   </p>
-                  <p className="text-[11px] text-zinc-400 font-medium">Please finalize your shop setup below.</p>
-               </div>
-            )}
-
-            {mode === 'setup' && (
-              <div className="space-y-2 group">
-                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Business Name</label>
-                <div className="relative">
-                  <Store className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
-                  <input
-                    type="text"
-                    required
-                    value={shopName}
-                    onChange={(e) => setShopName(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-bold"
-                    placeholder="e.g. My Elite Mart"
-                  />
+                  <button type="button" onClick={() => { setMode('login'); setResetSent(false); }} className="mt-6 text-[10px] font-black uppercase tracking-widest text-white hover:text-primary transition-colors">
+                    Return to Login
+                  </button>
                 </div>
-              </div>
-            )}
-
-            {mode === 'join' && (
-              <div className="space-y-2 group">
-                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Team Invite Code</label>
-                <div className="relative">
-                  <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
-                  <input
-                    type="text"
-                    required
-                    value={joinCode}
-                    onChange={(e) => setJoinCode(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-black tracking-[0.2em] placeholder:tracking-normal"
-                    placeholder="Code from Admin"
-                  />
-                </div>
-              </div>
-            )}
-
-            {mode === 'join' && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                <div className="space-y-2 group">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Your Full Name</label>
-                  <div className="relative">
-                    <LogIn className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
-                    <input
-                      type="text"
-                      required
-                      value={staffName}
-                      onChange={(e) => setStaffName(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-bold"
-                      placeholder="Enter your name"
-                    />
-                  </div>
-                </div>
-
-                  <div className="space-y-2 group col-span-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Phone Number</label>
-                    <input
-                      type="tel"
-                      required
-                      value={staffPhone}
-                      onChange={(e) => setStaffPhone(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-bold"
-                      placeholder="e.g. +91 98765 43210"
-                    />
-                  </div>
-              </div>
-            )}
-
-            {!user && (
-              <>
-                <div className="space-y-2 group">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Work Email</label>
-                  <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-bold"
-                      placeholder="your@email.com"
-                    />
-                  </div>
-                </div>
-
-                 <div className="space-y-2 group">
-                  <div className="flex justify-between items-center ml-1">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Security Key</label>
-                    <button 
-                      type="button" 
-                      onClick={() => setMode('forgot')}
-                      className="text-[9px] font-black uppercase tracking-widest text-primary hover:text-primary/70 transition-colors"
-                    >
-                      Forgot?
-                    </button>
-                  </div>
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
-                    <input
-                      type="password"
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-bold"
-                      placeholder="••••••••"
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-
-            {error && (
-              <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold animate-shake">
-                {error}
-              </div>
-            )}
-
-            <button
-              disabled={loading}
-              className="w-full premium-gradient text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:shadow-2xl transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-            >
-              {loading ? (
-                <Sparkles className="h-5 w-5 animate-spin" />
               ) : (
                 <>
-                  {mode === 'login' ? 'Enter Dashboard' : mode === 'join' ? 'Connect to Team' : 'Initialize Shop'}
-                  <ArrowRight className="h-5 w-5" />
+                  <div className="space-y-2 group">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Account Email</label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                      <input type="email" required value={formData.email} onChange={(e) => updateForm('email', e.target.value)} className="w-full bg-[#141414] border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all font-bold placeholder:text-zinc-700" placeholder="admin@zarra.com" />
+                    </div>
+                  </div>
+                  <button disabled={loading} className="w-full bg-gradient-to-r from-primary to-blue-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:opacity-90 transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-lg shadow-primary/20">
+                    {loading ? <Sparkles className="h-5 w-5 animate-spin" /> : 'Transmit Reset Link'}
+                  </button>
+                  <button type="button" onClick={() => setMode('login')} className="w-full text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-colors py-2">
+                    Cancel Action
+                  </button>
                 </>
               )}
-            </button>
-
-            {!user && mode !== 'setup' && (
-              <>
-                <div className="relative my-8">
-                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5"></div></div>
-                  <div className="relative flex justify-center text-[8px] font-black uppercase tracking-[0.3em] text-zinc-600 bg-[#050505] px-4">Instant Entry</div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <button
-                    type="button"
-                    onClick={handleGoogleAuth}
-                    className="flex items-center justify-center gap-3 py-4 bg-white/5 border border-white/10 rounded-[1.2rem] hover:bg-white/10 transition-all group"
-                  >
-                    <Globe className="h-4 w-4 text-zinc-400 group-hover:text-white transition-colors" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Google</span>
-                  </button>
-                  <div className="space-y-3">
-                    <button
-                      type="button"
-                      onClick={handleAnonymousAuth}
-                      className="w-full flex items-center justify-center gap-3 py-4 bg-white/5 border border-white/10 rounded-[1.2rem] hover:bg-white/10 transition-all group"
-                    >
-                      <LogIn className="h-4 w-4 text-zinc-400 group-hover:text-white transition-colors" />
-                      <span className="text-[10px] font-black uppercase tracking-widest">Guest</span>
-                    </button>
-                    <p className="text-[8px] text-center text-red-500/60 font-black uppercase tracking-tighter leading-tight">
-                      ⚠️ CRITICAL: Guest sessions are non-persistent. <br/>
-                      Data will be PERMANENTLY ERASED if you log out or clear browser cache without linking to Google/Email.
-                    </p>
+            </form>
+          ) : (
+            <form onSubmit={handleMasterAuthSubmit} className="space-y-5">
+              
+              {needsShopSetup && (
+                <div className="p-4 rounded-2xl bg-primary/10 border border-primary/20 flex items-center gap-3">
+                  <Sparkles className="h-4 w-4 text-primary shrink-0" />
+                  <div>
+                    <p className="text-[10px] font-black text-primary uppercase tracking-widest">Profile Verified</p>
+                    <p className="text-[11px] text-zinc-400 font-medium">Finalize your workspace settings below.</p>
                   </div>
                 </div>
-              </>
-            )}
-            
-            {user && (
-              <button 
-                type="button"
-                onClick={() => auth.signOut()}
-                className="w-full flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-600 hover:text-red-500 transition-all border border-transparent hover:border-red-500/20 rounded-xl hover:bg-red-500/5"
-              >
-                <LogOut className="h-3 w-3" />
-                Logout and Switch Account
-              </button>
-            )}
-          </form>
-        )}
-      </div>
+              )}
 
+              {mode === 'setup' && (
+                <div className="space-y-2 group animate-in fade-in slide-in-from-top-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Workspace Name</label>
+                  <div className="relative">
+                    <Store className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                    <input type="text" required value={formData.shopName} onChange={(e) => updateForm('shopName', e.target.value)} className="w-full bg-[#141414] border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-bold placeholder:text-zinc-700" placeholder="Zarra Operations Hub" />
+                  </div>
+                </div>
+              )}
+
+              {mode === 'join' && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                  <div className="space-y-2 group">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Access Token</label>
+                    <div className="relative">
+                      <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                      <input type="text" required value={formData.joinCode} onChange={(e) => updateForm('joinCode', e.target.value)} className="w-full bg-[#141414] border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-black tracking-[0.2em] placeholder:tracking-normal placeholder:text-zinc-700 uppercase" placeholder="Enter Secure Code" />
+                    </div>
+                  </div>
+                  <div className="space-y-2 group">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Full Legal Name</label>
+                    <div className="relative">
+                      <LogIn className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                      <input type="text" required value={formData.staffName} onChange={(e) => updateForm('staffName', e.target.value)} className="w-full bg-[#141414] border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-bold placeholder:text-zinc-700" placeholder="John Doe" />
+                    </div>
+                  </div>
+                  <div className="space-y-2 group">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Contact Number</label>
+                    <input type="tel" required value={formData.staffPhone} onChange={(e) => updateForm('staffPhone', e.target.value)} className="w-full bg-[#141414] border border-white/10 rounded-2xl px-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-bold placeholder:text-zinc-700" placeholder="+91 98765 43210" />
+                  </div>
+                </div>
+              )}
+
+              {!user && (
+                <div className="space-y-4 animate-in fade-in">
+                  <div className="space-y-2 group">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">System Identifier (Email)</label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                      <input type="email" required value={formData.email} onChange={(e) => updateForm('email', e.target.value)} className="w-full bg-[#141414] border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-bold placeholder:text-zinc-700" placeholder="user@domain.com" />
+                    </div>
+                  </div>
+                  <div className="space-y-2 group">
+                    <div className="flex justify-between items-center ml-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Security Key</label>
+                      <button type="button" onClick={() => setMode('forgot')} className="text-[9px] font-black uppercase tracking-widest text-primary hover:text-white transition-colors">
+                        Lost Access?
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                      <input type="password" required value={formData.password} onChange={(e) => updateForm('password', e.target.value)} className="w-full bg-[#141414] border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-bold placeholder:text-zinc-700" placeholder="••••••••" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <button disabled={loading} className="w-full bg-gradient-to-r from-primary to-blue-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:opacity-90 transition-all flex items-center justify-center gap-3 disabled:opacity-50 mt-6 shadow-lg shadow-primary/20">
+                {loading ? (
+                  <Sparkles className="h-5 w-5 animate-spin" />
+                ) : (
+                  <>
+                    {mode === 'login' ? 'Authenticate Session' : mode === 'join' ? 'Establish Connection' : 'Initialize Workspace'}
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </button>
+
+              {!user && (
+                <>
+                  <div className="relative my-8">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5"></div></div>
+                    <div className="relative flex justify-center text-[8px] font-black uppercase tracking-[0.3em] text-zinc-600">
+                      <span className="bg-[#0a0a0a] px-4">Federated Auth</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-center">
+                    {!loading ? (
+                      <button type="button" onClick={handleGoogleAuth} className="w-full max-w-xs flex items-center justify-center gap-3 py-4 bg-[#141414] border border-white/10 rounded-2xl hover:bg-white/5 hover:border-white/20 transition-all group">
+                        <Globe className="h-4 w-4 text-zinc-400 group-hover:text-white transition-colors" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-300 group-hover:text-white">Sign in with Google</span>
+                      </button>
+                    ) : (
+                       <p className="text-[10px] font-black uppercase tracking-widest text-primary animate-pulse py-4">Awaiting Verification Gateway...</p>
+                    )}
+                  </div>
+                </>
+              )}
+              
+              {user && (
+                <button type="button" onClick={() => auth.signOut()} className="w-full flex items-center justify-center gap-2 py-3 mt-4 text-[10px] font-black uppercase tracking-widest text-zinc-600 hover:text-red-400 transition-all border border-transparent hover:border-red-500/20 rounded-xl hover:bg-red-500/10">
+                  <LogOut className="h-3 w-3" /> Terminate Session
+                </button>
+              )}
+            </form>
+          )}
+        </div>
+
+        {/* Footer Trust Badges */}
         <div className="mt-8 flex items-center justify-center gap-6 opacity-30">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4" />
-            <span className="text-[10px] font-black uppercase tracking-tighter">Bank-Grade Security</span>
+            <span className="text-[10px] font-black uppercase tracking-tighter">End-to-End Encrypted</span>
           </div>
           <div className="flex items-center gap-2">
             <Globe className="h-4 w-4" />
-            <span className="text-[10px] font-black uppercase tracking-tighter">Cloud Sync Active</span>
+            <span className="text-[10px] font-black uppercase tracking-tighter">Global Sync Enabled</span>
           </div>
         </div>
       </div>
     </div>
-
   );
 }
-
