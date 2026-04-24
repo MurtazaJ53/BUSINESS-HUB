@@ -4,52 +4,69 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Base Light Theme */
+    --background: 0 0% 98%; /* Slightly off-white for reduced eye strain */
+    --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 240 10% 3.9%;
+    
+    /* Primary Brand Color (Zarra Blue) */
     --primary: 199 89% 48%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Secondary & Accents */
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    
+    /* Status Colors */
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Borders & Inputs */
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
     --ring: 199 89% 48%;
-    --radius: 0.75rem;
-    --sidebar: 240 10% 98%;
-    --sidebar-foreground: 240 10% 3.9%;
+    
+    --radius: 1rem; /* Slightly larger border radius for modern feel */
   }
 
   .dark {
-    --background: 222 84% 3.5%;
-    --foreground: 210 40% 98%;
-    --card: 222 84% 5%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 199 89% 48%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 217 32% 14%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 32% 14%;
-    --muted-foreground: 215 20% 75%;
-    --accent: 217 32% 18%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62% 35%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 32% 20%;
-    --input: 217 32% 14%;
-    --ring: 199 89% 48%;
-    --sidebar: 240 10% 3.9%;
-    --sidebar-foreground: 0 0% 98%;
+    /* True OLED Black Foundation */
+    --background: 0 0% 2%; 
+    --foreground: 0 0% 98%;
+    
+    /* Elevated Dark Surfaces */
+    --card: 0 0% 4%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 4%;
+    --popover-foreground: 0 0% 98%;
+    
+    /* Primary Brand Color (Slightly more vibrant for dark mode) */
+    --primary: 199 89% 52%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Secondary & Accents */
+    --secondary: 0 0% 9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 0 0% 12%;
+    --accent-foreground: 0 0% 98%;
+    
+    /* Status Colors */
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    
+    /* Borders & Inputs */
+    --border: 0 0% 12%;
+    --input: 0 0% 12%;
+    --ring: 199 89% 52%;
   }
 }
 
@@ -57,67 +74,98 @@
   * {
     @apply border-border;
   }
+  
+  html {
+    scroll-behavior: smooth;
+    /* Prevents pull-to-refresh rubber-banding on mobile apps */
+    overscroll-behavior-y: none; 
+  }
+  
   body {
-    @apply bg-background text-foreground;
-    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    transition-duration: 300ms;
+    @apply bg-background text-foreground antialiased selection:bg-primary/30 selection:text-primary;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    /* Hardware acceleration for ultra-smooth rendering */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
 @layer components {
+  /* Dynamic gradient using standard Tailwind HSL mapping */
   .premium-gradient {
-    @apply bg-gradient-to-br from-business-600 to-business-400;
+    @apply bg-gradient-to-br from-primary to-blue-600;
   }
 
   .glass-card {
-    background-color: rgba(var(--card), 0.7);
-    @apply backdrop-blur-[12px] border border-foreground/5 shadow-sm;
+    /* FIXED: Using hsl() instead of rgba() for HSL variables */
+    background-color: hsl(var(--card) / 0.7);
+    @apply backdrop-blur-xl border border-foreground/5 shadow-lg;
   }
 
   .dark .glass-card {
-    background-color: rgba(var(--card), 0.6);
-    @apply border-white/10 shadow-2xl shadow-black/40;
+    background-color: hsl(var(--card) / 0.6);
+    @apply border-white/5 shadow-2xl shadow-black/80;
   }
 }
 
 @layer utilities {
-  .animate-in {
-    @apply animate-fade-in;
-  }
-  
+  /* Capacitor Mobile Safe Area Utilities */
   .safe-area-top {
     padding-top: env(safe-area-inset-top);
   }
+  
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 
   .app-top-bar {
-    padding-top: max(env(safe-area-inset-top), 0.75rem);
+    padding-top: max(env(safe-area-inset-top), 1rem);
+  }
+
+  .app-bottom-bar {
+    padding-bottom: max(env(safe-area-inset-bottom), 1rem);
   }
 
   .sidebar-backdrop {
-    background-color: rgb(0 0 0 / 0.7);
-    @apply backdrop-blur-[4px];
+    background-color: hsl(0 0% 0% / 0.7);
+    @apply backdrop-blur-md;
+  }
+  
+  /* Hide scrollbar for clean UI but allow scrolling */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
   }
 }
 
-/* Custom Scrollbar */
+/* ─── Premium Scrollbar ────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background-color: rgba(156, 163, 175, 0.2);
+  background-color: hsl(var(--muted-foreground) / 0.3);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(156, 163, 175, 0.4);
+  background-color: hsl(var(--muted-foreground) / 0.5);
 }
 
-/* ─── Dropdown Fix for Dark Mode ────────────────────────────────────────── */
+/* ─── Form Overrides ────────────────────────────────────────── */
 .dark select option {
-  background-color: #1a1b1e !important;
-  color: white !important;
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Prevents input zoom on iOS Safari when tapping inputs */
+@media screen and (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
 }
