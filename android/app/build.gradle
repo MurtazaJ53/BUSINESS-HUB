@@ -18,21 +18,25 @@ android {
     }
     signingConfigs {
         release {
-            if (System.getenv("ANDROID_KEYSTORE_PASSWORD")) {
-                storeFile file("business-hub.jks")
-                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
-                keyAlias System.getenv("ANDROID_KEY_ALIAS")
-                keyPassword System.getenv("ANDROID_KEY_PASSWORD")
-            }
+            storeFile file("../../business-hub.jks")
+            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD") ?: "businesshubpro"
+            keyAlias System.getenv("ANDROID_KEY_ALIAS") ?: "business-hub"
+            keyPassword System.getenv("ANDROID_KEY_PASSWORD") ?: "businesshubpro"
         }
     }
 
     buildTypes {
         release {
             signingConfig signingConfigs.release
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 }
 

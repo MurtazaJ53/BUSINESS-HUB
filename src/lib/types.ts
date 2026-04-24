@@ -61,6 +61,7 @@ export interface ShopMetadata {
   currency: string;
   standardWorkingHours: number;
   allowStaffAttendance: boolean;
+  recoveryEmail?: string;
 }
 
 export interface ShopPrivate {

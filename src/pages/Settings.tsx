@@ -1,96 +1,86 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
-  Settings as SettingsIcon, 
-  Download, 
-  FileSpreadsheet, 
-  AlertTriangle,
-  HardDrive,
-  Database,
-  Store,
-  Monitor,
-  CheckCircle2,
-  Lock,
-  ShieldCheck,
-  Users,
-  Sun,
-  Moon,
-  RefreshCcw,
-  Sparkles,
-  Building2,
-  Smartphone,
-  Mail,
-  MapPin,
-  Trash2,
-  PlusCircle,
-  RotateCcw,
-  Building,
-  AlertCircle,
-  Upload,
-  ArrowRight
+  Settings as SettingsIcon, Download, FileSpreadsheet, AlertTriangle,
+  Database, Store, Monitor, CheckCircle2, Key,
+  Sun, Moon, RefreshCcw, LogOut, MapPin, TrendingUp, Lock, ShieldCheck,
+  ExternalLink, ChevronRight, AlertCircle, ShieldAlert
 } from 'lucide-react';
-import { db, auth } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, query, setDoc, doc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import bcrypt from 'bcryptjs';
-import { UserPlus, Ticket, LogOut, X, MessageCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { httpsCallable } from 'firebase/functions';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth, functions } from '@/lib/firebase';
 import { useSqlQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
+import { useAuthStore } from '@/lib/useAuthStore';
 import { downloadFile, convertToCSV, exportSalesReport, generateGSTR1, generateGSTR3B } from '@/lib/exportUtils';
 import { formatCurrency, cn, isValidIndianPhone, sanitizePhone } from '@/lib/utils';
-import ConfirmDialog from '@/components/ConfirmDialog';
-import { loadShopSettings } from '@/lib/shopSettings';
-import { useAuthStore } from '@/lib/useAuthStore';
-import { MigrationResult } from '@/lib/migrationEngine';
-import { InventoryItem, Staff, Sale, Customer } from '@/lib/types';
-import { sendStaffInvite } from '@/lib/mail';
-import { shareInviteWhatsApp } from '@/lib/whatsapp';
 import { usePermission } from '@/hooks/usePermission';
+import ConfirmDialog from '@/components/ConfirmDialog';
+import { MigrationResult } from '@/lib/migrationEngine';
+import { InventoryItem, Sale, Customer } from '@/lib/types';
+
+// --- 🛠️ MODULAR SUB-COMPONENTS ---
+
+const SectionHeader = ({ icon: Icon, title, subtitle }: { icon: any, title: string, subtitle?: string }) => (
+  <div className="flex items-center gap-4 mb-6 animate-in fade-in slide-in-from-left-4">
+    <div className="h-10 w-10 bg-[#141414] border border-white/10 rounded-xl flex items-center justify-center shadow-lg shadow-black/50">
+      <Icon className="h-5 w-5 text-primary" />
+    </div>
+    <div>
+      <h3 className="text-xl font-black tracking-tight text-white">{title}</h3>
+      {subtitle && <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{subtitle}</p>}
+    </div>
+  </div>
+);
 
 export default function Settings() {
-  const { shop, shopPrivate, updateShop, clearInventory, theme, setTheme, shopId, setActiveTab, addInventoryItem, upsertCustomer, addSale, invitations } = useBusinessStore();
+  const navigate = useNavigate();
+  const { shop, updateShop, clearInventory, theme, setTheme, setActiveTab, addInventoryItem, upsertCustomer, addSale, currentStaff } = useBusinessStore();
+  const { role, user } = useAuthStore();
+  
+  const canEditSettings = usePermission('settings', 'edit') || role === 'admin';
+  const canViewInventoryCost = usePermission('inventory', 'view_cost') || role === 'admin';
+  
   const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
   const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
   const sales = useSqlQuery<Sale>('SELECT * FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC', [], ['sales']);
   const customers = useSqlQuery<Customer>('SELECT * FROM customers WHERE tombstone = 0 ORDER BY name ASC', [], ['customers']);
 
-  const { role, user } = useAuthStore();
-  const canEditSettings = usePermission('settings', 'edit');
-  const canViewInventoryCost = usePermission('inventory', 'view_cost');
+  const [toast, setToast] = useState('');
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
-  const [toast, setToast] = useState('');
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(''), 3000);
-  };
   
-  // Migration State
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [importType, setImportType] = useState<'inventory' | 'customer' | 'sale'>('inventory');
-  const [migrationStatus, setMigrationStatus] = useState<string | null>(null);
-  const [migrationData, setMigrationData] = useState<MigrationResult | null>(null);
-  const [generatingInvite, setGeneratingInvite] = useState(false);
-  
-  const [editForm, setEditForm] = useState<any>({ 
-    ...shop
-  });
+  const [oldAdminPin, setOldAdminPin] = useState('');
   const [newAdminPin, setNewAdminPin] = useState('');
   const [pinRotating, setPinRotating] = useState(false);
 
-  // Sync editForm when shop or shopPrivate changes (e.g. on load)
-  React.useEffect(() => {
-    setEditForm({
-      ...shop
-    });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importType, setImportType] = useState<'inventory' | 'customer' | 'sale'>('inventory');
+  const [migrationStatus, setMigrationStatus] = useState<string | null>(null);
+  const [migrationData, setMigrationData] = useState<MigrationResult | null>(null);
+
+  const [recoveryEmail, setRecoveryEmail] = useState(shop.recoveryEmail || '');
+  const [updatingRecovery, setUpdatingRecovery] = useState(false);
+
+  const [editForm, setEditForm] = useState({ ...shop });
+
+  useEffect(() => {
+    setEditForm({ ...shop });
   }, [shop]);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 4000);
+  };
 
   const handleSaveShop = async () => {
     try {
       await updateShop(editForm);
       setEditOpen(false);
-      showToast('Profile Updated Successfully');
+      showToast('Workspace Profile Synchronized');
     } catch (err: any) {
-      showToast(`Error: ${err.message}`);
+      showToast(`Sync Error: ${err.message}`);
     }
   };
 
@@ -99,46 +89,56 @@ export default function Settings() {
     setPinRotating(true);
     try {
       const { shopId } = useBusinessStore.getState();
-      if (!shopId) throw new Error("Shop ID not identified.");
+      if (!shopId) throw new Error("Workspace Context Missing.");
       
-      // 1. Hash locally
-      const salt = bcrypt.genSaltSync(10);
-      const hash = bcrypt.hashSync(newAdminPin, salt);
+      const setPin = httpsCallable(functions, 'setAdminPin');
+      const result = await setPin({ oldPin: oldAdminPin, newPin: newAdminPin, shopId });
       
-      // 2. Save to private vault
-      await setDoc(doc(db, `shops/${shopId}/private`, 'auth'), {
-        adminPinHash: hash,
-        updatedAt: serverTimestamp(),
-        updatedBy: auth.currentUser?.uid
-      }, { merge: true });
+      if (!(result.data as any).success) throw new Error((result.data as any).error || "Encryption Failed.");
       
-      showToast('Master PIN Updated Successfully');
+      showToast('Master Cryptographic PIN Rotated');
       setNewAdminPin('');
+      setOldAdminPin('');
     } catch (err: any) {
-      showToast(`Security Error: ${err.message}`);
+      showToast(`Security Exception: ${err.message}`);
     } finally {
       setPinRotating(false);
     }
   };
 
+  const handleUpdateRecovery = async () => {
+    if (!recoveryEmail.includes('@')) return;
+    setUpdatingRecovery(true);
+    try {
+      await updateShop({ ...shop, recoveryEmail });
+      showToast('Recovery Infrastructure Updated');
+    } catch (err: any) {
+      showToast(`Update Failed: ${err.message}`);
+    } finally {
+      setUpdatingRecovery(false);
+    }
+  };
+
+  const handleSendPasswordReset = async () => {
+    if (!user?.email) return;
+    try {
+      await sendPasswordResetEmail(auth, user.email);
+      showToast(`Security Email Sent to ${user.email}`);
+    } catch (err: any) {
+      showToast(`Security Error: ${err.message}`);
+    }
+  };
+
   const handleInventoryCSV = () => {
     setExporting('inv-csv');
-    // Sanitize for CSV
     const csvData = inventory.map((i: InventoryItem) => {
       const privateData = canViewInventoryCost ? inventoryPrivate.find((pi: any) => pi.id === i.id) : null;
       return {
-        Name: i.name,
-        SKU: i.sku || 'N/A',
-        Category: i.category,
-        Subcategory: i.subcategory || '',
-        CostPrice: privateData?.costPrice || 0,
-        SellPrice: i.price,
-        Stock: i.stock ?? 0,
-        AddedOn: i.createdAt
+        Name: i.name, SKU: i.sku || 'N/A', Category: i.category,
+        CostPrice: privateData?.costPrice || 0, SellPrice: i.price, Stock: i.stock ?? 0, AddedOn: i.createdAt
       };
     });
-    const csv = convertToCSV(csvData);
-    downloadFile(csv, `Inventory_Export_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
+    downloadFile(convertToCSV(csvData), `Inventory_Master_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
     setTimeout(() => setExporting(null), 1000);
   };
 
@@ -152,12 +152,12 @@ export default function Settings() {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    setMigrationStatus(`Parsing ${type} data...`);
+    setMigrationStatus(`Analyzing ${type} data matrix...`);
     const { parseGenericExcel } = await import('@/lib/migrationEngine');
     const result = await parseGenericExcel(file, type);
     
     if (!result.success || result.validItems.length === 0) {
-      showToast(`Import Failed: ${result.errors[0] || 'No valid records found'}`);
+      showToast(`Import Aborted: ${result.errors[0] || 'No valid records detected.'}`);
       setMigrationStatus(null);
     } else {
       setMigrationData(result);
@@ -169,551 +169,272 @@ export default function Settings() {
 
   const executeMigration = async () => {
     if (!migrationData) return;
-    setMigrationStatus(`Importing ${migrationData.validItems.length} records...`);
+    setMigrationStatus(`Injecting ${migrationData.validItems.length} records...`);
     
     let count = 0;
     try {
       for (const item of migrationData.validItems) {
         if (migrationData.type === 'inventory') {
-          await addInventoryItem({
-            id: `inv-${Date.now()}-${count}`,
-            ...item,
-            createdAt: new Date().toISOString()
-          });
+          await addInventoryItem({ id: `inv-${Date.now()}-${count}`, ...item, createdAt: new Date().toISOString() });
         } else if (migrationData.type === 'customer') {
-          await upsertCustomer({
-            id: `cust-${Date.now()}-${count}`,
-            name: item.name,
-            phone: item.phone,
-            balance: item.balance,
-            totalSpent: item.totalSpent,
-            createdAt: new Date().toISOString()
-          });
+          await upsertCustomer({ id: `cust-${Date.now()}-${count}`, name: item.name, phone: item.phone, balance: item.balance, totalSpent: item.totalSpent, createdAt: new Date().toISOString() });
         } else if (migrationData.type === 'sale') {
-          await addSale({
-            id: `sale-${Date.now()}-${count}`,
-            ...item,
-            status: 'COMPLETED'
-          });
+          await addSale({ id: `sale-${Date.now()}-${count}`, ...item, status: 'COMPLETED' });
         }
         count++;
       }
-      showToast(`Success: Imported ${count} ${migrationData.type} records!`);
+      showToast(`Migration Complete: ${count} ${migrationData.type}s injected.`);
     } catch (e: any) {
-      showToast(`Partial Success: ${count} added. Error: ${e.message}`);
+      showToast(`Partial Failure: ${count} injected. Error: ${e.message}`);
     }
     setMigrationData(null);
     setMigrationStatus(null);
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-in pb-20">
-      <div className="flex items-center justify-between">
+    <div className="max-w-5xl mx-auto space-y-10 animate-in pb-24 font-sans min-h-screen text-foreground/80">
+      
+      <div className="flex items-end justify-between border-b border-border pb-6">
         <div>
-          <h1 className="text-4xl font-black tracking-tighter">Control Center</h1>
-          <p className="text-muted-foreground mt-1">Configure shop settings and data management</p>
+          <h1 className="text-4xl font-black tracking-tighter text-foreground drop-shadow-md">Command Center</h1>
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-[0.2em] mt-2">System Configuration & Data Ops</p>
         </div>
-        <div className="h-12 w-12 premium-gradient rounded-2xl flex items-center justify-center text-white shadow-lg">
-          <SettingsIcon className="h-6 w-6" />
+        <div className="h-14 w-14 bg-gradient-to-tr from-primary to-blue-600 rounded-2xl flex items-center justify-center text-white shadow-[0_0_30px_rgba(var(--primary),0.3)]">
+          <SettingsIcon className="h-6 w-6 animate-[spin_10s_linear_infinite]" />
         </div>
       </div>
 
-      {/* Shop Info Summary */}
-      <div className="glass-card rounded-3xl p-8 border-primary/10 relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none">
-          <Store className="h-40 w-40" />
-        </div>
-        <div className="flex items-start justify-between mb-8 relative z-10">
-          <div className="flex items-center gap-5">
-            <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
-              <Store className="h-10 w-10" />
+      <div className="bg-card rounded-[2rem] p-8 border border-border relative overflow-hidden shadow-2xl">
+        <Store className="absolute -bottom-10 -right-10 h-64 w-64 text-foreground/[0.02] pointer-events-none" />
+        
+        <div className="flex items-start justify-between relative z-10">
+          <div className="flex items-center gap-6">
+            <div className="h-20 w-20 rounded-[1.5rem] bg-accent/20 border border-border flex items-center justify-center text-primary shadow-inner">
+              <Store className="h-8 w-8" />
             </div>
             <div>
-              <div className="flex items-center gap-3">
-                <h2 className="text-2xl font-black tracking-tight">{shop.name}</h2>
+              <div className="flex items-center gap-4">
+                <h2 className="text-3xl font-black tracking-tight text-foreground">{shop.name}</h2>
                 {canEditSettings && (
-                  <button 
-                    onClick={() => { setEditForm(shop); setEditOpen(true); }}
-                    className="px-3 py-1 bg-primary/10 text-primary rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-sm border border-primary/20"
-                  >
-                    Edit Profile
+                  <button onClick={() => { setEditForm(shop); setEditOpen(true); }} className="px-4 py-1.5 bg-accent/50 text-foreground/70 hover:text-foreground rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border border-border hover:border-border/30 hover:bg-accent">
+                    Modify Parameters
                   </button>
                 )}
               </div>
-              <p className="text-sm font-bold text-muted-foreground uppercase tracking-[0.2em]">{shop.tagline}</p>
-              <p className="text-xs text-muted-foreground mt-1 opacity-60">{shop.address || 'No address set'}</p>
+              <p className="text-xs font-bold text-primary uppercase tracking-[0.25em] mt-1">{shop.tagline}</p>
+              <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-2 font-medium">
+                <MapPin className="h-3 w-3" /> {shop.address || 'Location Unspecified'}
+              </p>
             </div>
           </div>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-6 border-t border-border/50">
-          <div className="space-y-1">
-            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Inventory</p>
-            <p className="text-xl font-black italic">{inventory.length}</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Total Sales</p>
-            <p className="text-xl font-black italic">{sales.length}</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Customers</p>
-            <p className="text-xl font-black italic">{customers.length}</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Store Value</p>
-            <p className="text-xl font-black italic text-primary">₹{inventory.reduce((sum: number, i: InventoryItem) => sum + (i.price * (i.stock || 0)), 0).toLocaleString()}</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Shift Base</p>
-            <p className="text-xl font-black italic text-primary">{shop.standardWorkingHours || 9}h</p>
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-8 mt-8 border-t border-border relative z-10">
+          {[
+            { label: 'Total Assets', value: inventory.length },
+            { label: 'Transactions', value: sales.length },
+            { label: 'Client Base', value: customers.length },
+            { label: 'Gross Value', value: `₹${inventory.reduce((sum: number, i: InventoryItem) => sum + (i.price * (i.stock || 0)), 0).toLocaleString()}`, highlight: true },
+            { label: 'Shift Duration', value: `${shop.standardWorkingHours || 9}H` }
+          ].map((stat, i) => (
+            <div key={i} className="bg-accent/10 p-4 rounded-2xl border border-border">
+              <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-1">{stat.label}</p>
+              <p className={cn("text-xl font-black tracking-tighter", stat.highlight ? "text-primary drop-shadow-[0_0_10px_rgba(var(--primary),0.5)]" : "text-foreground")}>{stat.value}</p>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Theme / Appearance Section */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Monitor className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-black tracking-tight">Display & Appearance</h3>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <button
-            onClick={() => setTheme('light')}
-            className={`glass-card p-6 rounded-[2rem] text-left transition-all relative overflow-hidden group ${
-              theme === 'light' ? 'ring-2 ring-primary border-primary/50' : 'hover:bg-accent/50'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500">
-                <Sun className="h-5 w-5" />
-              </div>
-              {theme === 'light' && <CheckCircle2 className="h-5 w-5 text-primary" />}
-            </div>
-            <p className="text-sm font-black uppercase tracking-widest">White Mode</p>
-            <p className="text-[10px] text-muted-foreground mt-1 font-bold">Clean, professional light theme</p>
-            <div className="mt-4 flex gap-1.5 pointer-events-none">
-              <div className="h-2 w-8 bg-zinc-200 rounded-full" />
-              <div className="h-2 w-4 bg-primary/30 rounded-full" />
-            </div>
-          </button>
-
-          <button
-            onClick={() => setTheme('dark')}
-            className={`glass-card p-6 rounded-[2rem] text-left transition-all relative overflow-hidden group ${
-              theme === 'dark' ? 'ring-2 ring-primary border-primary/50 bg-zinc-900' : 'hover:bg-accent/50'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
-                <Moon className="h-5 w-5" />
-              </div>
-              {theme === 'dark' && <CheckCircle2 className="h-5 w-5 text-primary" />}
-            </div>
-            <p className="text-sm font-black uppercase tracking-widest text-zinc-100">Dark Mode</p>
-            <p className="text-[10px] text-zinc-500 mt-1 font-bold">Modern, elite dark theme</p>
-            <div className="mt-4 flex gap-1.5 pointer-events-none">
-              <div className="h-2 w-8 bg-zinc-800 rounded-full" />
-              <div className="h-2 w-4 bg-primary/30 rounded-full" />
-            </div>
-          </button>
-        </div>
-      </div>
-
-      {/* Profile & Account */}
-      <div className="space-y-4 pt-4 border-t border-border/50">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-full bg-accent flex items-center justify-center overflow-hidden border-2 border-primary/20">
-               <img src={user?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.email}`} alt="avatar" />
-            </div>
-            <div>
-              <p className="text-sm font-black tracking-tight">{user?.email}</p>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{role} Account</p>
-            </div>
-          </div>
-          <button 
-            onClick={() => auth.signOut()}
-            className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-red-500/10 to-transparent hover:from-red-600 hover:to-red-500 text-red-500 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl shadow-red-500/5 group border border-red-500/20"
-          >
-            <div className="h-8 w-8 rounded-xl bg-red-500/20 flex items-center justify-center group-hover:bg-white/20 transition-colors">
-              <LogOut className="h-4 w-4" />
-            </div>
-            <span>Terminate Hub Session</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Data Management Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Backup & Export */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Database className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-black tracking-tight">Data Backup & Export</h3>
-          </div>
-          
-          <div className="glass-card rounded-3xl p-6 space-y-3">
-            <button 
-              onClick={handleInventoryCSV}
-              disabled={exporting === 'inv-csv'}
-              className="w-full flex items-center justify-between p-4 bg-accent/50 hover:bg-primary/10 rounded-2xl transition-all group"
-            >
-              <div className="flex items-center gap-3">
-                <FileSpreadsheet className="h-5 w-5 text-emerald-500" />
-                <div className="text-left">
-                  <p className="text-sm font-bold">Inventory Assets</p>
-                  <p className="text-[10px] text-muted-foreground uppercase font-black">CSV Report</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+        <div className="space-y-10">
+          <section>
+            <SectionHeader icon={Key} title="Account Security" subtitle="Login Credential Management" />
+            <div className="bg-card rounded-[2rem] p-6 border border-border space-y-4">
+              <div className="flex items-center justify-between p-4 bg-accent/10 rounded-2xl border border-border">
+                <div>
+                  <p className="text-sm font-bold text-foreground">Change Login Password</p>
+                  <p className="text-[10px] text-muted-foreground font-medium mt-0.5">Secure reset link will be sent to your email.</p>
                 </div>
+                <button 
+                  onClick={handleSendPasswordReset}
+                  className="px-6 py-2.5 bg-primary/10 hover:bg-primary text-primary hover:text-black rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border border-primary/20"
+                >
+                  Trigger Reset
+                </button>
               </div>
-              <Download className="h-4 w-4 text-muted-foreground group-hover:text-emerald-500 transition-colors" />
-            </button>
+            </div>
+          </section>
 
-            <button 
-              onClick={handleSalesCSV}
-              disabled={exporting === 'sales-csv'}
-              className="w-full flex items-center justify-between p-4 bg-accent/50 hover:bg-primary/10 rounded-2xl transition-all group"
-            >
-              <div className="flex items-center gap-3">
-                <RefreshCcw className="h-5 w-5 text-blue-500" />
-                <div className="text-left">
-                  <p className="text-sm font-bold">Detailed Sales Log</p>
-                  <p className="text-[10px] text-muted-foreground uppercase font-black">CSV Report</p>
+          <section>
+            <SectionHeader icon={Monitor} title="Environment Interface" subtitle="UI Theme Configuration" />
+            <div className="grid grid-cols-2 gap-4">
+              <button onClick={() => setTheme('light')} className={cn("p-6 rounded-[2rem] text-left transition-all border group", theme === 'light' ? 'bg-secondary border-primary shadow-xl' : 'bg-card border-border hover:bg-accent/40')}>
+                <div className="flex justify-between mb-4">
+                  <div className="h-10 w-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500"><Sun className="h-5 w-5" /></div>
+                  {theme === 'light' && <CheckCircle2 className="h-5 w-5 text-primary" />}
                 </div>
-              </div>
-              <Download className="h-4 w-4 text-muted-foreground group-hover:text-blue-500 transition-colors" />
-            </button>
-
-            <div className="pt-2 grid grid-cols-2 gap-3">
-              <button 
-                onClick={() => generateGSTR1(sales, shop.gst)}
-                className="flex items-center gap-2 p-3 bg-primary/5 hover:bg-primary/10 text-primary rounded-xl transition-all border border-primary/10 text-[10px] font-black uppercase tracking-widest"
-              >
-                <div className="p-1.5 bg-primary/10 rounded-lg">
-                  <FileSpreadsheet className="h-3.5 w-3.5" />
-                </div>
-                GSTR-1 Export
+                <p className={cn("text-xs font-black uppercase tracking-widest", theme === 'light' ? "text-foreground" : "text-muted-foreground")}>Daylight Protocol</p>
               </button>
-              <button 
-                onClick={() => generateGSTR3B(sales)}
-                className="flex items-center gap-2 p-3 bg-purple-500/5 hover:bg-purple-500/10 text-purple-500 rounded-xl transition-all border border-purple-500/10 text-[10px] font-black uppercase tracking-widest"
-              >
-                <div className="p-1.5 bg-purple-500/10 rounded-lg">
-                  <Database className="h-3.5 w-3.5" />
+
+              <button onClick={() => setTheme('dark')} className={cn("p-6 rounded-[2rem] text-left transition-all border group", theme === 'dark' ? 'bg-secondary border-primary shadow-xl' : 'bg-card border-border hover:bg-accent/40')}>
+                <div className="flex justify-between mb-4">
+                  <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500"><Moon className="h-5 w-5" /></div>
+                  {theme === 'dark' && <CheckCircle2 className="h-5 w-5 text-primary" />}
                 </div>
-                GSTR-3B Summary
+                <p className={cn("text-xs font-black uppercase tracking-widest", theme === 'dark' ? "text-foreground" : "text-muted-foreground")}>Night Ops Mode</p>
               </button>
             </div>
-            
-            {/* Zobaze Migration Button */}
-            <div className="pt-4 border-t border-border/50">
-              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3 ml-1">Legacy Migration Engine</p>
-              <input 
-                type="file" 
-                ref={fileInputRef}
-                accept=".xlsx,.xls,.csv"
-                className="hidden"
-                onChange={(e) => handleFileUpload(e, importType)}
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <button 
-                  onClick={() => { setImportType('inventory'); setTimeout(() => fileInputRef.current?.click(), 10); }}
-                  disabled={migrationStatus !== null || !canEditSettings}
-                  className="flex flex-col items-center gap-2 p-4 bg-orange-500/5 hover:bg-orange-500/10 text-orange-500 rounded-2xl transition-all border border-orange-500/10 opacity-70 hover:opacity-100"
-                >
-                  <Database className="h-5 w-5" />
-                  <span className="text-[9px] font-black uppercase tracking-widest">Import Stock</span>
-                </button>
-                <button 
-                  onClick={() => { setImportType('customer'); setTimeout(() => fileInputRef.current?.click(), 10); }}
-                  disabled={migrationStatus !== null || !canEditSettings}
-                  className="flex flex-col items-center gap-2 p-4 bg-blue-600/5 hover:bg-blue-600/10 text-blue-600 rounded-2xl transition-all border border-blue-600/10 opacity-70 hover:opacity-100"
-                >
-                  <Users className="h-5 w-5" />
-                  <span className="text-[9px] font-black uppercase tracking-widest">Import Users</span>
-                </button>
-                <button 
-                  onClick={() => { setImportType('sale'); setTimeout(() => fileInputRef.current?.click(), 10); }}
-                  disabled={migrationStatus !== null || !canEditSettings}
-                  className="flex flex-col items-center gap-2 p-4 bg-emerald-600/5 hover:bg-emerald-600/10 text-emerald-600 rounded-2xl transition-all border border-emerald-600/10 opacity-70 hover:opacity-100"
-                >
-                  <RefreshCcw className="h-5 w-5" />
-                  <span className="text-[9px] font-black uppercase tracking-widest">Import Sales</span>
-                </button>
-                <button 
-                  onClick={() => { setImportType('inventory'); setTimeout(() => fileInputRef.current?.click(), 10); }}
-                  disabled={migrationStatus !== null || !canEditSettings}
-                  className="flex flex-col items-center gap-2 p-4 bg-purple-600/5 hover:bg-purple-600/10 text-purple-600 rounded-2xl transition-all border border-purple-600/10 opacity-70 hover:opacity-100"
-                >
-                  <Sparkles className="h-5 w-5" />
-                  <span className="text-[9px] font-black uppercase tracking-widest">Master Import</span>
-                </button>
-              </div>
-              {migrationStatus && (
-                <div className="mt-4 p-3 bg-accent/50 rounded-xl flex items-center gap-3">
-                  <RotateCcw className="h-4 w-4 animate-spin text-primary" />
-                  <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">{migrationStatus}</span>
+          </section>
+
+          <section className="bg-card rounded-[2rem] p-6 border border-border flex items-center justify-between">
+             <div className="flex items-center gap-4">
+                <img src={user?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.email}&backgroundColor=141414`} alt="avatar" className="h-12 w-12 rounded-full border border-border bg-accent/20" />
+                <div>
+                  <p className="text-sm font-black tracking-tight text-foreground">{user?.email}</p>
+                  <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">{role} Clearance</p>
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+              <button onClick={() => auth.signOut()} className="h-10 w-10 bg-red-500/10 hover:bg-red-500 hover:text-white text-red-500 rounded-xl flex items-center justify-center transition-all border border-red-500/20">
+                <LogOut className="h-4 w-4 ml-1" />
+              </button>
+          </section>
         </div>
 
-        {/* Security & Maintenance */}
-        {canEditSettings && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-2">
-              <HardDrive className="h-5 w-5 text-destructive" />
-              <h3 className="text-lg font-black tracking-tight">System Maintenance</h3>
-            </div>
-            
-            <div className="glass-card rounded-3xl p-6 space-y-4">
-              <div className="space-y-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Pin Security Control</p>
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black uppercase tracking-widest ml-1 text-primary">New Master Admin PIN</label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                      <input 
-                        type="password"
-                        maxLength={4}
-                        placeholder="Enter 4-digit PIN"
-                        className="w-full pl-8 pr-4 py-2 bg-accent/30 border border-border rounded-xl text-xs font-black tracking-[0.5em] focus:ring-2 focus:ring-primary/20"
-                        value={newAdminPin}
-                        onChange={e => setNewAdminPin(e.target.value.replace(/[^0-9]/g, ''))}
-                      />
-                    </div>
+        <div className="space-y-10">
+          <section>
+             <SectionHeader icon={Database} title="Data Telemetry" subtitle="Exports & Compliance" />
+             <div className="bg-card rounded-[2rem] p-6 border border-border space-y-3">
+                <button onClick={handleInventoryCSV} disabled={exporting === 'inv-csv'} className="w-full flex items-center justify-between p-4 bg-accent/10 hover:bg-accent/20 rounded-2xl transition-all border border-border group">
+                  <div className="flex items-center gap-4">
+                    <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-500"><FileSpreadsheet className="h-4 w-4" /></div>
+                    <div className="text-left"><p className="text-sm font-bold text-foreground group-hover:text-emerald-400 transition-colors">Asset Ledger (CSV)</p></div>
                   </div>
-                  
-                  <button 
-                    onClick={handleRotatePin}
-                    disabled={pinRotating || newAdminPin.length < 4}
-                    className={cn(
-                      "w-full py-3 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-2",
-                      newAdminPin.length === 4 
-                        ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary hover:text-white" 
-                        : "bg-accent/50 text-muted-foreground border-transparent opacity-50"
-                    )}
-                  >
-                    {pinRotating ? (
-                      <>
-                        <RefreshCcw className="h-3 w-3 animate-spin" />
-                        Encrypting...
-                      </>
-                    ) : (
-                      <>
-                        <ShieldCheck className="h-3 w-3" />
-                        Rotate Master PIN
-                      </>
-                    )}
-                  </button>
-                  <p className="text-[9px] text-muted-foreground italic text-center px-4">
-                    Security: PINs are hashed using bcrypt before being stored in the digital vault.
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-4 bg-destructive/5 border border-destructive/10 rounded-2xl">
-                <div className="flex items-center gap-3 text-destructive mb-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  <p className="text-xs font-black uppercase tracking-widest">Danger Zone</p>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Resetting the inventory will delete every product, SKU, and stock count permanently. This cannot be undone!
-                </p>
-                <button 
-                  onClick={() => setResetConfirmOpen(true)}
-                  className="w-full mt-4 py-3 bg-destructive text-white rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all hover:bg-destructive/90 hover:shadow-lg hover:shadow-destructive/20"
-                >
-                  Reset Inventory Data
+                  <Download className="h-4 w-4 text-muted-foreground group-hover:text-emerald-400" />
                 </button>
-              </div>
-
-              {/* Security Advancement (Admin Only) */}
-              <div className="glass-card p-8 rounded-[2.5rem] border border-white/5 space-y-6 mt-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 bg-primary/10 rounded-2xl flex items-center justify-center">
-                    <Database className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-black">Security Advancement</h2>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mt-1">Data Sequestration & Vault</p>
-                  </div>
-                </div>
                 
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Upgrade your shop to use the new sequestered data architecture. This moves sensitive salaries, PINs, and cost prices into a restricted private vault.
-                </p>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('sequestration')}
-                  className="w-full py-4 rounded-2xl border border-white/10 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all flex items-center justify-center gap-2 group"
-                >
-                  Open Security Vault
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                <button onClick={handleSalesCSV} disabled={exporting === 'sales-csv'} className="w-full flex items-center justify-between p-4 bg-accent/10 hover:bg-accent/20 rounded-2xl transition-all border border-border group">
+                  <div className="flex items-center gap-4">
+                    <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500"><RefreshCcw className="h-4 w-4" /></div>
+                    <div className="text-left"><p className="text-sm font-bold text-foreground group-hover:text-blue-400 transition-colors">Transaction History (CSV)</p></div>
+                  </div>
+                  <Download className="h-4 w-4 text-muted-foreground group-hover:text-blue-400" />
                 </button>
-              </div>
-            </div>
-          </div>
-        )}
+
+                <div className="grid grid-cols-2 gap-3 pt-3 mt-3 border-t border-border">
+                   <button onClick={() => generateGSTR1(sales, shop.gst)} className="py-3 bg-accent/10 hover:bg-accent/20 text-foreground rounded-xl border border-border text-[9px] font-black uppercase tracking-widest transition-all">Export GSTR-1</button>
+                   <button onClick={() => generateGSTR3B(sales)} className="py-3 bg-accent/10 hover:bg-accent/20 text-foreground rounded-xl border border-border text-[9px] font-black uppercase tracking-widest transition-all">Export GSTR-3B</button>
+                </div>
+             </div>
+          </section>
+
+          {canEditSettings && (
+            <>
+              <section>
+                <SectionHeader icon={ShieldAlert} title="Security Node" subtitle="Access & Integrity Controls" />
+                <div className="bg-card rounded-[2rem] p-6 border border-red-500/10 space-y-6">
+                   <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-3">Master PIN Rotation</p>
+                      <div className="flex gap-3">
+                        <input type="password" maxLength={4} placeholder="Old PIN" className="w-1/3 bg-accent/20 border border-border rounded-xl px-4 py-3 text-center text-sm font-black tracking-[0.5em] focus:border-primary focus:ring-1 focus:ring-primary outline-none text-foreground" value={oldAdminPin} onChange={e => setOldAdminPin(e.target.value.replace(/[^0-9]/g, ''))} />
+                        <input type="password" maxLength={4} placeholder="New PIN" className="w-1/3 bg-accent/20 border border-border rounded-xl px-4 py-3 text-center text-sm font-black tracking-[0.5em] focus:border-primary focus:ring-1 focus:ring-primary outline-none text-foreground" value={newAdminPin} onChange={e => setNewAdminPin(e.target.value.replace(/[^0-9]/g, ''))} />
+                        <button onClick={handleRotatePin} disabled={pinRotating || newAdminPin.length < 4} className="w-1/3 bg-primary/10 hover:bg-primary/20 disabled:opacity-50 text-primary rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border border-primary/20">
+                           {pinRotating ? 'Encrypting...' : 'Update'}
+                        </button>
+                      </div>
+                   </div>
+
+                   <div className="pt-6 border-t border-border">
+                      <button onClick={() => setResetConfirmOpen(true)} className="w-full py-4 bg-red-500/5 hover:bg-red-500/20 text-red-500 rounded-2xl border border-red-500/20 font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3">
+                        <AlertTriangle className="h-4 w-4" /> Initialize Core Wipe (Delete All Inventory)
+                      </button>
+                   </div>
+                </div>
+              </section>
+
+              <section>
+                <SectionHeader icon={Lock} title="Credential Vault" subtitle="Recovery & Access Management" />
+                <div className="bg-card rounded-[2rem] p-6 border border-border space-y-6">
+                  <div className="space-y-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-1">Administrative Recovery Email</p>
+                    <div className="flex gap-3">
+                      <input 
+                        type="email" 
+                        placeholder="recovery@zarra.com" 
+                        className="flex-1 bg-accent/20 border border-border rounded-xl px-4 py-3 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none text-foreground" 
+                        value={recoveryEmail} 
+                        onChange={e => setRecoveryEmail(e.target.value)} 
+                      />
+                      <button onClick={handleUpdateRecovery} disabled={updatingRecovery} className="px-6 bg-primary/10 hover:bg-primary/20 disabled:opacity-50 text-primary rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border border-primary/20">
+                         {updatingRecovery ? 'Syncing...' : 'Commit'}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground italic">This address will receive PIN reset authorizations if standard auth is bypassed.</p>
+                  </div>
+                </div>
+              </section>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Shop Editor Modal */}
+      <input type="file" ref={fileInputRef} accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => handleFileUpload(e, importType)} />
+
       {editOpen && (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-10 overflow-y-auto">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditOpen(false)} />
-          <div className="relative z-10 w-full max-w-xl glass-card rounded-[2.5rem] p-8 shadow-2xl animate-in fade-in slide-in-from-top-4 duration-500">
-            <h2 className="text-3xl font-black mb-1">Edit Shop Profile</h2>
-            <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-8 opacity-60">This info appears on your receipts</p>
+          <div className="relative z-10 w-full max-w-lg bg-card border border-border rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300">
+            <h2 className="text-2xl font-black text-foreground mb-6">Modify Parameters</h2>
             
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest ml-1 opacity-50">Shop Name</label>
-                <input 
-                  className="w-full bg-accent/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  value={editForm.name}
-                  onChange={e => setEditForm({...editForm, name: e.target.value})}
-                />
+            <div className="space-y-4 mb-8">
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground ml-1">Workspace Designation</label>
+                <input className="w-full bg-accent/20 border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary/50 transition-colors" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} />
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest ml-1 opacity-50">Tagline</label>
-                <input 
-                  className="w-full bg-accent/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  value={editForm.tagline}
-                  onChange={e => setEditForm({...editForm, tagline: e.target.value})}
-                />
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground ml-1">Contact Protocol (10 Digits)</label>
+                <input maxLength={10} className={cn("w-full bg-accent/20 border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none transition-colors", editForm.phone && !isValidIndianPhone(editForm.phone) ? "border-red-500/50 focus:border-red-500" : "border-border focus:border-primary/50")} value={editForm.phone} onChange={e => setEditForm({...editForm, phone: sanitizePhone(e.target.value)})} placeholder="9876543210" />
               </div>
-              <div className="col-span-2 space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest ml-1 opacity-50">Address</label>
-                <input 
-                  className="w-full bg-accent/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  value={editForm.address}
-                  onChange={e => setEditForm({...editForm, address: e.target.value})}
-                />
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-black uppercase tracking-widest ml-1 opacity-50">Phone Number</label>
-                  {editForm.phone && !isValidIndianPhone(editForm.phone) && (
-                    <span className="text-[9px] text-red-500 font-bold flex items-center gap-0.5 animate-pulse">
-                      <AlertCircle className="h-2.5 w-2.5" /> 10-digit req.
-                    </span>
-                  )}
-                </div>
-                <input 
-                  maxLength={10}
-                  className={cn(
-                    "w-full bg-accent/50 border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 transition-all font-bold",
-                    editForm.phone && !isValidIndianPhone(editForm.phone) ? "border-red-500/50 ring-red-500/20 text-red-500" : "border-border focus:ring-primary/20"
-                  )}
-                  value={editForm.phone}
-                  onChange={e => setEditForm({...editForm, phone: sanitizePhone(e.target.value)})}
-                  placeholder="9876543210"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest ml-1 opacity-50">GST Number</label>
-                <input 
-                  className="w-full bg-accent/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  value={editForm.gst}
-                  onChange={e => setEditForm({...editForm, gst: e.target.value})}
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest ml-1 opacity-50">Working Hours / Day</label>
-                <input 
-                  type="number"
-                  className="w-full bg-accent/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 font-black"
-                  value={editForm.standardWorkingHours}
-                  onChange={e => setEditForm({...editForm, standardWorkingHours: Number(e.target.value)})}
-                />
-              </div>
-              <div className="col-span-2 space-y-1 pt-2">
-                <div className="flex items-center justify-between p-4 bg-accent/30 rounded-2xl border border-border/50">
-                   <div>
-                      <p className="text-sm font-black tracking-tight">Staff Attendance Recording</p>
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase">Allow staff members to clock in/out themselves</p>
-                   </div>
-                   <button 
-                     onClick={() => setEditForm({...editForm, allowStaffAttendance: !editForm.allowStaffAttendance})}
-                     className={cn(
-                       "px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                       editForm.allowStaffAttendance ? "bg-green-500/10 text-green-500 border border-green-500/20" : "bg-red-500/10 text-red-500 border border-red-500/20"
-                     )}
-                   >
-                     {editForm.allowStaffAttendance ? 'Enabled' : 'Disabled'}
-                   </button>
-                </div>
-              </div>
-              <div className="col-span-2 space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest ml-1 opacity-50">Receipt Footer Note</label>
-                <input 
-                  className="w-full bg-accent/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  value={editForm.footer}
-                  onChange={e => setEditForm({...editForm, footer: e.target.value})}
-                />
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground ml-1">GST Identifier</label>
+                <input className="w-full bg-accent/20 border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary/50 uppercase transition-colors" value={editForm.gst} onChange={e => setEditForm({...editForm, gst: e.target.value})} />
               </div>
             </div>
 
             <div className="flex gap-3">
-              <button onClick={() => setEditOpen(false)} className="flex-1 py-4 rounded-2xl font-bold text-sm bg-accent hover:bg-accent/80 transition-all uppercase tracking-widest text-muted-foreground">Cancel</button>
-              <button 
-                onClick={handleSaveShop} 
-                disabled={editForm.phone.length !== 10 || !isValidIndianPhone(editForm.phone)}
-                className={cn(
-                  "flex-1 py-4 rounded-2xl font-black text-sm transition-all uppercase tracking-widest",
-                  editForm.phone.length === 10 && isValidIndianPhone(editForm.phone)
-                    ? "premium-gradient text-white shadow-xl hover:-translate-y-0.5"
-                    : "bg-accent text-muted-foreground cursor-not-allowed opacity-50"
-                )}
-              >
-                Save Settings
-              </button>
+              <button onClick={() => setEditOpen(false)} className="flex-1 py-4 rounded-xl font-black text-[10px] bg-accent/20 hover:bg-accent/30 border border-border transition-all uppercase tracking-widest text-muted-foreground">Abort</button>
+              <button onClick={handleSaveShop} disabled={editForm.phone.length !== 10 || !isValidIndianPhone(editForm.phone)} className="flex-1 py-4 rounded-xl font-black text-[10px] transition-all uppercase tracking-widest bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50">Commit Changes</button>
             </div>
           </div>
         </div>
       )}
 
-      {resetConfirmOpen && (
-        <ConfirmDialog
-          open={resetConfirmOpen}
-          title="Nuke Inventory?"
-          description="You are about to wipe your entire product database. This action is terminal and cannot be reversed. Are you sure?"
-          confirmText="Nuke All Data"
-          variant="danger"
-          onConfirm={async () => {
-            await clearInventory();
-            setResetConfirmOpen(false);
-          }}
-          onClose={() => setResetConfirmOpen(false)}
-        />
-      )}
-
-      {/* Migration Confirmation Modal */}
       {migrationData && (
         <ConfirmDialog
-          open={!!migrationData}
-          title={`${migrationData.type.toUpperCase()} Analysis Complete`}
-          description={`The neural engine mapping is ready. ${migrationData.validItems.length} records detected from your file. Inject into Business Hub?`}
-          confirmText="Inject Data"
-          variant="danger"
-          onConfirm={executeMigration}
-          onClose={() => setMigrationData(null)}
+          open={!!migrationData} title={`${migrationData.type.toUpperCase()} Analysis Complete`}
+          description={`Neural engine mapping ready. ${migrationData.validItems.length} records verified. Inject into database?`}
+          confirmText="Execute Injection" variant="danger"
+          onConfirm={executeMigration} onClose={() => setMigrationData(null)}
         />
       )}
 
-      {/* Toast Notification */}
+      <ConfirmDialog
+        open={resetConfirmOpen} title="Initialize Core Wipe?"
+        description="Warning: This action physically purges all inventory documents. Recovery is impossible. Proceed?"
+        confirmText="Acknowledge Purge" variant="danger"
+        onConfirm={async () => { await clearInventory(); setResetConfirmOpen(false); }}
+        onClose={() => setResetConfirmOpen(false)}
+      />
+
       {toast && (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[300] animate-in fade-in slide-in-from-bottom-5 duration-300">
-          <div className="bg-primary text-white px-8 py-4 rounded-3xl shadow-2xl font-black text-xs uppercase tracking-widest flex items-center gap-3">
-            <CheckCircle2 className="h-4 w-4" />
-            {toast}
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[300] animate-in slide-in-from-bottom-8 fade-in duration-300">
+          <div className="bg-card border border-border text-foreground px-6 py-4 rounded-2xl shadow-2xl font-black text-[10px] uppercase tracking-[0.2em] flex items-center gap-3">
+            <CheckCircle2 className="h-4 w-4 text-emerald-500" /> {toast}
           </div>
         </div>
       )}
+      <div className="mt-20 pt-10 border-t border-border text-center">
+        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.5em]">Release v1.3.3 • Patched Architecture</p>
+      </div>
     </div>
   );
 }
-

@@ -39,49 +39,77 @@ const admin = __importStar(require("firebase-admin"));
 if (admin.apps.length === 0) {
     admin.initializeApp();
 }
-exports.onStaffWrite = (0, firestore_1.onDocumentWritten)("shops/{shopId}/staff/{uid}", async (event) => {
+exports.onStaffWrite = (0, firestore_1.onDocumentWritten)({
+    document: "shops/{shopId}/staff/{uid}",
+    memory: "256MiB",
+    maxInstances: 2,
+}, async (event) => {
     var _a;
-    const shopId = event.params.shopId;
-    const uid = event.params.uid;
+    const { shopId, uid } = event.params;
+    const auth = admin.auth();
     if (!((_a = event.data) === null || _a === void 0 ? void 0 : _a.after.exists)) {
-        console.log(`Staff ${uid} deleted. Removing custom claims.`);
+        console.info(`[SECURITY] Staff ${uid} removed from shop ${shopId}. Wiping claims.`);
         try {
-            await admin.auth().setCustomUserClaims(uid, null);
+            await auth.setCustomUserClaims(uid, null);
+            await auth.revokeRefreshTokens(uid);
+            console.info(`[SUCCESS] Sessions terminated for ${uid}`);
         }
         catch (err) {
-            console.error("Error removing custom claims:", err);
+            if (err.code !== 'auth/user-not-found') {
+                console.error(`[ERROR] Failed to revoke claims for ${uid}:`, err);
+            }
         }
         return;
     }
     const data = event.data.after.data();
-    const permissions = (data === null || data === void 0 ? void 0 : data.permissions) || {};
-    const perms = {};
-    for (const modId in permissions) {
-        const modActions = permissions[modId];
+    const role = data.role || 'staff';
+    const status = data.status || 'active';
+    const rawPermissions = data.permissions || {};
+    if (status === 'suspended') {
+        console.warn(`[SECURITY] Staff ${uid} is marked suspended. Revoking functional access.`);
+        await auth.setCustomUserClaims(uid, { shopId, role: 'suspended' });
+        await auth.revokeRefreshTokens(uid);
+        return;
+    }
+    const compressedPerms = {};
+    for (const [modId, modActions] of Object.entries(rawPermissions)) {
         if (typeof modActions === 'object' && modActions !== null) {
             const activeActions = {};
             let hasActions = false;
-            for (const actId in modActions) {
-                const val = modActions[actId];
+            for (const [actId, val] of Object.entries(modActions)) {
                 if (val === true || (typeof val === 'object' && val !== null)) {
                     activeActions[actId] = val;
                     hasActions = true;
                 }
             }
             if (hasActions) {
-                perms[modId] = activeActions;
+                compressedPerms[modId] = activeActions;
             }
         }
     }
-    console.log(`Setting custom claims for staff ${uid} in shop ${shopId}`, perms);
-    try {
-        await admin.auth().setCustomUserClaims(uid, {
+    const claimsPayload = {
+        shopId,
+        role,
+        perms: compressedPerms
+    };
+    const payloadSize = Buffer.byteLength(JSON.stringify(claimsPayload), 'utf8');
+    if (payloadSize > 1000) {
+        console.error(`[CRITICAL LIMIT] Claims payload for ${uid} is ${payloadSize} bytes! Max is 1000.`);
+        await auth.setCustomUserClaims(uid, {
             shopId,
-            perms
+            role,
+            perms: { _error: "PAYLOAD_TOO_LARGE" }
         });
+        return;
+    }
+    console.info(`[AUTH SYNC] Setting claims for ${uid}. Payload size: ${payloadSize} bytes.`);
+    try {
+        await auth.setCustomUserClaims(uid, claimsPayload);
     }
     catch (err) {
-        console.error("Error setting custom claims:", err);
+        if (err.code !== 'auth/user-not-found') {
+            console.error(`[ERROR] Failed to set custom claims for ${uid}:`, err);
+        }
     }
 });
 //# sourceMappingURL=staff-claims.js.map

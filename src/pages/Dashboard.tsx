@@ -80,7 +80,7 @@ function KPICard({
 }
 
 export default function Dashboard() {
-  const { addExpense, recordAttendance, role, shop, lastBackupDate, setActiveTab, setInventorySearchTerm } = useBusinessStore();
+  const { addExpense, recordAttendance, role, shop, lastBackupDate, setActiveTab, setInventorySearchTerm, sidebarOpen } = useBusinessStore();
   const sales = useSqlQuery<Sale>('SELECT * FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC', [], ['sales']);
   const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
   const expenses = useSqlQuery<Expense>('SELECT * FROM expenses WHERE tombstone = 0 ORDER BY date DESC', [], ['expenses']);
@@ -546,15 +546,17 @@ export default function Dashboard() {
       )}
 
       {/* QUICK EXPENSE FAB */}
-      <button
-        onClick={() => setExpenseModalOpen(true)}
-        className="fixed bottom-8 right-8 h-14 w-14 rounded-2xl bg-primary text-white shadow-2xl shadow-primary/40 hover:scale-110 active:scale-95 transition-all flex items-center justify-center z-50 group border border-white/20"
-      >
-        <Plus className="h-6 w-6 group-hover:rotate-90 transition-transform duration-300" />
-        <span className="absolute right-full mr-4 px-3 py-1.5 rounded-xl bg-card border border-border shadow-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-          Post Expense
-        </span>
-      </button>
+      {!sidebarOpen && (
+        <button
+          onClick={() => setExpenseModalOpen(true)}
+          className="fixed bottom-8 right-8 h-14 w-14 rounded-2xl bg-primary text-white shadow-2xl shadow-primary/40 hover:scale-110 active:scale-95 transition-all flex items-center justify-center z-50 group border border-white/20"
+        >
+          <Plus className="h-6 w-6 group-hover:rotate-90 transition-transform duration-300" />
+          <span className="absolute right-full mr-4 px-3 py-1.5 rounded-xl bg-card border border-border shadow-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            Post Expense
+          </span>
+        </button>
+      )}
 
       {/* QUICK EXPENSE MODAL */}
       <Modal open={expenseModalOpen} onClose={() => setExpenseModalOpen(false)} title="Quick Expense Report">

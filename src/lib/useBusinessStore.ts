@@ -33,33 +33,42 @@ const SHOP_DEFAULTS: ShopMetadata = {
   allowStaffAttendance: true,
 };
 
+const PRIVATE_DEFAULTS: ShopPrivate = {
+  adminPin: '5253',
+  staffPin: '1234',
+};
+
 // ─── STATE INTERFACE ─────────────────────────────────────────
 
 interface BusinessState {
   // UI-only state
   shop: ShopMetadata;
-  shopPrivate: ShopPrivate | null;
+  shopPrivate: ShopPrivate;
   theme: 'dark' | 'light';
   activeTab: string;
   inventorySearchTerm: string;
-  role: 'admin' | 'staff' | null;
+  role: 'admin' | 'staff' | 'manager' | 'suspended' | null;
   shopId: string | null;
   lastBackupDate: string | null;
   invitations: Invitation[];
   currentStaff: Staff | null;
   dbReady: boolean;
+  dbError: string | null;
+  isLocked: boolean;
+  sidebarOpen: boolean;
 
   // Lifecycle
-  initStore: (shopId: string, role: 'admin' | 'staff') => () => void;
-  setRole: (role: 'admin' | 'staff' | null) => void;
+  initStore: (shopId: string, role: 'admin' | 'staff' | 'manager' | 'suspended') => () => void;
+  setRole: (role: 'admin' | 'staff' | 'manager' | 'suspended' | null, persistLock?: boolean) => void;
   logout: () => void;
 
   // Navigation
   setActiveTab: (tab: string) => void;
+  setSidebarOpen: (open: boolean) => void;
   setInventorySearchTerm: (term: string) => void;
 
   // Shop & Theme
-  updateShop: (data: Partial<ShopMetadata>) => Promise<void>;
+  updateShop: (data: Partial<ShopMetadata & ShopPrivate>) => Promise<void>;
   setTheme: (theme: 'dark' | 'light') => void;
 
   // Thin action wrappers (delegate to repos + outbox)
@@ -86,19 +95,26 @@ interface BusinessState {
 
 export const useBusinessStore = create<BusinessState>((set, get) => ({
   shop: SHOP_DEFAULTS,
-  shopPrivate: null,
-  theme: 'dark',
+  shopPrivate: PRIVATE_DEFAULTS,
+  theme: (localStorage.getItem('hub_theme') as 'dark' | 'light') || 'dark',
   activeTab: 'dashboard',
   inventorySearchTerm: '',
   role: null,
+  isLocked: localStorage.getItem('hub_is_locked') === 'true',
   shopId: null,
   lastBackupDate: null,
   invitations: [],
   currentStaff: null,
   dbReady: false,
+  dbError: null,
+  sidebarOpen: false,
 
   initStore: (shopId, role) => {
-    set({ shopId, role });
+    // SECURITY: Use the staff role if manually locked, otherwise use the claim role
+    const isLocked = localStorage.getItem('hub_is_locked') === 'true';
+    const effectiveRole = (isLocked && role === 'admin') ? 'staff' : role;
+    
+    set({ shopId, role: effectiveRole, isLocked });
 
     Database.boot()
       .then(async () => {
@@ -111,47 +127,104 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
           try { shopData = { ...SHOP_DEFAULTS, ...JSON.parse(shopMeta[0].value) }; } catch (_) {}
         }
 
-        // Resolve current staff
+        // Load private credentials if they exist
+        const privateMeta = await Database.query<{ value: string }>(
+          'SELECT value FROM shop_metadata WHERE key = ?;', ['credentials']
+        );
+        let privateData = PRIVATE_DEFAULTS;
+        if (privateMeta.length > 0) {
+          try { privateData = { ...PRIVATE_DEFAULTS, ...JSON.parse(privateMeta[0].value) }; } catch (_) {}
+        }
+
+        // Resolve current staff (Required for permission checks)
         let currentStaffObj: Staff | null = null;
-        if (role === 'staff' && auth.currentUser) {
+        if (auth.currentUser) {
           currentStaffObj = await staffRepo.getById(auth.currentUser.uid);
         }
 
-        set({ shop: shopData, currentStaff: currentStaffObj, dbReady: true });
+        set({ 
+          shop: shopData, 
+          shopPrivate: privateData,
+          currentStaff: currentStaffObj, 
+          dbReady: true,
+          dbError: null
+        });
 
-        // Start sync engine
+        // Start sync engine ONLY on success
         await SyncWorker.start();
       })
       .catch((err) => {
         console.error('[Store] DB boot failed:', err);
-        set({ dbReady: true });
+        set({ dbReady: false, dbError: err.message || 'Database connection failed.' });
       });
 
     return () => { SyncWorker.stop(); };
   },
 
-  setRole: (role) => set({ role }),
-  logout: () => { SyncWorker.stop(); set({ role: null, shopId: null, dbReady: false }); },
-  setActiveTab: (tab) => set({ activeTab: tab }),
+  setRole: (role, persistLock) => {
+    if (persistLock !== undefined) {
+      localStorage.setItem('hub_is_locked', persistLock ? 'true' : 'false');
+      set({ role, isLocked: persistLock });
+    } else {
+      set({ role });
+    }
+  },
+  logout: () => { 
+    SyncWorker.stop(); 
+    localStorage.removeItem('hub_is_locked');
+    set({ role: null, shopId: null, dbReady: false, isLocked: false }); 
+  },
+  setActiveTab: (tab) => set({ activeTab: tab, sidebarOpen: false }),
+  setSidebarOpen: (open) => set({ sidebarOpen: open }),
   setInventorySearchTerm: (term) => set({ inventorySearchTerm: term }),
 
   // ─── SHOP ─────
   updateShop: async (data) => {
-    const { shopId, shop } = get();
+    const { shopId, shop, shopPrivate } = get();
     if (!shopId) return;
+
     const { adminPin, staffPin, ...metadata } = data as any;
+    const ts = Date.now();
+
+    // 1. Update Public Metadata
     const newShop = { ...shop, ...metadata };
     set({ shop: newShop });
-    const ts = Date.now();
     await Database.run(
       'INSERT OR REPLACE INTO shop_metadata (key, value, updated_at, dirty) VALUES (?, ?, ?, 1);',
       ['settings', JSON.stringify(newShop), ts]
     );
-    await outboxRepo.enqueue({ opId: `shop_${ts}`, entityType: 'shop', entityId: shopId, operation: 'UPDATE', payload: JSON.stringify({ settings: metadata, name: metadata.name || shop.name }), createdAt: ts });
+
+    // 2. Update Private Credentials (if provided)
+    if (adminPin || staffPin) {
+      const newPrivate = { ...shopPrivate };
+      if (adminPin) newPrivate.adminPin = adminPin;
+      if (staffPin) newPrivate.staffPin = staffPin;
+      set({ shopPrivate: newPrivate });
+      
+      await Database.run(
+        'INSERT OR REPLACE INTO shop_metadata (key, value, updated_at, dirty) VALUES (?, ?, ?, 1);',
+        ['credentials', JSON.stringify(newPrivate), ts]
+      );
+    }
+
+    await outboxRepo.enqueue({ 
+      opId: `shop_${ts}`, 
+      entityType: 'shop', 
+      entityId: shopId, 
+      operation: 'UPDATE', 
+      payload: JSON.stringify({ 
+        settings: metadata, 
+        adminPin, 
+        staffPin,
+        name: metadata.name || shop.name 
+      }), 
+      createdAt: ts 
+    });
   },
 
   setTheme: (theme) => {
     set({ theme });
+    localStorage.setItem('hub_theme', theme);
     if (theme === 'dark') document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
   },
@@ -187,8 +260,14 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const { shopId } = get(); if (!shopId) return;
     const ts = Date.now();
     await inventoryRepo.updateStock(id, delta);
-    const updated = await inventoryRepo.getById(id);
-    if (updated) await outboxRepo.enqueue({ opId: `stock_${id}_${ts}`, entityType: 'inventory', entityId: id, operation: 'UPDATE', payload: JSON.stringify({ ...updated, updatedAt: ts }), createdAt: ts });
+    await outboxRepo.enqueue({ 
+      opId: `stock_${id}_${ts}`, 
+      entityType: 'inventory', 
+      entityId: id, 
+      operation: 'UPDATE', 
+      payload: JSON.stringify({ stockDelta: delta, updatedAt: ts }), 
+      createdAt: ts 
+    });
   },
 
   deleteInventoryItem: async (id) => {
@@ -239,7 +318,17 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
 
     await salesRepo.upsert(finalSale);
     for (const item of finalSale.items) {
-      if (!item.itemId.startsWith('custom-') && item.itemId !== 'payment-received') await inventoryRepo.updateStock(item.itemId, -item.quantity);
+      if (!item.itemId.startsWith('custom-') && item.itemId !== 'payment-received') {
+        await inventoryRepo.updateStock(item.itemId, -item.quantity);
+        await outboxRepo.enqueue({ 
+          opId: `stock_${item.itemId}_${ts}_${finalSale.id}`, 
+          entityType: 'inventory', 
+          entityId: item.itemId, 
+          operation: 'UPDATE', 
+          payload: JSON.stringify({ stockDelta: -item.quantity, updatedAt: ts }), 
+          createdAt: ts 
+        });
+      }
     }
     await outboxRepo.enqueue({ opId: `sale_${finalSale.id}_${ts}`, entityType: 'sales', entityId: finalSale.id, operation: 'CREATE', payload: JSON.stringify({ ...finalSale, updatedAt: ts }), createdAt: ts });
   },
@@ -256,7 +345,18 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
       if (itemId.startsWith('custom-') || itemId === 'payment-received') continue;
       const oldQty = oldSale.items.find((i: SaleItem) => i.itemId === itemId)?.quantity || 0;
       const newQty = newSale.items.find((i: SaleItem) => i.itemId === itemId)?.quantity || 0;
-      if (newQty - oldQty !== 0) await inventoryRepo.updateStock(itemId, -(newQty - oldQty));
+      const delta = -(newQty - oldQty);
+      if (delta !== 0) {
+        await inventoryRepo.updateStock(itemId, delta);
+        await outboxRepo.enqueue({ 
+          opId: `stock_rec_${itemId}_${ts}_${newSale.id}`, 
+          entityType: 'inventory', 
+          entityId: itemId, 
+          operation: 'UPDATE', 
+          payload: JSON.stringify({ stockDelta: delta, updatedAt: ts }), 
+          createdAt: ts 
+        });
+      }
     }
 
     // Reconcile customer balance
@@ -280,7 +380,17 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     if (!sale) return;
     const creditAmount = sale.payments.find((p: any) => p.mode === 'CREDIT')?.amount || 0;
     for (const item of sale.items) {
-      if (!item.itemId.startsWith('custom-') && item.itemId !== 'payment-received') await inventoryRepo.updateStock(item.itemId, item.quantity);
+      if (!item.itemId.startsWith('custom-') && item.itemId !== 'payment-received') {
+        await inventoryRepo.updateStock(item.itemId, item.quantity);
+        await outboxRepo.enqueue({ 
+          opId: `stock_res_${item.itemId}_${ts}_${id}`, 
+          entityType: 'inventory', 
+          entityId: item.itemId, 
+          operation: 'UPDATE', 
+          payload: JSON.stringify({ stockDelta: item.quantity, updatedAt: ts }), 
+          createdAt: ts 
+        });
+      }
     }
     if (sale.customerId) await customersRepo.updateBalance(sale.customerId, -sale.total, -creditAmount);
     await salesRepo.softDelete(id);

@@ -5,7 +5,10 @@ import * as admin from "firebase-admin";
  * Triggered whenever a sale is created, updated, or deleted.
  * Updates the daily aggregates for the shop.
  */
-export const onSaleWrite = onDocumentWritten("shops/{shopId}/sales/{saleId}", async (event) => {
+export const onSaleWrite = onDocumentWritten({
+  document: "shops/{shopId}/sales/{saleId}",
+  maxInstances: 2
+}, async (event) => {
   const shopId = event.params.shopId;
   const before = event.data?.before;
   const after = event.data?.after;
