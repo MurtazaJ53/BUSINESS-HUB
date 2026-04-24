@@ -22,3 +22,23 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment
+.env
+.env.production
+.env.local
+.env.*.local
+
+# Secrets
+service-account.json
+*.jks
+android/app/google-services.json
+
+# Firebase
+.firebase/
+firebase-debug.log*
+
+# Archives
+*.zip
+*.tar.gz
+
