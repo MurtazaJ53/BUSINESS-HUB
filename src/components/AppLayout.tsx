@@ -61,8 +61,8 @@ const NavItem = ({ icon: Icon, label, active, onClick }: { icon: any, label: str
     onClick={(e) => { e.stopPropagation(); onClick(); }}
     className={cn(
       "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group w-full text-left outline-none focus-visible:ring-2 focus-visible:ring-primary",
-      active ? "bg-primary text-black shadow-lg shadow-primary/20 font-black" 
-             : "text-zinc-400 hover:bg-white/5 hover:text-white font-bold"
+      active ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 font-black" 
+             : "text-muted-foreground hover:bg-accent hover:text-foreground font-bold"
     )}
   >
     <Icon className={cn("h-5 w-5 shrink-0 transition-transform duration-300", active ? "scale-110" : "group-hover:scale-110")} />
@@ -292,7 +292,7 @@ export default function AppLayout() {
 
   // --- 🎨 RENDER ---
   return (
-    <div className="flex h-[100dvh] w-full bg-[#030303] text-zinc-300 selection:bg-primary/30 overflow-hidden font-sans">
+    <div className="flex h-[100dvh] w-full bg-background text-foreground selection:bg-primary/30 overflow-hidden font-sans">
       
       {/* Mobile Backdrop */}
       {sidebarOpen && (
@@ -301,12 +301,12 @@ export default function AppLayout() {
 
       {/* 🚀 SIDEBAR */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-[100] w-64 bg-[#0a0a0a] border-r border-white/5 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 lg:z-auto no-print flex flex-col",
+        "fixed inset-y-0 left-0 z-[100] w-64 bg-sidebar border-r border-border transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 lg:z-auto no-print flex flex-col",
         sidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
       )}>
         <button 
           onClick={() => setSidebarOpen(false)}
-          className="absolute right-4 top-4 h-10 w-10 bg-[#141414] border border-white/10 rounded-xl text-zinc-400 lg:hidden flex items-center justify-center hover:text-white transition-all z-[100]"
+          className="absolute right-4 top-4 h-10 w-10 bg-accent border border-border rounded-xl text-muted-foreground lg:hidden flex items-center justify-center hover:text-foreground transition-all z-[100]"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
@@ -314,12 +314,12 @@ export default function AppLayout() {
         <div className="flex flex-col h-full p-4 overflow-y-auto no-scrollbar scroll-smooth">
           {/* Identity */}
           <div className="flex items-center gap-3 px-2 mb-8 mt-2 safe-area-top">
-            <div className="h-10 w-10 bg-gradient-to-tr from-primary to-blue-600 rounded-xl flex items-center justify-center text-white shadow-[0_0_15px_rgba(var(--primary),0.3)] shrink-0">
+            <div className="h-10 w-10 bg-gradient-to-tr from-primary to-blue-600 rounded-xl flex items-center justify-center text-foreground shadow-[0_0_15px_rgba(var(--primary),0.3)] shrink-0">
               <Store className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-base font-black text-white truncate">{shop.name}</h1>
-              <p className="text-[9px] text-zinc-500 font-black uppercase tracking-[0.2em] truncate">Agentic ERP</p>
+              <h1 className="text-base font-black text-foreground truncate">{shop.name}</h1>
+              <p className="text-[9px] text-muted-foreground font-black uppercase tracking-[0.2em] truncate">Zarra Ecosystem</p>
             </div>
           </div>
 
@@ -350,9 +350,9 @@ export default function AppLayout() {
           </nav>
 
           {/* Bottom Settings */}
-          <div className="pt-4 border-t border-white/5 space-y-1.5 mt-4">
+          <div className="pt-4 border-t border-border space-y-1.5 mt-4">
             <NavItem icon={SettingsIcon} label="System Config" active={activeTab === 'settings'} onClick={() => { navigate('settings'); setSidebarOpen(false); }} />
-            <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-500/10 text-zinc-500 hover:text-red-500 transition-all group">
+            <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all group">
               <LogOut className="h-4 w-4 group-hover:scale-110 transition-transform" />
               <span className="font-bold text-sm">Terminate Session</span>
             </button>
@@ -362,49 +362,49 @@ export default function AppLayout() {
 
       {/* 🖥️ MAIN VIEWPORT */}
       <main className="flex-1 flex flex-col h-full min-w-0 overflow-hidden relative">
-        <header className="shrink-0 flex items-center justify-between px-6 border-b border-white/5 bg-[#030303]/80 backdrop-blur-xl z-30 app-top-bar pb-4 pt-4">
+        <header className="shrink-0 flex items-center justify-between px-6 border-b border-border bg-background/80 backdrop-blur-xl z-30 app-top-bar pb-4 pt-4">
           <div className="flex items-center gap-3">
-            <button onClick={() => setSidebarOpen(true)} className="p-2.5 bg-[#141414] hover:bg-white/5 rounded-xl transition-all border border-white/5 lg:hidden">
-              <Menu className="h-5 w-5 text-white" />
+            <button onClick={() => setSidebarOpen(true)} className="p-2.5 bg-accent hover:bg-accent rounded-xl transition-all border border-border lg:hidden">
+              <Menu className="h-5 w-5 text-foreground" />
             </button>
-            <span className="hidden sm:block text-xs font-black text-zinc-500 uppercase tracking-[0.25em] ml-2">
+            <span className="hidden sm:block text-xs font-black text-muted-foreground uppercase tracking-[0.25em] ml-2">
               {PAGE_TITLES[activeTab] ?? 'Operation UI'}
             </span>
           </div>
 
           <div className="flex items-center gap-4 ml-auto">
             {canViewProfit && (
-              <div className="hidden md:flex items-center gap-3 bg-[#141414] px-4 py-2 rounded-xl border border-white/5">
+              <div className="hidden md:flex items-center gap-3 bg-accent px-4 py-2 rounded-xl border border-border">
                 <TrendingUp className="h-4 w-4 text-emerald-500" />
                 <div>
-                  <p className="text-[8px] font-black text-zinc-500 uppercase tracking-widest leading-none">Gross Pulse</p>
-                  <p className="text-sm font-black text-white">{formatCurrency(todayRevenue)}</p>
+                  <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest leading-none">Gross Pulse</p>
+                  <p className="text-sm font-black text-foreground">{formatCurrency(todayRevenue)}</p>
                 </div>
               </div>
             )}
 
             {/* Notification Node */}
             <div className="relative" ref={notifRef}>
-              <button onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); }} className={cn("relative p-2.5 rounded-xl transition-all border border-transparent", notifOpen ? "bg-primary/10 text-primary border-primary/20" : "bg-[#141414] hover:bg-white/5 text-zinc-400 border-white/5")}>
+              <button onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); }} className={cn("relative p-2.5 rounded-xl transition-all border border-transparent", notifOpen ? "bg-primary/10 text-primary border-primary/20" : "bg-accent hover:bg-accent text-muted-foreground border-border")}>
                 <Bell className={cn("h-4 w-4", notifOpen && "animate-pulse")} />
-                {inventory.length > 0 && <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-4 ring-[#030303]" />}
+                {inventory.length > 0 && <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-4 ring-background" />}
               </button>
 
               {notifOpen && (
-                <div className="absolute right-0 mt-3 w-80 bg-[#0a0a0a] rounded-[1.5rem] p-5 shadow-2xl animate-in zoom-in-95 duration-200 z-[100] border border-white/5">
+                <div className="absolute right-0 mt-3 w-80 bg-card rounded-[1.5rem] p-5 shadow-2xl animate-in zoom-in-95 duration-200 z-[100] border border-border">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">System Alerts</h3>
+                    <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">System Alerts</h3>
                     <span className="text-[9px] font-black bg-red-500/10 text-red-500 px-2 py-0.5 rounded-full">{inventory.length} Critical</span>
                   </div>
                   <div className="space-y-2 max-h-[300px] overflow-y-auto no-scrollbar">
                     {inventory.length === 0 ? (
-                      <p className="text-xs text-zinc-600 text-center py-6 font-medium">All telemetry nominal.</p>
+                      <p className="text-xs text-muted-foreground text-center py-6 font-medium">All telemetry nominal.</p>
                     ) : (
                       inventory.map(item => (
-                        <button key={item.id} onClick={() => { navigate('inventory'); setNotifOpen(false); }} className="w-full flex items-center gap-3 p-3 rounded-xl bg-[#141414] hover:bg-white/5 border border-white/5 transition-all text-left">
+                        <button key={item.id} onClick={() => { navigate('inventory'); setNotifOpen(false); }} className="w-full flex items-center gap-3 p-3 rounded-xl bg-accent hover:bg-accent border border-border transition-all text-left">
                           <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
                           <div className="min-w-0">
-                            <p className="text-xs font-bold text-white truncate">{item.name}</p>
+                            <p className="text-xs font-bold text-foreground truncate">{item.name}</p>
                             <p className="text-[10px] text-red-400/80 font-medium">Stock Depleted: {item.stock}</p>
                           </div>
                         </button>
@@ -416,29 +416,33 @@ export default function AppLayout() {
             </div>
 
             {/* Profile Node */}
-            <div className="relative" ref={profileRef}>
-              <button onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false); }} className={cn("h-10 w-10 rounded-xl bg-[#141414] border flex items-center justify-center transition-all", profileOpen ? "border-primary text-primary" : "border-white/5 text-white hover:border-white/20")}>
+            <div className="relative flex items-center gap-2" ref={profileRef}>
+              <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="p-2.5 bg-accent hover:bg-accent/80 rounded-xl transition-all border border-border text-muted-foreground hover:text-foreground hidden sm:flex">
+                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
+
+              <button onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false); }} className={cn("h-10 w-10 rounded-xl bg-accent border flex items-center justify-center transition-all", profileOpen ? "border-primary text-primary" : "border-border text-foreground hover:border-foreground/20")}>
                 <span className="text-sm font-black">{shop?.name?.charAt(0) || 'X'}</span>
               </button>
 
               {profileOpen && (
-                <div className="absolute right-0 mt-3 w-64 bg-[#0a0a0a] rounded-[1.5rem] p-3 shadow-2xl animate-in zoom-in-95 duration-200 z-[100] border border-white/5">
-                  <div className="p-3 mb-2 border-b border-white/5">
-                     <p className="text-sm font-black text-white truncate">{shop.name}</p>
-                     <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">{role} Authorization</p>
+                <div className="absolute right-0 mt-3 w-64 bg-card rounded-[1.5rem] p-3 shadow-2xl animate-in zoom-in-95 duration-200 z-[100] border border-border">
+                  <div className="p-3 mb-2 border-b border-border">
+                     <p className="text-sm font-black text-foreground truncate">{shop.name}</p>
+                     <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">{role} Authorization</p>
                   </div>
                   
                   <div className="space-y-1">
-                    <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-[#141414] text-zinc-400 hover:text-white transition-all text-xs font-bold">
+                    <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-all text-xs font-bold">
                       {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />} Toggle Optics
                     </button>
                     
                     {role === 'admin' ? (
-                      <button onClick={() => handleRoleSwitch('staff')} className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-amber-500/10 text-zinc-400 hover:text-amber-500 transition-all text-xs font-bold">
+                      <button onClick={() => handleRoleSwitch('staff')} className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-amber-500/10 text-muted-foreground hover:text-amber-500 transition-all text-xs font-bold">
                         <Lock className="h-4 w-4" /> Downgrade to Staff
                       </button>
                     ) : (
-                      <button onClick={() => handleRoleSwitch('admin')} className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-primary/10 text-zinc-400 hover:text-primary transition-all text-xs font-bold">
+                      <button onClick={() => handleRoleSwitch('admin')} className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all text-xs font-bold">
                         <ShieldCheck className="h-4 w-4" /> Uplink Admin Rights
                       </button>
                     )}
@@ -453,19 +457,19 @@ export default function AppLayout() {
         {showUnlockModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/80 backdrop-blur-md animate-in fade-in" onClick={() => setShowUnlockModal(false)} />
-            <div className="relative z-10 w-full max-w-sm bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="relative z-10 w-full max-w-sm bg-card border border-border rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300">
               
               {pinLoading && (
-                <div className="absolute inset-0 bg-[#0a0a0a]/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center rounded-[2.5rem]">
+                <div className="absolute inset-0 bg-card/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center rounded-[2.5rem]">
                   <Loader2 className="h-8 w-8 text-primary animate-spin mb-3" />
                   <p className="text-[10px] font-black uppercase tracking-widest text-primary">Decrypting Hash...</p>
                 </div>
               )}
 
               <div className="text-center mb-8">
-                <ShieldCheck className="h-10 w-10 text-white mx-auto mb-4 opacity-80" />
-                <h2 className="text-xl font-black text-white">Security Bypass</h2>
-                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Input Sequence</p>
+                <ShieldCheck className="h-10 w-10 text-foreground mx-auto mb-4 opacity-80" />
+                <h2 className="text-xl font-black text-foreground">Security Bypass</h2>
+                <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-1">Input Sequence</p>
               </div>
 
               <div className="flex justify-center gap-4 mb-6">
@@ -481,11 +485,11 @@ export default function AppLayout() {
 
               <div className="grid grid-cols-3 gap-3">
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
-                  <button key={num} onClick={() => { setPinEntry(p => { const next = p.length < 4 ? p + num : p; if(next.length === 4) verifyAdminPin(next); return next; }); setPinErrorMsg(''); }} className="h-14 rounded-2xl bg-[#141414] hover:bg-white/5 text-lg font-black text-white transition-all active:scale-95 border border-white/5">{num}</button>
+                  <button key={num} onClick={() => { setPinEntry(p => { const next = p.length < 4 ? p + num : p; if(next.length === 4) verifyAdminPin(next); return next; }); setPinErrorMsg(''); }} className="h-14 rounded-2xl bg-accent hover:bg-accent text-lg font-black text-foreground transition-all active:scale-95 border border-border">{num}</button>
                 ))}
-                <button onClick={() => handleRoleSwitch('admin')} className="h-14 rounded-2xl bg-[#141414] flex items-center justify-center text-primary hover:bg-primary/10 transition-all border border-transparent"><Fingerprint className="h-5 w-5" /></button>
-                <button onClick={() => { setPinEntry(p => { const next = p.length < 4 ? p + '0' : p; if(next.length === 4) verifyAdminPin(next); return next; }); setPinErrorMsg(''); }} className="h-14 rounded-2xl bg-[#141414] hover:bg-white/5 text-lg font-black text-white transition-all active:scale-95 border border-white/5">0</button>
-                <button onClick={() => setPinEntry(p => p.slice(0, -1))} className="h-14 rounded-2xl bg-[#141414] flex items-center justify-center text-zinc-500 hover:text-red-500 hover:bg-red-500/10 transition-all border border-transparent"><Delete className="h-5 w-5" /></button>
+                <button onClick={() => handleRoleSwitch('admin')} className="h-14 rounded-2xl bg-accent flex items-center justify-center text-primary hover:bg-primary/10 transition-all border border-transparent"><Fingerprint className="h-5 w-5" /></button>
+                <button onClick={() => { setPinEntry(p => { const next = p.length < 4 ? p + '0' : p; if(next.length === 4) verifyAdminPin(next); return next; }); setPinErrorMsg(''); }} className="h-14 rounded-2xl bg-accent hover:bg-accent text-lg font-black text-foreground transition-all active:scale-95 border border-border">0</button>
+                <button onClick={() => setPinEntry(p => p.slice(0, -1))} className="h-14 rounded-2xl bg-accent flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all border border-transparent"><Delete className="h-5 w-5" /></button>
               </div>
             </div>
           </div>
@@ -495,9 +499,9 @@ export default function AppLayout() {
         <div className="flex-1 overflow-y-auto no-scrollbar no-print relative">
           <div className="max-w-7xl mx-auto p-4 md:p-8 pt-6">
             <Suspense fallback={
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#030303] z-50">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background z-50">
                 <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Mounting Subsystem...</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Mounting Subsystem...</p>
               </div>
             }>
               <Routes>
@@ -515,7 +519,7 @@ export default function AppLayout() {
                 <Route path="/agents" element={<Agents />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/sequestration" element={<MigrationTool />} />
-                <Route path="*" element={<div className="text-zinc-500 text-center py-20 font-black uppercase tracking-widest">Sector Unmapped</div>} />
+                <Route path="*" element={<div className="text-muted-foreground text-center py-20 font-black uppercase tracking-widest">Sector Unmapped</div>} />
               </Routes>
             </Suspense>
           </div>
