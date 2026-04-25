@@ -16,6 +16,8 @@ import {
   outboxRepo,
 } from '../db';
 import { SyncWorker } from '../sync/SyncWorker';
+import { db } from './firebase';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 
 import type {
   InventoryItem, InventoryPrivate, Sale, Customer, ShopMetadata, ShopPrivate,
@@ -176,7 +178,20 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
         set({ dbReady: false, dbError: err.message || 'Storage engine unavailable.' });
       });
 
-    return () => { SyncWorker.stop(); };
+    const inviteQuery = query(
+      collection(db, `shops/${shopId}/invitations`),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubInv = onSnapshot(inviteQuery, (snap) => {
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Invitation));
+      set({ invitations: docs });
+    });
+
+    return () => { 
+      SyncWorker.stop(); 
+      unsubInv();
+    };
   },
 
   setRole: (role, persistLock) => {
@@ -191,7 +206,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
   logout: () => { 
     SyncWorker.stop(); 
     localStorage.removeItem('hub_is_locked');
-    set({ role: null, shopId: null, dbReady: false, isLocked: false, currentStaff: null }); 
+    set({ role: null, shopId: null, dbReady: false, isLocked: false, currentStaff: null, invitations: [] }); 
   },
 
   setActiveTab: (tab) => set({ activeTab: tab, sidebarOpen: false }),

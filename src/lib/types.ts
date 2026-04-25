@@ -93,6 +93,7 @@ export interface Sale {
   footerNote?: string;
   date: string;
   createdAt: string;
+  staffId?: string;
 }
 
 export type Action = 'view'|'create'|'edit'|'delete'|'export'|'override_price'|'void_sale'|'view_cost'|'view_profit'|'approve_credit';

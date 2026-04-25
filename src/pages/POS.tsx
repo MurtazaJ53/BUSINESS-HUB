@@ -18,7 +18,7 @@ type PayMode = 'CASH' | 'UPI' | 'CARD' | 'CREDIT' | 'ONLINE' | 'OTHERS';
 const PAY_MODES: PayMode[] = ['CASH', 'UPI', 'CARD', 'CREDIT', 'ONLINE', 'OTHERS'];
 
 export default function POS() {
-  const { addSale, updateInventoryItem, shop, shopPrivate, role } = useBusinessStore();
+  const { addSale, updateInventoryItem, shop, shopPrivate, role, currentStaff } = useBusinessStore();
   
   const canViewCost = usePermission('inventory', 'view_cost');
   const canOverridePrice = usePermission('sales', 'override_price');
@@ -383,6 +383,7 @@ export default function POS() {
       footerNote: footerNote.trim() || "",
       date: saleDate,
       createdAt: new Date().toISOString(),
+      staffId: currentStaff?.id ?? (role === 'admin' ? 'admin' : undefined)
     };
 
     try {

@@ -220,6 +220,13 @@ export default function AuthPage() {
         }
       }, { merge: true });
 
+      // Link Owner's Private Data (Salary, PIN)
+      await setDoc(doc(db, `shops/${finalShopId}/staff_private`, currentUser.uid), {
+        id: currentUser.uid,
+        salary: 0,
+        updatedAt: Date.now()
+      }, { merge: true });
+
       // Ensure the private auth doc exists for future PIN rotations
       await setDoc(doc(db, `shops/${finalShopId}/private/auth`), {
         initializedAt: timestamp,
