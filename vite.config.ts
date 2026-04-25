@@ -42,6 +42,9 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  optimizeDeps: {
+    exclude: ['sql.js'],
+  },
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(pkg.version),
   },
@@ -50,13 +53,16 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
+      external: ['sql.js'],
       output: {
+        globals: {
+          'sql.js': 'initSqlJs'
+        },
         manualChunks(id) {
           if (id.includes('firebase')) return 'vendor-firebase';
           if (id.includes('recharts') || id.includes('d3-')) return 'vendor-charts';
           if (id.includes('xlsx') || id.includes('papaparse')) return 'vendor-excel';
           if (id.includes('framer-motion')) return 'vendor-motion';
-          if (id.includes('sql.js') || id.includes('sql-wasm')) return 'vendor-sql';
           if (id.includes('react-router') || id.includes('@remix-run')) return 'vendor-router';
           if (id.includes('lucide-react')) return 'vendor-icons';
           if (id.includes('bcryptjs')) return 'vendor-crypto';

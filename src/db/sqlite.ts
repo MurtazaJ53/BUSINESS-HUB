@@ -1,13 +1,11 @@
 /**
- * SQLite Adapter — Industrial Indestructible Architecture
+ * SQLite Adapter — Ultimate Foundation v2
  * 
- * Optimized for professional deployment and agentic ERP environments.
- * This engine bypasses migration-log traps by using idempotent schema 
- * verification on every boot.
+ * Includes full column support for all Pro features (Subcategories, Sizes, Suppliers).
+ * Standardized to CamelCase across the whole entity list.
  */
 
 import { Capacitor } from '@capacitor/core';
-import { CapacitorSQLite, SQLiteConnection } from '@capacitor-community/sqlite';
 
 export interface RunResult { changes: number; }
 
@@ -54,7 +52,7 @@ class DatabaseSingleton {
   private ready = false;
   private booting = false;
   private bootPromise: Promise<void> | null = null;
-  private nativeSqlite: SQLiteConnection | null = null;
+  private nativeSqlite: any = null;
   private nativeDb: any = null;
   private webDb: SqlJsDatabase | null = null;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -66,18 +64,11 @@ class DatabaseSingleton {
     this.bootPromise = (async () => {
       this.booting = true;
       this.platform = Capacitor.getPlatform() === 'web' ? 'web' : 'native';
-
-      if (this.platform === 'native') {
-        await this.bootNative();
-      } else {
-        await this.bootWeb();
-      }
-
+      if (this.platform === 'native') await this.bootNative();
+      else await this.bootWeb();
       await this.runMigrations();
-      
       this.ready = true;
       this.booting = false;
-      console.log('[DB] System Online');
     })();
 
     return this.bootPromise;
@@ -85,35 +76,27 @@ class DatabaseSingleton {
 
   private async bootNative(): Promise<void> {
     try {
+      const { CapacitorSQLite, SQLiteConnection } = await import('@capacitor-community/sqlite');
       this.nativeSqlite = new SQLiteConnection(CapacitorSQLite);
-
       const DB_NAME = 'business_hub';
       const retCC = await this.nativeSqlite.checkConnectionsConsistency();
       const isConn = (await this.nativeSqlite.isConnection(DB_NAME, false)).result;
-
-      if (retCC.result && isConn) {
-        this.nativeDb = await this.nativeSqlite.retrieveConnection(DB_NAME, false);
-      } else {
-        this.nativeDb = await this.nativeSqlite.createConnection(DB_NAME, false, 'no-encryption', 1, false);
-      }
+      if (retCC.result && isConn) this.nativeDb = await this.nativeSqlite.retrieveConnection(DB_NAME, false);
+      else this.nativeDb = await this.nativeSqlite.createConnection(DB_NAME, false, 'no-encryption', 1, false);
       await this.nativeDb.open();
-    } catch (err) {
-      throw new Error(`Native DB Boot Failure: ${err}`);
-    }
+    } catch (err) { throw new Error(`Native DB Error: ${err}`); }
   }
 
   private async bootWeb(): Promise<void> {
     try {
-      const initSqlJs = (await import('sql.js')).default;
-      const response = await fetch('https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.wasm');
-      const SQL = await initSqlJs({ wasmBinary: new Uint8Array(await response.arrayBuffer()) });
+      const initSqlJs = (window as any).initSqlJs;
+      if (!initSqlJs) throw new Error("SQL.js not loaded.");
+      const SQL = await initSqlJs({
+        locateFile: (file: string) => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
+      });
       const saved = await idbLoad();
       this.webDb = saved ? new SQL.Database(saved) : new SQL.Database();
-      this.webDb!.run('PRAGMA journal_mode = MEMORY;');
-    } catch (err) {
-      const initSqlJs = (await import('sql.js')).default;
-      this.webDb = (await initSqlJs()).Database();
-    }
+    } catch (err) { console.error("Web Boot Error:", err); }
   }
 
   async query<T = Record<string, unknown>>(sql: string, params?: any[]): Promise<T[]> {
@@ -170,82 +153,58 @@ class DatabaseSingleton {
       try {
         for (const s of stmts) await this.nativeDb.run(s.sql, s.params);
         await this.nativeDb.run('COMMIT;');
-      } catch (e) {
-        await this.nativeDb.run('ROLLBACK;');
-        throw e;
-      }
+      } catch (e) { await this.nativeDb.run('ROLLBACK;'); throw e; }
       return;
     }
     this.webDb!.run('BEGIN TRANSACTION;');
     try {
       for (const s of stmts) this.webDb!.run(s.sql, s.params);
       this.webDb!.run('COMMIT;');
-    } catch (e) {
-      this.webDb!.run('ROLLBACK;');
-      throw e;
-    }
+    } catch (e) { this.webDb!.run('ROLLBACK;'); throw e; }
   }
 
   private async runMigrations(): Promise<void> {
-    console.log('[DB] Verifying Indestructible Core Schema...');
-
     const coreSchema = `
-        CREATE TABLE IF NOT EXISTS _migrations (id TEXT PRIMARY KEY, applied_at INTEGER NOT NULL);
-        CREATE TABLE IF NOT EXISTS shop_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL, dirty INTEGER NOT NULL DEFAULT 0);
-        CREATE TABLE IF NOT EXISTS sync_state (entity_type TEXT PRIMARY KEY, last_synced_at INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS shop_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL, updatedAt INTEGER NOT NULL, dirty INTEGER NOT NULL DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS sync_state (entityType TEXT PRIMARY KEY, lastSyncedAt INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS outbox (opId TEXT PRIMARY KEY, entityType TEXT NOT NULL, entityId TEXT NOT NULL, operation TEXT NOT NULL, payload TEXT NOT NULL, createdAt INTEGER NOT NULL, retries INTEGER DEFAULT 0);
         
-        CREATE TABLE IF NOT EXISTS inventory (id TEXT PRIMARY KEY, name TEXT NOT NULL, price REAL, stock REAL, category TEXT, sku TEXT, tombstone INTEGER DEFAULT 0, updatedAt INTEGER, dirty INTEGER DEFAULT 0);
-        CREATE TABLE IF NOT EXISTS inventory_private (id TEXT PRIMARY KEY, costPrice REAL, lastPurchaseDate TEXT, tombstone INTEGER DEFAULT 0, updatedAt INTEGER, dirty INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS inventory (id TEXT PRIMARY KEY, name TEXT NOT NULL, price REAL, stock REAL, category TEXT, subcategory TEXT, size TEXT, description TEXT, sku TEXT, createdAt INTEGER, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS inventory_private (id TEXT PRIMARY KEY, costPrice REAL, supplierId TEXT, lastPurchaseDate TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         
-        CREATE TABLE IF NOT EXISTS sales (id TEXT PRIMARY KEY, customerId TEXT, customerName TEXT, customerPhone TEXT, total REAL NOT NULL, date TEXT, status TEXT, items TEXT NOT NULL, payments TEXT NOT NULL, tombstone INTEGER DEFAULT 0, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS sales (id TEXT PRIMARY KEY, total REAL NOT NULL, discount REAL, discountValue REAL, discountType TEXT, paymentMode TEXT, customerName TEXT, customerPhone TEXT, customerId TEXT, footerNote TEXT, date TEXT, createdAt INTEGER, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS sale_items (id TEXT PRIMARY KEY, saleId TEXT, itemId TEXT, name TEXT, quantity REAL, price REAL, costPrice REAL, size TEXT, isReturn INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS sale_payments (id TEXT PRIMARY KEY, saleId TEXT, mode TEXT, amount REAL);
         
-        CREATE TABLE IF NOT EXISTS staff (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT, email TEXT, role TEXT, status TEXT, joinedAt TEXT, permissions TEXT, tombstone INTEGER DEFAULT 0, updatedAt INTEGER, dirty INTEGER DEFAULT 0);
-        CREATE TABLE IF NOT EXISTS staff_private (id TEXT PRIMARY KEY, salary REAL, pin TEXT, tombstone INTEGER DEFAULT 0, updatedAt INTEGER, dirty INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS staff (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT, email TEXT, role TEXT, status TEXT, joinedAt TEXT, permissions TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS staff_private (id TEXT PRIMARY KEY, salary REAL, pin TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         
-        CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT, balance REAL, totalSpent REAL, tombstone INTEGER DEFAULT 0, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0);
-        CREATE TABLE IF NOT EXISTS customer_payments (id TEXT PRIMARY KEY, customerId TEXT, amount REAL, date TEXT, tombstone INTEGER DEFAULT 0, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT, balance REAL, totalSpent REAL, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS customer_payments (id TEXT PRIMARY KEY, customerId TEXT, amount REAL, date TEXT, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         
-        CREATE TABLE IF NOT EXISTS expenses (id TEXT PRIMARY KEY, category TEXT, amount REAL, description TEXT, date TEXT, tombstone INTEGER DEFAULT 0, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0);
-        CREATE TABLE IF NOT EXISTS attendance (id TEXT PRIMARY KEY, staffId TEXT, date TEXT, clockIn TEXT, clockOut TEXT, totalHours REAL, status TEXT, overtime REAL, bonus REAL, tombstone INTEGER DEFAULT 0, updatedAt INTEGER, dirty INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS expenses (id TEXT PRIMARY KEY, category TEXT, amount REAL, description TEXT, date TEXT, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS attendance (id TEXT PRIMARY KEY, staffId TEXT, date TEXT, clockIn TEXT, clockOut TEXT, totalHours REAL, status TEXT, overtime REAL, bonus REAL, note TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         
-        CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sales(id);
-        CREATE INDEX IF NOT EXISTS idx_inventory_sku ON inventory(sku);
+        CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items(saleId);
+        CREATE INDEX IF NOT EXISTS idx_sale_payments_sale_id ON sale_payments(saleId);
     `;
 
     try {
-        if (this.platform === 'native') {
-            await this.nativeDb.execute(coreSchema);
-        } else {
-            this.webDb!.run(coreSchema);
-        }
+        if (this.platform === 'native') await this.nativeDb.execute(coreSchema);
+        else this.webDb!.run(coreSchema);
     } catch (schemaError) {
-        console.error('[DB] Schema Compilation Failed:', schemaError);
+        console.error('[DB] Schema Error:', schemaError);
         throw new Error('Database schema compilation failed.');
     }
-
-    const checkSchema = async () => {
-        try {
-            const tables = await this.query<{ name: string }>(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('staff', 'inventory', 'sales', 'shop_metadata');"
-            );
-            return tables.length === 4;
-        } catch (e) { return false; }
-    };
-
-    if (!(await checkSchema())) {
-        throw new Error('Schema Integrity Audit Failed. Critical tables are missing.');
-    }
-    console.log('[DB] Schema Verification Complete.');
   }
 
   async nuclearReset(): Promise<void> {
-    console.warn('[DB] NUCLEAR RESET TRIGGERED');
     if (this.platform === 'native') {
       try {
         if (this.nativeDb) await this.nativeDb.close();
+        const { CapacitorSQLite } = await import('@capacitor-community/sqlite');
         await CapacitorSQLite.deleteDatabase({ database: 'business_hub' });
-      } catch (e) { console.error('Nuclear Delete failed:', e); }
+      } catch (e) { console.error('Reset failed:', e); }
     } else {
       localStorage.clear();
       const req = indexedDB.deleteDatabase(IDB_NAME);
@@ -255,11 +214,8 @@ class DatabaseSingleton {
   }
 
   private assertReady(): void {
-    if (!this.ready && !this.booting) {
-      throw new Error('System not ready.');
-    }
+    if (!this.ready && !this.booting) throw new Error('System not ready.');
   }
 }
 
 export const Database = new DatabaseSingleton();
-

@@ -435,7 +435,7 @@ export default function Team() {
                     <h3 className="text-base font-black tracking-tight">{s.name}</h3>
                     <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider">{s.role}</p>
                     <div className="mt-1 flex items-center gap-2">
-                      <span className={cn("h-1.5 w-1.5 rounded-full", s.status === 'active' ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground")} />
+                      <span className={cn("h-1.5 w-1.5 rounded-full", s.status === 'active' ? "bg-primary animate-pulse" : "bg-muted-foreground")} />
                       <span className="text-[10px] font-black tracking-widest text-muted-foreground uppercase">{s.status}</span>
                     </div>
                   </div>
@@ -463,7 +463,7 @@ export default function Team() {
                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                      {s.email && (
                        <button 
-                         onClick={() => showToast('Email Automation: Coming Soon (Requires Domain Verification)')}
+                         onClick={(e) => { e.stopPropagation(); showToast('Email Automation: Coming Soon (Requires Domain Verification)'); }}
                          className="text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground/50 cursor-not-allowed transition-all flex items-center gap-1.5"
                        >
                          <Send className="h-3 w-3" /> Mail (Locked)
@@ -472,13 +472,16 @@ export default function Team() {
 
                      {s.phone && s.phone !== '-' && (
                        <button 
-                         onClick={() => sendWhatsAppInvite({
-                           phone: s.phone,
-                           staffName: s.name,
-                           inviteCode: invitations[0]?.code || 'HUBPRO',
-                           shopName: shop?.name || 'Our Shop'
-                         })}
-                         className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-500 hover:text-emerald-500/70 transition-all flex items-center gap-1.5"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           sendWhatsAppInvite({
+                             phone: s.phone,
+                             staffName: s.name,
+                             inviteCode: invitations[0]?.code || 'HUBPRO',
+                             shopName: shop?.name || 'Our Shop'
+                           });
+                         }}
+                         className="text-[10px] font-black uppercase tracking-[0.1em] text-primary hover:text-primary/70 transition-all flex items-center gap-1.5"
                        >
                          <MessageCircle className="h-3 w-3" /> WhatsApp
                        </button>
@@ -487,7 +490,8 @@ export default function Team() {
                      {canEditTeam && (
                        <>
                          <button 
-                           onClick={() => {
+                           onClick={(e) => {
+                             e.stopPropagation();
                              setPinInput('');
                              setConfirmRemoveStaff(s);
                            }}
@@ -527,8 +531,8 @@ export default function Team() {
                     className={cn(
                       "flex items-center gap-1.5 px-3 py-1 rounded-lg transition-all text-[9px] font-black uppercase tracking-widest",
                       shop?.allowStaffAttendance
-                        ? "bg-green-500/10 text-green-500 border border-green-500/20 hover:bg-green-500/20"
-                        : "bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20"
+                        ? "bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20"
+                        : "bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/20"
                     )}
                   >
                     {shop?.allowStaffAttendance ? <Unlock className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
@@ -621,7 +625,7 @@ export default function Team() {
                           <div className="flex flex-col">
                             <div className={cn(
                               "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest w-fit mb-1",
-                              record.status === 'PRESENT' ? "bg-green-500/10 text-green-500" :
+                              record.status === 'PRESENT' ? "bg-primary/10 text-primary" :
                               record.status === 'HALF_DAY' ? "bg-amber-500/10 text-amber-500" : "bg-accent/50 text-muted-foreground"
                             )}>
                               {record.status === 'PRESENT' ? 'Full Day' : record.status === 'HALF_DAY' ? 'Half Day' : record.status}
@@ -649,7 +653,7 @@ export default function Team() {
                                   clockIn: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
                                   status: 'PRESENT'
                                 })}
-                                className="px-3 py-1.5 bg-emerald-500/10 text-emerald-500 text-[9px] font-black uppercase tracking-widest rounded-lg border border-emerald-500/20 hover:bg-emerald-500 hover:text-white transition-all"
+                                className="px-3 py-1.5 bg-primary/10 text-primary text-[9px] font-black uppercase tracking-widest rounded-lg border border-primary/20 hover:bg-primary hover:text-white transition-all shadow-sm"
                               >
                                 Auto In
                               </button>
@@ -669,8 +673,8 @@ export default function Team() {
                                   ...record,
                                   clockOut: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
                                 })}
-                                className="px-3 py-1.5 bg-amber-500/10 text-amber-500 text-[9px] font-black uppercase tracking-widest rounded-lg border border-amber-500/20 hover:bg-amber-500 hover:text-white transition-all"
-                              >
+                                className="px-3 py-1.5 bg-primary/10 text-primary text-[9px] font-black uppercase tracking-widest rounded-lg border border-primary/20 hover:bg-primary hover:text-white transition-all shadow-sm"
+                                >
                                 Auto Out
                               </button>
                               <button
@@ -695,7 +699,7 @@ export default function Team() {
                             ) : (
                               <div className={cn(
                                 "inline-flex items-center gap-1.5 px-3 py-1 rounded-full",
-                                record.status === 'PRESENT' ? "bg-emerald-500/10 text-emerald-500" : "bg-accent/50 text-muted-foreground"
+                                record.status === 'PRESENT' ? "bg-primary/10 text-primary" : "bg-accent/50 text-muted-foreground"
                               )}>
                                 <span className="text-[9px] font-black uppercase tracking-widest">{record.status}</span>
                               </div>
@@ -742,10 +746,10 @@ export default function Team() {
               return (
                 <div key={s.id} className={cn(
                   "glass-card rounded-[2.5rem] p-8 border border-border/50 hover:border-primary/40 transition-all flex flex-col relative overflow-hidden",
-                  isPaid && "bg-green-500/[0.02]"
+                  isPaid && "bg-primary/5"
                 )}>
                   {isPaid && (
-                    <div className="absolute top-0 right-0 px-4 py-1 bg-emerald-500 text-primary-foreground text-[8px] font-black uppercase tracking-widest rounded-bl-xl shadow-lg">
+                    <div className="absolute top-0 right-0 px-4 py-1 bg-primary text-primary-foreground text-[8px] font-black uppercase tracking-widest rounded-bl-xl shadow-lg">
                       Distributed
                     </div>
                   )}
@@ -1104,11 +1108,13 @@ export default function Team() {
         <ConfirmDialog
           open={!!confirmRemoveStaff}
           onClose={() => { setConfirmRemoveStaff(null); setPinInput(''); }}
-          onConfirm={() => {
+          onConfirm={async () => {
             if (pinInput === shopPrivate?.adminPin) {
-              deleteStaff(confirmRemoveStaff.id);
-              showToast(`${confirmRemoveStaff.name} removed permanently.`);
               setConfirmRemoveStaff(null);
+              setEditingStaff(null);
+              await deleteStaff(confirmRemoveStaff.id);
+              showToast(`${confirmRemoveStaff.name} removed permanently.`);
+              setPinInput('');
             } else {
               showToast('Invalid Security PIN', true);
             }

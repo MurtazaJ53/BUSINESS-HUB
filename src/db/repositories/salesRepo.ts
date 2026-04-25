@@ -1,5 +1,5 @@
 /**
- * Sales Repository — epoch timestamps, tombstone, Database singleton
+ * Sales Repository — Standardized CamelCase Standards
  */
 
 import { Database } from '../sqlite';
@@ -10,22 +10,22 @@ const now = () => Date.now();
 export const salesRepo = {
   async getAll(limitCount = 100): Promise<Sale[]> {
     const rows = await Database.query<any>(
-      `SELECT id, total, discount, discount_value as discountValue, discount_type as discountType,
-              payment_mode as paymentMode, customer_name as customerName, customer_phone as customerPhone,
-              customer_id as customerId, footer_note as footerNote, date, created_at as createdAt
-       FROM sales WHERE tombstone = 0 ORDER BY created_at DESC LIMIT ?;`,
+      `SELECT id, total, discount, discountValue, discountType,
+              paymentMode, customerName, customerPhone,
+              customerId, footerNote, date, createdAt
+       FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC LIMIT ?;`,
       [limitCount],
     );
 
     const sales: Sale[] = [];
     for (const row of rows) {
       const items = await Database.query<SaleItem>(
-        `SELECT item_id as itemId, name, quantity, price, cost_price as costPrice, size,
-                is_return as isReturn
-         FROM sale_items WHERE sale_id = ?;`, [row.id],
+        `SELECT itemId, name, quantity, price, costPrice, size,
+                isReturn
+         FROM sale_items WHERE saleId = ?;`, [row.id],
       );
       const payments = await Database.query<{ mode: string; amount: number }>(
-        `SELECT mode, amount FROM sale_payments WHERE sale_id = ?;`, [row.id],
+        `SELECT mode, amount FROM sale_payments WHERE saleId = ?;`, [row.id],
       );
       sales.push({ ...row, items, payments });
     }
@@ -34,18 +34,18 @@ export const salesRepo = {
 
   async getById(id: string): Promise<Sale | null> {
     const rows = await Database.query<any>(
-      `SELECT id, total, discount, discount_value as discountValue, discount_type as discountType,
-              payment_mode as paymentMode, customer_name as customerName, customer_phone as customerPhone,
-              customer_id as customerId, footer_note as footerNote, date, created_at as createdAt
+      `SELECT id, total, discount, discountValue, discountType,
+              paymentMode, customerName, customerPhone,
+              customerId, footerNote, date, createdAt
        FROM sales WHERE id = ? AND tombstone = 0;`, [id],
     );
     if (!rows.length) return null;
     const items = await Database.query<SaleItem>(
-      `SELECT item_id as itemId, name, quantity, price, cost_price as costPrice, size, is_return as isReturn
-       FROM sale_items WHERE sale_id = ?;`, [id],
+      `SELECT itemId, name, quantity, price, costPrice, size, isReturn
+       FROM sale_items WHERE saleId = ?;`, [id],
     );
     const payments = await Database.query<{ mode: string; amount: number }>(
-      `SELECT mode, amount FROM sale_payments WHERE sale_id = ?;`, [id],
+      `SELECT mode, amount FROM sale_payments WHERE saleId = ?;`, [id],
     );
     return { ...rows[0], items, payments };
   },
@@ -57,19 +57,19 @@ export const salesRepo = {
 
     stmts.push({
       sql: `INSERT OR REPLACE INTO sales
-              (id, total, discount, discount_value, discount_type, payment_mode,
-               customer_name, customer_phone, customer_id, footer_note, date,
-               created_at, updated_at, dirty, tombstone)
+              (id, total, discount, discountValue, discountType, paymentMode,
+               customerName, customerPhone, customerId, footerNote, date,
+               createdAt, updatedAt, dirty, tombstone)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0);`,
       params: [sale.id, sale.total, sale.discount, sale.discountValue, sale.discountType,
                sale.paymentMode, sale.customerName ?? null, sale.customerPhone ?? null,
                sale.customerId ?? null, sale.footerNote ?? null, sale.date, ca, ts],
     });
 
-    stmts.push({ sql: 'DELETE FROM sale_items WHERE sale_id = ?;', params: [sale.id] });
+    stmts.push({ sql: 'DELETE FROM sale_items WHERE saleId = ?;', params: [sale.id] });
     sale.items.forEach((item, idx) => {
       stmts.push({
-        sql: `INSERT INTO sale_items (id, sale_id, item_id, name, quantity, price, cost_price, size, is_return)
+        sql: `INSERT INTO sale_items (id, saleId, itemId, name, quantity, price, costPrice, size, isReturn)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
         params: [`${sale.id}_${item.itemId}_${idx}`, sale.id, item.itemId, item.name,
                  item.quantity, item.price, item.costPrice ?? null, item.size ?? null,
@@ -77,10 +77,10 @@ export const salesRepo = {
       });
     });
 
-    stmts.push({ sql: 'DELETE FROM sale_payments WHERE sale_id = ?;', params: [sale.id] });
+    stmts.push({ sql: 'DELETE FROM sale_payments WHERE saleId = ?;', params: [sale.id] });
     sale.payments.forEach((pmt, idx) => {
       stmts.push({
-        sql: `INSERT INTO sale_payments (id, sale_id, mode, amount) VALUES (?, ?, ?, ?);`,
+        sql: `INSERT INTO sale_payments (id, saleId, mode, amount) VALUES (?, ?, ?, ?);`,
         params: [`${sale.id}_${pmt.mode}_${idx}`, sale.id, pmt.mode, pmt.amount],
       });
     });
@@ -90,27 +90,27 @@ export const salesRepo = {
 
   async softDelete(id: string): Promise<void> {
     await Database.run(
-      `UPDATE sales SET tombstone = 1, dirty = 1, updated_at = ? WHERE id = ?;`,
+      `UPDATE sales SET tombstone = 1, dirty = 1, updatedAt = ? WHERE id = ?;`,
       [now(), id],
     );
   },
 
   async getDirty(): Promise<Array<Sale & { tombstone: number; updatedAt: number }>> {
     const rows = await Database.query<any>(
-      `SELECT id, total, discount, discount_value as discountValue, discount_type as discountType,
-              payment_mode as paymentMode, customer_name as customerName, customer_phone as customerPhone,
-              customer_id as customerId, footer_note as footerNote, date, created_at as createdAt,
-              updated_at as updatedAt, tombstone
+      `SELECT id, total, discount, discountValue, discountType,
+              paymentMode, customerName, customerPhone,
+              customerId, footerNote, date, createdAt,
+              updatedAt, tombstone
        FROM sales WHERE dirty = 1;`,
     );
     const results: any[] = [];
     for (const row of rows) {
       const items = await Database.query<SaleItem>(
-        `SELECT item_id as itemId, name, quantity, price, cost_price as costPrice, size, is_return as isReturn
-         FROM sale_items WHERE sale_id = ?;`, [row.id],
+        `SELECT itemId, name, quantity, price, costPrice, size, isReturn
+         FROM sale_items WHERE saleId = ?;`, [row.id],
       );
       const payments = await Database.query<{ mode: string; amount: number }>(
-        `SELECT mode, amount FROM sale_payments WHERE sale_id = ?;`, [row.id],
+        `SELECT mode, amount FROM sale_payments WHERE saleId = ?;`, [row.id],
       );
       results.push({ ...row, items, payments });
     }
@@ -124,28 +124,28 @@ export const salesRepo = {
   },
 
   async mergeRemote(sale: Sale, remoteUpdatedAt: number): Promise<void> {
-    const existing = await Database.query<{ updated_at: number; dirty: number }>(
-      'SELECT updated_at, dirty FROM sales WHERE id = ?;', [sale.id],
+    const existing = await Database.query<{ updatedAt: number; dirty: number }>(
+      'SELECT updatedAt, dirty FROM sales WHERE id = ?;', [sale.id],
     );
-    if (existing.length === 0 || remoteUpdatedAt > existing[0].updated_at || !existing[0].dirty) {
+    if (existing.length === 0 || remoteUpdatedAt > existing[0].updatedAt || !existing[0].dirty) {
       const ca = typeof sale.createdAt === 'string' ? new Date(sale.createdAt).getTime() : (sale.createdAt || remoteUpdatedAt);
       const stmts: Array<{ sql: string; params?: any[] }> = [];
 
       stmts.push({
         sql: `INSERT OR REPLACE INTO sales
-                (id, total, discount, discount_value, discount_type, payment_mode,
-                 customer_name, customer_phone, customer_id, footer_note, date,
-                 created_at, updated_at, dirty, tombstone)
+                (id, total, discount, discountValue, discountType, paymentMode,
+                 customerName, customerPhone, customerId, footerNote, date,
+                 createdAt, updatedAt, dirty, tombstone)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0);`,
         params: [sale.id, sale.total, sale.discount, sale.discountValue, sale.discountType,
                  sale.paymentMode, sale.customerName ?? null, sale.customerPhone ?? null,
                  sale.customerId ?? null, sale.footerNote ?? null, sale.date, ca, remoteUpdatedAt],
       });
 
-      stmts.push({ sql: 'DELETE FROM sale_items WHERE sale_id = ?;', params: [sale.id] });
+      stmts.push({ sql: 'DELETE FROM sale_items WHERE saleId = ?;', params: [sale.id] });
       sale.items.forEach((item, idx) => {
         stmts.push({
-          sql: `INSERT INTO sale_items (id, sale_id, item_id, name, quantity, price, cost_price, size, is_return)
+          sql: `INSERT INTO sale_items (id, saleId, itemId, name, quantity, price, costPrice, size, isReturn)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
           params: [`${sale.id}_${item.itemId}_${idx}`, sale.id, item.itemId, item.name,
                    item.quantity, item.price, item.costPrice ?? null, item.size ?? null,
@@ -153,10 +153,10 @@ export const salesRepo = {
         });
       });
 
-      stmts.push({ sql: 'DELETE FROM sale_payments WHERE sale_id = ?;', params: [sale.id] });
+      stmts.push({ sql: 'DELETE FROM sale_payments WHERE saleId = ?;', params: [sale.id] });
       sale.payments.forEach((pmt, idx) => {
         stmts.push({
-          sql: `INSERT INTO sale_payments (id, sale_id, mode, amount) VALUES (?, ?, ?, ?);`,
+          sql: `INSERT INTO sale_payments (id, saleId, mode, amount) VALUES (?, ?, ?, ?);`,
           params: [`${sale.id}_${pmt.mode}_${idx}`, sale.id, pmt.mode, pmt.amount],
         });
       });
