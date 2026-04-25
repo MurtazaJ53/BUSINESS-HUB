@@ -10,9 +10,10 @@
  *   transaction(stmts[])     → void          (atomic batch)
  *
  * Lifecycle:
- *   1. main.tsx calls `await Database.boot()`
- *   2. boot() selects the right driver, opens the DB, runs migrations
- *   3. The rest of the app uses Database.query / .run / .transaction
+ *   1. main.tsx calls `ReactDOM.createRoot().render(...)`
+ *   2. App.tsx calls `Database.boot()` inside its state lifecycle
+ *   3. boot() selects the right driver, opens the DB, runs migrations
+ *   4. The rest of the app uses Database.query / .run / .transaction
  */
 
 import { Capacitor } from '@capacitor/core';
@@ -89,7 +90,7 @@ class DatabaseSingleton {
   private webDb: SqlJsDatabase | null = null;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
-  /** Call once from main.tsx before React renders. */
+  /** Call once from App.tsx before features mount. */
   async boot(): Promise<void> {
     if (this.ready) return;
     if (this.bootPromise) return this.bootPromise;
@@ -243,9 +244,7 @@ class DatabaseSingleton {
     }
 
     // sql.js path: exec() returns {columns, values[][]}
-    // We need to bind params manually
     if (params && params.length > 0) {
-      // Use a statement for parameterised queries
       const stmt = (this.webDb as any).prepare(sql);
       stmt.bind(params);
 
@@ -261,7 +260,6 @@ class DatabaseSingleton {
       return rows;
     }
 
-    // No params — use exec()
     const results = this.webDb!.exec(sql);
     if (results.length === 0) return [];
     const { columns, values } = results[0];
@@ -305,7 +303,6 @@ class DatabaseSingleton {
       return;
     }
 
-    // Web path
     this.webDb!.run('BEGIN TRANSACTION;');
     try {
       for (const s of stmts) this.webDb!.run(s.sql, s.params);
@@ -320,26 +317,13 @@ class DatabaseSingleton {
   // ── Migrations ────────────────────────────────────────────
 
   private async runMigrations(): Promise<void> {
-    // Ensure tracker table AND shop_metadata exist immediately
-    // This resolves the 'no such table: shop_metadata' error during early store init
+    // Stage 1: Meta Foundation
     if (this.platform === 'native') {
-      await this.nativeDb.run(`
-        CREATE TABLE IF NOT EXISTS _migrations (id TEXT PRIMARY KEY, applied_at INTEGER NOT NULL);
-      `);
-      await this.nativeDb.run(`
-        CREATE TABLE IF NOT EXISTS shop_metadata (
-          key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL, dirty INTEGER NOT NULL DEFAULT 0
-        );
-      `);
+      await this.nativeDb.run(`CREATE TABLE IF NOT EXISTS _migrations (id TEXT PRIMARY KEY, applied_at INTEGER NOT NULL);`);
+      await this.nativeDb.run(`CREATE TABLE IF NOT EXISTS shop_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL, dirty INTEGER NOT NULL DEFAULT 0);`);
     } else {
-      this.webDb!.run(`
-        CREATE TABLE IF NOT EXISTS _migrations (id TEXT PRIMARY KEY, applied_at INTEGER NOT NULL);
-      `);
-      this.webDb!.run(`
-        CREATE TABLE IF NOT EXISTS shop_metadata (
-          key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL, dirty INTEGER NOT NULL DEFAULT 0
-        );
-      `);
+      this.webDb!.run(`CREATE TABLE IF NOT EXISTS _migrations (id TEXT PRIMARY KEY, applied_at INTEGER NOT NULL);`);
+      this.webDb!.run(`CREATE TABLE IF NOT EXISTS shop_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL, dirty INTEGER NOT NULL DEFAULT 0);`);
     }
 
     const applied = await this.query<{ id: string }>('SELECT id FROM _migrations;');
@@ -347,30 +331,46 @@ class DatabaseSingleton {
 
     // Import migration SQL (Vite ?raw)
     const { default: sql0001 } = await import('./migrations/0001_init.sql?raw');
-
-    const migrations: Array<{ id: string; sql: string }> = [
-      { id: '0001_init', sql: sql0001 },
-    ];
+    const migrations = [{ id: '0001_init', sql: sql0001 }];
 
     for (const m of migrations) {
       if (appliedIds.has(m.id)) continue;
-      console.log(`[DB] Applying migration: ${m.id}`);
+      console.log(`[DB] Executing surgical migration: ${m.id}`);
 
       try {
-        // Execute the entire script at once (atomic block)
-        await this.run(`
-          BEGIN TRANSACTION;
-          ${m.sql}
-          INSERT INTO _migrations (id, applied_at) VALUES ('${m.id}', ${Date.now()});
-          COMMIT;
-        `);
+        // 🧪 Surgical Statement Processing
+        // Split by semicolon and filter out comments/whitespace
+        const statements = m.sql
+          .split(';')
+          .map(s => s.trim())
+          .filter(s => s.length > 0 && !s.startsWith('--'));
+
+        await this.run('BEGIN TRANSACTION;');
+        for (const statement of statements) {
+          await this.run(statement);
+        }
+        await this.run('INSERT INTO _migrations (id, applied_at) VALUES (?, ?);', [m.id, Date.now()]);
+        await this.run('COMMIT;');
+        
       } catch (e: any) {
-        await this.run('ROLLBACK;');
-        console.error(`[DB] Migration ${m.id} failed:`, e);
+        try { await this.run('ROLLBACK;'); } catch (_) {}
+        console.error(`[DB] Critical migration failure [${m.id}]:`, e);
         throw new Error(`Migration ${m.id} failed: ${e.message}`);
       }
-      console.log(`[DB] Migration ${m.id} applied`);
     }
+
+    // 🛡️ Final Schema Integrity Audit
+    const tablesFound = await this.query<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('staff', 'inventory', 'sales', 'shop_metadata');"
+    );
+    
+    if (tablesFound.length < 4) {
+      const missing = ['staff', 'inventory', 'sales', 'shop_metadata'].filter(t => !tablesFound.find(f => f.name === t));
+      console.error('[DB] Schema incomplete. Missing:', missing);
+      throw new Error(`Incomplete Schema. Missing tables: ${missing.join(', ')}`);
+    }
+
+    if (this.platform === 'web') await this.flush();
   }
 
   // ── Close ─────────────────────────────────────────────────
@@ -396,5 +396,4 @@ class DatabaseSingleton {
   }
 }
 
-/** The app-wide Database singleton. Import this everywhere. */
 export const Database = new DatabaseSingleton();
