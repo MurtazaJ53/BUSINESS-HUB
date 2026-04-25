@@ -22,10 +22,14 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 // 3. Platform-Aware App Check
 if (typeof window !== 'undefined' && import.meta.env.PROD) {
   const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+  const isLocalPreviewOrigin = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+    || window.location.protocol === 'file:';
   
   try {
     if (Capacitor.isNativePlatform()) {
       console.info("[Security] Bypassing reCAPTCHA v3 on native. Awaiting native attestation.");
+    } else if (isLocalPreviewOrigin) {
+      console.info("[Security] Skipping web App Check on local preview origin.");
     } else if (siteKey) {
       initializeAppCheck(app, {
         provider: new ReCaptchaV3Provider(siteKey),
