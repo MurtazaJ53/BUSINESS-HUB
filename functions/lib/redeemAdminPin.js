@@ -45,7 +45,7 @@ exports.redeemAdminPin = (0, https_1.onCall)({
     memory: "256MiB",
     maxInstances: 2,
 }, async (request) => {
-    var _a;
+    var _a, _b;
     if (!request.auth) {
         throw new https_1.HttpsError("unauthenticated", "Authentication required");
     }
@@ -71,6 +71,9 @@ exports.redeemAdminPin = (0, https_1.onCall)({
     if (!staffSnap.exists) {
         throw new https_1.HttpsError("permission-denied", "User is not recognized in this workspace.");
     }
+    if (((_a = staffSnap.data()) === null || _a === void 0 ? void 0 : _a.status) !== 'active') {
+        throw new https_1.HttpsError("permission-denied", "Only active staff members can request admin elevation.");
+    }
     if (attemptSnap.exists) {
         const data = attemptSnap.data();
         if ((data === null || data === void 0 ? void 0 : data.lockoutUntil) && data.lockoutUntil > now) {
@@ -79,12 +82,12 @@ exports.redeemAdminPin = (0, https_1.onCall)({
         }
     }
     let isMatch = false;
-    const adminPinHash = authSnap.exists ? (_a = authSnap.data()) === null || _a === void 0 ? void 0 : _a.adminPinHash : null;
+    const adminPinHash = authSnap.exists ? (_b = authSnap.data()) === null || _b === void 0 ? void 0 : _b.adminPinHash : null;
     if (adminPinHash && typeof adminPinHash === 'string' && adminPinHash.length > 0) {
         isMatch = await bcrypt.compare(pin, adminPinHash);
     }
     else {
-        isMatch = (pin === '5253');
+        throw new https_1.HttpsError("failed-precondition", "Admin PIN is not initialized for this workspace.");
     }
     await db.runTransaction(async (transaction) => {
         const currentAttemptSnap = await transaction.get(attemptRef);

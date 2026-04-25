@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 import { useSqlQuery } from '@/db/hooks';
+import { verifyAdminPin } from '@/lib/admin';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn, isValidIndianPhone, sanitizePhone } from '@/lib/utils';
 import ReceiptModal from '@/components/ReceiptModal';
@@ -18,7 +19,7 @@ type PayMode = 'CASH' | 'UPI' | 'CARD' | 'CREDIT' | 'ONLINE' | 'OTHERS';
 const PAY_MODES: PayMode[] = ['CASH', 'UPI', 'CARD', 'CREDIT', 'ONLINE', 'OTHERS'];
 
 export default function POS() {
-  const { addSale, shop, shopPrivate, role, currentStaff } = useBusinessStore();
+  const { addSale, shop, role, currentStaff, shopId } = useBusinessStore();
   
   const canViewCost = usePermission('inventory', 'view_cost');
   const canOverridePrice = usePermission('sales', 'override_price');
@@ -346,9 +347,16 @@ export default function POS() {
 
     // PIN Verification for Force Sale
     if (force) {
-      const pinToVerify = shopPrivate?.adminPin || '5253';
-      if (pinInput !== pinToVerify) {
-        setToast("❌ Invalid Manager PIN");
+      if (!shopId) {
+        setToast('Workspace unavailable');
+        setIsProcessing(false);
+        return;
+      }
+
+      try {
+        await verifyAdminPin(pinInput, shopId);
+      } catch (error: any) {
+        setToast(error?.message || 'Invalid Manager PIN');
         setIsProcessing(false);
         return;
       }

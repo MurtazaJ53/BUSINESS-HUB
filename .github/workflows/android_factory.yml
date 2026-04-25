@@ -94,3 +94,40 @@ jobs:
         with:
           name: BusinessHub-Signed-APK
           path: android/app/build/outputs/apk/release/app-release.apk
+
+  desktop-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Root Dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Build Web Project
+        run: npm run build
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Desktop Dependencies
+        working-directory: apps/desktop
+        run: npm install
+
+      - name: Build Windows Desktop Installers
+        working-directory: apps/desktop
+        run: npm run tauri build -- --bundles msi,nsis
+
+      - name: Upload Windows Desktop Bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: BusinessHub-Windows-Desktop
+          path: |
+            apps/desktop/src-tauri/target/release/bundle/msi/*.msi
+            apps/desktop/src-tauri/target/release/bundle/nsis/*.exe

@@ -9,6 +9,7 @@ if (admin.apps.length === 0) {
 
 // 1. Strict Type Definitions
 interface SetPinPayload {
+  oldPin?: string;
   newPin: string;
   shopId: string;
 }
@@ -29,7 +30,8 @@ export const setAdminPin = onCall<SetPinPayload>(
       );
     }
 
-    const { newPin: rawPin, shopId } = request.data;
+    const { oldPin: rawOldPin, newPin: rawPin, shopId } = request.data;
+    const oldPin = String(rawOldPin || "").trim();
     const newPin = String(rawPin || "").trim();
     const uid = request.auth.uid;
 
@@ -53,12 +55,26 @@ export const setAdminPin = onCall<SetPinPayload>(
       const staffRef = db.doc(`shops/${shopId}/staff/${uid}`);
       const staffSnap = await staffRef.get();
 
-      if (!staffSnap.exists || staffSnap.data()?.role !== 'admin') {
+      if (!staffSnap.exists || staffSnap.data()?.role !== 'admin' || staffSnap.data()?.status !== 'active') {
         console.warn(`[UNAUTHORIZED ATTEMPT] UID: ${uid} tried to set PIN for Shop: ${shopId}`);
         throw new HttpsError(
           "permission-denied", 
           "Insufficient clearance. Only verified administrators can rotate the shop PIN."
         );
+      }
+
+      const authRef = db.doc(`shops/${shopId}/private/auth`);
+      const authSnap = await authRef.get();
+      const existingHash = authSnap.data()?.adminPinHash;
+
+      if (existingHash && typeof existingHash === 'string') {
+        const oldPinMatches = await bcrypt.compare(oldPin, existingHash);
+        if (!oldPinMatches) {
+          throw new HttpsError(
+            "permission-denied",
+            "Current PIN verification failed."
+          );
+        }
       }
 
       // 4. Cryptographic Hashing (Salt rounds increased slightly for modern hardware)
@@ -69,7 +85,6 @@ export const setAdminPin = onCall<SetPinPayload>(
       const batch = db.batch();
 
       // Update the private auth document
-      const authRef = db.doc(`shops/${shopId}/private/auth`);
       batch.set(authRef, {
         adminPinHash: hash,
         updatedAt: timestamp,

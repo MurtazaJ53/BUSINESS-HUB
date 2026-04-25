@@ -45,11 +45,12 @@ exports.setAdminPin = (0, https_1.onCall)({
     memory: "256MiB",
     maxInstances: 2,
 }, async (request) => {
-    var _a;
+    var _a, _b, _c;
     if (!request.auth) {
         throw new https_1.HttpsError("unauthenticated", "Missing or invalid authentication token.");
     }
-    const { newPin: rawPin, shopId } = request.data;
+    const { oldPin: rawOldPin, newPin: rawPin, shopId } = request.data;
+    const oldPin = String(rawOldPin || "").trim();
     const newPin = String(rawPin || "").trim();
     const uid = request.auth.uid;
     const pinRegex = /^\d{4,6}$/;
@@ -63,14 +64,22 @@ exports.setAdminPin = (0, https_1.onCall)({
     try {
         const staffRef = db.doc(`shops/${shopId}/staff/${uid}`);
         const staffSnap = await staffRef.get();
-        if (!staffSnap.exists || ((_a = staffSnap.data()) === null || _a === void 0 ? void 0 : _a.role) !== 'admin') {
+        if (!staffSnap.exists || ((_a = staffSnap.data()) === null || _a === void 0 ? void 0 : _a.role) !== 'admin' || ((_b = staffSnap.data()) === null || _b === void 0 ? void 0 : _b.status) !== 'active') {
             console.warn(`[UNAUTHORIZED ATTEMPT] UID: ${uid} tried to set PIN for Shop: ${shopId}`);
             throw new https_1.HttpsError("permission-denied", "Insufficient clearance. Only verified administrators can rotate the shop PIN.");
+        }
+        const authRef = db.doc(`shops/${shopId}/private/auth`);
+        const authSnap = await authRef.get();
+        const existingHash = (_c = authSnap.data()) === null || _c === void 0 ? void 0 : _c.adminPinHash;
+        if (existingHash && typeof existingHash === 'string') {
+            const oldPinMatches = await bcrypt.compare(oldPin, existingHash);
+            if (!oldPinMatches) {
+                throw new https_1.HttpsError("permission-denied", "Current PIN verification failed.");
+            }
         }
         const hash = await bcrypt.hash(newPin, 12);
         const timestamp = admin.firestore.FieldValue.serverTimestamp();
         const batch = db.batch();
-        const authRef = db.doc(`shops/${shopId}/private/auth`);
         batch.set(authRef, {
             adminPinHash: hash,
             updatedAt: timestamp,

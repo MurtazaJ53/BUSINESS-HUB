@@ -92,7 +92,7 @@ class DatabaseSingleton {
       const initSqlJs = (window as any).initSqlJs;
       if (!initSqlJs) throw new Error("SQL.js not loaded.");
       const SQL = await initSqlJs({
-        locateFile: (file: string) => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
+        locateFile: (file: string) => `/${file}`
       });
       const saved = await idbLoad();
       this.webDb = saved ? new SQL.Database(saved) : new SQL.Database();
@@ -182,7 +182,7 @@ class DatabaseSingleton {
         CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT, email TEXT, balance REAL, totalSpent REAL, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS customer_payments (id TEXT PRIMARY KEY, customerId TEXT, amount REAL, date TEXT, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         
-        CREATE TABLE IF NOT EXISTS expenses (id TEXT PRIMARY KEY, category TEXT, amount REAL, description TEXT, date TEXT, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS expenses (id TEXT PRIMARY KEY, category TEXT, amount REAL, description TEXT, paymentMethod TEXT DEFAULT 'CASH', paymentReference TEXT, date TEXT, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS attendance (id TEXT PRIMARY KEY, staffId TEXT, date TEXT, clockIn TEXT, clockOut TEXT, totalHours REAL, status TEXT, overtime REAL, bonus REAL, note TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS daily_briefings (id TEXT PRIMARY KEY, summary TEXT, bullets TEXT, metrics TEXT, createdAt INTEGER, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         
@@ -252,6 +252,8 @@ class DatabaseSingleton {
     ]);
 
     await this.migrateLegacyColumns('expenses', [
+      ['paymentMethod', 'TEXT DEFAULT \'CASH\'', 'payment_method'],
+      ['paymentReference', 'TEXT', 'payment_reference'],
       ['createdAt', 'INTEGER', 'created_at'],
       ['updatedAt', 'INTEGER', 'updated_at'],
     ]);
