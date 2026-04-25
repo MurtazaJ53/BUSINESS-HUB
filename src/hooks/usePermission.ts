@@ -1,4 +1,5 @@
 import { useBusinessStore } from '@/lib/useBusinessStore';
+import { useAuthStore } from '@/lib/useAuthStore';
 import { Module, Action, LimitedAction } from '@/lib/types';
 
 /**
@@ -10,7 +11,8 @@ import { Module, Action, LimitedAction } from '@/lib/types';
 export const usePermission = (mod: Module, act: Action): LimitedAction => {
   const cur = useBusinessStore(s => s.currentStaff);
   const role = useBusinessStore(s => s.role);
+  const claimPermissions = useAuthStore(s => s.permissions);
   
   if (role === 'admin') return true;
-  return cur?.permissions?.[mod]?.[act] || false;
+  return cur?.permissions?.[mod]?.[act] || claimPermissions?.[mod]?.[act] || false;
 };

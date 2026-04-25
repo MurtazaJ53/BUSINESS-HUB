@@ -17,10 +17,10 @@ import {
   ShieldCheck,
   Printer
 } from 'lucide-react';
-import { useSqlQuery } from '@/db/hooks';
+import { useSqlQuery, useSalesQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { usePermission } from '@/hooks/usePermission';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, cn, toTimestamp } from '@/lib/utils';
 import { printReceipt } from '@/lib/printerService';
 import { loadShopSettings } from '@/lib/shopSettings';
 import type { Sale, Expense } from '@/lib/types';
@@ -32,7 +32,7 @@ export default function History() {
   const canEditSale = usePermission('sales', 'edit');
   const canVoidSale = usePermission('sales', 'void_sale');
   const canDeleteExpense = usePermission('expenses', 'delete');
-  const sales = useSqlQuery<Sale>('SELECT * FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC', [], ['sales']);
+  const sales = useSalesQuery();
   const expenses = useSqlQuery<Expense>('SELECT * FROM expenses WHERE tombstone = 0 ORDER BY date DESC', [], ['expenses']);
   const [tab, setTab] = useState<'sales' | 'expenses'>('sales');
   const [search, setSearch] = useState('');
@@ -92,7 +92,7 @@ export default function History() {
 
       return matchSearch && matchDate;
     })
-    .sort((a: Sale, b: Sale) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+    .sort((a: Sale, b: Sale) => b.date.localeCompare(a.date) || toTimestamp(b.createdAt) - toTimestamp(a.createdAt));
 
   const filteredExpenses = expenses
     .filter((e: Expense) => {
@@ -106,7 +106,7 @@ export default function History() {
 
       return matchSearch && matchDate;
     })
-    .sort((a: Expense, b: Expense) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+    .sort((a: Expense, b: Expense) => b.date.localeCompare(a.date) || toTimestamp(b.createdAt) - toTimestamp(a.createdAt));
 
   const handleDelete = () => {
     if (deletingId) {

@@ -3,6 +3,7 @@
  */
 
 import { Database } from '../sqlite';
+import { tableEvents } from '../events';
 import type { InventoryItem, InventoryPrivate } from '../../lib/types';
 
 const now = () => Date.now();
@@ -38,6 +39,7 @@ export const inventoryRepo = {
       [item.id, item.name, item.price, item.sku ?? null, item.category, item.subcategory ?? null,
        item.size ?? null, item.description ?? null, item.stock ?? 0, ca, ts],
     );
+    tableEvents.emit('inventory');
   },
 
   async updateStock(id: string, delta: number): Promise<void> {
@@ -45,6 +47,7 @@ export const inventoryRepo = {
       `UPDATE inventory SET stock = stock + ?, updatedAt = ?, dirty = 1 WHERE id = ?;`,
       [delta, now(), id],
     );
+    tableEvents.emit('inventory');
   },
 
   async softDelete(id: string): Promise<void> {
@@ -52,6 +55,7 @@ export const inventoryRepo = {
       `UPDATE inventory SET tombstone = 1, dirty = 1, updatedAt = ? WHERE id = ?;`,
       [now(), id],
     );
+    tableEvents.emit('inventory');
   },
 
   async clearAll(): Promise<void> {
@@ -59,6 +63,7 @@ export const inventoryRepo = {
       `UPDATE inventory SET tombstone = 1, dirty = 1, updatedAt = ?;`,
       [now()],
     );
+    tableEvents.emit('inventory');
   },
 
   // ─── SYNC ────────────────────────────────────────────────
@@ -127,6 +132,15 @@ export const inventoryPrivateRepo = {
        VALUES (?, ?, ?, ?, ?, 1);`,
       [item.id, item.costPrice, item.supplierId ?? null, item.lastPurchaseDate ?? null, now()],
     );
+    tableEvents.emit('inventory_private');
+  },
+
+  async remove(id: string): Promise<void> {
+    await Database.run(
+      `UPDATE inventory_private SET tombstone = 1, updatedAt = ?, dirty = 1 WHERE id = ?;`,
+      [now(), id],
+    );
+    tableEvents.emit('inventory_private');
   },
 
   async mergeRemote(item: InventoryPrivate, remoteUpdatedAt: number): Promise<void> {

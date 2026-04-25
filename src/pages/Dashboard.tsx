@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp,
   Package,
@@ -22,11 +23,11 @@ import {
   Sparkles,
   ChevronRight
 } from 'lucide-react';
-import { useSqlQuery } from '@/db/hooks';
+import { useSqlQuery, useSalesQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { useAuthStore } from '@/lib/useAuthStore';
 import { usePermission } from '@/hooks/usePermission';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, cn, toTimestamp } from '@/lib/utils';
 import Modal from '@/components/Modal';
 import Label from '@/components/Label';
 import Input from '@/components/Input';
@@ -80,8 +81,9 @@ function KPICard({
 }
 
 export default function Dashboard() {
-  const { addExpense, recordAttendance, role, shop, lastBackupDate, setActiveTab, setInventorySearchTerm, sidebarOpen } = useBusinessStore();
-  const sales = useSqlQuery<Sale>('SELECT * FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC', [], ['sales']);
+  const navigate = useNavigate();
+  const { addExpense, recordAttendance, role, shop, lastBackupDate, setInventorySearchTerm, sidebarOpen } = useBusinessStore();
+  const sales = useSalesQuery();
   const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
   const expenses = useSqlQuery<Expense>('SELECT * FROM expenses WHERE tombstone = 0 ORDER BY date DESC', [], ['expenses']);
   const attendance = useSqlQuery<Attendance>('SELECT * FROM attendance WHERE tombstone = 0', [], ['attendance']);
@@ -90,8 +92,10 @@ export default function Dashboard() {
   const briefing = briefings[0];
   const { user } = useAuthStore();
   const canViewInventoryCost = usePermission('inventory', 'view_cost');
+  const canViewInventory = usePermission('inventory', 'view');
   const canViewAnalytics = usePermission('analytics', 'view');
   const canViewTeam = usePermission('team', 'view');
+  const canViewSales = usePermission('sales', 'view');
   const canCreateSales = usePermission('sales', 'create');
   const canCreateCustomers = usePermission('customers', 'create');
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
@@ -251,8 +255,9 @@ export default function Dashboard() {
       {/* Unified High-Density Command Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {/* ACTION: START NEW SALE */}
+        {(role === 'admin' || canCreateSales) && (
         <button 
-          onClick={() => setActiveTab('sell')}
+          onClick={() => navigate('/sell')}
           className="group relative flex flex-col items-center justify-center aspect-square p-4 bg-primary rounded-3xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all border border-primary-foreground/10"
         >
           <div className="h-12 w-12 rounded-xl bg-primary-foreground/20 flex items-center justify-center mb-3 backdrop-blur-md">
@@ -261,10 +266,12 @@ export default function Dashboard() {
           <p className="text-primary-foreground font-black text-sm tracking-tighter leading-tight text-center">Start Sale</p>
           <p className="text-primary-foreground/60 text-[8px] font-black uppercase tracking-widest mt-1">POS Hub</p>
         </button>
+        )}
 
         {/* ACTION: INVENTORY */}
+        {(role === 'admin' || canViewInventory) && (
         <button 
-          onClick={() => setActiveTab('inventory')}
+          onClick={() => navigate('/inventory')}
           className="group relative flex flex-col items-center justify-center aspect-square p-4 glass-card border-border/5 rounded-3xl hover:bg-accent/40 hover:scale-[1.02] active:scale-95 transition-all"
         >
           <div className="h-12 w-12 rounded-xl bg-accent flex items-center justify-center mb-3">
@@ -273,6 +280,7 @@ export default function Dashboard() {
           <p className="font-black text-sm tracking-tighter leading-tight text-center text-foreground">Inventory</p>
           <p className="text-muted-foreground text-[8px] font-black uppercase tracking-widest mt-1">Catalog</p>
         </button>
+        )}
 
         {/* METRICS START HERE - ADMIN ONLY */}
         {canViewAnalytics && (
@@ -308,7 +316,7 @@ export default function Dashboard() {
 
         {/* ALERTS: RESTOCK */}
         <div 
-          onClick={() => { if(lowStockItems.length > 0) setActiveTab('inventory') }}
+          onClick={() => { if (lowStockItems.length > 0) navigate('/inventory'); }}
           className={cn(
             "flex flex-col items-center justify-center aspect-square p-4 rounded-3xl border transition-all hover:scale-105 cursor-pointer",
             lowStockItems.length > 0 ? "bg-red-500/10 border-red-500/30 shadow-red-500/10" : "glass-card"
@@ -349,10 +357,10 @@ export default function Dashboard() {
                   clockOut: timeStr
                 });
               } else {
-                setActiveTab('team');
+                navigate('/team');
               }
             } else {
-              setActiveTab('team');
+              navigate('/team');
             }
           }}
           className={cn(
@@ -465,7 +473,7 @@ export default function Dashboard() {
                   key={item.id}
                   onClick={() => {
                     setInventorySearchTerm(item.name);
-                    setActiveTab('inventory');
+                    navigate('/inventory');
                   }}
                   className="w-full flex items-center justify-between p-3 rounded-2xl bg-destructive/5 border border-destructive/10 hover:bg-destructive/10 transition-all hover:scale-[1.02] active:scale-[0.98] group"
                 >
@@ -487,7 +495,7 @@ export default function Dashboard() {
       </div>
 
       {/* Recent Sales - ADMIN ONLY */}
-      {usePermission('sales', 'view') && (
+      {canViewSales && (
         <div className="glass-card rounded-3xl p-8">
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
@@ -495,7 +503,7 @@ export default function Dashboard() {
               Recent Sales
             </h3>
             <button 
-              onClick={() => setActiveTab('history')}
+              onClick={() => navigate('/history')}
               className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline"
             >
               View All History →
@@ -509,7 +517,7 @@ export default function Dashboard() {
           ) : (
             <div className="divide-y divide-border/50">
               {[...sales]
-                .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+                .sort((a, b) => toTimestamp(b.createdAt) - toTimestamp(a.createdAt))
                 .slice(0, 10)
                 .map((sale) => (
                   <div key={sale.id} className="flex items-center justify-between py-4 hover:bg-accent/10 transition-colors px-2 rounded-xl">

@@ -14,6 +14,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { useAuthStore } from '@/lib/useAuthStore';
+import { ADMIN_PERMISSION_TEMPLATE, getRolePermissions, normalizePermissionMatrix } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 
 // --- 🛠️ 1. TYPE DEFINITIONS & ERROR MAPPING ---
@@ -199,6 +200,7 @@ export default function AuthPage() {
       }
 
       const timestamp = new Date().toISOString();
+      const updatedAt = Date.now();
       await setDoc(doc(db, 'users', currentUser.uid), {
         email: currentUser.email,
         shopId: finalShopId,
@@ -210,21 +212,19 @@ export default function AuthPage() {
         id: currentUser.uid,
         name: currentUser.displayName || currentUser.email?.split('@')[0] || 'Owner',
         email: currentUser.email,
+        phone: '-',
         role: 'admin',
         status: 'active',
         joinedAt: timestamp,
-        permissions: {
-          analytics: { view: true }, inventory: { view: true, edit: true, view_cost: true },
-          sales: { view: true, edit: true }, customers: { view: true, edit: true },
-          expenses: { view: true, edit: true }, settings: { edit: true }
-        }
+        permissions: ADMIN_PERMISSION_TEMPLATE,
+        updatedAt,
       }, { merge: true });
 
       // Link Owner's Private Data (Salary, PIN)
       await setDoc(doc(db, `shops/${finalShopId}/staff_private`, currentUser.uid), {
         id: currentUser.uid,
         salary: 0,
-        updatedAt: Date.now()
+        updatedAt
       }, { merge: true });
 
       // Ensure the private auth doc exists for future PIN rotations
@@ -261,13 +261,33 @@ export default function AuthPage() {
     const [phoneSnap, emailSnap] = await Promise.all([getDocs(staffByPhoneQ), getDocs(staffByEmailQ)]);
     const existingDoc = !phoneSnap.empty ? phoneSnap.docs[0] : (!emailSnap.empty ? emailSnap.docs[0] : null);
     
-    let existingData = { role: 'Sales', salary: 0, permissions: ['dashboard', 'inventory', 'sell', 'customers', 'history'] };
+    const timestamp = new Date().toISOString();
+    const updatedAt = Date.now();
+    let existingData: Record<string, any> = {
+      role: 'Sales Associate',
+      salary: 0,
+      status: 'active',
+      joinedAt: timestamp,
+      permissions: getRolePermissions('Sales Associate'),
+    };
 
     if (existingDoc) {
       const oldData = existingDoc.data();
-      existingData = { ...existingData, ...oldData };
+      existingData = {
+        ...existingData,
+        ...oldData,
+        permissions: normalizePermissionMatrix(
+          oldData.permissions,
+          getRolePermissions(String(oldData.role || existingData.role)),
+        ),
+      };
       if (existingDoc.id !== currentUser.uid) await deleteDoc(doc(db, `shops/${foundShopId}/staff`, existingDoc.id));
     }
+
+    const normalizedPermissions = normalizePermissionMatrix(
+      existingData.permissions,
+      getRolePermissions(String(existingData.role || 'Sales Associate')),
+    );
 
     const publicStaffData = {
       id: currentUser.uid,
@@ -275,15 +295,17 @@ export default function AuthPage() {
       email: currentUser.email || '',
       phone: formData.staffPhone || '-',
       role: existingData.role,
-      joinedAt: new Date().toISOString(),
-      status: 'active',
-      permissions: existingData.permissions
+      joinedAt: existingData.joinedAt || timestamp,
+      status: existingData.status || 'active',
+      permissions: normalizedPermissions,
+      updatedAt,
     };
 
     await setDoc(doc(db, `shops/${foundShopId}/staff`, currentUser.uid), publicStaffData);
     await setDoc(doc(db, `shops/${foundShopId}/staff_private`, currentUser.uid), {
       id: currentUser.uid,
-      salary: existingData.salary
+      salary: Number(existingData.salary || 0),
+      updatedAt,
     });
   };
 
@@ -332,7 +354,7 @@ export default function AuthPage() {
           id: currentUser.uid,
           role: 'admin',
           status: 'active',
-          updatedAt: new Date().toISOString()
+          updatedAt: Date.now()
         }, { merge: true });
         
         // 3. FORCE REFRESH: Fetch the new claims immediately

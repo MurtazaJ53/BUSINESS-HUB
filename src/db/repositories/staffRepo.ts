@@ -3,6 +3,8 @@
  */
 
 import { Database } from '../sqlite';
+import { tableEvents } from '../events';
+import { ADMIN_PERMISSION_TEMPLATE, normalizePermissionMatrix } from '../../lib/permissions';
 import type { Staff, StaffPrivate, Attendance } from '../../lib/types';
 
 const now = () => Date.now();
@@ -16,7 +18,11 @@ export const staffRepo = {
        FROM staff WHERE tombstone = 0 ORDER BY name ASC;`,
     );
     return rows.map((r: any) => ({
-      ...r, permissions: r.permissions ? JSON.parse(r.permissions) : {},
+      ...r,
+      permissions: normalizePermissionMatrix(
+        r.permissions ? JSON.parse(r.permissions) : {},
+        r.role === 'admin' ? ADMIN_PERMISSION_TEMPLATE : {},
+      ),
     }));
   },
 
@@ -27,16 +33,27 @@ export const staffRepo = {
     );
     if (!rows.length) return null;
     const r = rows[0];
-    return { ...r, permissions: r.permissions ? JSON.parse(r.permissions) : {} };
+    return {
+      ...r,
+      permissions: normalizePermissionMatrix(
+        r.permissions ? JSON.parse(r.permissions) : {},
+        r.role === 'admin' ? ADMIN_PERMISSION_TEMPLATE : {},
+      ),
+    };
   },
 
   async upsert(s: Staff): Promise<void> {
+    const normalizedPermissions = normalizePermissionMatrix(
+      s.permissions || {},
+      s.role === 'admin' ? ADMIN_PERMISSION_TEMPLATE : {},
+    );
     await Database.run(
       `INSERT OR REPLACE INTO staff (id, name, phone, email, role, joinedAt, status, permissions, updatedAt, dirty, tombstone)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0);`,
       [s.id, s.name, s.phone, s.email ?? null, s.role, s.joinedAt, s.status,
-       JSON.stringify(s.permissions || {}), now()],
+       JSON.stringify(normalizedPermissions), now()],
     );
+    tableEvents.emit('staff');
   },
 
   async remove(id: string): Promise<void> {
@@ -44,6 +61,7 @@ export const staffRepo = {
       `UPDATE staff SET tombstone = 1, dirty = 1, updatedAt = ? WHERE id = ?;`,
       [now(), id],
     );
+    tableEvents.emit('staff');
   },
 
   async hardDelete(id: string): Promise<void> {
@@ -57,7 +75,11 @@ export const staffRepo = {
        FROM staff WHERE dirty = 1;`,
     );
     return rows.map((r: any) => ({
-      ...r, permissions: r.permissions ? JSON.parse(r.permissions) : {},
+      ...r,
+      permissions: normalizePermissionMatrix(
+        r.permissions ? JSON.parse(r.permissions) : {},
+        r.role === 'admin' ? ADMIN_PERMISSION_TEMPLATE : {},
+      ),
     }));
   },
 
@@ -68,6 +90,10 @@ export const staffRepo = {
   },
 
   async mergeRemote(s: Staff, remoteUpdatedAt: number): Promise<void> {
+    const normalizedPermissions = normalizePermissionMatrix(
+      s.permissions || {},
+      s.role === 'admin' ? ADMIN_PERMISSION_TEMPLATE : {},
+    );
     const existing = await Database.query<{ updatedAt: number; dirty: number }>(
       'SELECT updatedAt, dirty FROM staff WHERE id = ?;', [s.id],
     );
@@ -76,14 +102,14 @@ export const staffRepo = {
         `INSERT INTO staff (id, name, phone, email, role, joinedAt, status, permissions, updatedAt, dirty, tombstone)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0);`,
         [s.id, s.name, s.phone, s.email ?? null, s.role, s.joinedAt, s.status,
-         JSON.stringify(s.permissions || {}), remoteUpdatedAt],
+         JSON.stringify(normalizedPermissions), remoteUpdatedAt],
       );
     } else if (remoteUpdatedAt > existing[0].updatedAt || !existing[0].dirty) {
       await Database.run(
         `UPDATE staff SET name=?, phone=?, email=?, role=?, status=?, permissions=?,
                 updatedAt=?, dirty=0, tombstone=0 WHERE id=?;`,
         [s.name, s.phone, s.email ?? null, s.role, s.status,
-         JSON.stringify(s.permissions || {}), remoteUpdatedAt, s.id],
+         JSON.stringify(normalizedPermissions), remoteUpdatedAt, s.id],
       );
     }
   },
@@ -104,6 +130,15 @@ export const staffPrivateRepo = {
        VALUES (?, ?, ?, ?, 1);`,
       [sp.id, sp.salary ?? 0, sp.pin ?? null, now()],
     );
+    tableEvents.emit('staff_private');
+  },
+
+  async remove(id: string): Promise<void> {
+    await Database.run(
+      `UPDATE staff_private SET tombstone = 1, updatedAt = ?, dirty = 1 WHERE id = ?;`,
+      [now(), id],
+    );
+    tableEvents.emit('staff_private');
   },
 
   async getDirty(): Promise<Array<StaffPrivate & { updatedAt: number }>> {
@@ -164,6 +199,7 @@ export const attendanceRepo = {
        entry.status, entry.totalHours ?? null, entry.overtime ?? null, entry.bonus ?? null,
        entry.note ?? null, now()],
     );
+    tableEvents.emit('attendance');
   },
 
   async getDirty(): Promise<Array<Attendance & { updatedAt: number }>> {
