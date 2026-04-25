@@ -1,5 +1,6 @@
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { useAuthStore } from '@/lib/useAuthStore';
+import { getEffectivePermissionMatrix, getPermissionValue } from '@/lib/permissions';
 import { Module, Action, LimitedAction } from '@/lib/types';
 
 /**
@@ -11,8 +12,16 @@ import { Module, Action, LimitedAction } from '@/lib/types';
 export const usePermission = (mod: Module, act: Action): LimitedAction => {
   const cur = useBusinessStore(s => s.currentStaff);
   const role = useBusinessStore(s => s.role);
+  const isLocked = useBusinessStore(s => s.isLocked);
   const claimPermissions = useAuthStore(s => s.permissions);
-  
-  if (role === 'admin') return true;
-  return cur?.permissions?.[mod]?.[act] || claimPermissions?.[mod]?.[act] || false;
+
+  const permissions = getEffectivePermissionMatrix({
+    role,
+    isLocked,
+    staffRole: cur?.role,
+    staffPermissions: cur?.permissions,
+    claimPermissions,
+  });
+
+  return getPermissionValue(permissions, mod, act);
 };
