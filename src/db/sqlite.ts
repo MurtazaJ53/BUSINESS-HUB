@@ -104,9 +104,11 @@ class DatabaseSingleton {
         await this.bootWeb();
       }
 
-      // Set ready BEFORE migrations so they can use run/query methods
-      this.ready = true;
+      // 🛑 CRITICAL: We must run migrations BEFORE marking as ready
+      // This prevents race conditions where UI queries hit an empty DB.
       await this.runMigrations();
+      
+      this.ready = true;
       console.log('[DB] Ready');
     })();
 
@@ -316,13 +318,27 @@ class DatabaseSingleton {
   // ── Migrations ────────────────────────────────────────────
 
   private async runMigrations(): Promise<void> {
-    // Ensure tracker table
-    await this.run(`
-      CREATE TABLE IF NOT EXISTS _migrations (
-        id TEXT PRIMARY KEY,
-        applied_at INTEGER NOT NULL
-      );
-    `);
+    // Ensure tracker table AND shop_metadata exist immediately
+    // This resolves the 'no such table: shop_metadata' error during early store init
+    if (this.platform === 'native') {
+      await this.nativeDb.run(`
+        CREATE TABLE IF NOT EXISTS _migrations (id TEXT PRIMARY KEY, applied_at INTEGER NOT NULL);
+      `);
+      await this.nativeDb.run(`
+        CREATE TABLE IF NOT EXISTS shop_metadata (
+          key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL, dirty INTEGER NOT NULL DEFAULT 0
+        );
+      `);
+    } else {
+      this.webDb!.run(`
+        CREATE TABLE IF NOT EXISTS _migrations (id TEXT PRIMARY KEY, applied_at INTEGER NOT NULL);
+      `);
+      this.webDb!.run(`
+        CREATE TABLE IF NOT EXISTS shop_metadata (
+          key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL, dirty INTEGER NOT NULL DEFAULT 0
+        );
+      `);
+    }
 
     const applied = await this.query<{ id: string }>('SELECT id FROM _migrations;');
     const appliedIds = new Set(applied.map(r => r.id));

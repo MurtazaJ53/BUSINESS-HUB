@@ -43,7 +43,7 @@ export const auth = getAuth(app);
 
 // Capacitor/WebView doesn't support SharedWorker (required by multiple tab manager)
 const tabManager = Capacitor.isNativePlatform() 
-  ? persistentSingleTabManager() 
+  ? persistentSingleTabManager({}) 
   : persistentMultipleTabManager();
 
 export const db = initializeFirestore(app, { 
