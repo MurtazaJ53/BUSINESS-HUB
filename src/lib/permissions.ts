@@ -174,6 +174,12 @@ export const ADMIN_PERMISSION_TEMPLATE: PermissionMatrix = normalizePermissionMa
   settings: { view: true, edit: true },
 });
 
+export const STAFF_LOCK_PERMISSION_TEMPLATE: PermissionMatrix = normalizePermissionMatrix({
+  sales: { view: true, create: true },
+  customers: { view: true, create: true },
+  team: { view: true },
+});
+
 export const ROLE_PERMISSION_TEMPLATES: Record<string, PermissionMatrix> = {
   'Store Manager': normalizePermissionMatrix({
     inventory: { view: true, create: true, edit: true, delete: true, view_cost: true },
@@ -211,3 +217,40 @@ export const getRolePermissions = (role: string, fallbackRole = 'Sales Associate
     ROLE_PERMISSION_TEMPLATES[canonicalRole] ?? ROLE_PERMISSION_TEMPLATES[fallbackRole] ?? {},
   );
 };
+
+interface EffectivePermissionContext {
+  role: string | null;
+  isLocked?: boolean;
+  staffRole?: string | null;
+  staffPermissions?: unknown;
+  claimPermissions?: unknown;
+}
+
+export const getEffectivePermissionMatrix = ({
+  role,
+  isLocked = false,
+  staffRole,
+  staffPermissions,
+  claimPermissions,
+}: EffectivePermissionContext): PermissionMatrix => {
+  if (role === 'admin') {
+    return normalizePermissionMatrix(staffPermissions, ADMIN_PERMISSION_TEMPLATE);
+  }
+
+  if (!role || role === 'suspended') {
+    return {};
+  }
+
+  if (isLocked && staffRole === 'admin') {
+    return clonePermissionMatrix(STAFF_LOCK_PERMISSION_TEMPLATE);
+  }
+
+  const fallback = normalizePermissionMatrix(claimPermissions, {});
+  return normalizePermissionMatrix(staffPermissions, fallback);
+};
+
+export const getPermissionValue = (
+  permissions: PermissionMatrix,
+  moduleId: Module,
+  actionId: Action,
+): LimitedAction => permissions[moduleId]?.[actionId] || false;
