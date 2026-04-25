@@ -217,6 +217,24 @@ class DatabaseSingleton {
     }
   }
 
+  /** Nuclear Recovery: Deletes the physical database file and reboots fresh. */
+  async nuclearReset(): Promise<void> {
+    console.warn('[DB] NUCLEAR RESET TRIGGERED');
+    if (this.platform === 'native') {
+      try {
+        await this.nativeDb.close();
+        const { CapacitorSQLite, SQLiteConnection } = await import('@capacitor-community/sqlite');
+        const conn = new SQLiteConnection(CapacitorSQLite);
+        await conn.deleteDatabase('business_hub', false);
+      } catch (e) { console.error('Delete failed', e); }
+    } else {
+      localStorage.clear();
+      const req = indexedDB.deleteDatabase(IDB_NAME);
+      await new Promise(r => req.onsuccess = r);
+    }
+    window.location.reload();
+  }
+
   private assertReady(): void {
     if (!this.ready && !this.booting) {
       throw new Error('[DB] System not ready.');
