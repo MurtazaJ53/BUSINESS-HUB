@@ -335,28 +335,33 @@ class DatabaseSingleton {
 
     for (const m of migrations) {
       if (appliedIds.has(m.id)) continue;
-      console.log(`[DB] Executing surgical migration: ${m.id}`);
+      console.log(`[DB] Executing Indestructible Sync: ${m.id}`);
 
       try {
-        // 🧪 Surgical Statement Processing
-        // Split by semicolon and filter out comments/whitespace
-        const statements = m.sql
-          .split(';')
-          .map(s => s.trim())
-          .filter(s => s.length > 0 && !s.startsWith('--'));
+        if (this.platform === 'native') {
+          // 🚀 Native Best Practice: Use execute() for massive SQL scripts.
+          // This creates all tables and indices in a single atomic operation.
+          await this.nativeDb.execute(m.sql);
+        } else {
+          // 🧪 Web path: Split and run sequentially (sql.js preference)
+          const statements = m.sql
+            .split(';')
+            .map(s => s.trim())
+            .filter(s => s.length > 0 && !s.startsWith('--'));
 
-        await this.run('BEGIN TRANSACTION;');
-        for (const statement of statements) {
-          await this.run(statement);
+          this.webDb!.run('BEGIN TRANSACTION;');
+          for (const s of statements) this.webDb!.run(s);
+          this.webDb!.run('COMMIT;');
         }
+
+        // Finalize migration tracking
         await this.run('INSERT INTO _migrations (id, applied_at) VALUES (?, ?);', [m.id, Date.now()]);
-        await this.run('COMMIT;');
         
       } catch (e: any) {
-        try { await this.run('ROLLBACK;'); } catch (_) {}
         console.error(`[DB] Critical migration failure [${m.id}]:`, e);
         throw new Error(`Migration ${m.id} failed: ${e.message}`);
       }
+      console.log(`[DB] Migration ${m.id} established.`);
     }
 
     // 🛡️ Final Schema Integrity Audit
