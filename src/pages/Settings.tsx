@@ -3,13 +3,13 @@ import {
   Settings as SettingsIcon, Download, FileSpreadsheet, AlertTriangle,
   Database, Store, Monitor, CheckCircle2, Key,
   Sun, Moon, RefreshCcw, LogOut, MapPin, TrendingUp, Lock, ShieldCheck,
-  ArrowRight, ShieldAlert, Fingerprint, Loader2
+  ArrowRight, ShieldAlert, Fingerprint, Loader2, Archive, Clock3, Trash2, HardDriveDownload
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth, functions } from '@/lib/firebase';
-import { useSqlQuery, useSalesQuery } from '@/db/hooks';
+import { useLiveQuery, useSqlQuery, useSalesQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { useAuthStore } from '@/lib/useAuthStore';
 import { downloadFile, convertToCSV, exportSalesReport, generateGSTR1, generateGSTR3B } from '@/lib/exportUtils';
@@ -18,6 +18,16 @@ import { usePermission } from '@/hooks/usePermission';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { MigrationResult } from '@/lib/migrationEngine';
 import { InventoryItem, Sale, Customer } from '@/lib/types';
+import {
+  createBackup,
+  deleteBackup,
+  getBackupPayload,
+  getBackupSettings,
+  listBackups,
+  saveBackupSettings,
+  type BackupRecord,
+  type BackupSettings,
+} from '@/lib/backup';
 
 const SectionHeader = ({ icon: Icon, title, subtitle }: { icon: any, title: string, subtitle?: string }) => (
   <div className="flex items-center gap-4 mb-6 animate-in fade-in slide-in-from-left-4">
@@ -33,7 +43,7 @@ const SectionHeader = ({ icon: Icon, title, subtitle }: { icon: any, title: stri
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { shop, updateShop, clearInventory, theme, setTheme, addInventoryItem, upsertCustomer, addSale } = useBusinessStore();
+  const { shop, updateShop, clearInventory, theme, setTheme, addInventoryItem, upsertCustomer, addSale, lastBackupDate } = useBusinessStore();
   const { role, user } = useAuthStore();
   
   const canEditSettings = usePermission('settings', 'edit') || role === 'admin';
@@ -60,10 +70,18 @@ export default function Settings() {
 
   const [recoveryEmail, setRecoveryEmail] = useState(shop.recoveryEmail || '');
   const [updatingRecovery, setUpdatingRecovery] = useState(false);
+  const [backupSettings, setBackupSettings] = useState<BackupSettings>({ enabled: true, scheduledTime: '18:00', retentionCount: 14 });
+  const [savingBackupSettings, setSavingBackupSettings] = useState(false);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [deletingBackupId, setDeletingBackupId] = useState<string | null>(null);
 
   const [editForm, setEditForm] = useState({ ...shop });
+  const backups = useLiveQuery<BackupRecord>(() => listBackups(), ['local_backups']);
 
   useEffect(() => setEditForm({ ...shop }), [shop]);
+  useEffect(() => {
+    void getBackupSettings().then(setBackupSettings);
+  }, []);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -170,6 +188,53 @@ export default function Settings() {
       showToast(`Partial Failure: ${count} injected. Error: ${e.message}`);
     }
     setMigrationData(null); setMigrationStatus(null);
+  };
+
+  const handleSaveBackupSettings = async () => {
+    setSavingBackupSettings(true);
+    try {
+      await saveBackupSettings(backupSettings);
+      showToast('Backup schedule updated');
+    } catch (error: any) {
+      showToast(`Backup schedule failed: ${error.message}`);
+    } finally {
+      setSavingBackupSettings(false);
+    }
+  };
+
+  const handleManualBackup = async () => {
+    setBackupBusy(true);
+    try {
+      const backup = await createBackup('manual');
+      showToast(`Backup stored: ${backup.label}`);
+    } catch (error: any) {
+      showToast(`Backup failed: ${error.message}`);
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const handleDownloadBackup = async (backupId: string, backupLabel: string) => {
+    try {
+      const payload = await getBackupPayload(backupId);
+      if (!payload) throw new Error('Backup package not found.');
+      const safeName = backupLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      downloadFile(payload, `${safeName}.json`, 'application/json');
+    } catch (error: any) {
+      showToast(`Download failed: ${error.message}`);
+    }
+  };
+
+  const handleDeleteBackup = async (backupId: string) => {
+    setDeletingBackupId(backupId);
+    try {
+      await deleteBackup(backupId);
+      showToast('Backup removed from local vault');
+    } catch (error: any) {
+      showToast(`Delete failed: ${error.message}`);
+    } finally {
+      setDeletingBackupId(null);
+    }
   };
 
   return (
@@ -284,6 +349,127 @@ export default function Settings() {
 
         {/* --- RIGHT COLUMN --- */}
         <div className="space-y-10">
+          <section>
+            <SectionHeader icon={Archive} title="Backup Vault" subtitle="Daily Local Safety Snapshots" />
+            <div className="glass-card rounded-[2.5rem] p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="rounded-2xl border border-border bg-accent/30 p-4">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-2">Last Backup</p>
+                  <p className="text-sm font-black text-foreground">
+                    {lastBackupDate ? new Date(lastBackupDate).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'Not yet created'}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-border bg-accent/30 p-4">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-2">Stored Copies</p>
+                  <p className="text-2xl font-black text-primary">{backups.length}</p>
+                </div>
+                <div className="rounded-2xl border border-border bg-accent/30 p-4">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-2">Schedule</p>
+                  <p className="text-sm font-black text-foreground">{backupSettings.enabled ? backupSettings.scheduledTime : 'Disabled'}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Auto Daily Backup</label>
+                  <button
+                    onClick={() => setBackupSettings((prev) => ({ ...prev, enabled: !prev.enabled }))}
+                    className={cn(
+                      "w-full h-12 rounded-2xl border text-xs font-black uppercase tracking-widest transition-all",
+                      backupSettings.enabled
+                        ? "bg-primary/10 text-primary border-primary/20"
+                        : "bg-accent/40 text-muted-foreground border-border"
+                    )}
+                  >
+                    {backupSettings.enabled ? 'Enabled' : 'Disabled'}
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Daily Time</label>
+                  <input
+                    type="time"
+                    value={backupSettings.scheduledTime}
+                    onChange={(e) => setBackupSettings((prev) => ({ ...prev, scheduledTime: e.target.value }))}
+                    className="w-full h-12 rounded-2xl bg-accent/40 border border-border px-4 text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Retention</label>
+                  <select
+                    value={backupSettings.retentionCount}
+                    onChange={(e) => setBackupSettings((prev) => ({ ...prev, retentionCount: Number(e.target.value) }))}
+                    className="w-full h-12 rounded-2xl bg-accent/40 border border-border px-4 text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  >
+                    {[7, 14, 21, 30].map((days) => (
+                      <option key={days} value={days}>Keep {days} backups</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={handleSaveBackupSettings}
+                  disabled={savingBackupSettings}
+                  className="flex-1 py-4 rounded-2xl bg-accent hover:bg-accent/80 border border-border text-[10px] font-black uppercase tracking-widest text-foreground transition-all disabled:opacity-60"
+                >
+                  {savingBackupSettings ? 'Saving...' : 'Save Backup Rules'}
+                </button>
+                <button
+                  onClick={handleManualBackup}
+                  disabled={backupBusy}
+                  className="flex-1 py-4 rounded-2xl premium-gradient text-primary-foreground text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary/20 disabled:opacity-60"
+                >
+                  {backupBusy ? 'Creating Backup...' : 'Backup Now'}
+                </button>
+              </div>
+
+              <div className="rounded-[2rem] border border-border bg-accent/20 p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <Clock3 className="h-4 w-4 text-primary" />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Local Backup History</p>
+                </div>
+                {backups.length === 0 ? (
+                  <p className="text-sm text-muted-foreground font-medium">No local backups yet. Run your first snapshot now.</p>
+                ) : (
+                  <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                    {backups.slice(0, 12).map((backup) => (
+                      <div key={backup.id} className="rounded-2xl border border-border bg-background/60 p-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-black text-foreground truncate">{backup.label}</p>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">
+                              {backup.trigger} - {(backup.sizeBytes / 1024).toFixed(1)} KB
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleDownloadBackup(backup.id, backup.label)}
+                              className="h-10 w-10 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center"
+                              title="Download backup package"
+                            >
+                              <HardDriveDownload className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteBackup(backup.id)}
+                              disabled={deletingBackupId === backup.id}
+                              className="h-10 w-10 rounded-xl bg-destructive/10 text-destructive border border-destructive/20 flex items-center justify-center disabled:opacity-50"
+                              title="Delete local backup"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
           <section>
              <SectionHeader icon={Database} title="Data Telemetry" subtitle="Exports & Compliance" />
              <div className="glass-card rounded-[2.5rem] p-6 space-y-3">

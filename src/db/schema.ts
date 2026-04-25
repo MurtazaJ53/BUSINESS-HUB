@@ -171,6 +171,15 @@ export const shopMetadata = sqliteTable('shop_metadata', {
   dirty:     integer('dirty').notNull().default(0),
 });
 
+export const localBackups = sqliteTable('local_backups', {
+  id:         text('id').primaryKey(),
+  label:      text('label').notNull(),
+  trigger:    text('trigger').notNull().default('manual'),
+  createdAt:  integer('created_at').notNull(),
+  sizeBytes:  integer('size_bytes').notNull().default(0),
+  payload:    text('payload').notNull(),
+});
+
 // ─── SYNC INFRASTRUCTURE ───────────────────────────────────
 
 /** Mutation outbox: pending offline writes that need pushing to Firestore. */
