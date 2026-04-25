@@ -114,7 +114,21 @@ export default function AppLayout() {
 
   // --- 🔄 LIFECYCLE & EVENT LISTENERS ---
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
+    const isDark = theme === 'dark';
+    document.documentElement.classList.toggle('dark', isDark);
+    
+    // 📱 Android/iOS System Integration
+    const color = isDark ? '#000000' : '#ffffff';
+    document.documentElement.style.backgroundColor = color;
+    document.body.style.backgroundColor = color;
+
+    // Sync Capacitor Status Bar if on native
+    if (typeof window !== 'undefined' && (window as any).Capacitor) {
+      import('@capacitor/status-bar').then(({ StatusBar }) => {
+        StatusBar.setBackgroundColor({ color: color }).catch(() => {});
+        StatusBar.setStyle({ style: isDark ? 'dark' : 'light' } as any).catch(() => {});
+      });
+    }
   }, [theme]);
 
   useEffect(() => {
@@ -352,6 +366,15 @@ export default function AppLayout() {
           {/* Bottom Settings */}
           <div className="pt-4 border-t border-border space-y-1.5 mt-4">
             <NavItem icon={SettingsIcon} label="System Config" active={activeTab === 'settings'} onClick={() => { navigate('settings'); setSidebarOpen(false); }} />
+            
+            <button 
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-accent text-muted-foreground hover:text-foreground transition-all group"
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              <span className="font-bold text-sm">Switch Optics</span>
+            </button>
+
             <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all group">
               <LogOut className="h-4 w-4 group-hover:scale-110 transition-transform" />
               <span className="font-bold text-sm">Terminate Session</span>
@@ -415,11 +438,31 @@ export default function AppLayout() {
               )}
             </div>
 
+            {/* 🌓 Optics Switch */}
+            <div className="flex items-center gap-1.5 p-1 bg-accent/50 rounded-2xl border border-border">
+              <button 
+                onClick={() => setTheme('light')} 
+                className={cn(
+                  "p-2 rounded-xl transition-all",
+                  theme === 'light' ? "bg-card text-amber-500 shadow-sm border border-border" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Sun className="h-4 w-4" />
+              </button>
+              <button 
+                onClick={() => setTheme('dark')} 
+                className={cn(
+                  "p-2 rounded-xl transition-all",
+                  theme === 'dark' ? "bg-card text-primary shadow-neon-primary border border-border" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Moon className="h-4 w-4" />
+              </button>
+            </div>
+
             {/* Profile Node */}
             <div className="relative flex items-center gap-2" ref={profileRef}>
-              <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="p-2.5 bg-accent hover:bg-accent/80 rounded-xl transition-all border border-border text-muted-foreground hover:text-foreground hidden sm:flex">
-                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              </button>
+
 
               <button onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false); }} className={cn("h-10 w-10 rounded-xl bg-accent border flex items-center justify-center transition-all", profileOpen ? "border-primary text-primary" : "border-border text-foreground hover:border-foreground/20")}>
                 <span className="text-sm font-black">{shop?.name?.charAt(0) || 'X'}</span>
