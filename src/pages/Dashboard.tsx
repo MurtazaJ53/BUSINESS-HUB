@@ -253,19 +253,19 @@ export default function Dashboard() {
         {/* ACTION: START NEW SALE */}
         <button 
           onClick={() => setActiveTab('sell')}
-          className="group relative flex flex-col items-center justify-center aspect-square p-4 bg-primary rounded-3xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all border border-white/10"
+          className="group relative flex flex-col items-center justify-center aspect-square p-4 bg-primary rounded-3xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all border border-primary-foreground/10"
         >
-          <div className="h-12 w-12 rounded-xl bg-white/20 flex items-center justify-center mb-3 backdrop-blur-md">
-            <ShoppingCart className="h-6 w-6 text-white" />
+          <div className="h-12 w-12 rounded-xl bg-primary-foreground/20 flex items-center justify-center mb-3 backdrop-blur-md">
+            <ShoppingCart className="h-6 w-6 text-primary-foreground" />
           </div>
-          <p className="text-white font-black text-sm tracking-tighter leading-tight text-center">Start Sale</p>
-          <p className="text-white/60 text-[8px] font-black uppercase tracking-widest mt-1">POS Hub</p>
+          <p className="text-primary-foreground font-black text-sm tracking-tighter leading-tight text-center">Start Sale</p>
+          <p className="text-primary-foreground/60 text-[8px] font-black uppercase tracking-widest mt-1">POS Hub</p>
         </button>
 
         {/* ACTION: INVENTORY */}
         <button 
           onClick={() => setActiveTab('inventory')}
-          className="group relative flex flex-col items-center justify-center aspect-square p-4 glass-card border-white/5 rounded-3xl hover:bg-accent/40 hover:scale-[1.02] active:scale-95 transition-all"
+          className="group relative flex flex-col items-center justify-center aspect-square p-4 glass-card border-border/5 rounded-3xl hover:bg-accent/40 hover:scale-[1.02] active:scale-95 transition-all"
         >
           <div className="h-12 w-12 rounded-xl bg-accent flex items-center justify-center mb-3">
             <Package className="h-6 w-6 text-primary transition-colors" />
@@ -549,7 +549,7 @@ export default function Dashboard() {
       {!sidebarOpen && (
         <button
           onClick={() => setExpenseModalOpen(true)}
-          className="fixed bottom-8 right-8 h-14 w-14 rounded-2xl bg-primary text-white shadow-2xl shadow-primary/40 hover:scale-110 active:scale-95 transition-all flex items-center justify-center z-50 group border border-white/20"
+          className="fixed bottom-8 right-8 h-14 w-14 rounded-2xl bg-primary text-primary-foreground shadow-2xl shadow-primary/40 hover:scale-110 active:scale-95 transition-all flex items-center justify-center z-50 group border border-primary-foreground/20"
         >
           <Plus className="h-6 w-6 group-hover:rotate-90 transition-transform duration-300" />
           <span className="absolute right-full mr-4 px-3 py-1.5 rounded-xl bg-card border border-border shadow-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
@@ -583,10 +583,10 @@ export default function Dashboard() {
             <select 
               value={expenseForm.category}
               onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
-              className="w-full bg-accent/30 border border-border/50 rounded-xl px-4 py-3 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none transition-all"
+              className="w-full bg-accent border border-border rounded-xl px-4 py-3 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none transition-all"
             >
               {['General', 'Rent', 'Electricity', 'Water', 'Staff Salary', 'Maintenance', 'Stock Purchase', 'Marketing', 'Tea/Coffee', 'Cleaning'].map(c => (
-                <option key={c} value={c} className="bg-[#1a1b1e] text-white">{c}</option>
+                <option key={c} value={c} className="bg-card text-foreground">{c}</option>
               ))}
             </select>
           </div>

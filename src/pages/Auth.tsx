@@ -354,7 +354,7 @@ export default function AuthPage() {
 
   // --- 🎨 5. RENDER METHODS ---
   return (
-    <div className="min-h-screen bg-[#030303] text-white flex flex-col items-center justify-center p-6 selection:bg-primary/30 font-sans">
+    <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-6 selection:bg-primary/30 font-sans">
       {/* Immersive Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-15%] left-[-10%] w-[50%] h-[50%] bg-primary/10 rounded-full blur-[140px] animate-pulse" />
@@ -367,17 +367,17 @@ export default function AuthPage() {
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-primary to-blue-600 shadow-[0_0_40px_rgba(var(--primary),0.3)] mb-6 group">
             <ShoppingBag className="h-8 w-8 text-white transition-transform duration-500 group-hover:scale-110" />
           </div>
-          <h1 className="text-4xl font-black tracking-tighter mb-2 text-white drop-shadow-md">
+          <h1 className="text-4xl font-black tracking-tighter mb-2 text-foreground drop-shadow-md">
             Business Hub <span className="text-primary italic">Pro</span>
           </h1>
-          <p className="text-xs font-bold text-zinc-500 uppercase tracking-[0.25em]">Intelligent Management</p>
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-[0.25em]">Intelligent Management</p>
         </div>
 
         {/* Main Card */}
-        <div className="bg-[#0a0a0a]/80 backdrop-blur-2xl rounded-[2.5rem] p-8 border border-white/5 shadow-2xl animate-in fade-in zoom-in-95 duration-700">
+        <div className="bg-card/80 backdrop-blur-2xl rounded-[2.5rem] p-8 border border-border/50 shadow-2xl animate-in fade-in zoom-in-95 duration-700">
           
           {/* Mode Selector */}
-          <div className="flex bg-[#141414] p-1.5 rounded-2xl mb-8 overflow-hidden border border-white/5">
+          <div className="flex bg-accent/50 p-1.5 rounded-2xl mb-8 overflow-hidden border border-border/50">
             {['login', 'join', 'setup'].map((m) => (
               <button 
                 key={m}
@@ -385,8 +385,8 @@ export default function AuthPage() {
                 className={cn(
                   "flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-all duration-300 rounded-xl",
                   mode === m 
-                    ? "bg-white text-black shadow-[0_4px_14px_rgba(255,255,255,0.1)]" 
-                    : "text-zinc-500 hover:text-white hover:bg-white/5"
+                    ? "bg-foreground text-background shadow-[0_4px_14px_rgba(var(--foreground),0.1)]" 
+                    : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
                 )}
               >
                 {m === 'login' ? 'Sign In' : m === 'join' ? 'Join Team' : 'New Shop'}
@@ -396,9 +396,9 @@ export default function AuthPage() {
 
           {/* Error Banner */}
           {error && (
-            <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
-              <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
-              <p className="text-red-400 text-xs font-bold leading-relaxed">{error}</p>
+            <div className="mb-6 p-4 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+              <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+              <p className="text-destructive text-xs font-bold leading-relaxed">{error}</p>
             </div>
           )}
 
@@ -409,26 +409,26 @@ export default function AuthPage() {
                 <div className="p-6 rounded-3xl bg-green-500/10 border border-green-500/20 text-center">
                   <Mail className="h-10 w-10 text-green-500 mx-auto mb-4" />
                   <p className="text-xs font-black text-green-500 uppercase tracking-widest mb-2">Link Dispatched</p>
-                  <p className="text-[10px] text-zinc-400 font-bold px-2 leading-relaxed">
-                    Check <span className="text-white">{formData.email}</span> for secure recovery instructions.
+                  <p className="text-[10px] text-muted-foreground font-bold px-2 leading-relaxed">
+                    Check <span className="text-foreground">{formData.email}</span> for secure recovery instructions.
                   </p>
-                  <button type="button" onClick={() => { setMode('login'); setResetSent(false); }} className="mt-6 text-[10px] font-black uppercase tracking-widest text-white hover:text-primary transition-colors">
+                  <button type="button" onClick={() => { setMode('login'); setResetSent(false); }} className="mt-6 text-[10px] font-black uppercase tracking-widest text-foreground hover:text-primary transition-colors">
                     Return to Login
                   </button>
                 </div>
               ) : (
                 <>
                   <div className="space-y-2 group">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Account Email</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Account Email</label>
                     <div className="relative">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
-                      <input type="email" required value={formData.email} onChange={(e) => updateForm('email', e.target.value)} className="w-full bg-[#141414] border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all font-bold placeholder:text-zinc-700" placeholder="admin@zarra.com" />
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <input type="email" required value={formData.email} onChange={(e) => updateForm('email', e.target.value)} className="w-full bg-accent/50 border border-border/50 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all font-bold placeholder:text-muted-foreground/30 text-foreground" placeholder="admin@zarra.com" />
                     </div>
                   </div>
                   <button disabled={loading} className="w-full bg-gradient-to-r from-primary to-blue-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:opacity-90 transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-lg shadow-primary/20">
                     {loading ? <Sparkles className="h-5 w-5 animate-spin" /> : 'Transmit Reset Link'}
                   </button>
-                  <button type="button" onClick={() => setMode('login')} className="w-full text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-colors py-2">
+                  <button type="button" onClick={() => setMode('login')} className="w-full text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors py-2">
                     Cancel Action
                   </button>
                 </>
@@ -442,17 +442,17 @@ export default function AuthPage() {
                   <Sparkles className="h-4 w-4 text-primary shrink-0" />
                   <div>
                     <p className="text-[10px] font-black text-primary uppercase tracking-widest">Profile Verified</p>
-                    <p className="text-[11px] text-zinc-400 font-medium">Finalize your workspace settings below.</p>
+                    <p className="text-[11px] text-muted-foreground font-medium">Finalize your workspace settings below.</p>
                   </div>
                 </div>
               )}
 
               {mode === 'setup' && (
                 <div className="space-y-2 group animate-in fade-in slide-in-from-top-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Workspace Name</label>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Workspace Name</label>
                   <div className="relative">
-                    <Store className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
-                    <input type="text" required value={formData.shopName} onChange={(e) => updateForm('shopName', e.target.value)} className="w-full bg-[#141414] border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-bold placeholder:text-zinc-700" placeholder="Zarra Operations Hub" />
+                    <Store className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <input type="text" required value={formData.shopName} onChange={(e) => updateForm('shopName', e.target.value)} className="w-full bg-accent/50 border border-border/50 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-bold placeholder:text-muted-foreground/30 text-foreground" placeholder="Zarra Operations Hub" />
                   </div>
                 </div>
               )}
@@ -460,22 +460,22 @@ export default function AuthPage() {
               {mode === 'join' && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
                   <div className="space-y-2 group">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Access Token</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Access Token</label>
                     <div className="relative">
-                      <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
-                      <input type="text" required value={formData.joinCode} onChange={(e) => updateForm('joinCode', e.target.value)} className="w-full bg-[#141414] border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-black tracking-[0.2em] placeholder:tracking-normal placeholder:text-zinc-700 uppercase" placeholder="Enter Secure Code" />
+                      <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <input type="text" required value={formData.joinCode} onChange={(e) => updateForm('joinCode', e.target.value)} className="w-full bg-accent/50 border border-border/50 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-black tracking-[0.2em] placeholder:tracking-normal placeholder:text-muted-foreground/30 text-foreground uppercase" placeholder="Enter Secure Code" />
                     </div>
                   </div>
                   <div className="space-y-2 group">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Full Legal Name</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Full Legal Name</label>
                     <div className="relative">
-                      <LogIn className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
-                      <input type="text" required value={formData.staffName} onChange={(e) => updateForm('staffName', e.target.value)} className="w-full bg-[#141414] border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-bold placeholder:text-zinc-700" placeholder="John Doe" />
+                      <LogIn className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <input type="text" required value={formData.staffName} onChange={(e) => updateForm('staffName', e.target.value)} className="w-full bg-accent/50 border border-border/50 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-bold placeholder:text-muted-foreground/30 text-foreground" placeholder="John Doe" />
                     </div>
                   </div>
                   <div className="space-y-2 group">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Contact Number</label>
-                    <input type="tel" required value={formData.staffPhone} onChange={(e) => updateForm('staffPhone', e.target.value)} className="w-full bg-[#141414] border border-white/10 rounded-2xl px-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-bold placeholder:text-zinc-700" placeholder="+91 98765 43210" />
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Contact Number</label>
+                    <input type="tel" required value={formData.staffPhone} onChange={(e) => updateForm('staffPhone', e.target.value)} className="w-full bg-accent/50 border border-border/50 rounded-2xl px-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-bold placeholder:text-muted-foreground/30 text-foreground" placeholder="+91 98765 43210" />
                   </div>
                 </div>
               )}
@@ -483,22 +483,22 @@ export default function AuthPage() {
               {!user && (
                 <div className="space-y-4 animate-in fade-in">
                   <div className="space-y-2 group">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">System Identifier (Email)</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">System Identifier (Email)</label>
                     <div className="relative">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
-                      <input type="email" required value={formData.email} onChange={(e) => updateForm('email', e.target.value)} className="w-full bg-[#141414] border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-bold placeholder:text-zinc-700" placeholder="user@domain.com" />
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <input type="email" required value={formData.email} onChange={(e) => updateForm('email', e.target.value)} className="w-full bg-accent/50 border border-border/50 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-bold placeholder:text-muted-foreground/30 text-foreground" placeholder="user@domain.com" />
                     </div>
                   </div>
                   <div className="space-y-2 group">
                     <div className="flex justify-between items-center ml-1">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Security Key</label>
-                      <button type="button" onClick={() => setMode('forgot')} className="text-[9px] font-black uppercase tracking-widest text-primary hover:text-white transition-colors">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Security Key</label>
+                      <button type="button" onClick={() => setMode('forgot')} className="text-[9px] font-black uppercase tracking-widest text-primary hover:text-foreground transition-colors">
                         Lost Access?
                       </button>
                     </div>
                     <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
-                      <input type="password" required value={formData.password} onChange={(e) => updateForm('password', e.target.value)} className="w-full bg-[#141414] border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-bold placeholder:text-zinc-700" placeholder="••••••••" />
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <input type="password" required value={formData.password} onChange={(e) => updateForm('password', e.target.value)} className="w-full bg-accent/50 border border-border/50 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-bold placeholder:text-muted-foreground/30 text-foreground" placeholder="••••••••" />
                     </div>
                   </div>
                 </div>
@@ -518,16 +518,16 @@ export default function AuthPage() {
               {!user && (
                 <>
                   <div className="relative my-8">
-                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5"></div></div>
-                    <div className="relative flex justify-center text-[8px] font-black uppercase tracking-[0.3em] text-zinc-600">
-                      <span className="bg-[#0a0a0a] px-4">Federated Auth</span>
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border/50"></div></div>
+                    <div className="relative flex justify-center text-[8px] font-black uppercase tracking-[0.3em] text-muted-foreground">
+                      <span className="bg-card px-4">Federated Auth</span>
                     </div>
                   </div>
                   <div className="flex justify-center">
                     {!loading ? (
-                      <button type="button" onClick={handleGoogleAuth} className="w-full max-w-xs flex items-center justify-center gap-3 py-4 bg-[#141414] border border-white/10 rounded-2xl hover:bg-white/5 hover:border-white/20 transition-all group">
-                        <Globe className="h-4 w-4 text-zinc-400 group-hover:text-white transition-colors" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-300 group-hover:text-white">Sign in with Google</span>
+                      <button type="button" onClick={handleGoogleAuth} className="w-full max-w-xs flex items-center justify-center gap-3 py-4 bg-accent/50 border border-border/50 rounded-2xl hover:bg-accent hover:border-border transition-all group">
+                        <Globe className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground group-hover:text-foreground">Sign in with Google</span>
                       </button>
                     ) : (
                        <p className="text-[10px] font-black uppercase tracking-widest text-primary animate-pulse py-4">Awaiting Verification Gateway...</p>
@@ -537,7 +537,7 @@ export default function AuthPage() {
               )}
               
               {user && (
-                <button type="button" onClick={() => auth.signOut()} className="w-full flex items-center justify-center gap-2 py-3 mt-4 text-[10px] font-black uppercase tracking-widest text-zinc-600 hover:text-red-400 transition-all border border-transparent hover:border-red-500/20 rounded-xl hover:bg-red-500/10">
+                <button type="button" onClick={() => auth.signOut()} className="w-full flex items-center justify-center gap-2 py-3 mt-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-destructive transition-all border border-transparent hover:border-destructive/20 rounded-xl hover:bg-destructive/10">
                   <LogOut className="h-3 w-3" /> Terminate Session
                 </button>
               )}
@@ -548,12 +548,12 @@ export default function AuthPage() {
         {/* Footer Trust Badges */}
         <div className="mt-8 flex items-center justify-center gap-6 opacity-30">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4" />
-            <span className="text-[10px] font-black uppercase tracking-tighter">End-to-End Encrypted</span>
+            <ShieldCheck className="h-4 w-4 text-foreground" />
+            <span className="text-[10px] font-black uppercase tracking-tighter text-foreground">End-to-End Encrypted</span>
           </div>
           <div className="flex items-center gap-2">
-            <Globe className="h-4 w-4" />
-            <span className="text-[10px] font-black uppercase tracking-tighter">Global Sync Enabled</span>
+            <Globe className="h-4 w-4 text-foreground" />
+            <span className="text-[10px] font-black uppercase tracking-tighter text-foreground">Global Sync Enabled</span>
           </div>
         </div>
       </div>

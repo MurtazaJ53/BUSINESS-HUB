@@ -75,7 +75,7 @@ const InventoryCard = ({
   return (
     <div
       className={`glass-card group rounded-xl p-3 hover:shadow-lg transition-all border flex flex-col justify-between min-h-[160px] lg:min-h-[220px] ${
-        isLow ? 'border-red-500/20' : 'border-border/20'
+        isLow ? 'border-destructive/20' : 'border-border/20'
       }`}
     >
       <div className="space-y-2">
@@ -113,7 +113,7 @@ const InventoryCard = ({
                     stock: item.stock?.toString() || '0' 
                   }); 
                 }}
-                className="p-3 rounded-xl bg-blue-500 text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
+                  className="p-3 rounded-xl bg-primary text-primary-foreground shadow-lg hover:scale-110 active:scale-95 transition-all"
                 title="Edit Details"
               >
                 <Pencil className="h-4 w-4" />
@@ -147,14 +147,14 @@ const InventoryCard = ({
               "px-2.5 py-1 text-[9px] font-black uppercase rounded-lg border flex items-center gap-1.5",
               item.velocity.status === 'fast' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" :
               item.velocity.status === 'medium' ? "bg-amber-500/10 text-amber-500 border-amber-500/30" :
-              item.velocity.status === 'slow' ? "bg-orange-500/10 text-orange-500 border-orange-500/30" :
-              "bg-red-500/10 text-red-500 border-red-500/30"
+              item.velocity.status === 'slow' ? "bg-amber-500/10 text-amber-500 border-amber-500/30" :
+              "bg-destructive/10 text-destructive border-destructive/30"
             )}>
               <span className={cn(
                 "h-1 w-1 rounded-full",
                 item.velocity.status === 'fast' ? "bg-emerald-500 animate-pulse" :
                 item.velocity.status === 'medium' ? "bg-amber-500" :
-                item.velocity.status === 'slow' ? "bg-orange-500" : "bg-red-500"
+                item.velocity.status === 'slow' ? "bg-amber-500" : "bg-destructive"
               )} />
               {item.velocity.status}
             </span>
@@ -176,7 +176,7 @@ const InventoryCard = ({
             {daysLeft !== 'Infinity' && (
               <span className={cn(
                 "text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md mt-0.5",
-                daysLeft <= 3 ? "bg-red-500/10 text-red-500 animate-pulse" : "bg-primary/10 text-primary"
+                daysLeft <= 3 ? "bg-destructive/10 text-destructive animate-pulse" : "bg-primary/10 text-primary"
               )}>
                 ±{daysLeft} days left
               </span>
@@ -604,7 +604,7 @@ export default function Inventory() {
         {[
           ...(usePermission('inventory', 'view_cost') ? [
             { label: 'Inventory Value', value: formatCurrency(stats.inventoryValue || 0), color: 'text-primary' },
-            { label: 'Potential Profit', value: formatCurrency(stats.potentialProfit || 0), color: 'text-green-400' },
+            { label: 'Potential Profit', value: formatCurrency(stats.potentialProfit || 0), color: 'text-emerald-500' },
           ] : []),
           { label: 'Distinct Products', value: String(stats.totalItems), color: '' },
           { label: 'Total Stock Units', value: String(stats.totalStock), color: '' },
@@ -617,7 +617,7 @@ export default function Inventory() {
       </div>
 
       {stats.lowStock > 0 && (
-        <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-sm font-semibold text-red-400">
+        <div className="flex items-center gap-3 p-4 bg-destructive/10 border border-destructive/20 rounded-2xl text-sm font-semibold text-destructive">
           <AlertTriangle className="h-5 w-5 shrink-0" />
           {stats.lowStock} item{stats.lowStock !== 1 ? 's' : ''} running low on stock! Go to the Overview tab to see which ones.
         </div>
@@ -688,7 +688,7 @@ export default function Inventory() {
       <div className="flex flex-wrap gap-3 p-4 bg-accent/20 border border-border/30 rounded-2xl">
         <button
           onClick={() => setConfirmClear(true)}
-          className="flex items-center gap-2 px-4 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl text-red-500 border border-red-500/20 hover:bg-red-500/10 transition-all"
+          className="flex items-center gap-2 px-4 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl text-destructive border border-destructive/20 hover:bg-destructive/10 transition-all"
         >
           <Trash2 className="h-4 w-4" /> Wipe Stock
         </button>
@@ -805,7 +805,7 @@ export default function Inventory() {
                        <p className="text-xs font-black text-muted-foreground uppercase opacity-40 tracking-widest">
                         {data.items.length} Variants
                       </p>
-                      <p className={`text-sm font-bold ${data.totalStock <= 5 ? 'text-red-500' : 'text-primary'}`}>
+                      <p className={`text-sm font-bold ${data.totalStock <= 5 ? 'text-destructive' : 'text-primary'}`}>
                         {data.totalStock} units
                       </p>
                     </div>
@@ -1212,7 +1212,7 @@ export default function Inventory() {
       {/* ── Toast Notification ── */}
       {toast && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-4">
-          <div className="bg-white text-black px-6 py-3 rounded-2xl shadow-2xl font-black text-xs uppercase tracking-widest flex items-center gap-3 border border-white/20">
+          <div className="bg-card border border-border text-foreground px-6 py-3 rounded-2xl shadow-2xl font-black text-xs uppercase tracking-widest flex items-center gap-3">
             <Sparkles className="h-4 w-4 text-primary" />
             {toast}
           </div>

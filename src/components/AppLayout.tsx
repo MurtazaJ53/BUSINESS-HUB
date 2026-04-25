@@ -296,7 +296,7 @@ export default function AppLayout() {
       
       {/* Mobile Backdrop */}
       {sidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm lg:hidden animate-in fade-in" onClick={() => setSidebarOpen(false)} />
+        <div className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden animate-in fade-in duration-300" onClick={() => setSidebarOpen(false)} />
       )}
 
       {/* 🚀 SIDEBAR */}
@@ -456,7 +456,7 @@ export default function AppLayout() {
         {/* 🔐 HARDWARE UNLOCK MODAL */}
         {showUnlockModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-md animate-in fade-in" onClick={() => setShowUnlockModal(false)} />
+            <div className="absolute inset-0 bg-background/80 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setShowUnlockModal(false)} />
             <div className="relative z-10 w-full max-w-sm bg-card border border-border rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300">
               
               {pinLoading && (
@@ -476,7 +476,7 @@ export default function AppLayout() {
                 {[...Array(4)].map((_, i) => (
                   <div key={i} className={cn("h-3 w-3 rounded-full border transition-all duration-300", 
                     pinEntry.length > i ? 'bg-primary border-primary shadow-[0_0_15px_rgba(var(--primary),0.5)]' 
-                    : pinErrorMsg ? 'border-red-500/50 animate-shake' : 'border-white/20'
+                    : pinErrorMsg ? 'border-destructive/50 animate-shake' : 'border-border'
                   )} />
                 ))}
               </div>

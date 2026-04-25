@@ -36,29 +36,29 @@ export default function ConfirmDialog({
 
   const colors = {
     primary: 'bg-primary text-primary-foreground hover:shadow-primary/30',
-    warning: 'bg-orange-500 text-white hover:shadow-orange-500/30',
-    danger: 'bg-red-500 text-white hover:shadow-red-500/30'
+    warning: 'bg-amber-500 text-white hover:shadow-amber-500/30',
+    danger: 'bg-destructive text-destructive-foreground hover:shadow-destructive/30'
   };
 
   const iconColors = {
     primary: 'text-primary bg-primary/10',
-    warning: 'text-orange-500 bg-orange-500/10',
-    danger: 'text-red-500 bg-red-500/10'
+    warning: 'text-amber-500 bg-amber-500/10',
+    danger: 'text-destructive bg-destructive/10'
   };
 
   return (
     <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in duration-300" 
+        className="absolute inset-0 bg-background/60 backdrop-blur-md animate-in fade-in duration-300" 
         onClick={onClose} 
       />
       
       {/* Content */}
-      <div className="relative z-10 w-full max-w-sm glass-card rounded-[2rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300 border border-white/10">
+      <div className="relative z-10 w-full max-w-sm glass-card rounded-[2rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300 border border-border">
         <button 
           onClick={onClose}
-          className="absolute top-6 right-6 p-2 hover:bg-white/10 rounded-xl transition-all text-muted-foreground"
+          className="absolute top-6 right-6 p-2 hover:bg-accent rounded-xl transition-all text-muted-foreground"
         >
           <X className="h-5 w-5" />
         </button>
@@ -83,7 +83,7 @@ export default function ConfirmDialog({
                   placeholder={inputPlaceholder}
                   value={inputValue}
                   onChange={(e) => onInputChange(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-xl font-black text-center focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all placeholder:text-muted-foreground/30"
+                  className="w-full bg-accent border border-border rounded-2xl py-4 px-6 text-xl font-black text-center focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all placeholder:text-muted-foreground/30"
                   onKeyDown={(e) => e.key === 'Enter' && onConfirm()}
                 />
               </div>
@@ -93,7 +93,7 @@ export default function ConfirmDialog({
           <div className="grid grid-cols-2 gap-3 w-full mt-8">
             <button
               onClick={onClose}
-              className="py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest border border-white/10 hover:bg-white/5 transition-all text-muted-foreground"
+              className="py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest border border-border hover:bg-accent transition-all text-muted-foreground"
             >
               {cancelText}
             </button>
