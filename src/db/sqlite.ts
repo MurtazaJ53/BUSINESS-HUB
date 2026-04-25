@@ -76,8 +76,10 @@ async function idbLoad(): Promise<Uint8Array | null> {
 // ─── Database Singleton ─────────────────────────────────────
 
 class DatabaseSingleton {
-  private platform: 'native' | 'web' = 'web';
+  private platform: 'web' | 'native' = 'web';
   private ready = false;
+  private booting = false;
+  private bootPromise: Promise<void> | null = null;
 
   // Native driver state (@capacitor-community/sqlite)
   private nativeSqlite: any = null;     // SQLiteConnection
@@ -87,14 +89,13 @@ class DatabaseSingleton {
   private webDb: SqlJsDatabase | null = null;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
-  private bootingPromise: Promise<void> | null = null;
-
   /** Call once from main.tsx before React renders. */
   async boot(): Promise<void> {
     if (this.ready) return;
-    if (this.bootingPromise) return this.bootingPromise;
+    if (this.bootPromise) return this.bootPromise;
 
-    this.bootingPromise = (async () => {
+    this.bootPromise = (async () => {
+      this.booting = true;
       this.platform = Capacitor.getPlatform() === 'web' ? 'web' : 'native';
       console.log(`[DB] Booting on platform: ${this.platform}`);
 
@@ -109,10 +110,11 @@ class DatabaseSingleton {
       await this.runMigrations();
       
       this.ready = true;
+      this.booting = false;
       console.log('[DB] Ready');
     })();
 
-    return this.bootingPromise;
+    return this.bootPromise;
   }
 
   // ── Native boot ────────────────────────────────────────────
@@ -388,7 +390,9 @@ class DatabaseSingleton {
   }
 
   private assertReady(): void {
-    if (!this.ready) throw new Error('[DB] Not initialized. Call Database.boot() first.');
+    if (!this.ready && !this.booting) {
+      throw new Error('[DB] Not initialized. Call Database.boot() first.');
+    }
   }
 }
 
