@@ -10,6 +10,7 @@ import { doc, deleteDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useSqlQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
+import { getRolePermissions, normalizePermissionMatrix } from '@/lib/permissions';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Staff, Action, Module, PermissionMatrix, Attendance } from '@/lib/types';
 import { shareInviteWhatsApp, sendWhatsAppInvite } from '@/lib/whatsapp';
@@ -161,31 +162,6 @@ export default function Team() {
   const [selectedRole, setSelectedRole] = useState<string>('Sales Associate');
   const [showAdvancedAccess, setShowAdvancedAccess] = useState(false);
 
-  // --- 🛡️ ROLE PERMISSIONS CONFIGURATION ---
-  const ROLE_DEFAULTS: Record<string, any> = {
-    'Store Manager': {
-      inventory: ['view', 'add', 'edit', 'delete', 'price', 'cost'],
-      sales_hub: ['view', 'add', 'edit', 'void', 'price'],
-      customers: ['view', 'add', 'edit', 'delete'],
-      expenses: ['view', 'add', 'edit', 'delete'],
-      analytics: ['view'],
-      team_portal: ['view', 'add', 'edit']
-    },
-    'Sales Associate': {
-      inventory: ['view'],
-      sales_hub: ['view', 'add'],
-      customers: ['view', 'add']
-    },
-    'Delivery Partner': {
-      sales_hub: ['view']
-    },
-    'Inventory Incharge': {
-      inventory: ['view', 'add', 'edit', 'delete', 'price', 'cost']
-    },
-    'General Staff': {
-      inventory: ['view']
-    }
-  };
   const [customAmount, setCustomAmount] = useState('');
   const [payoutLoading, setPayoutLoading] = useState(false);
 
@@ -194,7 +170,7 @@ export default function Team() {
   const canEditTeam = usePermission('team', 'edit');
 
   const filteredStaff = staff.filter((s: Staff) => {
-    if (!canEditTeam && currentStaff) return s.id === currentStaff.id;
+    if (!canEditTeam) return currentStaff ? s.id === currentStaff.id : false;
     return s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.phone.includes(searchTerm);
   });
 
@@ -227,13 +203,19 @@ export default function Team() {
   // --- 💡 HELPERS ---
   const startAdding = () => {
     setSelectedRole('Sales Associate');
-    setNewStaffPermissions(ROLE_DEFAULTS['Sales Associate']);
+    setEditingStaff(null);
+    setShowAdvancedAccess(false);
+    setNewStaffPermissions(getRolePermissions('Sales Associate'));
     setIsAddingStaff(true);
   };
 
   const startEditing = (s: Staff) => {
     setSelectedRole(s.role);
-    setEditingStaff(s);
+    setShowAdvancedAccess(false);
+    setEditingStaff({
+      ...s,
+      permissions: normalizePermissionMatrix(s.permissions, getRolePermissions(s.role)),
+    });
   };
 
   // --- 🎨 RENDER ---
@@ -437,7 +419,7 @@ export default function Team() {
                     >
                       WhatsApp
                     </button>
-                    {canEditTeam && (
+                    {canEditTeam && currentStaff?.id !== s.id && (
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
@@ -790,24 +772,29 @@ export default function Team() {
               </button>
             </div>
             
-            <form className="space-y-8" onSubmit={(e) => {
+            <form className="space-y-8" onSubmit={async (e) => {
               e.preventDefault();
               const fd = new FormData(e.currentTarget);
               const phone = fd.get('phone') as string;
               if (!editingStaff && staff.some(s => s.phone === phone)) return showToast("Comm Link already established!");
               
               const salaryValue = Number(fd.get('salary'));
+              const roleValue = fd.get('role') as string;
+              const finalPermissions = normalizePermissionMatrix(
+                editingStaff ? editingStaff.permissions : newStaffPermissions,
+                getRolePermissions(roleValue),
+              );
               
-              upsertStaff({
+              await upsertStaff({
                 id: editingStaff ? editingStaff.id : `staff-${Date.now()}`,
                 name: fd.get('name') as string, 
                 phone, 
                 email: fd.get('email') as string,
-                role: fd.get('role') as string,
+                role: roleValue,
                 joinedAt: editingStaff ? editingStaff.joinedAt : new Date().toISOString(),
                 status: 'active', 
                 salary: salaryValue,
-                permissions: editingStaff ? editingStaff.permissions : newStaffPermissions
+                permissions: finalPermissions
               } as any);
               
               showToast(editingStaff ? 'Protocol Updated' : 'Operative Enlisted');
@@ -838,8 +825,11 @@ export default function Team() {
                       onChange={(e) => {
                         const role = e.target.value;
                         setSelectedRole(role);
-                        if (!editingStaff) {
-                          setNewStaffPermissions(ROLE_DEFAULTS[role] || {});
+                        const roleDefaults = getRolePermissions(role);
+                        if (editingStaff) {
+                          setEditingStaff({ ...editingStaff, role, permissions: roleDefaults });
+                        } else {
+                          setNewStaffPermissions(roleDefaults);
                         }
                       }}
                       className="w-full bg-background border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-4 py-3.5 font-medium text-sm outline-none transition-all text-foreground appearance-none cursor-pointer"
@@ -920,10 +910,10 @@ export default function Team() {
               </div>
             </div>
 
-            <form className="space-y-6" onSubmit={(e) => {
+            <form className="space-y-6" onSubmit={async (e) => {
               e.preventDefault();
               if (!manualEntryStaff) return;
-              recordAttendance({
+              await recordAttendance({
                 id: `${manualEntryStaff.id}_${manualTimes.date}`,
                 staffId: manualEntryStaff.id,
                 date: manualTimes.date,
@@ -1028,11 +1018,15 @@ export default function Team() {
           onClose={() => { setConfirmRemoveStaff(null); setPinInput(''); }}
           onConfirm={async () => {
             if (pinInput === shopPrivate?.adminPin) {
-              setConfirmRemoveStaff(null);
-              setEditingStaff(null);
-              await deleteStaff(confirmRemoveStaff.id);
-              showToast(`${confirmRemoveStaff.name} removed permanently.`);
-              setPinInput('');
+              try {
+                setConfirmRemoveStaff(null);
+                setEditingStaff(null);
+                await deleteStaff(confirmRemoveStaff.id);
+                showToast(`${confirmRemoveStaff.name} removed permanently.`);
+                setPinInput('');
+              } catch (error: any) {
+                showToast(error?.message || 'Unable to remove this staff member right now.', true);
+              }
             } else {
               showToast('Invalid Security PIN', true);
             }

@@ -197,7 +197,7 @@ class SyncWorkerEngine {
           await Promise.all(processedOpIds.map(opId => outboxRepo.remove(opId)));
           
           await Database.run(
-            `INSERT OR REPLACE INTO sync_state (entity_type, last_synced_at) VALUES ('_lastPush', ?);`, 
+            `INSERT OR REPLACE INTO sync_state (entityType, lastSyncedAt) VALUES ('_lastPush', ?);`, 
             [Date.now()]
           );
         }
@@ -218,15 +218,15 @@ class SyncWorkerEngine {
   // ─── PULL: FIRESTORE TO SQLITE ────────────────────────────
 
   private async getWatermark(entityType: string): Promise<number> {
-    const rows = await Database.query<{ last_synced_at: number }>(
-      `SELECT last_synced_at FROM sync_state WHERE entity_type = ?`, [entityType]
+    const rows = await Database.query<{ lastSyncedAt: number }>(
+      `SELECT lastSyncedAt FROM sync_state WHERE entityType = ?`, [entityType]
     );
-    return rows[0]?.last_synced_at ?? 0;
+    return rows[0]?.lastSyncedAt ?? 0;
   }
 
   private async updateWatermark(entityType: string, ts: number) {
     await Database.run(
-      `INSERT OR REPLACE INTO sync_state (entity_type, last_synced_at) VALUES (?, ?);`,
+      `INSERT OR REPLACE INTO sync_state (entityType, lastSyncedAt) VALUES (?, ?);`,
       [entityType, ts]
     );
   }
@@ -265,7 +265,7 @@ class SyncWorkerEngine {
 
         if (Object.keys(credentials).length > 0) {
           await Database.run(
-            `INSERT OR REPLACE INTO shop_metadata (key, value, updated_at, dirty) VALUES ('credentials', ?, ?, 0);`,
+            `INSERT OR REPLACE INTO shop_metadata (key, value, updatedAt, dirty) VALUES ('credentials', ?, ?, 0);`,
             [JSON.stringify(credentials), Date.now()]
           );
         }
@@ -275,7 +275,7 @@ class SyncWorkerEngine {
         delete settings.staffPin;
 
         await Database.run(
-          `INSERT OR REPLACE INTO shop_metadata (key, value, updated_at, dirty) VALUES ('settings', ?, ?, 0);`,
+          `INSERT OR REPLACE INTO shop_metadata (key, value, updatedAt, dirty) VALUES ('settings', ?, ?, 0);`,
           [JSON.stringify(settings), Date.now()]
         );
         tableEvents.emit('shop_metadata');
@@ -285,10 +285,10 @@ class SyncWorkerEngine {
     // 2. Collection Subscriptions
     for (const coll of collections) {
       let watermark = await this.getWatermark(coll.key);
-      const q = query(
-        collection(firestoreDb, `${base}/${coll.subCol}`), 
-        where('updatedAt', '>', watermark)
-      );
+      const collRef = collection(firestoreDb, `${base}/${coll.subCol}`);
+      const q = (watermark === 0 || coll.key === 'staff' || coll.key === 'staff_private')
+        ? query(collRef)
+        : query(collRef, where('updatedAt', '>', watermark));
 
       this.unsubscribers.push(
         onSnapshot(q, { includeMetadataChanges: true }, async (snap) => {
@@ -314,7 +314,7 @@ class SyncWorkerEngine {
               writePromises.push(
                 coll.key === 'staff' 
                   ? staffRepo.hardDelete(ch.doc.id)
-                  : Database.run(`UPDATE ${coll.key} SET tombstone=1, updated_at=? WHERE id=? AND dirty=0;`, [ts, ch.doc.id])
+                  : Database.run(`UPDATE ${coll.key} SET tombstone=1, updatedAt=? WHERE id=? AND dirty=0;`, [ts, ch.doc.id])
               );
             } else {
               writePromises.push(coll.repo.mergeRemote({ id: ch.doc.id, ...d } as any, ts));

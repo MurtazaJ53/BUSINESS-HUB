@@ -108,7 +108,7 @@ export interface Staff {
   email?: string;
   role: string;
   joinedAt: string;
-  status: 'active' | 'inactive';
+  status: 'active' | 'inactive' | 'suspended';
   permissions?: PermissionMatrix;
 }
 

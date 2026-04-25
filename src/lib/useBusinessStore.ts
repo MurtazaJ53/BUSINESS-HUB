@@ -16,6 +16,7 @@ import {
   outboxRepo,
 } from '../db';
 import { SyncWorker } from '../sync/SyncWorker';
+import { tableEvents } from '../db/events';
 import { db } from './firebase';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 
@@ -62,6 +63,20 @@ const enqueueSync = async (
     payload: operation === 'DELETE' ? '{}' : JSON.stringify({ ...payload, updatedAt: ts }),
     createdAt: ts
   });
+};
+
+const getInventoryDeltaForSaleItem = (item: SaleItem): number => {
+  if (item.itemId.startsWith('custom-') || item.itemId === 'payment-received') return 0;
+  return item.isReturn ? item.quantity : -item.quantity;
+};
+
+const getInventoryDeltasForSale = (items: SaleItem[]): Record<string, number> => {
+  return items.reduce<Record<string, number>>((acc, item) => {
+    const delta = getInventoryDeltaForSaleItem(item);
+    if (delta === 0) return acc;
+    acc[item.itemId] = (acc[item.itemId] || 0) + delta;
+    return acc;
+  }, {});
 };
 
 // ─── STATE INTERFACE ────────────────────────────────────────
@@ -138,8 +153,23 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
   initStore: (shopId, role) => {
     const isLocked = localStorage.getItem('hub_is_locked') === 'true';
     const effectiveRole = (isLocked && role === 'admin') ? 'staff' : role;
+    let isActive = true;
+    let unsubStaff = () => {};
     
     set({ shopId, role: effectiveRole, isLocked });
+
+    const refreshCurrentStaff = async () => {
+      const currentUid = auth.currentUser?.uid;
+      if (!currentUid) {
+        if (isActive && get().shopId === shopId) set({ currentStaff: null });
+        return;
+      }
+
+      const nextStaff = await staffRepo.getById(currentUid);
+      if (isActive && get().shopId === shopId) {
+        set({ currentStaff: nextStaff });
+      }
+    };
 
     Database.boot()
       .then(async () => {
@@ -171,6 +201,10 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
           dbError: null
         });
 
+        unsubStaff = tableEvents.on('staff', () => {
+          void refreshCurrentStaff();
+        });
+
         await SyncWorker.start();
       })
       .catch((err) => {
@@ -189,7 +223,9 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     });
 
     return () => { 
+      isActive = false;
       SyncWorker.stop(); 
+      unsubStaff();
       unsubInv();
     };
   },
@@ -228,12 +264,14 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const newShop = { ...shop, ...metadata };
 
     set({ shop: newShop });
-    await Database.run('INSERT OR REPLACE INTO shop_metadata (key, value, updated_at, dirty) VALUES (?, ?, ?, 1);', ['settings', JSON.stringify(newShop), ts]);
+    await Database.run('INSERT OR REPLACE INTO shop_metadata (key, value, updatedAt, dirty) VALUES (?, ?, ?, 1);', ['settings', JSON.stringify(newShop), ts]);
+    tableEvents.emit('shop_metadata');
 
     if (adminPin || staffPin) {
       const newPrivate = { ...shopPrivate, ...(adminPin && { adminPin }), ...(staffPin && { staffPin }) };
       set({ shopPrivate: newPrivate });
-      await Database.run('INSERT OR REPLACE INTO shop_metadata (key, value, updated_at, dirty) VALUES (?, ?, ?, 1);', ['credentials', JSON.stringify(newPrivate), ts]);
+      await Database.run('INSERT OR REPLACE INTO shop_metadata (key, value, updatedAt, dirty) VALUES (?, ?, ?, 1);', ['credentials', JSON.stringify(newPrivate), ts]);
+      tableEvents.emit('shop_metadata');
     }
 
     await enqueueSync('shop', shopId, 'UPDATE', { 
@@ -282,17 +320,29 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
 
   deleteInventoryItem: async (id) => {
     const { shopId } = get(); if (!shopId) return;
-    await inventoryRepo.softDelete(id);
-    await enqueueSync('inventory', id, 'DELETE');
+    await Promise.all([
+      inventoryRepo.softDelete(id),
+      inventoryPrivateRepo.remove(id),
+    ]);
+    await Promise.all([
+      enqueueSync('inventory', id, 'DELETE'),
+      enqueueSync('inventory_private', id, 'DELETE'),
+    ]);
   },
 
   clearInventory: async () => {
     const { shopId } = get(); if (!shopId) return;
     const all = await inventoryRepo.getAll();
     await inventoryRepo.clearAll();
+    await Promise.all(all.map(item => inventoryPrivateRepo.remove(item.id)));
 
     // Prevent blocking the main thread by firing queue injections concurrently
-    await Promise.all(all.map(item => enqueueSync('inventory', item.id, 'DELETE')));
+    await Promise.all(
+      all.flatMap(item => [
+        enqueueSync('inventory', item.id, 'DELETE'),
+        enqueueSync('inventory_private', item.id, 'DELETE'),
+      ]),
+    );
   },
 
   restockItem: async (id, newQty, newPurchasePrice) => {
@@ -343,15 +393,13 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const creditPayment = sale.payments.find(p => p.mode === 'CREDIT');
     const creditAmount = creditPayment ? creditPayment.amount : 0;
 
-    // Concurrently verify customer existence and process stock reduction
+    // Concurrently verify customer existence and process stock reconciliation.
     const [custs] = await Promise.all([
       customersRepo.getAll(),
-      ...finalSale.items
-        .filter(item => !item.itemId.startsWith('custom-') && item.itemId !== 'payment-received')
-        .map(async item => {
-          await inventoryRepo.updateStock(item.itemId, -item.quantity);
-          return enqueueSync('inventory', item.itemId, 'UPDATE', { stockDelta: -item.quantity });
-        })
+      ...Object.entries(getInventoryDeltasForSale(finalSale.items)).map(async ([itemId, delta]) => {
+        await inventoryRepo.updateStock(itemId, delta);
+        return enqueueSync('inventory', itemId, 'UPDATE', { stockDelta: delta });
+      }),
     ]);
 
     // Handle Customer Linkage & Balance
@@ -393,25 +441,18 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const oldSale = await salesRepo.getById(newSale.id);
     if (!oldSale) return;
 
-    const itemIds = new Set([
-      ...oldSale.items.map(i => i.itemId), 
-      ...newSale.items.map(i => i.itemId)
-    ]);
+    const oldDeltas = getInventoryDeltasForSale(oldSale.items);
+    const newDeltas = getInventoryDeltasForSale(newSale.items);
+    const itemIds = new Set([...Object.keys(oldDeltas), ...Object.keys(newDeltas)]);
 
-    // Concurrently process all stock reconciliations
-    const stockPromises = Array.from(itemIds).map(async (itemId) => {
-      if (itemId.startsWith('custom-') || itemId === 'payment-received') return;
-      const oldQty = oldSale.items.find(i => i.itemId === itemId)?.quantity || 0;
-      const newQty = newSale.items.find(i => i.itemId === itemId)?.quantity || 0;
-      const delta = -(newQty - oldQty);
-      
-      if (delta !== 0) {
+    await Promise.all(
+      Array.from(itemIds).map(async (itemId) => {
+        const delta = (newDeltas[itemId] || 0) - (oldDeltas[itemId] || 0);
+        if (delta === 0) return;
         await inventoryRepo.updateStock(itemId, delta);
         await enqueueSync('inventory', itemId, 'UPDATE', { stockDelta: delta });
-      }
-    });
-
-    await Promise.all(stockPromises);
+      }),
+    );
 
     // Reconcile customer balances
     const oldCredit = oldSale.payments.find(p => p.mode === 'CREDIT')?.amount || 0;
@@ -424,6 +465,15 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
       if (newSale.customerId) await customersRepo.updateBalance(newSale.customerId, newSale.total, newCredit);
     }
 
+    await Promise.all(
+      Array.from(new Set([oldSale.customerId, newSale.customerId].filter(Boolean))).map(async (customerId) => {
+        const updatedCustomer = await customersRepo.getById(customerId as string);
+        if (updatedCustomer) {
+          await enqueueSync('customers', updatedCustomer.id, 'UPDATE', updatedCustomer);
+        }
+      }),
+    );
+
     await salesRepo.upsert(newSale);
     await enqueueSync('sales', newSale.id, 'UPDATE', newSale);
   },
@@ -435,16 +485,20 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     
     const creditAmount = sale.payments.find(p => p.mode === 'CREDIT')?.amount || 0;
     
-    // Concurrently restore all inventory stock
-    await Promise.all(sale.items.map(async (item) => {
-      if (!item.itemId.startsWith('custom-') && item.itemId !== 'payment-received') {
-        await inventoryRepo.updateStock(item.itemId, item.quantity);
-        await enqueueSync('inventory', item.itemId, 'UPDATE', { stockDelta: item.quantity });
-      }
-    }));
+    await Promise.all(
+      Object.entries(getInventoryDeltasForSale(sale.items)).map(async ([itemId, delta]) => {
+        const reversalDelta = -delta;
+        await inventoryRepo.updateStock(itemId, reversalDelta);
+        await enqueueSync('inventory', itemId, 'UPDATE', { stockDelta: reversalDelta });
+      }),
+    );
 
     if (sale.customerId) {
       await customersRepo.updateBalance(sale.customerId, -sale.total, -creditAmount);
+      const updatedCustomer = await customersRepo.getById(sale.customerId);
+      if (updatedCustomer) {
+        await enqueueSync('customers', sale.customerId, 'UPDATE', updatedCustomer);
+      }
     }
     
     await salesRepo.softDelete(id);
@@ -517,8 +571,33 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
 
   deleteStaff: async (id) => {
     const { shopId } = get(); if (!shopId) return;
-    await staffRepo.remove(id);
-    await enqueueSync('staff', id, 'DELETE');
+    const currentUid = auth.currentUser?.uid;
+    if (id === currentUid) {
+      throw new Error('You cannot remove the account that is currently signed in.');
+    }
+
+    const [targetStaff, allStaff] = await Promise.all([
+      staffRepo.getById(id),
+      staffRepo.getAll(),
+    ]);
+
+    if (targetStaff?.role === 'admin') {
+      const remainingAdmins = allStaff.filter((staffMember) =>
+        staffMember.id !== id && staffMember.role === 'admin' && staffMember.status === 'active',
+      );
+      if (remainingAdmins.length === 0) {
+        throw new Error('At least one active admin must remain assigned to this workspace.');
+      }
+    }
+
+    await Promise.all([
+      staffRepo.remove(id),
+      staffPrivateRepo.remove(id),
+    ]);
+    await Promise.all([
+      enqueueSync('staff', id, 'DELETE'),
+      enqueueSync('staff_private', id, 'DELETE'),
+    ]);
   },
 
   recordAttendance: async (entry) => {

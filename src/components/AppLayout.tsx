@@ -15,6 +15,7 @@ import { useAuthStore } from '@/lib/useAuthStore';
 import { usePermission } from '@/hooks/usePermission';
 import { useSqlQuery } from '@/db/hooks';
 import { auth, functions } from '@/lib/firebase';
+import { ADMIN_PERMISSION_TEMPLATE } from '@/lib/permissions';
 import { formatCurrency, cn } from '@/lib/utils';
 import type { InventoryItem, Sale } from '@/lib/types';
 
@@ -79,11 +80,11 @@ export default function AppLayout() {
   // 📦 Global State
   const { user, forceTokenRefresh, clearSession } = useAuthStore();
   const { 
-    shop, shopId, theme, setTheme, role, currentStaff, setActiveTab, 
+    shop, shopId, theme, setTheme, role, currentStaff, 
     sidebarOpen, setSidebarOpen, upsertStaff, logout 
   } = useBusinessStore(useShallow(state => ({
     shop: state.shop, shopId: state.shopId, theme: state.theme, setTheme: state.setTheme,
-    role: state.role, currentStaff: state.currentStaff, setActiveTab: state.setActiveTab,
+    role: state.role, currentStaff: state.currentStaff,
     sidebarOpen: state.sidebarOpen, setSidebarOpen: state.setSidebarOpen,
     upsertStaff: state.upsertStaff, logout: state.logout
   })));
@@ -97,7 +98,6 @@ export default function AppLayout() {
   // 🔒 Permissions
   const canViewProfit = usePermission('sales', 'view_profit');
   const canViewAnalytics = usePermission('analytics', 'view');
-  const canManageTeam = usePermission('team', 'edit');
 
   // 🎛️ UI State
   const [notifOpen, setNotifOpen] = useState(false);
@@ -162,11 +162,7 @@ export default function AppLayout() {
             role: 'admin',
             status: 'active',
             joinedAt: new Date().toISOString(),
-            permissions: {
-              analytics: { view: true }, inventory: { view: true, edit: true, view_cost: true },
-              sales: { view: true, edit: true }, customers: { view: true, edit: true },
-              expenses: { view: true, edit: true }, settings: { edit: true }
-            }
+            permissions: ADMIN_PERMISSION_TEMPLATE,
           });
         } catch (e) {
           console.error("[Auto-Heal] Offline synchronization failed:", e);
@@ -183,20 +179,23 @@ export default function AppLayout() {
       const hasAccess = (tab: string) => {
         switch (tab) {
           case 'team': case 'agents': return true;
-          case 'dashboard': case 'analytics': return canViewAnalytics;
+          case 'dashboard': return true;
+          case 'analytics': return canViewAnalytics;
           case 'inventory': case 'stock-alerts': return !!p.inventory?.view;
           case 'sell': case 'history': return !!p.sales?.view;
           case 'customers': return !!p.customers?.view;
           case 'expenses': return !!p.expenses?.view;
+          case 'settings': return !!p.settings?.view || !!p.settings?.edit;
           default: return false;
         }
       };
 
-      if (activeTab !== 'settings' && !hasAccess(activeTab)) {
-        setActiveTab(NAV_ITEMS.find(item => hasAccess(item.id))?.id || 'dashboard');
+      if (!hasAccess(activeTab)) {
+        const fallbackTab = NAV_ITEMS.find(item => hasAccess(item.id))?.id || 'dashboard';
+        navigate(`/${fallbackTab}`, { replace: true });
       }
     }
-  }, [role, currentStaff, activeTab, setActiveTab, canViewAnalytics]);
+  }, [role, currentStaff, activeTab, canViewAnalytics, navigate]);
 
   // --- 🔐 MASTER AUTH & HARDWARE INTEGRATION ---
   const handleLogout = async () => {
@@ -215,7 +214,7 @@ export default function AppLayout() {
     if (newRole === 'staff') {
       setRole('staff', true);
       if (['settings', 'inventory', 'analytics', 'expenses', 'stock-alerts'].includes(activeTab)) {
-        setActiveTab('dashboard');
+        navigate('/dashboard', { replace: true });
       }
       return;
     }
@@ -347,9 +346,10 @@ export default function AppLayout() {
                 if (!p) return null;
                 const tid = item.id;
                 const hasPerm = (tid === 'team' || tid === 'agents') || 
-                                ((tid === 'dashboard' || tid === 'analytics') && p.analytics?.view) ||
+                                (tid === 'dashboard') ||
+                                (tid === 'analytics' && p.analytics?.view) ||
                                 ((tid === 'inventory' || tid === 'stock-alerts') && p.inventory?.view) ||
-                                (tid === 'history' && p.sales?.view) ||
+                                ((tid === 'sell' || tid === 'history') && p.sales?.view) ||
                                 (tid === 'customers' && p.customers?.view) ||
                                 (tid === 'expenses' && p.expenses?.view);
                 if (!hasPerm) return null;
@@ -358,14 +358,16 @@ export default function AppLayout() {
               const label = item.id === 'team' ? (role === 'admin' ? 'Team Hub' : 'My Terminal') : item.label;
 
               return (
-                <NavItem key={item.id} icon={item.icon} label={label} active={activeTab === item.id} onClick={() => { navigate(item.id); setSidebarOpen(false); }} />
+                <NavItem key={item.id} icon={item.icon} label={label} active={activeTab === item.id} onClick={() => { navigate(`/${item.id}`); setSidebarOpen(false); }} />
               );
             })}
           </nav>
 
           {/* Bottom Settings */}
           <div className="pt-4 border-t border-border space-y-1.5 mt-4">
-            <NavItem icon={SettingsIcon} label="System Config" active={activeTab === 'settings'} onClick={() => { navigate('settings'); setSidebarOpen(false); }} />
+            {(role === 'admin' || currentStaff?.permissions?.settings?.view || currentStaff?.permissions?.settings?.edit) && (
+              <NavItem icon={SettingsIcon} label="System Config" active={activeTab === 'settings'} onClick={() => { navigate('/settings'); setSidebarOpen(false); }} />
+            )}
             
             <button 
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -424,7 +426,7 @@ export default function AppLayout() {
                       <p className="text-xs text-muted-foreground text-center py-6 font-medium">All telemetry nominal.</p>
                     ) : (
                       inventory.map(item => (
-                        <button key={item.id} onClick={() => { navigate('inventory'); setNotifOpen(false); }} className="w-full flex items-center gap-3 p-3 rounded-xl bg-accent hover:bg-accent border border-border transition-all text-left">
+                        <button key={item.id} onClick={() => { navigate('/inventory'); setNotifOpen(false); }} className="w-full flex items-center gap-3 p-3 rounded-xl bg-accent hover:bg-accent border border-border transition-all text-left">
                           <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
                           <div className="min-w-0">
                             <p className="text-xs font-bold text-foreground truncate">{item.name}</p>

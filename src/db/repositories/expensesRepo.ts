@@ -3,6 +3,7 @@
  */
 
 import { Database } from '../sqlite';
+import { tableEvents } from '../events';
 import type { Expense } from '../../lib/types';
 
 const now = () => Date.now();
@@ -23,6 +24,7 @@ export const expensesRepo = {
        VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0);`,
       [expense.id, expense.category, expense.amount, expense.description, expense.date, ca, ts],
     );
+    tableEvents.emit('expenses');
   },
 
   async softDelete(id: string): Promise<void> {
@@ -30,6 +32,7 @@ export const expensesRepo = {
       `UPDATE expenses SET tombstone = 1, dirty = 1, updatedAt = ? WHERE id = ?;`,
       [now(), id],
     );
+    tableEvents.emit('expenses');
   },
 
   async getDirty(): Promise<Array<Expense & { tombstone: number }>> {

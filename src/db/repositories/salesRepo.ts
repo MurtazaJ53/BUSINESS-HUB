@@ -3,18 +3,24 @@
  */
 
 import { Database } from '../sqlite';
+import { tableEvents } from '../events';
 import type { Sale, SaleItem } from '../../lib/types';
 
 const now = () => Date.now();
 
 export const salesRepo = {
-  async getAll(limitCount = 100): Promise<Sale[]> {
+  async getAll(limitCount?: number): Promise<Sale[]> {
     const rows = await Database.query<any>(
-      `SELECT id, total, discount, discountValue, discountType,
-              paymentMode, customerName, customerPhone,
-              customerId, footerNote, date, createdAt
-       FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC LIMIT ?;`,
-      [limitCount],
+      limitCount
+        ? `SELECT id, total, discount, discountValue, discountType,
+                  paymentMode, customerName, customerPhone,
+                  customerId, footerNote, date, createdAt, staffId
+           FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC LIMIT ?;`
+        : `SELECT id, total, discount, discountValue, discountType,
+                  paymentMode, customerName, customerPhone,
+                  customerId, footerNote, date, createdAt, staffId
+           FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC;`,
+      limitCount ? [limitCount] : [],
     );
 
     const sales: Sale[] = [];
@@ -36,7 +42,7 @@ export const salesRepo = {
     const rows = await Database.query<any>(
       `SELECT id, total, discount, discountValue, discountType,
               paymentMode, customerName, customerPhone,
-              customerId, footerNote, date, createdAt
+              customerId, footerNote, date, createdAt, staffId
        FROM sales WHERE id = ? AND tombstone = 0;`, [id],
     );
     if (!rows.length) return null;
@@ -59,11 +65,11 @@ export const salesRepo = {
       sql: `INSERT OR REPLACE INTO sales
               (id, total, discount, discountValue, discountType, paymentMode,
                customerName, customerPhone, customerId, footerNote, date,
-               createdAt, updatedAt, dirty, tombstone)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0);`,
+               createdAt, updatedAt, staffId, dirty, tombstone)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0);`,
       params: [sale.id, sale.total, sale.discount, sale.discountValue, sale.discountType,
                sale.paymentMode, sale.customerName ?? null, sale.customerPhone ?? null,
-               sale.customerId ?? null, sale.footerNote ?? null, sale.date, ca, ts],
+               sale.customerId ?? null, sale.footerNote ?? null, sale.date, ca, ts, sale.staffId ?? null],
     });
 
     stmts.push({ sql: 'DELETE FROM sale_items WHERE saleId = ?;', params: [sale.id] });
@@ -86,6 +92,7 @@ export const salesRepo = {
     });
 
     await Database.transaction(stmts);
+    tableEvents.emit(['sales', 'sale_items', 'sale_payments']);
   },
 
   async softDelete(id: string): Promise<void> {
@@ -93,13 +100,14 @@ export const salesRepo = {
       `UPDATE sales SET tombstone = 1, dirty = 1, updatedAt = ? WHERE id = ?;`,
       [now(), id],
     );
+    tableEvents.emit(['sales', 'sale_items', 'sale_payments']);
   },
 
   async getDirty(): Promise<Array<Sale & { tombstone: number; updatedAt: number }>> {
     const rows = await Database.query<any>(
       `SELECT id, total, discount, discountValue, discountType,
               paymentMode, customerName, customerPhone,
-              customerId, footerNote, date, createdAt,
+              customerId, footerNote, date, createdAt, staffId,
               updatedAt, tombstone
        FROM sales WHERE dirty = 1;`,
     );
@@ -135,11 +143,11 @@ export const salesRepo = {
         sql: `INSERT OR REPLACE INTO sales
                 (id, total, discount, discountValue, discountType, paymentMode,
                  customerName, customerPhone, customerId, footerNote, date,
-                 createdAt, updatedAt, dirty, tombstone)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0);`,
+                 createdAt, updatedAt, staffId, dirty, tombstone)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0);`,
         params: [sale.id, sale.total, sale.discount, sale.discountValue, sale.discountType,
                  sale.paymentMode, sale.customerName ?? null, sale.customerPhone ?? null,
-                 sale.customerId ?? null, sale.footerNote ?? null, sale.date, ca, remoteUpdatedAt],
+                 sale.customerId ?? null, sale.footerNote ?? null, sale.date, ca, remoteUpdatedAt, sale.staffId ?? null],
       });
 
       stmts.push({ sql: 'DELETE FROM sale_items WHERE saleId = ?;', params: [sale.id] });

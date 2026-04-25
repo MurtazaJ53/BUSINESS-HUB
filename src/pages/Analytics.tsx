@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { TrendingUp, TrendingDown, BarChart3, Target, Calendar, ShoppingCart, Wallet, CheckCircle2 } from 'lucide-react';
-import { useSqlQuery } from '@/db/hooks';
+import { useSqlQuery, useSalesQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { usePermission } from '@/hooks/usePermission';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -16,7 +16,7 @@ export default function Analytics() {
   const { role } = useBusinessStore();
   const canViewCost = usePermission('inventory', 'view_cost');
   const canViewProfit = usePermission('sales', 'view_profit');
-  const sales = useSqlQuery<Sale>('SELECT * FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC', [], ['sales']);
+  const sales = useSalesQuery();
   const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
   const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
   const customerPayments = useSqlQuery<CustomerPayment>('SELECT * FROM customer_payments WHERE tombstone = 0', [], ['customer_payments']);

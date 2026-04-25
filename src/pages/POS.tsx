@@ -18,7 +18,7 @@ type PayMode = 'CASH' | 'UPI' | 'CARD' | 'CREDIT' | 'ONLINE' | 'OTHERS';
 const PAY_MODES: PayMode[] = ['CASH', 'UPI', 'CARD', 'CREDIT', 'ONLINE', 'OTHERS'];
 
 export default function POS() {
-  const { addSale, updateInventoryItem, shop, shopPrivate, role, currentStaff } = useBusinessStore();
+  const { addSale, shop, shopPrivate, role, currentStaff } = useBusinessStore();
   
   const canViewCost = usePermission('inventory', 'view_cost');
   const canOverridePrice = usePermission('sales', 'override_price');
@@ -391,25 +391,6 @@ export default function POS() {
       // Final Update and Reset
       setLastReceipt(finalSale);
       setReceiptOpen(true);
-      
-      // Aggregate all changes for each item in the transaction
-      const stockDeltas: Record<string, number> = {};
-      for (const cartItem of finalSale.items) {
-        if (cartItem.itemId.startsWith('custom-')) continue;
-        const delta = cartItem.isReturn ? cartItem.quantity : -cartItem.quantity;
-        stockDeltas[cartItem.itemId] = (stockDeltas[cartItem.itemId] || 0) + delta;
-      }
-
-      // Perform single update per item ID
-      for (const [itemId, netChange] of Object.entries(stockDeltas)) {
-        const invItem = inventory.find((i: InventoryItem) => i.id === itemId);
-        if (invItem && invItem.stock !== undefined) {
-          await updateInventoryItem({
-            ...invItem,
-            stock: invItem.stock + netChange,
-          });
-        }
-      }
     } catch (e: any) {
       console.error("Turbo Checkout Failed:", e);
       setErrorModal({

@@ -172,18 +172,19 @@ class DatabaseSingleton {
         CREATE TABLE IF NOT EXISTS inventory (id TEXT PRIMARY KEY, name TEXT NOT NULL, price REAL, stock REAL, category TEXT, subcategory TEXT, size TEXT, description TEXT, sku TEXT, createdAt INTEGER, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS inventory_private (id TEXT PRIMARY KEY, costPrice REAL, supplierId TEXT, lastPurchaseDate TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         
-        CREATE TABLE IF NOT EXISTS sales (id TEXT PRIMARY KEY, total REAL NOT NULL, discount REAL, discountValue REAL, discountType TEXT, paymentMode TEXT, customerName TEXT, customerPhone TEXT, customerId TEXT, footerNote TEXT, date TEXT, createdAt INTEGER, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS sales (id TEXT PRIMARY KEY, total REAL NOT NULL, discount REAL, discountValue REAL, discountType TEXT, paymentMode TEXT, customerName TEXT, customerPhone TEXT, customerId TEXT, footerNote TEXT, date TEXT, createdAt INTEGER, updatedAt INTEGER, staffId TEXT, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS sale_items (id TEXT PRIMARY KEY, saleId TEXT, itemId TEXT, name TEXT, quantity REAL, price REAL, costPrice REAL, size TEXT, isReturn INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS sale_payments (id TEXT PRIMARY KEY, saleId TEXT, mode TEXT, amount REAL);
         
         CREATE TABLE IF NOT EXISTS staff (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT, email TEXT, role TEXT, status TEXT, joinedAt TEXT, permissions TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS staff_private (id TEXT PRIMARY KEY, salary REAL, pin TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         
-        CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT, balance REAL, totalSpent REAL, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT, email TEXT, balance REAL, totalSpent REAL, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS customer_payments (id TEXT PRIMARY KEY, customerId TEXT, amount REAL, date TEXT, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         
         CREATE TABLE IF NOT EXISTS expenses (id TEXT PRIMARY KEY, category TEXT, amount REAL, description TEXT, date TEXT, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS attendance (id TEXT PRIMARY KEY, staffId TEXT, date TEXT, clockIn TEXT, clockOut TEXT, totalHours REAL, status TEXT, overtime REAL, bonus REAL, note TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS daily_briefings (id TEXT PRIMARY KEY, summary TEXT, bullets TEXT, metrics TEXT, createdAt INTEGER, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         
         CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items(saleId);
         CREATE INDEX IF NOT EXISTS idx_sale_payments_sale_id ON sale_payments(saleId);
@@ -192,10 +193,136 @@ class DatabaseSingleton {
     try {
         if (this.platform === 'native') await this.nativeDb.execute(coreSchema);
         else this.webDb!.run(coreSchema);
+        await this.ensureLegacyCompatibility();
     } catch (schemaError) {
         console.error('[DB] Schema Error:', schemaError);
         throw new Error('Database schema compilation failed.');
     }
+  }
+
+  private async ensureLegacyCompatibility(): Promise<void> {
+    await this.migrateLegacyColumns('inventory', [
+      ['createdAt', 'INTEGER', 'created_at'],
+      ['updatedAt', 'INTEGER', 'updated_at'],
+    ]);
+
+    await this.migrateLegacyColumns('inventory_private', [
+      ['costPrice', 'REAL', 'cost_price'],
+      ['supplierId', 'TEXT', 'supplier_id'],
+      ['lastPurchaseDate', 'TEXT', 'last_purchase_date'],
+      ['updatedAt', 'INTEGER', 'updated_at'],
+      ['tombstone', 'INTEGER DEFAULT 0'],
+    ]);
+
+    await this.migrateLegacyColumns('sales', [
+      ['discountValue', 'REAL', 'discount_value'],
+      ['discountType', 'TEXT', 'discount_type'],
+      ['paymentMode', 'TEXT', 'payment_mode'],
+      ['customerName', 'TEXT', 'customer_name'],
+      ['customerPhone', 'TEXT', 'customer_phone'],
+      ['customerId', 'TEXT', 'customer_id'],
+      ['footerNote', 'TEXT', 'footer_note'],
+      ['createdAt', 'INTEGER', 'created_at'],
+      ['updatedAt', 'INTEGER', 'updated_at'],
+      ['staffId', 'TEXT'],
+    ]);
+
+    await this.migrateLegacyColumns('sale_items', [
+      ['saleId', 'TEXT', 'sale_id'],
+      ['itemId', 'TEXT', 'item_id'],
+      ['costPrice', 'REAL', 'cost_price'],
+      ['isReturn', 'INTEGER DEFAULT 0', 'is_return'],
+    ]);
+
+    await this.migrateLegacyColumns('sale_payments', [
+      ['saleId', 'TEXT', 'sale_id'],
+    ]);
+
+    await this.migrateLegacyColumns('customers', [
+      ['email', 'TEXT'],
+      ['totalSpent', 'REAL', 'total_spent'],
+      ['createdAt', 'INTEGER', 'created_at'],
+      ['updatedAt', 'INTEGER', 'updated_at'],
+    ]);
+
+    await this.migrateLegacyColumns('customer_payments', [
+      ['customerId', 'TEXT', 'customer_id'],
+      ['createdAt', 'INTEGER', 'created_at'],
+      ['updatedAt', 'INTEGER', 'updated_at'],
+    ]);
+
+    await this.migrateLegacyColumns('expenses', [
+      ['createdAt', 'INTEGER', 'created_at'],
+      ['updatedAt', 'INTEGER', 'updated_at'],
+    ]);
+
+    await this.migrateLegacyColumns('staff', [
+      ['joinedAt', 'TEXT', 'joined_at'],
+      ['updatedAt', 'INTEGER', 'updated_at'],
+    ]);
+
+    await this.migrateLegacyColumns('staff_private', [
+      ['updatedAt', 'INTEGER', 'updated_at'],
+      ['tombstone', 'INTEGER DEFAULT 0'],
+    ]);
+
+    await this.migrateLegacyColumns('attendance', [
+      ['staffId', 'TEXT', 'staff_id'],
+      ['clockIn', 'TEXT', 'clock_in'],
+      ['clockOut', 'TEXT', 'clock_out'],
+      ['totalHours', 'REAL', 'total_hours'],
+      ['updatedAt', 'INTEGER', 'updated_at'],
+    ]);
+
+    await this.migrateLegacyColumns('shop_metadata', [
+      ['updatedAt', 'INTEGER', 'updated_at'],
+    ]);
+
+    await this.migrateLegacyColumns('sync_state', [
+      ['entityType', 'TEXT', 'entity_type'],
+      ['lastSyncedAt', 'INTEGER', 'last_synced_at'],
+    ]);
+
+    await this.migrateLegacyOutbox();
+  }
+
+  private async migrateLegacyColumns(
+    table: string,
+    mappings: Array<[column: string, definition: string, legacyColumn?: string]>,
+  ): Promise<void> {
+    const columns = await this.getColumnNames(table);
+    if (!columns.length) return;
+
+    for (const [column, definition, legacyColumn] of mappings) {
+      if (!columns.includes(column)) {
+        await this.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition};`);
+        columns.push(column);
+      }
+
+      if (legacyColumn && columns.includes(legacyColumn)) {
+        await this.run(
+          `UPDATE ${table}
+             SET ${column} = ${legacyColumn}
+           WHERE ${column} IS NULL AND ${legacyColumn} IS NOT NULL;`,
+        );
+      }
+    }
+  }
+
+  private async migrateLegacyOutbox(): Promise<void> {
+    const legacyColumns = await this.getColumnNames('sync_queue');
+    if (!legacyColumns.length) return;
+
+    await this.run(`
+      INSERT OR REPLACE INTO outbox (opId, entityType, entityId, operation, payload, createdAt, retries)
+      SELECT op_id, entity_type, entity_id, operation, payload, created_at, retries
+      FROM sync_queue;
+    `);
+  }
+
+  private async getColumnNames(table: string): Promise<string[]> {
+    const columns = await this.query<{ name: string }>(`PRAGMA table_info(${table});`);
+    return columns.map((entry) => entry.name);
   }
 
   async nuclearReset(): Promise<void> {

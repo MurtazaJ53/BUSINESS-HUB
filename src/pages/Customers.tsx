@@ -15,16 +15,16 @@ import {
   History,
   X
 } from 'lucide-react';
-import { useSqlQuery } from '@/db/hooks';
+import { useSqlQuery, useSalesQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
-import { formatCurrency, isValidIndianPhone, sanitizePhone } from '@/lib/utils';
+import { formatCurrency, isValidIndianPhone, sanitizePhone, toTimestamp } from '@/lib/utils';
 import type { Customer, Sale, CustomerPayment } from '@/lib/types';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
 export default function Customers() {
   const { upsertCustomer, deleteCustomer, addCustomerPayment } = useBusinessStore();
   const customers = useSqlQuery<Customer>('SELECT * FROM customers WHERE tombstone = 0 ORDER BY name ASC', [], ['customers']);
-  const sales = useSqlQuery<Sale>('SELECT * FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC', [], ['sales']);
+  const sales = useSalesQuery();
   const customerPayments = useSqlQuery<CustomerPayment>('SELECT * FROM customer_payments WHERE tombstone = 0', [], ['customer_payments']);
   const [search, setSearch] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -51,7 +51,7 @@ export default function Customers() {
                                      .map((p: CustomerPayment) => ({ ...p, type: 'PAYMENT' as const }));
     
     return [...customerSales, ...payments]
-           .sort((a: any, b: any) => b.createdAt.localeCompare(a.createdAt));
+           .sort((a: any, b: any) => toTimestamp(b.createdAt) - toTimestamp(a.createdAt));
   };
 
   const stats = {

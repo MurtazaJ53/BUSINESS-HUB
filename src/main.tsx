@@ -6,6 +6,27 @@ import './index.css'
 import { Database } from './db/sqlite'
 import { ShieldAlert } from 'lucide-react'
 
+const CHUNK_RECOVERY_KEY = 'hub_chunk_recovery_at';
+const isChunkLoadError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error || '');
+  return (
+    message.includes('Failed to fetch dynamically imported module') ||
+    message.includes('Importing a module script failed')
+  );
+};
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', (event) => {
+    event.preventDefault();
+
+    const lastRecoveryAt = Number(sessionStorage.getItem(CHUNK_RECOVERY_KEY) || '0');
+    if (!lastRecoveryAt || Date.now() - lastRecoveryAt > 30000) {
+      sessionStorage.setItem(CHUNK_RECOVERY_KEY, String(Date.now()));
+      window.location.reload();
+    }
+  });
+}
+
 // Professional "Rescue UI" - Prevents White Screen of Death
 class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: any, recovering: boolean}> {
   constructor(props: any) { 
@@ -17,12 +38,18 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
 
   handleRecovery = async () => {
     this.setState({ recovering: true });
-    // Execute the Nuclear Reset requested in the expert-grade plan
+    if (isChunkLoadError(this.state.error)) {
+      sessionStorage.removeItem(CHUNK_RECOVERY_KEY);
+      window.location.reload();
+      return;
+    }
+
     await Database.nuclearReset();
   };
 
   render() {
     if (this.state.hasError) {
+      const isStaleUiError = isChunkLoadError(this.state.error);
       return (
         <div style={{ 
           background: '#000', 
@@ -47,11 +74,13 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
           </div>
 
           <h1 style={{ fontSize: '24px', fontWeight: '900', letterSpacing: '-0.025em', marginBottom: '8px', textTransform: 'uppercase' }}>
-            DATABASE BOOT ERROR
+            {isStaleUiError ? 'APP UPDATE REQUIRED' : 'DATABASE BOOT ERROR'}
           </h1>
           
           <p style={{ color: '#9ca3af', fontSize: '15px', maxWidth: '300px', lineHeight: '1.5', marginBottom: '40px' }}>
-            {this.state.error?.message || 'Database connection lost or schema mismatch detected.'}
+            {isStaleUiError
+              ? 'This tab is using an older app bundle. Reload to reconnect to the latest UI safely.'
+              : (this.state.error?.message || 'Database connection lost or schema mismatch detected.')}
           </p>
 
           <div style={{ color: '#374151', fontSize: '12px', marginBottom: '48px' }}>
@@ -75,7 +104,9 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
                 cursor: 'pointer',
                 opacity: this.state.recovering ? 0.5 : 1
               }}>
-              {this.state.recovering ? 'Reparing System...' : 'Attempt System Recovery'}
+              {this.state.recovering
+                ? (isStaleUiError ? 'Reloading UI...' : 'Repairing System...')
+                : (isStaleUiError ? 'Reload Latest UI' : 'Attempt System Recovery')}
             </button>
 
             <button 

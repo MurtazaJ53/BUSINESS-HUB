@@ -22,3 +22,15 @@ export function sanitizePhone(input: string): string {
   // Only allow digits 0-9
   return input.replace(/\D/g, '').slice(0, 10);
 }
+
+export function toTimestamp(value: string | number | Date | null | undefined): number {
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const numericValue = Number(value);
+    if (Number.isFinite(numericValue) && value.trim() !== '') return numericValue;
+    const parsedValue = new Date(value).getTime();
+    return Number.isFinite(parsedValue) ? parsedValue : 0;
+  }
+  return 0;
+}

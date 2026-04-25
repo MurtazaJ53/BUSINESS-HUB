@@ -5,6 +5,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { tableEvents } from './events';
 import { Database } from './sqlite';
+import { salesRepo } from './repositories/salesRepo';
+import type { Sale } from '../lib/types';
 
 /**
  * useLiveQuery — Automatically re-runs a query when dependent tables change.
@@ -59,5 +61,13 @@ export function useSqlQuery<T>(sql: string, params: any[], tables: string[]): T[
     () => Database.query<T>(sql, params),
     tables,
     [sql, ...params]
+  );
+}
+
+export function useSalesQuery(limitCount?: number): Sale[] {
+  return useLiveQuery(
+    () => salesRepo.getAll(limitCount),
+    ['sales', 'sale_items', 'sale_payments'],
+    [limitCount],
   );
 }
