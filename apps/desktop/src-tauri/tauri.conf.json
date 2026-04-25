@@ -4,9 +4,9 @@
   "version": "1.0.0",
   "identifier": "com.businesshub.erp",
   "build": {
-    "beforeDevCommand": "",
-    "devUrl": "http://localhost:5174",
-    "beforeBuildCommand": "npm run build",
+    "beforeDevCommand": "npm --prefix ../.. run dev -- --host 127.0.0.1 --port 5174",
+    "devUrl": "http://127.0.0.1:5174",
+    "beforeBuildCommand": "npm --prefix ../.. run build",
     "frontendDist": "../../../dist"
   },
   "app": {
@@ -15,7 +15,10 @@
       {
         "title": "Business Hub ERP",
         "width": 1280,
-        "height": 800
+        "height": 800,
+        "minWidth": 1100,
+        "minHeight": 720,
+        "resizable": true
       }
     ],
     "security": {
