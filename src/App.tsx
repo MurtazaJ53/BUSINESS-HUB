@@ -22,6 +22,7 @@ const Analytics = React.lazy(() => import('@/pages/Analytics'));
 const Team = React.lazy(() => import('@/pages/Team'));
 const Settings = React.lazy(() => import('@/pages/Settings'));
 const MigrationTool = React.lazy(() => import('@/pages/MigrationTool'));
+const Agents = React.lazy(() => import('@/pages/Agents'));
 
 export default function App() {
   const navigate = useNavigate();
