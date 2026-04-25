@@ -42,3 +42,7 @@ firebase-debug.log*
 *.zip
 *.tar.gz
 
+# Local release outputs
+*.apk
+release-artifacts/
+
