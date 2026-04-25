@@ -240,7 +240,7 @@ export default function Settings() {
                   <p className="text-sm font-bold text-foreground">Cryptographic Reset</p>
                   <p className="text-[10px] text-muted-foreground font-medium mt-0.5">Dispatches a secure auth link to your email.</p>
                 </div>
-                <button onClick={handleSendPasswordReset} className="px-6 py-2.5 bg-primary/10 hover:bg-primary text-primary hover:text-black rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border border-primary/20">
+                <button onClick={handleSendPasswordReset} className="px-6 py-2.5 bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border border-primary/20">
                   Trigger Reset
                 </button>
               </div>
@@ -252,7 +252,7 @@ export default function Settings() {
             <div className="grid grid-cols-2 gap-4">
               <button onClick={() => setTheme('light')} className={cn("p-6 rounded-[2.5rem] text-left transition-all border group", theme === 'light' ? 'bg-card border-primary shadow-lg' : 'bg-accent/30 border-border hover:bg-accent/80')}>
                 <div className="flex justify-between mb-4">
-                  <div className="h-10 w-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500"><Sun className="h-5 w-5" /></div>
+                  <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500"><Sun className="h-5 w-5" /></div>
                   {theme === 'light' && <CheckCircle2 className="h-5 w-5 text-primary" />}
                 </div>
                 <p className={cn("text-xs font-black uppercase tracking-widest", theme === 'light' ? "text-foreground" : "text-muted-foreground")}>Daylight Protocol</p>
@@ -260,7 +260,7 @@ export default function Settings() {
 
               <button onClick={() => setTheme('dark')} className={cn("p-6 rounded-[2.5rem] text-left transition-all border group", theme === 'dark' ? 'bg-card border-primary shadow-neon-primary' : 'bg-accent/30 border-border hover:bg-accent/80')}>
                 <div className="flex justify-between mb-4">
-                  <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500"><Moon className="h-5 w-5" /></div>
+                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary"><Moon className="h-5 w-5" /></div>
                   {theme === 'dark' && <CheckCircle2 className="h-5 w-5 text-primary" />}
                 </div>
                 <p className={cn("text-xs font-black uppercase tracking-widest", theme === 'dark' ? "text-foreground" : "text-muted-foreground")}>Night Ops Mode</p>
@@ -276,7 +276,7 @@ export default function Settings() {
                   <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">{role} Clearance</p>
                 </div>
               </div>
-              <button onClick={() => auth.signOut()} className="h-10 w-10 bg-red-500/10 hover:bg-red-500 hover:text-white text-red-500 rounded-xl flex items-center justify-center transition-all border border-red-500/20 hover:shadow-neon-destructive">
+              <button onClick={() => auth.signOut()} className="h-10 w-10 bg-destructive/10 hover:bg-destructive hover:text-primary-foreground text-destructive rounded-xl flex items-center justify-center transition-all border border-destructive/20 hover:shadow-neon-destructive">
                 <LogOut className="h-4 w-4 ml-1" />
               </button>
           </section>
@@ -297,10 +297,10 @@ export default function Settings() {
                 
                 <button onClick={handleSalesCSV} disabled={exporting === 'sales-csv'} className="w-full flex items-center justify-between p-4 bg-accent/50 hover:bg-accent rounded-2xl transition-all border border-border group">
                   <div className="flex items-center gap-4">
-                    <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500"><RefreshCcw className="h-4 w-4" /></div>
-                    <div className="text-left"><p className="text-sm font-bold text-foreground group-hover:text-blue-500 transition-colors">Transaction History (CSV)</p></div>
+                    <div className="p-2 bg-primary/10 rounded-lg text-primary"><RefreshCcw className="h-4 w-4" /></div>
+                    <div className="text-left"><p className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">Transaction History (CSV)</p></div>
                   </div>
-                  <Download className="h-4 w-4 text-muted-foreground group-hover:text-blue-500" />
+                  <Download className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
                 </button>
 
                 <div className="grid grid-cols-2 gap-3 pt-3 mt-3 border-t border-border">
@@ -314,7 +314,7 @@ export default function Settings() {
             <>
               <section>
                 <SectionHeader icon={ShieldAlert} title="Security Node" subtitle="Access & Integrity Controls" />
-                <div className="glass-card rounded-[2.5rem] p-6 border border-red-500/10 space-y-6">
+                <div className="glass-card rounded-[2.5rem] p-6 border border-destructive/10 space-y-6">
                    <div>
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-3">Master PIN Rotation</p>
                       <div className="flex gap-3">
@@ -326,8 +326,8 @@ export default function Settings() {
                       </div>
                    </div>
 
-                   <div className="pt-6 border-t border-red-500/10">
-                      <button onClick={() => setResetConfirmOpen(true)} className="w-full py-4 bg-red-500/5 hover:bg-red-500/10 text-red-500 rounded-2xl border border-red-500/20 font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3">
+                   <div className="pt-6 border-t border-destructive/10">
+                      <button onClick={() => setResetConfirmOpen(true)} className="w-full py-4 bg-destructive/5 hover:bg-destructive/10 text-destructive rounded-2xl border border-destructive/20 font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3">
                         <AlertTriangle className="h-4 w-4" /> Initialize Core Wipe
                       </button>
                    </div>
@@ -359,7 +359,7 @@ export default function Settings() {
 
       {editOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-md animate-in fade-in" onClick={() => setEditOpen(false)} />
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-md animate-in fade-in" onClick={() => setEditOpen(false)} />
           <div className="relative z-10 w-full max-w-lg bg-card border border-border rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300">
             <h2 className="text-2xl font-black text-foreground mb-6">Modify Parameters</h2>
             
@@ -370,7 +370,7 @@ export default function Settings() {
               </div>
               <div className="space-y-1.5">
                 <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground ml-1">Contact Protocol (10 Digits)</label>
-                <input maxLength={10} className={cn("w-full bg-accent/50 border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none transition-colors", editForm.phone && !isValidIndianPhone(editForm.phone) ? "border-red-500/50 focus:border-red-500" : "border-border focus:border-primary/50")} value={editForm.phone} onChange={e => setEditForm({...editForm, phone: sanitizePhone(e.target.value)})} placeholder="9876543210" />
+                <input maxLength={10} className={cn("w-full bg-accent/50 border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none transition-colors", editForm.phone && !isValidIndianPhone(editForm.phone) ? "border-destructive/50 focus:border-destructive" : "border-border focus:border-primary/50")} value={editForm.phone} onChange={e => setEditForm({...editForm, phone: sanitizePhone(e.target.value)})} placeholder="9876543210" />
               </div>
               <div className="space-y-1.5">
                 <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground ml-1">GST Identifier</label>

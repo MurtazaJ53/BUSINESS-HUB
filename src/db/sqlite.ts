@@ -1,11 +1,13 @@
 /**
- * SQLite Adapter — Indestructible Self-Healing Architecture
+ * SQLite Adapter — Industrial Indestructible Architecture
  * 
- * Optimized for professional deployment. 
- * This engine detects schema corruption and automatically self-repairs.
+ * Optimized for professional deployment and agentic ERP environments.
+ * This engine bypasses migration-log traps by using idempotent schema 
+ * verification on every boot.
  */
 
 import { Capacitor } from '@capacitor/core';
+import { CapacitorSQLite, SQLiteConnection } from '@capacitor-community/sqlite';
 
 export interface RunResult { changes: number; }
 
@@ -52,7 +54,7 @@ class DatabaseSingleton {
   private ready = false;
   private booting = false;
   private bootPromise: Promise<void> | null = null;
-  private nativeSqlite: any = null;
+  private nativeSqlite: SQLiteConnection | null = null;
   private nativeDb: any = null;
   private webDb: SqlJsDatabase | null = null;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -75,7 +77,7 @@ class DatabaseSingleton {
       
       this.ready = true;
       this.booting = false;
-      console.log('[DB] Ready');
+      console.log('[DB] System Online');
     })();
 
     return this.bootPromise;
@@ -83,7 +85,6 @@ class DatabaseSingleton {
 
   private async bootNative(): Promise<void> {
     try {
-      const { CapacitorSQLite, SQLiteConnection } = await import('@capacitor-community/sqlite');
       this.nativeSqlite = new SQLiteConnection(CapacitorSQLite);
 
       const DB_NAME = 'business_hub';
@@ -110,7 +111,8 @@ class DatabaseSingleton {
       this.webDb = saved ? new SQL.Database(saved) : new SQL.Database();
       this.webDb!.run('PRAGMA journal_mode = MEMORY;');
     } catch (err) {
-      this.webDb = (await (await import('sql.js')).default()).Database(); // Fallback
+      const initSqlJs = (await import('sql.js')).default;
+      this.webDb = (await initSqlJs()).Database();
     }
   }
 
@@ -161,7 +163,67 @@ class DatabaseSingleton {
     return { changes: 1 };
   }
 
+  async transaction(stmts: Array<{ sql: string; params?: any[] }>): Promise<void> {
+    this.assertReady();
+    if (this.platform === 'native') {
+      await this.nativeDb.run('BEGIN TRANSACTION;');
+      try {
+        for (const s of stmts) await this.nativeDb.run(s.sql, s.params);
+        await this.nativeDb.run('COMMIT;');
+      } catch (e) {
+        await this.nativeDb.run('ROLLBACK;');
+        throw e;
+      }
+      return;
+    }
+    this.webDb!.run('BEGIN TRANSACTION;');
+    try {
+      for (const s of stmts) this.webDb!.run(s.sql, s.params);
+      this.webDb!.run('COMMIT;');
+    } catch (e) {
+      this.webDb!.run('ROLLBACK;');
+      throw e;
+    }
+  }
+
   private async runMigrations(): Promise<void> {
+    console.log('[DB] Verifying Indestructible Core Schema...');
+
+    const coreSchema = `
+        CREATE TABLE IF NOT EXISTS _migrations (id TEXT PRIMARY KEY, applied_at INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS shop_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL, dirty INTEGER NOT NULL DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS sync_state (entity_type TEXT PRIMARY KEY, last_synced_at INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS outbox (opId TEXT PRIMARY KEY, entityType TEXT NOT NULL, entityId TEXT NOT NULL, operation TEXT NOT NULL, payload TEXT NOT NULL, createdAt INTEGER NOT NULL, retries INTEGER DEFAULT 0);
+        
+        CREATE TABLE IF NOT EXISTS inventory (id TEXT PRIMARY KEY, name TEXT NOT NULL, price REAL, stock REAL, category TEXT, sku TEXT, tombstone INTEGER DEFAULT 0, updatedAt INTEGER, dirty INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS inventory_private (id TEXT PRIMARY KEY, costPrice REAL, lastPurchaseDate TEXT, tombstone INTEGER DEFAULT 0, updatedAt INTEGER, dirty INTEGER DEFAULT 0);
+        
+        CREATE TABLE IF NOT EXISTS sales (id TEXT PRIMARY KEY, customerId TEXT, customerName TEXT, customerPhone TEXT, total REAL NOT NULL, date TEXT, status TEXT, items TEXT NOT NULL, payments TEXT NOT NULL, tombstone INTEGER DEFAULT 0, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0);
+        
+        CREATE TABLE IF NOT EXISTS staff (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT, email TEXT, role TEXT, status TEXT, joinedAt TEXT, permissions TEXT, tombstone INTEGER DEFAULT 0, updatedAt INTEGER, dirty INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS staff_private (id TEXT PRIMARY KEY, salary REAL, pin TEXT, tombstone INTEGER DEFAULT 0, updatedAt INTEGER, dirty INTEGER DEFAULT 0);
+        
+        CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT, balance REAL, totalSpent REAL, tombstone INTEGER DEFAULT 0, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS customer_payments (id TEXT PRIMARY KEY, customerId TEXT, amount REAL, date TEXT, tombstone INTEGER DEFAULT 0, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0);
+        
+        CREATE TABLE IF NOT EXISTS expenses (id TEXT PRIMARY KEY, category TEXT, amount REAL, description TEXT, date TEXT, tombstone INTEGER DEFAULT 0, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS attendance (id TEXT PRIMARY KEY, staffId TEXT, date TEXT, clockIn TEXT, clockOut TEXT, totalHours REAL, status TEXT, overtime REAL, bonus REAL, tombstone INTEGER DEFAULT 0, updatedAt INTEGER, dirty INTEGER DEFAULT 0);
+        
+        CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sales(id);
+        CREATE INDEX IF NOT EXISTS idx_inventory_sku ON inventory(sku);
+    `;
+
+    try {
+        if (this.platform === 'native') {
+            await this.nativeDb.execute(coreSchema);
+        } else {
+            this.webDb!.run(coreSchema);
+        }
+    } catch (schemaError) {
+        console.error('[DB] Schema Compilation Failed:', schemaError);
+        throw new Error('Database schema compilation failed.');
+    }
+
     const checkSchema = async () => {
         try {
             const tables = await this.query<{ name: string }>(
@@ -171,62 +233,19 @@ class DatabaseSingleton {
         } catch (e) { return false; }
     };
 
-    // Stage 1: Meta Reset Check
-    // If the DB was partly initialized in a previous failed session, we wipe it.
-    if (this.platform === 'native') {
-        const hasMigrations = (await this.nativeDb.query("SELECT name FROM sqlite_master WHERE type='table' AND name='_migrations';")).values?.length > 0;
-        const schemaOk = hasMigrations ? await checkSchema() : false;
-
-        if (hasMigrations && !schemaOk) {
-            console.warn('[DB] Schema corruption detected. Executing self-repair factory reset...');
-            await this.nativeDb.close();
-            await this.nativeSqlite.deleteDatabase('business_hub', false);
-            await this.bootNative(); // Re-open fresh
-        }
-    }
-
-    // Stage 2: Initialize Core Tables
-    const initSql = `
-        CREATE TABLE IF NOT EXISTS _migrations (id TEXT PRIMARY KEY, applied_at INTEGER NOT NULL);
-        CREATE TABLE IF NOT EXISTS shop_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL, dirty INTEGER NOT NULL DEFAULT 0);
-    `;
-    if (this.platform === 'native') {
-        await this.nativeDb.execute(initSql);
-    } else {
-        this.webDb!.run(initSql);
-    }
-
-    // Stage 3: Load & Execute Migration
-    const { default: sql0001 } = await import('./migrations/0001_init.sql?raw');
-    const applied = await this.query<{ id: string }>('SELECT id FROM _migrations WHERE id = ?;', ['0001_init']);
-    
-    if (applied.length === 0) {
-        console.log('[DB] Applying Industrial Migration 0001...');
-        if (this.platform === 'native') {
-            await this.nativeDb.execute(sql0001);
-            await this.nativeDb.run('INSERT INTO _migrations (id, applied_at) VALUES (?, ?);', ['0001_init', Date.now()]);
-        } else {
-            this.webDb!.run(sql0001);
-            this.webDb!.run('INSERT INTO _migrations (id, applied_at) VALUES (?, ?);', ['0001_init', Date.now()]);
-        }
-    }
-
-    // Stage 4: High-Reliability Audit
     if (!(await checkSchema())) {
-        throw new Error('Database integrity check failed after self-repair. Please contact support.');
+        throw new Error('Schema Integrity Audit Failed. Critical tables are missing.');
     }
+    console.log('[DB] Schema Verification Complete.');
   }
 
-  /** Nuclear Recovery: Deletes the physical database file and reboots fresh. */
   async nuclearReset(): Promise<void> {
     console.warn('[DB] NUCLEAR RESET TRIGGERED');
     if (this.platform === 'native') {
       try {
-        await this.nativeDb.close();
-        const { CapacitorSQLite, SQLiteConnection } = await import('@capacitor-community/sqlite');
-        const conn = new SQLiteConnection(CapacitorSQLite);
-        await conn.deleteDatabase('business_hub', false);
-      } catch (e) { console.error('Delete failed', e); }
+        if (this.nativeDb) await this.nativeDb.close();
+        await CapacitorSQLite.deleteDatabase({ database: 'business_hub' });
+      } catch (e) { console.error('Nuclear Delete failed:', e); }
     } else {
       localStorage.clear();
       const req = indexedDB.deleteDatabase(IDB_NAME);
@@ -237,9 +256,10 @@ class DatabaseSingleton {
 
   private assertReady(): void {
     if (!this.ready && !this.booting) {
-      throw new Error('[DB] System not ready.');
+      throw new Error('System not ready.');
     }
   }
 }
 
 export const Database = new DatabaseSingleton();
+

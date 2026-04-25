@@ -137,13 +137,13 @@ export default function History() {
               onClick={() => setTab('sales')}
               className={cn(
                 "px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
-                tab === 'sales' ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-muted-foreground hover:text-foreground"
+                tab === 'sales' ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "text-muted-foreground hover:text-foreground"
               )}
             >
               Sales
               <span className={cn(
                 "px-2 py-0.5 rounded-full text-[8px] font-bold",
-                tab === 'sales' ? "bg-white/20" : "bg-accent/50 text-muted-foreground"
+                tab === 'sales' ? "bg-primary-foreground/20" : "bg-accent/50 text-muted-foreground"
               )}>
                 {filteredSales.length}
               </span>
@@ -152,13 +152,13 @@ export default function History() {
               onClick={() => setTab('expenses')}
               className={cn(
                 "px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
-                tab === 'expenses' ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-muted-foreground hover:text-foreground"
+                tab === 'expenses' ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "text-muted-foreground hover:text-foreground"
               )}
             >
               Expenses
               <span className={cn(
                 "px-2 py-0.5 rounded-full text-[8px] font-bold",
-                tab === 'expenses' ? "bg-white/20" : "bg-accent/50 text-muted-foreground"
+                tab === 'expenses' ? "bg-primary-foreground/20" : "bg-accent/50 text-muted-foreground"
               )}>
                 {filteredExpenses.length}
               </span>
@@ -214,16 +214,16 @@ export default function History() {
 
           <div className={cn(
             "glass-card p-6 rounded-[2rem] border-l-4 transition-all duration-500",
-            tab === 'expenses' ? "border-l-red-500 scale-100 opacity-100" : "border-l-transparent scale-95 opacity-50 grayscale"
+            tab === 'expenses' ? "border-l-destructive scale-100 opacity-100" : "border-l-transparent scale-95 opacity-50 grayscale"
           )}>
             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Store Outflow</p>
             <div className="flex items-center justify-between">
-              <h3 className="text-3xl font-black italic tracking-tighter text-red-500">{formatCurrency(totalExpensesAmount)}</h3>
-              <div className="h-10 w-10 rounded-xl bg-red-500/10 flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-red-500 rotate-180" />
+              <h3 className="text-3xl font-black italic tracking-tighter text-destructive">{formatCurrency(totalExpensesAmount)}</h3>
+              <div className="h-10 w-10 rounded-xl bg-destructive/10 flex items-center justify-center">
+                <TrendingUp className="h-5 w-5 text-destructive rotate-180" />
               </div>
             </div>
-            <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-widest">{filteredExpenses.length} Overhead Records</p>
+            <p className="text-[10px] font-bold text-destructive mt-1 uppercase tracking-widest">{filteredExpenses.length} Overhead Records</p>
           </div>
         </div>
       )}
@@ -260,7 +260,7 @@ export default function History() {
                         <div className="flex items-center gap-3">
                           <div className={cn(
                             "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform",
-                            sale.id.startsWith('PAY-') ? "bg-green-500/10 text-green-600" : "bg-primary/5 text-primary"
+                            sale.id.startsWith('PAY-') ? "bg-emerald-500/10 text-emerald-600" : "bg-primary/5 text-primary"
                           )}>
                             {sale.id.startsWith('PAY-') ? (
                               <IndianRupee className="h-5 w-5" />
@@ -297,9 +297,9 @@ export default function History() {
                         <div className="flex items-center gap-2">
                           <div className={cn(
                             "h-2 w-2 rounded-full",
-                            sale.id.startsWith('PAY-') ? "bg-green-500 animate-pulse" : 
+                            sale.id.startsWith('PAY-') ? "bg-emerald-500 animate-pulse" : 
                             (sale.payments && sale.payments.length > 1 ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : 
-                            (sale.paymentMode === 'CASH' ? "bg-green-500" : "bg-primary"))
+                            (sale.paymentMode === 'CASH' ? "bg-emerald-500" : "bg-primary"))
                           )} />
                           <span className="text-[11px] font-black uppercase tracking-widest leading-none">
                             {sale.id.startsWith('PAY-') 
@@ -346,7 +346,7 @@ export default function History() {
                           {canVoidSale && (
                             <button 
                               onClick={() => setDeletingId(sale.id)}
-                              className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-all"
+                              className="p-2 hover:bg-destructive/10 hover:text-destructive rounded-xl transition-all"
                               title="Delete Sale"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -382,14 +382,14 @@ export default function History() {
                   </tr>
                 ) : (
                   filteredExpenses.map((exp: Expense) => (
-                    <tr key={exp.id} className="group hover:bg-red-500/[0.02] transition-colors">
+                    <tr key={exp.id} className="group hover:bg-destructive/[0.02] transition-colors">
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-xl bg-red-500/5 text-red-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                          <div className="h-10 w-10 rounded-xl bg-destructive/5 text-destructive flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                             <TrendingUp className="h-5 w-5" />
                           </div>
                           <div>
-                            <p className="text-sm font-black uppercase tracking-tighter text-red-600">EXPENSE</p>
+                            <p className="text-sm font-black uppercase tracking-tighter text-destructive">EXPENSE</p>
                             <p className="text-[10px] font-bold text-muted-foreground flex items-center gap-1 mt-0.5">
                               {exp.date}
                             </p>
@@ -404,14 +404,14 @@ export default function History() {
                       <td className="px-6 py-5">
                         <p className="text-xs font-bold truncate max-w-[200px]">{exp.description || 'No description'}</p>
                       </td>
-                      <td className="px-6 py-5 text-right font-black text-red-600 tabular-nums">
+                      <td className="px-6 py-5 text-right font-black text-destructive tabular-nums">
                         -{formatCurrency(exp.amount)}
                       </td>
                       <td className="px-6 py-5 text-center">
                         {canDeleteExpense && (
                           <button 
                             onClick={() => setDeletingId(exp.id)}
-                            className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-all"
+                            className="p-2 hover:bg-destructive/10 hover:text-destructive rounded-xl transition-all"
                             title="Delete Expense"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -430,8 +430,8 @@ export default function History() {
       {/* Edit Modal */}
       {editingSale && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingSale(null)} />
-          <div className="relative z-10 w-full max-w-md glass-card rounded-3xl p-8 shadow-2xl animate-in">
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setEditingSale(null)} />
+          <div className="relative z-10 w-full max-w-md bg-card border border-border rounded-3xl p-8 shadow-2xl animate-in">
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h2 className="text-2xl font-black">Edit Order Details</h2>
@@ -491,7 +491,7 @@ export default function History() {
               <div className="pt-4 space-y-3">
                 <button
                   onClick={handleUpdate}
-                  className="w-full premium-gradient text-white py-4 rounded-2xl font-black text-sm hover:shadow-xl transition-all uppercase tracking-widest flex items-center justify-center gap-2"
+                  className="w-full premium-gradient text-primary-foreground py-4 rounded-2xl font-black text-sm hover:shadow-xl transition-all uppercase tracking-widest flex items-center justify-center gap-2"
                 >
                   <Check className="h-5 w-5" /> Save Changes
                 </button>

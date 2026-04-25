@@ -24,6 +24,8 @@ const Settings = React.lazy(() => import('@/pages/Settings'));
 const MigrationTool = React.lazy(() => import('@/pages/MigrationTool'));
 const Agents = React.lazy(() => import('@/pages/Agents'));
 
+import { Database } from '@/db/sqlite';
+
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -77,41 +79,21 @@ export default function App() {
     
     const handleEmergencyReset = async () => {
       try {
-        // 1. Unregister all service workers
-        if ('serviceWorker' in navigator) {
-          const registrations = await navigator.serviceWorker.getRegistrations();
-          for (const registration of registrations) {
-            await registration.unregister();
-          }
-        }
-        // 2. Clear caches
-        if ('caches' in window) {
-          const keys = await caches.keys();
-          for (const key of keys) {
-            await caches.delete(key);
-          }
-        }
-        // 3. Clear IndexedDB
-        indexedDB.deleteDatabase('business_hub_sqljs');
-
-        // 4. Clear local storage for good measure
-        localStorage.clear();
-        // 5. Reload
-        window.location.reload();
+        await Database.nuclearReset();
       } catch (e) {
         window.location.reload();
       }
     };
 
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-6 text-center">
+      <div className="min-h-screen bg-background flex items-center justify-center p-6 text-center">
         <div className="max-w-md space-y-6">
-          <div className="h-20 w-20 rounded-3xl bg-red-500/10 flex items-center justify-center text-red-500 mx-auto shadow-2xl">
+          <div className="h-20 w-20 rounded-3xl bg-destructive/10 flex items-center justify-center text-destructive mx-auto shadow-2xl">
             <ShieldAlert className="h-10 w-10" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-xl font-black text-white uppercase tracking-tighter">Database Boot Error</h1>
-            <p className="text-sm text-zinc-500 font-medium leading-relaxed">
+            <h1 className="text-xl font-black text-foreground uppercase tracking-tighter">Database Boot Error</h1>
+            <p className="text-sm text-muted-foreground font-medium leading-relaxed">
               {isWasmError 
                 ? "The secure vault's binary module is corrupted in your browser cache. A deep reset is required."
                 : dbError}
@@ -122,19 +104,19 @@ export default function App() {
           <div className="space-y-3">
             <button 
               onClick={handleEmergencyReset}
-              className="w-full py-4 bg-red-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-600 transition-all shadow-[0_0_20px_rgba(239,68,68,0.2)]"
+              className="w-full py-4 bg-destructive text-destructive-foreground rounded-2xl font-black text-[10px] uppercase tracking-widest hover:brightness-110 transition-all shadow-[0_0_20px_rgba(239,68,68,0.2)]"
             >
               {isWasmError ? 'Execute Emergency Reset' : 'Attempt System Recovery'}
             </button>
             <button 
               onClick={() => window.location.reload()}
-              className="w-full py-4 bg-white/5 text-zinc-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all"
+              className="w-full py-4 bg-accent text-muted-foreground rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-accent/80 transition-all font-sans"
             >
               Standard Reload
             </button>
           </div>
           {isWasmError && (
-             <p className="text-[9px] text-zinc-600 uppercase tracking-widest font-bold">
+             <p className="text-[9px] text-muted-foreground/60 uppercase tracking-widest font-bold">
                This will clear your local session but fix the loading loop.
              </p>
           )}
@@ -145,12 +127,12 @@ export default function App() {
 
   if (loading || (shopId && !dbReady)) {
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 animate-pulse">
           <div className="h-12 w-12 rounded-2xl bg-primary/20 flex items-center justify-center">
             <Sparkles className="h-6 w-6 text-primary animate-spin" />
           </div>
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">
             {!dbReady && shopId ? 'Booting Secure Vault...' : 'Initializing Hub...'}
           </p>
         </div>
@@ -165,12 +147,12 @@ export default function App() {
 
   return (
     <React.Suspense fallback={
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 animate-pulse">
           <div className="h-12 w-12 rounded-2xl bg-primary/20 flex items-center justify-center">
             <Sparkles className="h-6 w-6 text-primary animate-spin" />
           </div>
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Loading UI...</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Loading UI...</p>
         </div>
       </div>
     }>

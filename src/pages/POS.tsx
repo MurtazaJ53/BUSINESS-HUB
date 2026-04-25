@@ -500,25 +500,25 @@ export default function POS() {
                 <div
                   key={`${item.itemId}-${!!item.isReturn}`}
                   className={`flex items-center gap-3 p-3 border rounded-3xl animate-in zoom-in-95 duration-300 shadow-sm ${
-                    item.isReturn ? 'bg-red-500/5 border-red-500/20' : 'bg-primary/5 border-primary/20'
+                    item.isReturn ? 'bg-destructive/5 border-destructive/20' : 'bg-primary/5 border-primary/20'
                   }`}
                 >
-                  <div className={`h-12 w-12 shrink-0 rounded-2xl flex items-center justify-center shadow-md ${item.isReturn ? 'bg-red-500' : 'premium-gradient'}`}>
-                    {item.isReturn ? <RotateCcw className="h-5 w-5 text-white" /> : <Package className="h-5 w-5 text-white" />}
+                  <div className={`h-12 w-12 shrink-0 rounded-2xl flex items-center justify-center shadow-md ${item.isReturn ? 'bg-destructive' : 'premium-gradient'}`}>
+                    {item.isReturn ? <RotateCcw className="h-5 w-5 text-destructive-foreground" /> : <Package className="h-5 w-5 text-primary-foreground" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 mb-1">
                       <p className="text-[11px] font-black uppercase tracking-tight truncate">{item.name}</p>
-                      {item.isReturn && <span className="text-[7px] font-black uppercase bg-red-500 text-white px-1 rounded">Return</span>}
+                      {item.isReturn && <span className="text-[7px] font-black uppercase bg-destructive text-destructive-foreground px-1 rounded">Return</span>}
                     </div>
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-1">
-                        <span className={`text-[10px] font-black ${item.isReturn ? 'text-red-500' : 'text-primary'}`}>{item.isReturn ? '-' : ''}₹</span>
+                        <span className={`text-[10px] font-black ${item.isReturn ? 'text-destructive' : 'text-primary'}`}>{item.isReturn ? '-' : ''}₹</span>
                         <input 
                           type="number"
                           value={item.price}
                           onChange={(e) => updatePrice(item.itemId, !!item.isReturn, parseFloat(e.target.value) || 0)}
-                          className={`bg-transparent border-none p-0 text-[10px] font-black w-14 focus:ring-0 ${item.isReturn ? 'text-red-500' : 'text-primary'}`}
+                          className={`bg-transparent border-none p-0 text-[10px] font-black w-14 focus:ring-0 ${item.isReturn ? 'text-destructive' : 'text-primary'}`}
                         />
                       </div>
                     </div>
@@ -533,14 +533,14 @@ export default function POS() {
                     <span className="text-[10px] font-black min-w-[1rem] text-center">{item.quantity}</span>
                     <button 
                       onClick={() => updateQty(item.itemId, !!item.isReturn, 1)}
-                      className={`p-1 hover:bg-accent rounded-lg transition-colors ${item.isReturn ? 'text-red-500' : 'text-primary'}`}
+                      className={`p-1 hover:bg-accent rounded-lg transition-colors ${item.isReturn ? 'text-destructive' : 'text-primary'}`}
                     >
                       <Plus className="h-3 w-3" />
                     </button>
                     <div className="w-px h-3 bg-border/50 mx-0.5" />
                     <button 
                       onClick={() => removeFromCart(item.itemId, !!item.isReturn)}
-                      className="p-1 hover:bg-red-500/10 hover:text-red-500 rounded-lg transition-colors"
+                      className="p-1 hover:bg-destructive/10 hover:text-destructive rounded-lg transition-colors"
                     >
                       <Trash2 className="h-3 w-3" />
                     </button>
@@ -560,7 +560,7 @@ export default function POS() {
           {drillDepth > 0 && !search && (
             <button
               onClick={() => navigateTo((drillDepth - 1) as any, drillDepth === 2 ? activeCategory : null)}
-              className="flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-sm active:scale-95"
+              className="flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-primary hover:text-primary-foreground transition-all shadow-sm active:scale-95"
             >
               <ArrowRight className="h-3 w-3 rotate-180" />
               Back
@@ -606,7 +606,7 @@ export default function POS() {
               placeholder={`Filter ${drillDepth === 0 ? 'Categories' : drillDepth === 1 ? 'Products' : 'Variants'}...`}
               value={localSearch}
               onChange={(e) => setLocalSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 bg-accent/30 border border-border/50 rounded-xl text-[10px] font-bold focus:outline-none focus:ring-1 focus:ring-primary/30"
+              className="w-full pl-8 pr-3 py-1.5 bg-accent border border-border rounded-xl text-[10px] font-bold focus:outline-none focus:ring-1 focus:ring-primary/30"
             />
             {localSearch && (
               <button 
@@ -628,7 +628,7 @@ export default function POS() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search catalog named/barcode..."
-            className="w-full bg-accent/30 border-border/50 text-foreground placeholder:text-muted-foreground/60 rounded-2xl py-4 pl-12 pr-24 focus:ring-2 focus:ring-primary/50 transition-all font-bold text-sm"
+            className="w-full bg-accent border border-border text-foreground placeholder:text-muted-foreground/60 rounded-2xl py-4 pl-12 pr-24 focus:ring-2 focus:ring-primary/50 transition-all font-bold text-sm"
           />
           <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
             <button
@@ -668,7 +668,7 @@ export default function POS() {
           />
           <button 
             onClick={addCustom} 
-            className="px-4 py-2 bg-primary text-white rounded-xl font-bold text-sm hover:scale-105 active:scale-95 transition-all shadow-md"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-xl font-bold text-sm hover:scale-105 active:scale-95 transition-all shadow-md"
             title="Add Custom Item"
           >
             <Plus className="h-4 w-4" />
@@ -700,7 +700,7 @@ export default function POS() {
                     className="glass-card p-6 rounded-3xl text-left transition-all hover:shadow-2xl hover:-translate-y-1 hover:border-primary/30 group active:scale-95"
                   >
                     <div className="h-12 w-12 premium-gradient rounded-2xl flex items-center justify-center shadow-lg mb-4 group-hover:scale-110 transition-transform">
-                      <Sparkles className="h-6 w-6 text-white" />
+                      <Sparkles className="h-6 w-6 text-primary-foreground" />
                     </div>
                     <h3 className="font-black text-sm uppercase tracking-tighter leading-tight break-words">{cat}</h3>
                     <p className="text-[10px] text-muted-foreground font-bold mt-1 uppercase tracking-widest">{count} Products</p>
@@ -753,12 +753,12 @@ export default function POS() {
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="h-10 w-10 premium-gradient rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
-                          <Package className="h-5 w-5 text-white" />
+                          <Package className="h-5 w-5 text-primary-foreground" />
                         </div>
                         <div className="flex gap-1.5 grayscale group-hover:grayscale-0 transition-all">
                           <button
                             onClick={(e) => { e.stopPropagation(); addToCart(product, true); }}
-                            className="h-8 w-8 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                            className="h-8 w-8 rounded-xl bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-all shadow-sm"
                             title="Add as Return"
                           >
                             <RotateCcw className="h-4 w-4" />
@@ -775,7 +775,7 @@ export default function POS() {
                             </span>
                           )}
                           <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-lg border ${
-                            outOfStock ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                            outOfStock ? 'bg-destructive/10 text-destructive border-destructive/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
                           }`}>
                             Stk: {product.stock || 0}
                           </span>
@@ -819,12 +819,12 @@ export default function POS() {
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="h-10 w-10 premium-gradient rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
-                      <Package className="h-5 w-5 text-white" />
+                      <Package className="h-5 w-5 text-primary-foreground" />
                     </div>
                     <div className="flex gap-1.5 grayscale group-hover:grayscale-0 transition-all">
                       <button
                         onClick={(e) => { e.stopPropagation(); addToCart(product, true); }}
-                        className="h-8 w-8 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                        className="h-8 w-8 rounded-xl bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-all shadow-sm"
                         title="Add as Return"
                       >
                         <RotateCcw className="h-4 w-4" />
@@ -844,7 +844,7 @@ export default function POS() {
                         </span>
                       )}
                       <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-lg border ${
-                        outOfStock ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                        outOfStock ? 'bg-destructive/10 text-destructive border-destructive/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
                       }`}>
                         Stk: {product.stock || 0}
                       </span>
@@ -1125,7 +1125,7 @@ export default function POS() {
                 disabled={!canCharge || isProcessing}
                 className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm transition-all flex items-center justify-center gap-3 ${
                   canCharge && !isProcessing
-                    ? (calcTotal() < 0 ? 'bg-red-500 text-white shadow-xl hover:-translate-y-0.5 active:scale-95' : 'premium-gradient text-white shadow-xl hover:-translate-y-0.5 active:scale-95')
+                    ? (calcTotal() < 0 ? 'bg-destructive text-destructive-foreground shadow-xl hover:-translate-y-0.5 active:scale-95' : 'premium-gradient text-primary-foreground shadow-xl hover:-translate-y-0.5 active:scale-95')
                     : 'bg-accent text-muted-foreground cursor-not-allowed opacity-50'
                 }`}
               >
@@ -1148,9 +1148,9 @@ export default function POS() {
         <div className="lg:hidden fixed bottom-6 left-6 right-6 z-[200] animate-in slide-in-from-bottom-5">
           <button 
             onClick={() => setTerminalStep('checkout')}
-            className="w-full premium-gradient text-white py-4 rounded-3xl font-black uppercase tracking-widest shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all border border-white/20"
+            className="w-full premium-gradient text-primary-foreground py-4 rounded-3xl font-black uppercase tracking-widest shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all border border-primary-foreground/20"
           >
-            <div className="bg-white/20 px-2 py-0.5 rounded-lg text-xs">
+            <div className="bg-primary-foreground/20 px-2 py-0.5 rounded-lg text-xs">
               {cart.length}
             </div>
             Review Order
@@ -1187,10 +1187,10 @@ export default function POS() {
 
       {stockWarningItems.length > 0 && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 overflow-y-auto">
-          <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={() => { setStockWarningItems([]); setShowPinField(false); setPinInput(''); }} />
-          <div className="relative z-10 w-full max-w-md glass-card rounded-[2.5rem] p-8 border-red-500/20 shadow-[0_0_50px_rgba(239,68,68,0.15)] animate-in zoom-in-95 duration-300">
-            <div className="flex items-center gap-4 text-red-500 mb-8">
-              <div className="h-14 w-14 rounded-3xl bg-red-500/10 flex items-center justify-center shadow-[inset_0_0_20px_rgba(239,68,68,0.1)]">
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-xl" onClick={() => { setStockWarningItems([]); setShowPinField(false); setPinInput(''); }} />
+          <div className="relative z-10 w-full max-w-md bg-card rounded-[2.5rem] p-8 border border-destructive/20 shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="flex items-center gap-4 text-destructive mb-8">
+              <div className="h-14 w-14 rounded-3xl bg-destructive/10 flex items-center justify-center">
                 <AlertCircle className="h-7 w-7" />
               </div>
               <div>

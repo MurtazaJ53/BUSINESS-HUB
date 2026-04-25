@@ -137,7 +137,7 @@ const PermissionTable = ({ permissions = {}, onChange }: { permissions: Permissi
                             className={cn(
                               "h-5 w-5 rounded-md border flex items-center justify-center transition-all",
                               isActive
-                                ? "bg-primary border-primary text-white scale-110 shadow-lg shadow-primary/20"
+                                ? "bg-primary border-primary text-primary-foreground scale-110 shadow-lg shadow-primary/20"
                                 : "bg-accent/30 border-border/50 text-muted-foreground hover:bg-accent hover:border-primary/30"
                             )}
                           >
@@ -282,7 +282,7 @@ export default function Team() {
           {canEditTeam && (
             <button
               onClick={() => setIsAddingStaff(true)}
-              className="premium-gradient text-white px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-95"
+              className="premium-gradient text-primary-foreground px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-95"
             >
               <UserPlus className="h-4 w-4" />
               Add Member
@@ -321,13 +321,13 @@ export default function Team() {
                 <Ticket className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="text-sm font-black uppercase tracking-widest text-zinc-500">Staff Access Engine</h3>
+                <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground">Staff Access Engine</h3>
                 <div className="flex items-center gap-3">
                   <p className="text-2xl font-black tracking-tighter">
                     {invitations[0]?.code || 'No Active Code'}
                   </p>
                   {invitations[0] && (
-                    <span className="bg-green-500/10 text-green-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">Active</span>
+                    <span className="bg-emerald-500/10 text-emerald-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">Active</span>
                   )}
                 </div>
               </div>
@@ -358,7 +358,7 @@ export default function Team() {
                   }
                 }}
                 disabled={generatingInvite}
-                className="bg-primary text-white p-3 rounded-xl hover:shadow-lg hover:shadow-primary/30 transition-all flex items-center gap-2 group"
+                className="bg-primary text-primary-foreground p-3 rounded-xl hover:shadow-lg hover:shadow-primary/30 transition-all flex items-center gap-2 group"
               >
                 <PlusCircle className="h-4 w-4 group-hover:rotate-90 transition-transform" />
                 <span className="text-[10px] font-black uppercase tracking-widest">Generate New Code</span>
@@ -367,7 +367,7 @@ export default function Team() {
               {invitations[0] && (
                 <button
                   onClick={() => shareInviteWhatsApp(invitations[0].code, shop?.name || 'Our Shop')}
-                  className="bg-green-500/10 text-green-500 border border-green-500/20 p-3 rounded-xl hover:bg-green-500 hover:text-white transition-all flex items-center gap-2"
+                  className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 p-3 rounded-xl hover:bg-emerald-500 hover:text-white transition-all flex items-center gap-2"
                 >
                   <Share2 className="h-4 w-4" />
                   <span className="text-[10px] font-black uppercase tracking-widest">Share Hub</span>
@@ -381,7 +381,7 @@ export default function Team() {
                     showToast('Code Copied');
                   }
                 }}
-                className="bg-zinc-500/10 text-zinc-500 p-3 rounded-xl hover:bg-zinc-500 hover:text-white transition-all text-[10px] font-black uppercase tracking-widest"
+                className="bg-muted/10 text-muted-foreground p-3 rounded-xl hover:bg-muted hover:text-foreground transition-all text-[10px] font-black uppercase tracking-widest"
               >
                 Copy
               </button>
@@ -435,8 +435,8 @@ export default function Team() {
                     <h3 className="text-base font-black tracking-tight">{s.name}</h3>
                     <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider">{s.role}</p>
                     <div className="mt-1 flex items-center gap-2">
-                      <span className={cn("h-1.5 w-1.5 rounded-full", s.status === 'active' ? "bg-green-500 animate-pulse" : "bg-zinc-500")} />
-                      <span className="text-[10px] font-black tracking-widest text-zinc-500 uppercase">{s.status}</span>
+                      <span className={cn("h-1.5 w-1.5 rounded-full", s.status === 'active' ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground")} />
+                      <span className="text-[10px] font-black tracking-widest text-muted-foreground uppercase">{s.status}</span>
                     </div>
                   </div>
                 </div>
@@ -464,7 +464,7 @@ export default function Team() {
                      {s.email && (
                        <button 
                          onClick={() => showToast('Email Automation: Coming Soon (Requires Domain Verification)')}
-                         className="text-[10px] font-black uppercase tracking-[0.1em] text-zinc-500/50 cursor-not-allowed transition-all flex items-center gap-1.5"
+                         className="text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground/50 cursor-not-allowed transition-all flex items-center gap-1.5"
                        >
                          <Send className="h-3 w-3" /> Mail (Locked)
                        </button>
@@ -478,7 +478,7 @@ export default function Team() {
                            inviteCode: invitations[0]?.code || 'HUBPRO',
                            shopName: shop?.name || 'Our Shop'
                          })}
-                         className="text-[10px] font-black uppercase tracking-[0.1em] text-green-500 hover:text-green-500/70 transition-all flex items-center gap-1.5"
+                         className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-500 hover:text-emerald-500/70 transition-all flex items-center gap-1.5"
                        >
                          <MessageCircle className="h-3 w-3" /> WhatsApp
                        </button>
@@ -491,7 +491,7 @@ export default function Team() {
                              setPinInput('');
                              setConfirmRemoveStaff(s);
                            }}
-                           className="text-[10px] font-black uppercase tracking-[0.1em] text-red-500/50 hover:text-red-500 transition-all flex items-center gap-1.5 ml-auto"
+                           className="text-[10px] font-black uppercase tracking-[0.1em] text-destructive/50 hover:text-destructive transition-all flex items-center gap-1.5 ml-auto"
                          >
                            <Trash2 className="h-3 w-3" /> Remove
                          </button>
@@ -550,7 +550,7 @@ export default function Team() {
                       bonus: 0
                     });
                   }}
-                  className="h-10 px-4 bg-primary text-white rounded-xl flex items-center gap-2 hover:bg-primary/90 transition-all text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 active:scale-95"
+                  className="h-10 px-4 bg-primary text-primary-foreground rounded-xl flex items-center gap-2 hover:bg-primary/90 transition-all text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 active:scale-95"
                 >
                   <Clock9 className="h-4 w-4" />
                   Manual Log
@@ -572,12 +572,12 @@ export default function Team() {
             <table className="w-full">
               <thead className="bg-accent/10">
                 <tr>
-                  <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-zinc-500">Staff Member</th>
-                  <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-zinc-500">In</th>
-                  <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-zinc-500">Out</th>
-                  <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-zinc-500">Hours</th>
-                  <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-zinc-500">Status</th>
-                  <th className="px-8 py-4 text-right text-[10px] font-black uppercase tracking-widest text-zinc-500">Actions</th>
+                  <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-muted-foreground">Staff Member</th>
+                  <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-muted-foreground">In</th>
+                  <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-muted-foreground">Out</th>
+                  <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-muted-foreground">Hours</th>
+                  <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-muted-foreground">Status</th>
+                  <th className="px-8 py-4 text-right text-[10px] font-black uppercase tracking-widest text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/30">
@@ -604,7 +604,7 @@ export default function Team() {
                       </td>
                       <td className="px-8 py-5">
                         <div className="flex items-center gap-2 text-xs font-bold text-foreground">
-                          <Clock3 className="h-3.5 w-3.5 text-zinc-500" />
+                          <Clock3 className="h-3.5 w-3.5 text-muted-foreground" />
                           {record?.clockOut || '--:--'}
                         </div>
                       </td>
@@ -634,7 +634,7 @@ export default function Team() {
                             )}
                           </div>
                         ) : (
-                          <span className="text-[10px] font-bold text-zinc-400 opacity-50 italic">—</span>
+                          <span className="text-[10px] font-bold text-muted-foreground/50 opacity-50 italic">—</span>
                         )}
                       </td>
                       <td className="px-8 py-5">
@@ -649,7 +649,7 @@ export default function Team() {
                                   clockIn: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
                                   status: 'PRESENT'
                                 })}
-                                className="px-3 py-1.5 bg-green-500/10 text-green-500 text-[9px] font-black uppercase tracking-widest rounded-lg border border-green-500/20 hover:bg-green-500 hover:text-white transition-all"
+                                className="px-3 py-1.5 bg-emerald-500/10 text-emerald-500 text-[9px] font-black uppercase tracking-widest rounded-lg border border-emerald-500/20 hover:bg-emerald-500 hover:text-white transition-all"
                               >
                                 Auto In
                               </button>
@@ -695,7 +695,7 @@ export default function Team() {
                             ) : (
                               <div className={cn(
                                 "inline-flex items-center gap-1.5 px-3 py-1 rounded-full",
-                                record.status === 'PRESENT' ? "bg-green-500/10 text-green-500" : "bg-accent/50 text-muted-foreground"
+                                record.status === 'PRESENT' ? "bg-emerald-500/10 text-emerald-500" : "bg-accent/50 text-muted-foreground"
                               )}>
                                 <span className="text-[9px] font-black uppercase tracking-widest">{record.status}</span>
                               </div>
@@ -716,15 +716,15 @@ export default function Team() {
         <div className="space-y-6">
           {canViewPayroll && (
             <div className="p-8 glass-card rounded-[3rem] border border-primary/20 bg-primary/5 flex flex-col md:flex-row items-center gap-8">
-              <div className="h-20 w-20 rounded-[2rem] premium-gradient flex items-center justify-center text-white shadow-2xl shadow-primary/40">
-                <DollarSign className="h-10 w-10 text-white" />
+              <div className="h-20 w-20 rounded-[2rem] premium-gradient flex items-center justify-center text-primary-foreground shadow-2xl shadow-primary/40">
+                <DollarSign className="h-10 w-10 text-primary-foreground" />
               </div>
               <div className="flex-1 text-center md:text-left">
                 <h2 className="text-2xl font-black tracking-tight mb-1">Monthly Payroll Hub</h2>
                 <p className="text-sm font-medium text-muted-foreground">Automation for <span className="text-primary font-black">{new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</span> based on live attendance.</p>
               </div>
               <div className="flex gap-4">
-                <button className="px-8 py-4 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-primary/30 hover:scale-105 active:scale-95 transition-all">
+                <button className="px-8 py-4 bg-primary text-primary-foreground font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-primary/30 hover:scale-105 active:scale-95 transition-all">
                   Release All Salaries
                 </button>
               </div>
@@ -745,7 +745,7 @@ export default function Team() {
                   isPaid && "bg-green-500/[0.02]"
                 )}>
                   {isPaid && (
-                    <div className="absolute top-0 right-0 px-4 py-1 bg-green-500 text-white text-[8px] font-black uppercase tracking-widest rounded-bl-xl shadow-lg">
+                    <div className="absolute top-0 right-0 px-4 py-1 bg-emerald-500 text-primary-foreground text-[8px] font-black uppercase tracking-widest rounded-bl-xl shadow-lg">
                       Distributed
                     </div>
                   )}
@@ -813,8 +813,8 @@ export default function Team() {
 
       {isAddingStaff && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setIsAddingStaff(false)} />
-          <div className="relative z-10 w-full max-w-lg glass-card rounded-[3rem] p-10 border border-white/10 shadow-2xl animate-in zoom-in slide-in-from-bottom-4 duration-300">
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-md" onClick={() => setIsAddingStaff(false)} />
+          <div className="relative z-10 w-full max-w-lg bg-card border border-border rounded-[3rem] p-10 shadow-2xl animate-in zoom-in slide-in-from-bottom-4 duration-300">
             <h2 className="text-2xl font-black mb-8 flex items-center gap-3">
               <UserPlus className="h-7 w-7 text-primary" />
               Add New Member
@@ -871,7 +871,7 @@ export default function Team() {
                     <ShieldAlert className="h-5 w-5 text-primary" />
                     <h3 className="text-lg font-black tracking-tight">App Access & Permissions</h3>
                   </div>
-                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4">Set which modules the new member can access</p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-4">Set which modules the new member can access</p>
                   
                   <div className="space-y-6 pt-2">
                     <PermissionTable 
@@ -882,7 +882,7 @@ export default function Team() {
                 </div>
               </div>
               <div className="pt-4 flex gap-4">
-                <button type="submit" className="flex-1 premium-gradient text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:shadow-primary/20 transition-all">Add to Roster</button>
+                <button type="submit" className="flex-1 premium-gradient text-primary-foreground py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:shadow-primary/20 transition-all">Add to Roster</button>
                 <button type="button" onClick={() => setIsAddingStaff(false)} className="flex-1 py-4 bg-accent/50 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors hover:bg-accent/70">Cancel</button>
               </div>
             </form>
@@ -892,8 +892,8 @@ export default function Team() {
 
       {manualEntryStaff && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setManualEntryStaff(null)} />
-          <div className="relative z-10 w-full max-w-lg glass-card rounded-[3rem] p-10 border border-white/10 shadow-2xl animate-in zoom-in slide-in-from-bottom-4 duration-300">
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-md" onClick={() => setManualEntryStaff(null)} />
+          <div className="relative z-10 w-full max-w-lg bg-card border border-border rounded-[3rem] p-10 shadow-2xl animate-in zoom-in slide-in-from-bottom-4 duration-300">
             <h2 className="text-2xl font-black mb-2 flex items-center gap-3">
               <Clock9 className="h-7 w-7 text-primary" />
               Manual Attendance Entry
@@ -1010,7 +1010,7 @@ export default function Team() {
               </div>
 
               <div className="pt-4 flex gap-4">
-                <button type="submit" className="flex-1 premium-gradient text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:shadow-primary/20 transition-all">Inject Record</button>
+                <button type="submit" className="flex-1 premium-gradient text-primary-foreground py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:shadow-primary/20 transition-all">Inject Record</button>
                 <button type="button" onClick={() => setManualEntryStaff(null)} className="flex-1 py-4 bg-accent/50 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors hover:bg-accent/70">Cancel</button>
               </div>
             </form>
@@ -1020,8 +1020,8 @@ export default function Team() {
 
       {editingStaff && canEditTeam && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setEditingStaff(null)} />
-          <div className="relative z-10 w-full max-w-2xl glass-card rounded-[3rem] p-10 border border-white/10 shadow-2xl animate-in zoom-in slide-in-from-bottom-4 duration-300 max-h-[90vh] overflow-y-auto custom-scrollbar">
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-md" onClick={() => setEditingStaff(null)} />
+          <div className="relative z-10 w-full max-w-2xl bg-card border border-border rounded-[3rem] p-10 shadow-2xl animate-in zoom-in slide-in-from-bottom-4 duration-300 max-h-[90vh] overflow-y-auto custom-scrollbar">
             <h2 className="text-2xl font-black mb-8 flex items-center gap-3 text-secondary">
               <Edit3 className="h-7 w-7 text-primary" />
               Edit Team Member
@@ -1080,7 +1080,7 @@ export default function Team() {
                   <ShieldAlert className="h-5 w-5 text-primary" />
                   <h3 className="text-lg font-black tracking-tight">App Access & Permissions</h3>
                 </div>
-                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4">Toggle modules this staff member can access</p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-4">Toggle modules this staff member can access</p>
                 
                 <div className="space-y-6 pt-2">
                   <PermissionTable 
@@ -1091,7 +1091,7 @@ export default function Team() {
               </div>
 
               <div className="pt-4 flex gap-4">
-                <button type="submit" className="flex-1 premium-gradient text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:shadow-primary/20 transition-all">Save Changes</button>
+                <button type="submit" className="flex-1 premium-gradient text-primary-foreground py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:shadow-primary/20 transition-all">Save Changes</button>
                 <button type="button" onClick={() => setEditingStaff(null)} className="flex-1 py-4 bg-accent/50 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors hover:bg-accent/70">Cancel</button>
               </div>
             </form>
@@ -1121,16 +1121,16 @@ export default function Team() {
           onInputChange={setPinInput}
           inputPlaceholder="Enter Admin PIN..."
           inputType="password"
-          icon={<ShieldCheck className="h-8 w-8 text-red-500" />}
+          icon={<ShieldCheck className="h-8 w-8 text-destructive" />}
         />
       )}
       {/* ── MODAL: Payout Confirmation & Advance Pay ── */}
       {payoutStaff && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-md animate-in fade-in" onClick={() => setPayoutStaff(null)} />
-          <div className="relative z-10 w-full max-w-md glass-card rounded-[3rem] p-10 border border-white/10 shadow-2xl animate-in zoom-in slide-in-from-bottom-4 duration-300">
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-md animate-in fade-in" onClick={() => setPayoutStaff(null)} />
+          <div className="relative z-10 w-full max-w-md bg-card border border-border rounded-[3rem] p-10 shadow-2xl animate-in zoom-in slide-in-from-bottom-4 duration-300">
             <div className="flex items-center gap-4 mb-8">
-              <div className="h-14 w-14 rounded-2xl premium-gradient flex items-center justify-center text-white shadow-xl">
+              <div className="h-14 w-14 rounded-2xl premium-gradient flex items-center justify-center text-primary-foreground shadow-xl">
                 <CreditCard className="h-7 w-7" />
               </div>
               <div>
@@ -1185,7 +1185,7 @@ export default function Team() {
                     onChange={(e) => setCustomAmount(e.target.value)}
                     readOnly={!isAdvanceMode}
                     placeholder="0.00"
-                    className="w-full h-20 bg-white dark:bg-zinc-900 border-2 border-border/50 rounded-3xl pl-12 pr-6 text-3xl font-black focus:outline-none focus:ring-4 focus:ring-primary/20 focus:border-primary transition-all disabled:opacity-75"
+                    className="w-full h-20 bg-background border-2 border-border/50 rounded-3xl pl-12 pr-6 text-3xl font-black focus:outline-none focus:ring-4 focus:ring-primary/20 focus:border-primary transition-all disabled:opacity-75"
                   />
                 </div>
               </div>
@@ -1212,7 +1212,7 @@ export default function Team() {
                     setPayoutLoading(false);
                   }}
                   disabled={payoutLoading || !customAmount || Number(customAmount) <= 0}
-                  className="w-full py-5 premium-gradient text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all disabled:grayscale disabled:opacity-50 disabled:scale-100"
+                  className="w-full py-5 premium-gradient text-primary-foreground rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all disabled:grayscale disabled:opacity-50 disabled:scale-100"
                 >
                   {payoutLoading ? 'Recording Expense...' : 'Confirm Distribution'}
                 </button>

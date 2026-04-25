@@ -10,6 +10,25 @@
     <link rel="manifest" href="./manifest.json" />
     <link rel="apple-touch-icon" href="./logo.png" />
     <title>Business Hub | Pro Edition</title>
+    <script>
+      (function() {
+        const theme = localStorage.getItem('hub_theme') || 'dark';
+        if (theme === 'dark') {
+          document.documentElement.classList.add('dark');
+          document.documentElement.style.backgroundColor = '#000000';
+          document.body.style.backgroundColor = '#000000';
+        } else {
+          document.documentElement.classList.remove('dark');
+          document.documentElement.style.backgroundColor = '#fafafa';
+          document.body.style.backgroundColor = '#fafafa';
+        }
+      })();
+    </script>
+    <style>
+      :root { background-color: #fafafa; }
+      :root.dark { background-color: #000000; }
+      body { margin: 0; padding: 0; min-height: 100vh; transition: background-color 0.3s ease; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
