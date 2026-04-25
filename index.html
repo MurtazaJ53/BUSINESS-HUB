@@ -14,14 +14,15 @@
     <script>
       (function() {
         const theme = localStorage.getItem('hub_theme') || 'dark';
+        const body = document.body;
         if (theme === 'dark') {
           document.documentElement.classList.add('dark');
           document.documentElement.style.backgroundColor = '#000000';
-          document.body.style.backgroundColor = '#000000';
+          if (body) body.style.backgroundColor = '#000000';
         } else {
           document.documentElement.classList.remove('dark');
           document.documentElement.style.backgroundColor = '#fafafa';
-          document.body.style.backgroundColor = '#fafafa';
+          if (body) body.style.backgroundColor = '#fafafa';
         }
       })();
     </script>
