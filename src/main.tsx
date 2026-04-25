@@ -5,6 +5,7 @@ import App from './App.tsx'
 import './index.css'
 import { Database } from './db/sqlite'
 import { ShieldAlert } from 'lucide-react'
+import AppPopupHost from './components/AppPopupHost'
 
 const CHUNK_RECOVERY_KEY = 'hub_chunk_recovery_at';
 
@@ -168,6 +169,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <BrowserRouter>
+        <AppPopupHost />
         <App />
       </BrowserRouter>
     </ErrorBoundary>

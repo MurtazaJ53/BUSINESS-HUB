@@ -18,6 +18,7 @@ import { logAuditEntry } from '@/lib/audit';
 import Input from '@/components/Input';
 import { db } from '@/lib/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { showAppPopup } from '@/lib/popup';
 
 export default function Reconciliation() {
   const { shopId, role } = useBusinessStore();
@@ -81,7 +82,12 @@ export default function Reconciliation() {
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
       console.error(err);
-      alert('Failed to save reconciliation');
+      showAppPopup({
+        title: 'Save Failed',
+        message: 'Failed to save reconciliation.',
+        variant: 'error',
+        confirmText: 'Close',
+      });
     } finally {
       setIsSaving(false);
     }

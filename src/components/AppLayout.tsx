@@ -8,13 +8,13 @@ import {
   Bot, Fingerprint, Delete, Loader2, Lock
 } from 'lucide-react';
 import { NativeBiometric } from '@capgo/capacitor-native-biometric';
-import { httpsCallable } from 'firebase/functions';
 
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { useAuthStore } from '@/lib/useAuthStore';
 import { usePermission } from '@/hooks/usePermission';
 import { useSqlQuery } from '@/db/hooks';
-import { auth, functions } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
+import { verifyAdminPin as verifyAdminPinCode } from '@/lib/admin';
 import { ADMIN_PERMISSION_TEMPLATE } from '@/lib/permissions';
 import { formatCurrency, cn } from '@/lib/utils';
 import type { InventoryItem, Sale } from '@/lib/types';
@@ -38,7 +38,7 @@ const PAGE_TITLES: Record<string, string> = {
   dashboard: 'Command Center', inventory: 'Inventory', sell: 'Sales Hub',
   customers: 'Customer Ledger', expenses: 'Expense Ledger', 'stock-alerts': 'Stock Alerts',
   analytics: 'Analytics', history: 'History Log', team: 'Team Hub',
-  reconciliation: 'Cash Reconciliation', agents: 'AI Command', settings: 'Control Center',
+  reconciliation: 'Cash Reconciliation', agents: 'AI Agents', settings: 'Control Center',
 };
 
 // --- ⚡ LAZY LOADED MODULES ---
@@ -268,10 +268,7 @@ export default function AppLayout() {
     setPinLoading(true);
     try {
       if (!shopId) throw new Error("Workspace isolated.");
-      
-      const redeemPin = httpsCallable(functions, 'redeemAdminPin');
-      const result = await redeemPin({ pin: code, shopId });
-      if (!(result.data as any).success) throw new Error((result.data as any).error || "Invalid Cryptographic Hash.");
+      await verifyAdminPinCode(code, shopId);
       
       useBusinessStore.getState().setRole('admin', false);
       

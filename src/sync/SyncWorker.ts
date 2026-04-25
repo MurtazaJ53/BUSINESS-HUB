@@ -28,7 +28,7 @@ export type SyncStatus = 'idle' | 'syncing' | 'offline' | 'error' | 'backoff';
 
 const CONFIG = {
   BATCH_LIMIT: 400,          // Firestore maximum is 500
-  PUSH_INTERVAL_MS: 5000,
+  PUSH_INTERVAL_MS: 1500,
   NETWORK_DEBOUNCE_MS: 2000, // Prevent thrashing on unstable cell connections
   MAX_RETRIES: 5
 };
@@ -37,18 +37,26 @@ class SyncWorkerEngine {
   private currentStatus: SyncStatus = 'idle';
   private statusListeners = new Set<(status: SyncStatus) => void>();
   private unsubscribers: Unsubscribe[] = [];
+  private pullUnsubscribers: Unsubscribe[] = [];
   
   private pushIntervalId: ReturnType<typeof setInterval> | null = null;
   private networkTimeoutId: ReturnType<typeof setTimeout> | null = null;
   
   private isOnline = true;
   private isPushing = false;
+  private currentShopId: string | null = null;
+  private currentRole: AppRole = null;
 
   get status() { return this.currentStatus; }
 
   onStatusChange(listener: (status: SyncStatus) => void) {
     this.statusListeners.add(listener);
     return () => this.statusListeners.delete(listener);
+  }
+
+  async requestFlush(shopId = this.currentShopId) {
+    if (!shopId || !this.isOnline || this.isPushing) return;
+    await this.drainQueue(shopId);
   }
 
   private setStatus(s: SyncStatus) {
@@ -74,8 +82,6 @@ class SyncWorkerEngine {
 
     // Dynamic import to prevent circular state dependencies
     const { useAuthStore } = await import('../lib/useAuthStore');
-    let currentShopId: string | null = null;
-
     // 1. Debounced Network Listener
     const networkHandle = await Network.addListener('networkStatusChange', (status) => {
       if (this.networkTimeoutId) clearTimeout(this.networkTimeoutId);
@@ -86,7 +92,7 @@ class SyncWorkerEngine {
         
         if (status.connected) {
           this.setStatus('syncing');
-          if (wasOffline && currentShopId) await this.drainQueue(currentShopId);
+          if (wasOffline && this.currentShopId) await this.drainQueue(this.currentShopId);
           this.setStatus('idle');
         } else {
           this.setStatus('offline');
@@ -98,24 +104,26 @@ class SyncWorkerEngine {
 
     // 2. Auth State Reactor
     const unsubAuth = useAuthStore.subscribe(async (state) => {
-      if (state.shopId && state.role && state.shopId !== currentShopId) {
-        currentShopId = state.shopId;
+      if (state.shopId && state.role && (state.shopId !== this.currentShopId || state.role !== this.currentRole)) {
+        this.currentShopId = state.shopId;
+        this.currentRole = state.role;
         this.setStatus(this.isOnline ? 'syncing' : 'offline');
         
         await this.startPull(state.shopId, state.role);
         
         if (this.pushIntervalId) clearInterval(this.pushIntervalId);
         this.pushIntervalId = setInterval(async () => {
-          if (this.isOnline && currentShopId) await this.drainQueue(currentShopId);
+          if (this.isOnline && this.currentShopId) await this.drainQueue(this.currentShopId);
         }, CONFIG.PUSH_INTERVAL_MS);
 
         if (this.isOnline) {
           await this.drainQueue(state.shopId);
           this.setStatus('idle');
         }
-      } else if (!state.shopId && currentShopId) {
+      } else if (!state.shopId && this.currentShopId) {
         // Logout sequence
-        currentShopId = null;
+        this.currentShopId = null;
+        this.currentRole = null;
         if (this.pushIntervalId) clearInterval(this.pushIntervalId);
         this.pushIntervalId = null;
         this.stop(); 
@@ -126,6 +134,8 @@ class SyncWorkerEngine {
   }
 
   stop() {
+    this.stopPull();
+
     for (const unsub of this.unsubscribers) { 
       try { unsub(); } catch (e) { console.warn('Unsubscribe failed', e); } 
     }
@@ -136,7 +146,16 @@ class SyncWorkerEngine {
     
     this.pushIntervalId = null;
     this.networkTimeoutId = null;
+    this.currentShopId = null;
+    this.currentRole = null;
     this.setStatus('idle');
+  }
+
+  private stopPull() {
+    for (const unsub of this.pullUnsubscribers) {
+      try { unsub(); } catch (e) { console.warn('Pull unsubscribe failed', e); }
+    }
+    this.pullUnsubscribers.length = 0;
   }
 
   // ─── PUSH: OUTBOX TO FIRESTORE ────────────────────────────
@@ -232,6 +251,7 @@ class SyncWorkerEngine {
   }
 
   private async startPull(shopId: string, role: AppRole) {
+    this.stopPull();
     const base = `shops/${shopId}`;
 
     const collections = [
@@ -250,29 +270,17 @@ class SyncWorkerEngine {
     }
 
     // 1. Meta Subscription
-    this.unsubscribers.push(
+    this.pullUnsubscribers.push(
       onSnapshot(doc(firestoreDb, 'shops', shopId), async (snap) => {
         if (!snap.exists()) return;
         const data = snap.data();
         const settings = { ...data.settings, name: data.name };
         
-        // Save sensitive fields separately for administrators/managers
-        const credentials: any = {};
-        if (data.adminPin) credentials.adminPin = data.adminPin;
-        if (data.staffPin) credentials.staffPin = data.staffPin;
-        if (data.settings?.adminPin) credentials.adminPin = data.settings.adminPin;
-        if (data.settings?.staffPin) credentials.staffPin = data.settings.staffPin;
-
-        if (Object.keys(credentials).length > 0) {
-          await Database.run(
-            `INSERT OR REPLACE INTO shop_metadata (key, value, updatedAt, dirty) VALUES ('credentials', ?, ?, 0);`,
-            [JSON.stringify(credentials), Date.now()]
-          );
-        }
-        
         // Strip sensitive fields before local caching in general settings
         delete settings.adminPin; 
         delete settings.staffPin;
+
+        await Database.run(`DELETE FROM shop_metadata WHERE key = 'credentials';`);
 
         await Database.run(
           `INSERT OR REPLACE INTO shop_metadata (key, value, updatedAt, dirty) VALUES ('settings', ?, ?, 0);`,
@@ -290,7 +298,7 @@ class SyncWorkerEngine {
         ? query(collRef)
         : query(collRef, where('updatedAt', '>', watermark));
 
-      this.unsubscribers.push(
+      this.pullUnsubscribers.push(
         onSnapshot(q, { includeMetadataChanges: true }, async (snap) => {
           let latestSeenTimestamp = watermark;
           let hasChanges = false;

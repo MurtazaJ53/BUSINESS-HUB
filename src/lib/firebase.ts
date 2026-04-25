@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, connectAuthEmulator } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache, persistentSingleTabManager, persistentMultipleTabManager, connectFirestoreEmulator } from 'firebase/firestore';
+import { initializeFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import { Capacitor } from '@capacitor/core';
@@ -44,15 +44,7 @@ if (typeof window !== 'undefined' && import.meta.env.PROD) {
 
 // 4. Core Service Initialization
 export const auth = getAuth(app);
-
-// Capacitor/WebView doesn't support SharedWorker (required by multiple tab manager)
-const tabManager = Capacitor.isNativePlatform() 
-  ? persistentSingleTabManager({}) 
-  : persistentMultipleTabManager();
-
-export const db = initializeFirestore(app, { 
-  localCache: persistentLocalCache({ tabManager }) 
-});
+export const db = initializeFirestore(app, {});
 
 // 5. Regional Optimization
 // Currently set to us-central1 for quota stability. 
