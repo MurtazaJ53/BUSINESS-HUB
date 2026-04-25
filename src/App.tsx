@@ -9,6 +9,7 @@ import AuthPage from './pages/Auth';
 import { Sparkles, ShieldAlert } from 'lucide-react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { usePushNotifications } from './hooks/usePushNotifications';
+import { maybeRunScheduledBackup } from './lib/backup';
 
 // Lazy load components outside the component to prevent re-creation
 const Dashboard = React.lazy(() => import('@/pages/Dashboard'));
@@ -72,6 +73,30 @@ export default function App() {
       return () => unsub();
     }
   }, [shopId, role, initStore]);
+
+  useEffect(() => {
+    if (!shopId || !dbReady) return;
+
+    let active = true;
+    const checkBackup = async () => {
+      try {
+        if (!active) return;
+        await maybeRunScheduledBackup();
+      } catch (error) {
+        console.error('[Backup Scheduler] Failed:', error);
+      }
+    };
+
+    void checkBackup();
+    const intervalId = window.setInterval(() => {
+      void checkBackup();
+    }, 60000);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [shopId, dbReady]);
 
   // Handle DB Boot Failure
   if (dbError) {

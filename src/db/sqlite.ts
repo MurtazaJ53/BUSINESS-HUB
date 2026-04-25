@@ -185,9 +185,11 @@ class DatabaseSingleton {
         CREATE TABLE IF NOT EXISTS expenses (id TEXT PRIMARY KEY, category TEXT, amount REAL, description TEXT, paymentMethod TEXT DEFAULT 'CASH', paymentReference TEXT, date TEXT, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS attendance (id TEXT PRIMARY KEY, staffId TEXT, date TEXT, clockIn TEXT, clockOut TEXT, totalHours REAL, status TEXT, overtime REAL, bonus REAL, note TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS daily_briefings (id TEXT PRIMARY KEY, summary TEXT, bullets TEXT, metrics TEXT, createdAt INTEGER, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS local_backups (id TEXT PRIMARY KEY, label TEXT NOT NULL, trigger TEXT NOT NULL DEFAULT 'manual', createdAt INTEGER NOT NULL, sizeBytes INTEGER NOT NULL DEFAULT 0, payload TEXT NOT NULL);
         
         CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items(saleId);
         CREATE INDEX IF NOT EXISTS idx_sale_payments_sale_id ON sale_payments(saleId);
+        CREATE INDEX IF NOT EXISTS idx_local_backups_created_at ON local_backups(createdAt DESC);
     `;
 
     try {
@@ -278,6 +280,11 @@ class DatabaseSingleton {
 
     await this.migrateLegacyColumns('shop_metadata', [
       ['updatedAt', 'INTEGER', 'updated_at'],
+    ]);
+
+    await this.migrateLegacyColumns('local_backups', [
+      ['createdAt', 'INTEGER', 'created_at'],
+      ['sizeBytes', 'INTEGER', 'size_bytes'],
     ]);
 
     await this.migrateLegacyColumns('sync_state', [
