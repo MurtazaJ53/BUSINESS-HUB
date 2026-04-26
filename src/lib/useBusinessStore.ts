@@ -38,6 +38,7 @@ const SHOP_DEFAULTS: ShopMetadata = {
 };
 
 const PRIVATE_DEFAULTS: ShopPrivate = {};
+const DB_BOOT_TIMEOUT_MS = 15000;
 
 // ─── UTILITIES ──────────────────────────────────────────────
 
@@ -180,7 +181,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     let isActive = true;
     let unsubStaff = () => {};
     
-    set({ shopId, role: effectiveRole, isLocked });
+    set({ shopId, role: effectiveRole, isLocked, dbReady: false, dbError: null });
 
     const refreshCurrentStaff = async () => {
       const currentUid = auth.currentUser?.uid;
@@ -195,7 +196,14 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
       }
     };
 
-    Database.boot()
+    let bootTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
+    const bootTimeout = new Promise<void>((_, reject) => {
+      bootTimeoutHandle = setTimeout(() => {
+        reject(new Error('Database startup timed out on this device. Tap recovery to reset the local vault and reopen the app.'));
+      }, DB_BOOT_TIMEOUT_MS);
+    });
+
+    Promise.race([Database.boot(), bootTimeout])
       .then(async () => {
         const [shopMeta] = await Promise.all([
           Database.query<{ value: string }>('SELECT value FROM shop_metadata WHERE key = ?;', ['settings']),
@@ -250,7 +258,15 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
       })
       .catch((err) => {
         console.error('[Store] Local Database Mount Failure:', err);
-        set({ dbReady: false, dbError: err.message || 'Storage engine unavailable.' });
+        if (isActive && get().shopId === shopId) {
+          set({ dbReady: false, dbError: err.message || 'Storage engine unavailable.' });
+        }
+      })
+      .finally(() => {
+        if (bootTimeoutHandle) {
+          clearTimeout(bootTimeoutHandle);
+          bootTimeoutHandle = null;
+        }
       });
 
     const inviteQuery = query(

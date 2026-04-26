@@ -113,7 +113,7 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
           </p>
 
           <div style={{ color: '#374151', fontSize: '12px', marginBottom: '48px' }}>
-            System v1.3.3 - If visible, please hard refresh the app once.
+            System v1.3.6 - If visible, please reload the app once.
           </div>
 
           <div style={{ width: '100%', maxWidth: '320px', display: 'flex', flexDirection: 'column', gap: '12px' }}>

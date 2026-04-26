@@ -34,6 +34,7 @@ export default function App() {
   const { initStore, dbReady, dbError } = useBusinessStore();
   const { updateAvailable } = useUpdateCheck();
   const [showUpdate, setShowUpdate] = React.useState(true);
+  const [bootTakingTooLong, setBootTakingTooLong] = React.useState(false);
 
   usePushNotifications(shopId);
 
@@ -98,6 +99,19 @@ export default function App() {
     };
   }, [shopId, dbReady]);
 
+  useEffect(() => {
+    if (!(loading || (shopId && !dbReady))) {
+      setBootTakingTooLong(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setBootTakingTooLong(true);
+    }, 8000);
+
+    return () => window.clearTimeout(timer);
+  }, [loading, shopId, dbReady]);
+
   // Handle DB Boot Failure
   if (dbError) {
     const isWasmError = dbError.toLowerCase().includes('webassembly') || dbError.includes('magic word');
@@ -123,7 +137,7 @@ export default function App() {
                 ? "The secure vault's binary module is corrupted in your browser cache. A deep reset is required."
                 : dbError}
               <br /><br />
-              <span className="text-[10px] opacity-30">System v1.3.3 - (If visible, please CTRL+F5 to Hard Refresh)</span>
+              <span className="text-[10px] opacity-30">System v1.3.6 - (If visible, please reload once after recovery)</span>
             </p>
           </div>
           <div className="space-y-3">
@@ -153,13 +167,26 @@ export default function App() {
   if (loading || (shopId && !dbReady)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4 animate-pulse">
+        <div className="flex flex-col items-center gap-4 text-center px-6">
           <div className="h-12 w-12 rounded-2xl bg-primary/20 flex items-center justify-center">
             <Sparkles className="h-6 w-6 text-primary animate-spin" />
           </div>
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">
             {!dbReady && shopId ? 'Booting Secure Vault...' : 'Initializing Hub...'}
           </p>
+          {bootTakingTooLong && (
+            <div className="max-w-sm space-y-3 animate-in fade-in">
+              <p className="text-xs font-bold text-muted-foreground leading-relaxed">
+                Startup is taking longer than expected on this device. If this does not recover shortly, reload the app.
+              </p>
+              <button
+                onClick={() => window.location.reload()}
+                className="rounded-2xl bg-accent px-5 py-3 text-[10px] font-black uppercase tracking-[0.22em] text-foreground transition-all hover:bg-accent/80"
+              >
+                Reload App
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
