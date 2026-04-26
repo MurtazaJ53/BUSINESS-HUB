@@ -426,22 +426,18 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     const creditAmount = creditPayment ? creditPayment.amount : 0;
 
     // Concurrently verify customer existence and process stock reconciliation.
-    const [custs] = await Promise.all([
-      customersRepo.getAll(),
-      ...Object.entries(getInventoryDeltasForSale(finalSale.items)).map(async ([itemId, delta]) => {
+    await Promise.all(
+      Object.entries(getInventoryDeltasForSale(finalSale.items)).map(async ([itemId, delta]) => {
         await inventoryRepo.updateStock(itemId, delta);
         return enqueueSync('inventory', itemId, 'UPDATE', { stockDelta: delta });
       }),
-    ]);
+    );
 
     // Handle Customer Linkage & Balance
     if (creditAmount > 0 && finalSale.customerName && !finalSale.customerId) {
       const phoneToMatch = finalSale.customerPhone?.trim();
       const nameToMatch = finalSale.customerName?.trim().toLowerCase();
-      const existing = custs.find(c => 
-        (phoneToMatch && c.phone === phoneToMatch) || 
-        (nameToMatch && c.name.toLowerCase() === nameToMatch)
-      );
+      const existing = await customersRepo.findByPhoneOrName(phoneToMatch, nameToMatch);
 
       if (existing) {
         finalSale.customerId = existing.id;

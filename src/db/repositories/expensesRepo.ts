@@ -8,11 +8,100 @@ import type { Expense } from '../../lib/types';
 
 const now = () => Date.now();
 
+export interface ExpenseListFilters {
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface ExpenseListMetrics {
+  totalCount: number;
+  totalAmount: number;
+}
+
+export interface ExpenseCategoryTotal {
+  category: string;
+  total: number;
+}
+
+const buildExpenseWhereClause = (
+  filters: ExpenseListFilters = {},
+): { clause: string; params: Array<string | number> } => {
+  const conditions = ['tombstone = 0'];
+  const params: Array<string | number> = [];
+
+  if (filters.search?.trim()) {
+    const like = `%${filters.search.trim().toLowerCase()}%`;
+    conditions.push('(LOWER(category) LIKE ? OR LOWER(description) LIKE ?)');
+    params.push(like, like);
+  }
+
+  if (filters.dateFrom) {
+    conditions.push('date >= ?');
+    params.push(filters.dateFrom);
+  }
+
+  if (filters.dateTo) {
+    conditions.push('date <= ?');
+    params.push(filters.dateTo);
+  }
+
+  return {
+    clause: `WHERE ${conditions.join(' AND ')}`,
+    params,
+  };
+};
+
 export const expensesRepo = {
   async getAll(): Promise<Expense[]> {
     return Database.query<Expense>(
       `SELECT id, category, amount, description, paymentMethod, paymentReference, date, createdAt
        FROM expenses WHERE tombstone = 0 ORDER BY date DESC, createdAt DESC;`,
+    );
+  },
+
+  async getPage(
+    filters: ExpenseListFilters = {},
+    page: number = 1,
+    pageSize: number = 100,
+  ): Promise<Expense[]> {
+    const safePage = Math.max(1, page);
+    const safePageSize = Math.max(1, Math.min(pageSize, 500));
+    const offset = (safePage - 1) * safePageSize;
+    const { clause, params } = buildExpenseWhereClause(filters);
+    return Database.query<Expense>(
+      `SELECT id, category, amount, description, paymentMethod, paymentReference, date, createdAt
+       FROM expenses
+       ${clause}
+       ORDER BY date DESC, createdAt DESC
+       LIMIT ? OFFSET ?;`,
+      [...params, safePageSize, offset],
+    );
+  },
+
+  async getMetrics(filters: ExpenseListFilters = {}): Promise<ExpenseListMetrics> {
+    const { clause, params } = buildExpenseWhereClause(filters);
+    const rows = await Database.query<ExpenseListMetrics>(
+      `SELECT COUNT(*) AS totalCount,
+              COALESCE(SUM(amount), 0) AS totalAmount
+       FROM expenses
+       ${clause};`,
+      params,
+    );
+    return rows[0] ?? { totalCount: 0, totalAmount: 0 };
+  },
+
+  async getCategoryTotals(dateFrom?: string): Promise<ExpenseCategoryTotal[]> {
+    const filters: ExpenseListFilters = {};
+    if (dateFrom) filters.dateFrom = dateFrom;
+    const { clause, params } = buildExpenseWhereClause(filters);
+    return Database.query<ExpenseCategoryTotal>(
+      `SELECT category, COALESCE(SUM(amount), 0) AS total
+       FROM expenses
+       ${clause}
+       GROUP BY category
+       ORDER BY total DESC;`,
+      params,
     );
   },
 

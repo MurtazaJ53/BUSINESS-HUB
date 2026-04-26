@@ -4,7 +4,7 @@ import {
   X, FileText, ClipboardPaste, Copy, AlertCircle, AlertTriangle, Sparkles, Loader2,
   PackagePlus
 } from 'lucide-react';
-import { calculateSalesVelocity, calculateDaysRemaining } from '@/lib/analyticsUtils';
+import { calculateDaysRemaining } from '@/lib/analyticsUtils';
 import ErrorModal from '@/components/ErrorModal';
 import { useSalesRangeQuery, useSqlQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
@@ -57,7 +57,7 @@ const InventoryCard = ({
   onEdit, 
   setEditForm, 
   onDelete,
-  sales
+  velocity
 }: { 
   item: InventoryItem, 
   role: string,
@@ -66,10 +66,9 @@ const InventoryCard = ({
   onEdit: (item: InventoryItem) => void,
   setEditForm: any,
   onDelete: (id: string) => void,
-  sales: Sale[]
+  velocity: number
 }) => {
   const isLow = item.stock !== undefined && item.stock <= 5;
-  const velocity = calculateSalesVelocity(item.id, sales);
   const daysLeft = calculateDaysRemaining(item.stock || 0, velocity);
 
   return (
@@ -199,14 +198,18 @@ export default function Inventory() {
   const sales = useSalesRangeQuery(last30Days, today);
 
   const canViewCost = usePermission('inventory', 'view_cost');
+  const inventoryPrivateById = useMemo(
+    () => new Map(inventoryPrivate.map((entry: any) => [entry.id, entry])),
+    [inventoryPrivate],
+  );
 
   const inventoryWithPrivate = useMemo(() => {
     if (!canViewCost) return inventory;
     return inventory.map((item: InventoryItem) => ({
       ...item,
-      costPrice: inventoryPrivate.find((pi: any) => pi.id === item.id)?.costPrice
+      costPrice: inventoryPrivateById.get(item.id)?.costPrice
     }));
-  }, [inventory, inventoryPrivate, canViewCost]);
+  }, [inventory, inventoryPrivateById, canViewCost]);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [search, setSearch] = useState('');
@@ -261,16 +264,30 @@ export default function Inventory() {
     setTimeout(() => setToast(''), 3000);
   };
 
+  const velocityByItemId = useMemo(() => {
+    const totals = new Map<string, number>();
+    sales.forEach((sale: Sale) => {
+      sale.items.forEach((item) => {
+        if (item.isReturn) return;
+        totals.set(item.itemId, (totals.get(item.itemId) || 0) + item.quantity);
+      });
+    });
+    return totals;
+  }, [sales]);
+
   // ── Autocomplete data ──
   const uniqueCategoriesSummary = useMemo(() => {
-    const counts: Record<string, number> = {};
+    const productSets = new Map<string, Set<string>>();
     inventoryWithPrivate.forEach((item: InventoryItem) => {
       const cat = item.category || 'General';
-      if (!counts[cat]) counts[cat] = 0;
-      const productNamesInCategory = new Set(inventoryWithPrivate.filter((i: InventoryItem) => (i.category || 'General') === cat).map((i: InventoryItem) => i.name));
-      counts[cat] = productNamesInCategory.size;
+      const names = productSets.get(cat) ?? new Set<string>();
+      names.add(item.name);
+      productSets.set(cat, names);
     });
-    return counts;
+    return Array.from(productSets.entries()).reduce<Record<string, number>>((acc, [category, names]) => {
+      acc[category] = names.size;
+      return acc;
+    }, {});
   }, [inventoryWithPrivate]);
 
   const filteredCategoriesSummary = useMemo(() => {
@@ -753,7 +770,7 @@ export default function Inventory() {
                 }}
                 setEditForm={setEditForm}
                 onDelete={deleteInventoryItem}
-                sales={sales}
+                velocity={(velocityByItemId.get(item.id) || 0) / 30}
               />
             ))}
           </div>
@@ -845,7 +862,7 @@ export default function Inventory() {
                   }}
                   setEditForm={setEditForm}
                   onDelete={deleteInventoryItem}
-                  sales={sales}
+                  velocity={(velocityByItemId.get(item.id) || 0) / 30}
                 />
               ))}
             </div>

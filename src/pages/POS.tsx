@@ -5,7 +5,8 @@ import {
   ArrowRight, CheckCircle2, Sparkles, PlusCircle, X, Database, Scan
 } from 'lucide-react';
 import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
-import { useSqlQuery } from '@/db/hooks';
+import { useLiveQuery, useSqlQuery } from '@/db/hooks';
+import { customersRepo } from '@/db/repositories/customersRepo';
 import { verifyAdminPin } from '@/lib/admin';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn, isValidIndianPhone, sanitizePhone } from '@/lib/utils';
@@ -27,7 +28,6 @@ export default function POS() {
 
   const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
   const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
-  const customers = useSqlQuery<Customer>('SELECT * FROM customers WHERE tombstone = 0 ORDER BY name ASC', [], ['customers']);
 
   const [cart, setCart] = useState<SaleItem[]>([]);
   const [search, setSearch] = useState('');
@@ -128,15 +128,37 @@ export default function POS() {
     }
   }, [shop.footer]);
 
+  const inventoryPrivateById = useMemo(
+    () => new Map(inventoryPrivate.map((entry: any) => [entry.id, entry])),
+    [inventoryPrivate],
+  );
+
+  const inventoryById = useMemo(
+    () => new Map(inventory.map((item) => [item.id, item])),
+    [inventory],
+  );
+
+  const inventoryBySku = useMemo(() => {
+    const map = new Map<string, InventoryItem>();
+    inventory.forEach((item) => {
+      if (item.sku) map.set(item.sku, item);
+      map.set(item.id, item);
+    });
+    return map;
+  }, [inventory]);
+
   const uniqueCategoriesSummary = useMemo(() => {
-    const counts: Record<string, number> = {};
+    const productSets = new Map<string, Set<string>>();
     inventory.forEach((item: InventoryItem) => {
       const cat = item.category || 'General';
-      if (!counts[cat]) counts[cat] = 0;
-      const productNamesInCategory = new Set(inventory.filter((i: InventoryItem) => (i.category || 'General') === cat).map((i: InventoryItem) => i.name));
-      counts[cat] = productNamesInCategory.size;
+      const names = productSets.get(cat) ?? new Set<string>();
+      names.add(item.name);
+      productSets.set(cat, names);
     });
-    return counts;
+    return Array.from(productSets.entries()).reduce<Record<string, number>>((acc, [category, names]) => {
+      acc[category] = names.size;
+      return acc;
+    }, {});
   }, [inventory]);
 
   const filteredCategoriesSummary = useMemo(() => {
@@ -205,17 +227,18 @@ export default function POS() {
   }, [inventory]);
   
   // CUSTOMER AUTOCOMPLETE ENGINE
-  const filteredCustomers = useMemo(() => {
-    if (!customerName || selectedCustomerId) return [];
-    return customers.filter((c: any) => 
-      c.name.toLowerCase().includes(customerName.toLowerCase()) ||
-      c.phone.includes(customerName)
-    ).slice(0, 5);
-  }, [customers, customerName, selectedCustomerId]);
+  const filteredCustomers = useLiveQuery<Customer>(
+    () => {
+      if (!customerName.trim() || selectedCustomerId) return Promise.resolve([]);
+      return customersRepo.getPage({ search: customerName.trim() }, 1, 5);
+    },
+    ['customers'],
+    [customerName, selectedCustomerId],
+  );
 
   const addToCart = (product: typeof inventory[0], isReturn: boolean = false) => {
     // Find costPrice from private collection if permitted
-    const privateData = canViewCost ? inventoryPrivate.find((pi: any) => pi.id === product.id) : null;
+    const privateData = canViewCost ? inventoryPrivateById.get(product.id) : null;
     const costPrice = privateData?.costPrice;
 
     setCart((prev) => {
@@ -332,7 +355,7 @@ export default function POS() {
       const warnings: {item: SaleItem, stock: number}[] = [];
       for (const cartItem of cart) {
         if (cartItem.itemId.startsWith('custom-') || cartItem.isReturn) continue;
-        const invItem = inventory.find((i: any) => i.id === cartItem.itemId);
+        const invItem = inventoryById.get(cartItem.itemId);
         if (invItem && (invItem.stock ?? 0) < cartItem.quantity) {
           warnings.push({ item: cartItem, stock: invItem.stock ?? 0 });
         }
@@ -449,7 +472,7 @@ export default function POS() {
       const { barcodes } = await BarcodeScanner.scan();
       if (barcodes.length > 0) {
         const val = barcodes[0].displayValue;
-        const found = inventory.find(i => i.sku === val || i.id === val);
+        const found = val ? inventoryBySku.get(val) : undefined;
         if (found) {
           addToCart(found);
           showToast(`Added: ${found.name}`);

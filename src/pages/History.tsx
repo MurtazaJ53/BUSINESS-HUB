@@ -17,11 +17,12 @@ import {
   ShieldCheck,
   Printer
 } from 'lucide-react';
-import { useLiveQuery, useSqlQuery } from '@/db/hooks';
+import { useLiveQuery } from '@/db/hooks';
+import { expensesRepo } from '@/db/repositories/expensesRepo';
 import { salesRepo, type SaleHistorySummary } from '@/db/repositories/salesRepo';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { usePermission } from '@/hooks/usePermission';
-import { formatCurrency, cn, toTimestamp } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import { printReceipt } from '@/lib/printerService';
 import { loadShopSettings } from '@/lib/shopSettings';
 import type { Sale, Expense } from '@/lib/types';
@@ -33,7 +34,6 @@ export default function History() {
   const canEditSale = usePermission('sales', 'edit');
   const canVoidSale = usePermission('sales', 'void_sale');
   const canDeleteExpense = usePermission('expenses', 'delete');
-  const expenses = useSqlQuery<Expense>('SELECT * FROM expenses WHERE tombstone = 0 ORDER BY date DESC', [], ['expenses']);
   const [tab, setTab] = useState<'sales' | 'expenses'>('sales');
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
@@ -95,6 +95,18 @@ export default function History() {
     [page, pageSize, salesFilters.search || '', salesFilters.dateFrom || '', salesFilters.dateTo || ''],
   );
 
+  const expenseMetrics = useLiveQuery(
+    () => expensesRepo.getMetrics(salesFilters).then((metrics) => [{ ...metrics }]),
+    ['expenses'],
+    [salesFilters.search || '', salesFilters.dateFrom || '', salesFilters.dateTo || ''],
+  );
+
+  const expensePage = useLiveQuery<Expense>(
+    () => expensesRepo.getPage(salesFilters, page, pageSize),
+    ['expenses'],
+    [page, pageSize, salesFilters.search || '', salesFilters.dateFrom || '', salesFilters.dateTo || ''],
+  );
+
   useEffect(() => {
     setPage(1);
   }, [deferredSearch, dateFilter, tab]);
@@ -134,20 +146,6 @@ export default function History() {
     printReceipt(sale, shop);
   };
 
-  const filteredExpenses = expenses
-    .filter((e: Expense) => {
-      const matchSearch = e.category.toLowerCase().includes(search.toLowerCase()) || 
-                          e.description.toLowerCase().includes(search.toLowerCase());
-      
-      let matchDate = true;
-      if (dateFilter === 'Today') matchDate = e.date === today;
-      else if (dateFilter === 'Yesterday') matchDate = e.date === yesterday;
-      else if (dateFilter === 'Last 7 Days') matchDate = e.date >= last7Days;
-
-      return matchSearch && matchDate;
-    })
-    .sort((a: Expense, b: Expense) => b.date.localeCompare(a.date) || toTimestamp(b.createdAt) - toTimestamp(a.createdAt));
-
   const handleDelete = () => {
     if (deletingId) {
       if (tab === 'sales') deleteSale(deletingId);
@@ -158,8 +156,9 @@ export default function History() {
 
   const totalSalesAmount = historyMetrics[0]?.totalAmount ?? 0;
   const filteredSalesCount = historyMetrics[0]?.totalCount ?? 0;
-  const totalExpensesAmount = filteredExpenses.reduce((sum: number, e: Expense) => sum + e.amount, 0);
-  const totalPages = Math.max(1, Math.ceil(filteredSalesCount / pageSize));
+  const totalExpensesAmount = expenseMetrics[0]?.totalAmount ?? 0;
+  const filteredExpenseCount = expenseMetrics[0]?.totalCount ?? 0;
+  const totalPages = Math.max(1, Math.ceil((tab === 'sales' ? filteredSalesCount : filteredExpenseCount) / pageSize));
 
   const dateFilters = ['All Time', 'Today', 'Yesterday', 'Last 7 Days'];
   const paymentModes = ['CASH', 'UPI', 'CARD', 'CREDIT', 'ONLINE', 'OTHERS'];
@@ -202,7 +201,7 @@ export default function History() {
                 "px-2 py-0.5 rounded-full text-[8px] font-bold",
                 tab === 'expenses' ? "bg-primary-foreground/20" : "bg-accent/50 text-muted-foreground"
               )}>
-                {filteredExpenses.length}
+                {filteredExpenseCount}
               </span>
             </button>
           </div>
@@ -265,7 +264,7 @@ export default function History() {
                 <TrendingUp className="h-5 w-5 text-destructive rotate-180" />
               </div>
             </div>
-            <p className="text-[10px] font-bold text-destructive mt-1 uppercase tracking-widest">{filteredExpenses.length} Overhead Records</p>
+            <p className="text-[10px] font-bold text-destructive mt-1 uppercase tracking-widest">{filteredExpenseCount} Overhead Records</p>
           </div>
         </div>
       )}
@@ -316,6 +315,11 @@ export default function History() {
                             </p>
                             <p className="text-[10px] font-bold text-muted-foreground flex items-center gap-1 mt-0.5">
                               {sale.date}
+                              {Boolean(sale.sourceMeta?.provider) && (
+                                <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest text-primary">
+                                  Imported
+                                </span>
+                              )}
                             </p>
                           </div>
                         </div>
@@ -413,7 +417,7 @@ export default function History() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {filteredExpenses.length === 0 ? (
+                {expensePage.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-20 text-center">
                       <div className="flex flex-col items-center justify-center opacity-30">
@@ -423,7 +427,7 @@ export default function History() {
                     </td>
                   </tr>
                 ) : (
-                  filteredExpenses.map((exp: Expense) => (
+                  expensePage.map((exp: Expense) => (
                     <tr key={exp.id} className="group hover:bg-destructive/[0.02] transition-colors">
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
@@ -469,10 +473,10 @@ export default function History() {
         </div>
       </div>
 
-      {tab === 'sales' && totalPages > 1 && (
+      {totalPages > 1 && (
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-            Showing page {page} of {totalPages} · {filteredSalesCount.toLocaleString()} receipts
+            Showing page {page} of {totalPages} - {(tab === 'sales' ? filteredSalesCount : filteredExpenseCount).toLocaleString()} {tab === 'sales' ? 'receipts' : 'expenses'}
           </p>
           <div className="flex items-center gap-2">
             <button

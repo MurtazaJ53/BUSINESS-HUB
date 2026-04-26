@@ -22,30 +22,46 @@ export function useLiveQuery<T>(
 ): T[] {
   const [data, setData] = useState<T[]>([]);
   const queryFnRef = useRef(queryFn);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeRunIdRef = useRef(0);
   queryFnRef.current = queryFn;
 
   useEffect(() => {
     let active = true;
 
     const runQuery = async () => {
+      const runId = ++activeRunIdRef.current;
       try {
         const results = await queryFnRef.current();
-        if (active) setData(results);
+        if (active && runId === activeRunIdRef.current) setData(results);
       } catch (err) {
         console.error('[useLiveQuery] Error:', err);
       }
     };
 
-    // Initial run
-    runQuery();
+    const scheduleQuery = (delayMs: number) => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      debounceTimerRef.current = setTimeout(() => {
+        debounceTimerRef.current = null;
+        void runQuery();
+      }, delayMs);
+    };
 
-    // Subscribe to changes
+    scheduleQuery(0);
+
     const unsubscribe = tableEvents.on(tables, () => {
-      runQuery();
+      scheduleQuery(75);
     });
 
     return () => {
       active = false;
+      activeRunIdRef.current += 1;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
       unsubscribe();
     };
   }, [...deps, ...tables]); // Re-subscribe if tables list changes
