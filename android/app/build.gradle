@@ -7,8 +7,8 @@ android {
         applicationId "com.businesshub.pro"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
-        versionName "1.2"
+        versionCode 4
+        versionName "1.3.6"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -19,9 +19,9 @@ android {
     signingConfigs {
         release {
             storeFile file(System.getenv("ANDROID_KEYSTORE_FILE") ?: "business-hub.jks")
-            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD") ?: "businesshubpro"
-            keyAlias System.getenv("ANDROID_KEY_ALIAS") ?: "business-hub"
-            keyPassword System.getenv("ANDROID_KEY_PASSWORD") ?: "businesshubpro"
+            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+            keyAlias System.getenv("ANDROID_KEY_ALIAS")
+            keyPassword System.getenv("ANDROID_KEY_PASSWORD")
         }
     }
 

@@ -1,5 +1,5 @@
 {
-  "version": "1.3.3",
-  "notes": "Stability update for team management, POS staff attribution, and startup hardening.",
-  "downloadUrl": "https://github.com/MurtazaJ53/BUSINESS-HUB/releases/latest/download/app-release.apk"
+  "version": "1.3.6",
+  "notes": "Release pipeline hardening, desktop packaging fixes, and aligned production version metadata.",
+  "downloadUrl": "https://github.com/MurtazaJ53/BUSINESS-HUB/releases/latest/download/BusinessHub-Android-APK-latest.apk"
 }
