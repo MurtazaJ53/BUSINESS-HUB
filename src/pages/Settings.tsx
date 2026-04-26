@@ -3,7 +3,7 @@ import {
   Settings as SettingsIcon, Download, FileSpreadsheet, AlertTriangle,
   Database, Store, Monitor, CheckCircle2, Key,
   Sun, Moon, RefreshCcw, LogOut, MapPin, TrendingUp, Lock, ShieldCheck,
-  ArrowRight, ShieldAlert, Fingerprint, Loader2, Archive, Clock3, Trash2, HardDriveDownload
+  ArrowRight, ShieldAlert, Fingerprint, Loader2, Archive, Clock3, Trash2, HardDriveDownload, Upload
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
@@ -20,11 +20,18 @@ import { MigrationResult } from '@/lib/migrationEngine';
 import { InventoryItem, Sale, Customer } from '@/lib/types';
 import {
   createBackup,
+  createCloudBackup,
+  deleteCloudBackup,
   deleteBackup,
+  getCloudBackupPayload,
   getBackupPayload,
   getBackupSettings,
+  listCloudBackups,
   listBackups,
+  restoreBackupFromPayload,
   saveBackupSettings,
+  uploadLocalBackupToCloud,
+  type CloudBackupRecord,
   type BackupRecord,
   type BackupSettings,
 } from '@/lib/backup';
@@ -43,11 +50,12 @@ const SectionHeader = ({ icon: Icon, title, subtitle }: { icon: any, title: stri
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { shop, updateShop, clearInventory, theme, setTheme, addInventoryItem, upsertCustomer, addSale, lastBackupDate } = useBusinessStore();
+  const { shop, updateShop, clearInventory, theme, setTheme, addInventoryItem, upsertCustomer, addSale, lastBackupDate, shopId } = useBusinessStore();
   const { role, user } = useAuthStore();
   
   const canEditSettings = usePermission('settings', 'edit') || role === 'admin';
   const canViewInventoryCost = usePermission('inventory', 'view_cost') || role === 'admin';
+  const canManageBackups = role === 'admin';
   
   const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
   const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
@@ -64,6 +72,7 @@ export default function Settings() {
   const [pinRotating, setPinRotating] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const backupImportRef = useRef<HTMLInputElement>(null);
   const [importType, setImportType] = useState<'inventory' | 'customer' | 'sale'>('inventory');
   const [migrationStatus, setMigrationStatus] = useState<string | null>(null);
   const [migrationData, setMigrationData] = useState<MigrationResult | null>(null);
@@ -74,6 +83,14 @@ export default function Settings() {
   const [savingBackupSettings, setSavingBackupSettings] = useState(false);
   const [backupBusy, setBackupBusy] = useState(false);
   const [deletingBackupId, setDeletingBackupId] = useState<string | null>(null);
+  const [uploadingCloudId, setUploadingCloudId] = useState<string | null>(null);
+  const [cloudActionBusy, setCloudActionBusy] = useState(false);
+  const [deletingCloudBackupId, setDeletingCloudBackupId] = useState<string | null>(null);
+  const [cloudBackups, setCloudBackups] = useState<CloudBackupRecord[]>([]);
+  const [loadingCloudBackups, setLoadingCloudBackups] = useState(false);
+  const [pendingRestorePayload, setPendingRestorePayload] = useState<string | null>(null);
+  const [pendingRestoreLabel, setPendingRestoreLabel] = useState<string>('');
+  const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
 
   const [editForm, setEditForm] = useState({ ...shop });
   const backups = useLiveQuery<BackupRecord>(() => listBackups(), ['local_backups']);
@@ -86,6 +103,35 @@ export default function Settings() {
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(''), 4000);
+  };
+
+  const refreshCloudBackupList = async () => {
+    if (!shopId || !canManageBackups) {
+      setCloudBackups([]);
+      return;
+    }
+
+    setLoadingCloudBackups(true);
+    try {
+      const rows = await listCloudBackups(shopId);
+      setCloudBackups(rows);
+    } catch (error: any) {
+      showToast(`Cloud backup sync failed: ${error.message}`);
+    } finally {
+      setLoadingCloudBackups(false);
+    }
+  };
+
+  useEffect(() => {
+    void refreshCloudBackupList();
+  }, [shopId, canManageBackups]);
+
+  const buildBackupFileName = (label: string) => `${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.json`;
+
+  const queueRestore = (payload: string, label: string) => {
+    setPendingRestorePayload(payload);
+    setPendingRestoreLabel(label);
+    setRestoreConfirmOpen(true);
   };
 
   const handleSaveShop = async () => {
@@ -203,6 +249,10 @@ export default function Settings() {
   };
 
   const handleManualBackup = async () => {
+    if (!canManageBackups) {
+      showToast('Only admins can manage backups');
+      return;
+    }
     setBackupBusy(true);
     try {
       const backup = await createBackup('manual');
@@ -218,10 +268,23 @@ export default function Settings() {
     try {
       const payload = await getBackupPayload(backupId);
       if (!payload) throw new Error('Backup package not found.');
-      const safeName = backupLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      downloadFile(payload, `${safeName}.json`, 'application/json');
+      downloadFile(payload, buildBackupFileName(backupLabel), 'application/json');
     } catch (error: any) {
       showToast(`Download failed: ${error.message}`);
+    }
+  };
+
+  const handleRestoreBackup = async (backupId: string, backupLabel: string) => {
+    if (!canManageBackups) {
+      showToast('Only admins can manage backups');
+      return;
+    }
+    try {
+      const payload = await getBackupPayload(backupId);
+      if (!payload) throw new Error('Backup package not found.');
+      queueRestore(payload, backupLabel);
+    } catch (error: any) {
+      showToast(`Restore prep failed: ${error.message}`);
     }
   };
 
@@ -234,6 +297,103 @@ export default function Settings() {
       showToast(`Delete failed: ${error.message}`);
     } finally {
       setDeletingBackupId(null);
+    }
+  };
+
+  const handleBackupImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const payload = await file.text();
+      queueRestore(payload, file.name);
+    } catch (error: any) {
+      showToast(`Backup import failed: ${error.message}`);
+    } finally {
+      if (backupImportRef.current) backupImportRef.current.value = '';
+    }
+  };
+
+  const executeRestore = async () => {
+    if (!pendingRestorePayload) return;
+    try {
+      const summary = await restoreBackupFromPayload(pendingRestorePayload);
+      showToast(`Backup restored: ${summary.totalRows} rows verified. Reloading...`);
+      setTimeout(() => window.location.reload(), 900);
+    } catch (error: any) {
+      showToast(`Restore failed: ${error.message}`);
+    } finally {
+      setPendingRestorePayload(null);
+      setPendingRestoreLabel('');
+      setRestoreConfirmOpen(false);
+    }
+  };
+
+  const handleCreateCloudBackup = async () => {
+    if (!canManageBackups) {
+      showToast('Only admins can manage backups');
+      return;
+    }
+    setCloudActionBusy(true);
+    try {
+      const backup = await createCloudBackup();
+      showToast(`Cloud backup uploaded: ${backup.label}`);
+      await refreshCloudBackupList();
+    } catch (error: any) {
+      showToast(`Cloud backup failed: ${error.message}`);
+    } finally {
+      setCloudActionBusy(false);
+    }
+  };
+
+  const handleUploadLocalBackup = async (backupId: string) => {
+    if (!canManageBackups) {
+      showToast('Only admins can manage backups');
+      return;
+    }
+    setUploadingCloudId(backupId);
+    try {
+      const backup = await uploadLocalBackupToCloud(backupId);
+      showToast(`Uploaded to cloud: ${backup.label}`);
+      await refreshCloudBackupList();
+    } catch (error: any) {
+      showToast(`Cloud upload failed: ${error.message}`);
+    } finally {
+      setUploadingCloudId(null);
+    }
+  };
+
+  const handleDownloadCloudBackup = async (backup: CloudBackupRecord) => {
+    try {
+      const payload = await getCloudBackupPayload(backup.shopId, backup.id);
+      downloadFile(payload, buildBackupFileName(backup.label), 'application/json');
+    } catch (error: any) {
+      showToast(`Cloud download failed: ${error.message}`);
+    }
+  };
+
+  const handleRestoreCloudBackup = async (backup: CloudBackupRecord) => {
+    if (!canManageBackups) {
+      showToast('Only admins can manage backups');
+      return;
+    }
+    try {
+      const payload = await getCloudBackupPayload(backup.shopId, backup.id);
+      queueRestore(payload, backup.label);
+    } catch (error: any) {
+      showToast(`Cloud restore prep failed: ${error.message}`);
+    }
+  };
+
+  const handleDeleteCloudBackup = async (backup: CloudBackupRecord) => {
+    setDeletingCloudBackupId(backup.id);
+    try {
+      await deleteCloudBackup(backup.shopId, backup.id);
+      showToast('Cloud backup removed');
+      await refreshCloudBackupList();
+    } catch (error: any) {
+      showToast(`Cloud delete failed: ${error.message}`);
+    } finally {
+      setDeletingCloudBackupId(null);
     }
   };
 
@@ -409,7 +569,14 @@ export default function Settings() {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3">
+              {!canManageBackups && (
+                <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-1">Admin Only</p>
+                  <p className="text-sm text-muted-foreground font-medium">Backup packages include private business data, so create, restore, and cloud actions are limited to admin accounts.</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <button
                   onClick={handleSaveBackupSettings}
                   disabled={savingBackupSettings}
@@ -419,10 +586,24 @@ export default function Settings() {
                 </button>
                 <button
                   onClick={handleManualBackup}
-                  disabled={backupBusy}
+                  disabled={backupBusy || !canManageBackups}
                   className="flex-1 py-4 rounded-2xl premium-gradient text-primary-foreground text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary/20 disabled:opacity-60"
                 >
                   {backupBusy ? 'Creating Backup...' : 'Backup Now'}
+                </button>
+                <button
+                  onClick={() => backupImportRef.current?.click()}
+                  disabled={!canManageBackups}
+                  className="flex-1 py-4 rounded-2xl bg-accent hover:bg-accent/80 border border-border text-[10px] font-black uppercase tracking-widest text-foreground transition-all disabled:opacity-60"
+                >
+                  Restore From File
+                </button>
+                <button
+                  onClick={handleCreateCloudBackup}
+                  disabled={cloudActionBusy || !canManageBackups}
+                  className="flex-1 py-4 rounded-2xl bg-primary/10 hover:bg-primary/20 border border-primary/20 text-primary text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-60"
+                >
+                  {cloudActionBusy ? 'Uploading...' : 'Backup To Cloud'}
                 </button>
               </div>
 
@@ -446,6 +627,14 @@ export default function Settings() {
                           </div>
                           <div className="flex gap-2">
                             <button
+                              onClick={() => handleRestoreBackup(backup.id, backup.label)}
+                              disabled={!canManageBackups}
+                              className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center justify-center disabled:opacity-50"
+                              title="Restore this local backup"
+                            >
+                              <RefreshCcw className="h-4 w-4" />
+                            </button>
+                            <button
                               onClick={() => handleDownloadBackup(backup.id, backup.label)}
                               className="h-10 w-10 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center"
                               title="Download backup package"
@@ -453,10 +642,81 @@ export default function Settings() {
                               <HardDriveDownload className="h-4 w-4" />
                             </button>
                             <button
+                              onClick={() => handleUploadLocalBackup(backup.id)}
+                              disabled={uploadingCloudId === backup.id || !canManageBackups}
+                              className="h-10 w-10 rounded-xl bg-sky-500/10 text-sky-500 border border-sky-500/20 flex items-center justify-center disabled:opacity-50"
+                              title="Upload backup to cloud"
+                            >
+                              <Upload className="h-4 w-4" />
+                            </button>
+                            <button
                               onClick={() => handleDeleteBackup(backup.id)}
                               disabled={deletingBackupId === backup.id}
                               className="h-10 w-10 rounded-xl bg-destructive/10 text-destructive border border-destructive/20 flex items-center justify-center disabled:opacity-50"
                               title="Delete local backup"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-[2rem] border border-border bg-accent/20 p-5">
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Cloud Backup Vault</p>
+                    <p className="text-sm text-muted-foreground font-medium mt-1">Encrypted Firebase Storage copies for web, Android, and desktop restore.</p>
+                  </div>
+                  <button
+                    onClick={refreshCloudBackupList}
+                    disabled={loadingCloudBackups || !canManageBackups}
+                    className="h-10 w-10 rounded-xl bg-accent/60 border border-border flex items-center justify-center disabled:opacity-50"
+                    title="Refresh cloud backups"
+                  >
+                    <RefreshCcw className={cn("h-4 w-4 text-foreground", loadingCloudBackups && "animate-spin")} />
+                  </button>
+                </div>
+                {!canManageBackups ? (
+                  <p className="text-sm text-muted-foreground font-medium">Cloud backup management is available to admins only.</p>
+                ) : loadingCloudBackups ? (
+                  <p className="text-sm text-muted-foreground font-medium">Loading cloud backups...</p>
+                ) : cloudBackups.length === 0 ? (
+                  <p className="text-sm text-muted-foreground font-medium">No cloud backups yet. Upload a local copy or run Backup To Cloud.</p>
+                ) : (
+                  <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                    {cloudBackups.map((backup) => (
+                      <div key={backup.id} className="rounded-2xl border border-border bg-background/60 p-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-black text-foreground truncate">{backup.label}</p>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">
+                              cloud - {(backup.sizeBytes / 1024).toFixed(1)} KB
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleRestoreCloudBackup(backup)}
+                              className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center justify-center"
+                              title="Restore cloud backup"
+                            >
+                              <RefreshCcw className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDownloadCloudBackup(backup)}
+                              className="h-10 w-10 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center"
+                              title="Download cloud backup"
+                            >
+                              <HardDriveDownload className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCloudBackup(backup)}
+                              disabled={deletingCloudBackupId === backup.id}
+                              className="h-10 w-10 rounded-xl bg-destructive/10 text-destructive border border-destructive/20 flex items-center justify-center disabled:opacity-50"
+                              title="Delete cloud backup"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -542,6 +802,7 @@ export default function Settings() {
 
       {/* --- INVISIBLE INPUTS & MODALS --- */}
       <input type="file" ref={fileInputRef} accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => handleFileUpload(e, importType)} />
+      <input type="file" ref={backupImportRef} accept=".json,application/json" className="hidden" onChange={handleBackupImport} />
 
       {editOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -587,6 +848,20 @@ export default function Settings() {
         confirmText="Acknowledge Purge" variant="danger"
         onConfirm={async () => { await clearInventory(); setResetConfirmOpen(false); }}
         onClose={() => setResetConfirmOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={restoreConfirmOpen}
+        title="Restore Full Backup?"
+        description={`This will replace the current local database with "${pendingRestoreLabel}". The app will reload after verification.`}
+        confirmText="Restore Now"
+        variant="warning"
+        onConfirm={executeRestore}
+        onClose={() => {
+          setRestoreConfirmOpen(false);
+          setPendingRestorePayload(null);
+          setPendingRestoreLabel('');
+        }}
       />
 
       {toast && (

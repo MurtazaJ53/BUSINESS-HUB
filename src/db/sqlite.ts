@@ -57,6 +57,14 @@ class DatabaseSingleton {
   private webDb: SqlJsDatabase | null = null;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
+  private scheduleWebPersist(): void {
+    if (this.platform !== 'web' || !this.webDb) return;
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(async () => {
+      await this.flush();
+    }, 500);
+  }
+
   async boot(): Promise<void> {
     if (this.ready) return;
     if (this.bootPromise) return this.bootPromise;
@@ -136,13 +144,7 @@ class DatabaseSingleton {
       return { changes: res.changes?.changes ?? 0 };
     }
     this.webDb!.run(sql, params);
-    if (this.platform === 'web') {
-      if (this.saveTimer) clearTimeout(this.saveTimer);
-      this.saveTimer = setTimeout(async () => {
-        const data = this.webDb!.export();
-        await idbSave(data);
-      }, 500);
-    }
+    this.scheduleWebPersist();
     return { changes: 1 };
   }
 
@@ -160,7 +162,18 @@ class DatabaseSingleton {
     try {
       for (const s of stmts) this.webDb!.run(s.sql, s.params);
       this.webDb!.run('COMMIT;');
+      await this.flush();
     } catch (e) { this.webDb!.run('ROLLBACK;'); throw e; }
+  }
+
+  async flush(): Promise<void> {
+    if (this.platform !== 'web' || !this.webDb) return;
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+    }
+    const data = this.webDb.export();
+    await idbSave(data);
   }
 
   private async runMigrations(): Promise<void> {
