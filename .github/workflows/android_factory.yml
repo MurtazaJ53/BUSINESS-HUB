@@ -16,15 +16,15 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: zulu
           java-version: "21"
@@ -34,13 +34,6 @@ jobs:
 
       - name: Build Web Project
         run: npm run build
-
-      - name: Upload Web Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: BusinessHub-Web
-          path: dist
-          if-no-files-found: error
 
       - name: Sync Capacitor
         run: npx cap sync android
@@ -83,11 +76,25 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
-      - name: Upload Android APK Artifact
-        uses: actions/upload-artifact@v4
+      - name: Collect Web + Android Release Assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          (
+            cd dist
+            zip -r "../release-assets/BusinessHub-Web-latest.zip" .
+          )
+          cp \
+            android/app/build/outputs/apk/release/app-release.apk \
+            "release-assets/BusinessHub-Android-APK-latest.apk"
+          ls -la release-assets
+
+      - name: Upload Web + Android Release Artifacts
+        uses: actions/upload-artifact@v7
         with:
-          name: BusinessHub-Android-APK
-          path: android/app/build/outputs/apk/release/app-release.apk
+          name: BusinessHub-Web-Android-latest
+          path: release-assets
           if-no-files-found: error
 
   build-desktop:
@@ -112,10 +119,10 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
 
@@ -153,11 +160,61 @@ jobs:
         working-directory: apps/desktop
         run: npm run tauri -- build ${{ matrix.bundle_args }}
 
+      - name: Collect Desktop Release Assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          mkdir -p release-assets
+
+          case "${{ matrix.label }}" in
+            Windows)
+              patterns=(
+                apps/desktop/src-tauri/target/release/bundle/**/*.msi
+                apps/desktop/src-tauri/target/release/bundle/**/*.exe
+              )
+              ;;
+            Linux)
+              patterns=(
+                apps/desktop/src-tauri/target/release/bundle/**/*.deb
+                apps/desktop/src-tauri/target/release/bundle/**/*.AppImage
+              )
+              ;;
+            macOS)
+              patterns=(
+                apps/desktop/src-tauri/target/release/bundle/**/*.dmg
+                apps/desktop/src-tauri/target/release/bundle/**/*.app.tar.gz
+              )
+              ;;
+            *)
+              echo "Unsupported desktop target: ${{ matrix.label }}"
+              exit 1
+              ;;
+          esac
+
+          copied=0
+          for pattern in "${patterns[@]}"; do
+            for file in $pattern; do
+              cp "$file" release-assets/
+              if [ -f "${file}.sig" ]; then
+                cp "${file}.sig" release-assets/
+              fi
+              copied=$((copied + 1))
+            done
+          done
+
+          if [ "$copied" -eq 0 ]; then
+            echo "No desktop release assets found for ${{ matrix.label }}"
+            exit 1
+          fi
+
+          ls -la release-assets
+
       - name: Upload Desktop Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.artifact_name }}
-          path: apps/desktop/src-tauri/target/release/bundle
+          name: ${{ matrix.artifact_name }}-latest
+          path: release-assets
           if-no-files-found: error
 
   publish-latest-release:
@@ -170,28 +227,60 @@ jobs:
 
     steps:
       - name: Download All Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: release-artifacts
 
       - name: List Release Files
         run: find release-artifacts -type f | sort
 
-      - name: Publish Latest GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: Latest Automated Build
-          body: |
-            Automated build from the main branch.
-
-            Included artifacts:
-            - Web production build
-            - Signed Android APK
-            - Windows desktop bundles
-            - Linux desktop bundles
-            - macOS desktop bundles
-          files: release-artifacts/**/*
-          fail_on_unmatched_files: true
+      - name: Move latest tag to the current commit
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          repo="${{ github.repository }}"
+          if gh api "repos/$repo/git/ref/tags/latest" >/dev/null 2>&1; then
+            gh api --method PATCH "repos/$repo/git/refs/tags/latest" \
+              -f sha="${GITHUB_SHA}" \
+              -F force=true >/dev/null
+          else
+            gh api --method POST "repos/$repo/git/refs" \
+              -f ref="refs/tags/latest" \
+              -f sha="${GITHUB_SHA}" >/dev/null
+          fi
+
+      - name: Publish Latest GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          notes_file="$(mktemp)"
+          cat <<EOF > "$notes_file"
+          Automated build from the main branch.
+
+          Commit: ${GITHUB_SHA}
+
+          Included artifacts:
+          - Web production build zip
+          - Signed Android APK
+          - Windows desktop installers
+          - Linux desktop bundles
+          - macOS desktop bundles
+          EOF
+
+          mapfile -t files < <(find release-artifacts -type f | sort)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No release files found"
+            exit 1
+          fi
+
+          if gh release view latest >/dev/null 2>&1; then
+            gh release edit latest --title "Latest Automated Build" --notes-file "$notes_file"
+          else
+            gh release create latest --title "Latest Automated Build" --notes-file "$notes_file"
+          fi
+
+          gh release upload latest "${files[@]}" --clobber
