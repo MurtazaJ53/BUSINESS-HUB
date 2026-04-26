@@ -20,6 +20,7 @@ interface SqlJsDatabase {
 const IDB_NAME = 'business_hub_sqljs';
 const IDB_STORE = 'databases';
 const IDB_KEY = 'main';
+const PREFER_WEB_DB_ON_ANDROID = import.meta.env.VITE_ANDROID_DB_MODE !== 'native';
 
 async function idbSave(data: Uint8Array): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -79,7 +80,16 @@ class DatabaseSingleton {
 
     this.bootPromise = (async () => {
       this.booting = true;
-      this.platform = Capacitor.getPlatform() === 'web' ? 'web' : 'native';
+      const capacitorPlatform = Capacitor.getPlatform();
+      const shouldUseWebDb =
+        capacitorPlatform === 'web' ||
+        (capacitorPlatform === 'android' && PREFER_WEB_DB_ON_ANDROID);
+
+      this.platform = shouldUseWebDb ? 'web' : 'native';
+      if (capacitorPlatform === 'android' && this.platform === 'web') {
+        console.info('[DB] Using WebView SQL engine on Android for stability.');
+      }
+
       if (this.platform === 'native') await this.bootNative();
       else await this.bootWeb();
       await this.runMigrations();
