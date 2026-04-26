@@ -210,7 +210,7 @@ jobs:
 
     steps:
       - name: Download All Artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           path: release-artifacts
 
@@ -238,8 +238,10 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          repo="${GH_REPO}"
           notes_file="$(mktemp)"
           cat <<EOF > "$notes_file"
           Automated build from the main branch.
@@ -273,10 +275,10 @@ jobs:
             exit 1
           fi
 
-          if gh release view latest >/dev/null 2>&1; then
-            gh release edit latest --title "Latest Automated Build" --notes-file "$notes_file"
+          if gh release view latest --repo "$repo" >/dev/null 2>&1; then
+            gh release edit latest --repo "$repo" --title "Latest Automated Build" --notes-file "$notes_file"
           else
-            gh release create latest --title "Latest Automated Build" --notes-file "$notes_file"
+            gh release create latest --repo "$repo" --title "Latest Automated Build" --notes-file "$notes_file"
           fi
 
-          gh release upload latest "${files[@]}" --clobber
+          gh release upload latest "${files[@]}" --repo "$repo" --clobber
