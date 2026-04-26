@@ -63,6 +63,28 @@ const enqueueSync = async (
   void SyncWorker.requestFlush();
 };
 
+const enqueueSyncMany = async (
+  entries: Array<{
+    entityType: string;
+    entityId: string;
+    operation: 'CREATE' | 'UPDATE' | 'DELETE';
+    payload?: Record<string, any>;
+  }>,
+) => {
+  if (!entries.length) return;
+  const ts = Date.now();
+  await outboxRepo.enqueueMany(
+    entries.map((entry, index) => ({
+      opId: `${entry.entityType}_${entry.entityId}_${ts}_${index}`,
+      entityType: entry.entityType,
+      entityId: entry.entityId,
+      operation: entry.operation,
+      payload: entry.operation === 'DELETE' ? '{}' : JSON.stringify({ ...(entry.payload || {}), updatedAt: ts }),
+      createdAt: ts + index,
+    })),
+  );
+};
+
 const getInventoryDeltaForSaleItem = (item: SaleItem): number => {
   if (item.itemId.startsWith('custom-') || item.itemId === 'payment-received') return 0;
   return item.isReturn ? item.quantity : -item.quantity;
@@ -116,6 +138,7 @@ interface BusinessState {
   
   addSale: (sale: Sale) => Promise<void>;
   importHistoricalSale: (sale: Sale) => Promise<void>;
+  importHistoricalSalesBatch: (sales: Sale[]) => Promise<void>;
   updateSale: (sale: Sale) => Promise<void>;
   deleteSale: (id: string) => Promise<void>;
   
@@ -452,6 +475,19 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     await enqueueSync('sales', sale.id, existing ? 'UPDATE' : 'CREATE', sale);
   },
 
+  importHistoricalSalesBatch: async (sales) => {
+    const { shopId } = get(); if (!shopId || !sales.length) return;
+    await salesRepo.upsertMany(sales);
+    await enqueueSyncMany(
+      sales.map((sale) => ({
+        entityType: 'sales',
+        entityId: sale.id,
+        operation: 'UPDATE',
+        payload: sale,
+      })),
+    );
+  },
+
   updateSale: async (newSale) => {
     const { shopId } = get(); if (!shopId) return;
     const oldSale = await salesRepo.getById(newSale.id);
@@ -573,9 +609,14 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     tableEvents.emit('customers');
 
     const currentCustomers = await customersRepo.getAll();
-    await Promise.all(currentCustomers.map(async (customer) => {
-      await enqueueSync('customers', customer.id, 'UPDATE', customer);
-    }));
+    await enqueueSyncMany(
+      currentCustomers.map((customer) => ({
+        entityType: 'customers',
+        entityId: customer.id,
+        operation: 'UPDATE',
+        payload: customer,
+      })),
+    );
   },
 
   addExpense: async (expense) => {

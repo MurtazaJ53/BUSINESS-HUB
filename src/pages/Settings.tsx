@@ -51,7 +51,7 @@ const SectionHeader = ({ icon: Icon, title, subtitle }: { icon: any, title: stri
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { shop, updateShop, clearInventory, theme, setTheme, addInventoryItem, upsertCustomer, importHistoricalSale, rebuildCustomerTotalsFromSales, lastBackupDate, shopId } = useBusinessStore();
+  const { shop, updateShop, clearInventory, theme, setTheme, addInventoryItem, upsertCustomer, importHistoricalSalesBatch, rebuildCustomerTotalsFromSales, lastBackupDate, shopId } = useBusinessStore();
   const { role, user } = useAuthStore();
   
   const canEditSettings = usePermission('settings', 'edit') || role === 'admin';
@@ -132,6 +132,7 @@ export default function Settings() {
     setImportType(type);
     requestAnimationFrame(() => fileInputRef.current?.click());
   };
+  const yieldToUi = () => new Promise<void>((resolve) => window.setTimeout(resolve, 0));
 
   const queueRestore = (payload: string, label: string) => {
     setPendingRestorePayload(payload);
@@ -224,10 +225,16 @@ export default function Settings() {
 
   const executeMigration = async () => {
     if (!migrationData) return;
-    setMigrationStatus(`Injecting ${migrationData.validItems.length} records...`);
+    const activeMigration = migrationData;
+    setMigrationData(null);
+    setMigrationStatus(`Injecting ${activeMigration.validItems.length} records...`);
     let count = 0;
     try {
       const normalizeKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      const toStableFallbackId = (name: string, size?: string) => {
+        const base = normalizeKey(`${name} ${size || ''}`) || 'unknown-item';
+        return `legacy-${base.replace(/\s+/g, '-')}`;
+      };
       const inventoryRows = await inventoryRepo.getAll();
       const inventoryByName = new Map<string, InventoryItem[]>();
       inventoryRows.forEach((item) => {
@@ -244,10 +251,17 @@ export default function Settings() {
       );
       const customersByName = new Map(customers.map((customer) => [normalizeKey(customer.name), customer] as const));
 
-      await Promise.all(migrationData.validItems.map(async (item) => {
-        if (migrationData.type === 'inventory') {
+      if (activeMigration.type === 'inventory') {
+        for (const item of activeMigration.validItems) {
           await addInventoryItem({ ...item, createdAt: item.createdAt || new Date().toISOString() });
-        } else if (migrationData.type === 'customer') {
+          count++;
+          if (count % 25 === 0) {
+            setMigrationStatus(`Importing inventory ${count}/${activeMigration.validItems.length}...`);
+            await yieldToUi();
+          }
+        }
+      } else if (activeMigration.type === 'customer') {
+        for (const item of activeMigration.validItems) {
           await upsertCustomer({
             id: item.id,
             name: item.name,
@@ -258,12 +272,20 @@ export default function Settings() {
             createdAt: item.createdAt || new Date().toISOString(),
             sourceMeta: item.sourceMeta,
           });
-        } else if (migrationData.type === 'sale') {
+          count++;
+          if (count % 25 === 0) {
+            setMigrationStatus(`Importing customers ${count}/${activeMigration.validItems.length}...`);
+            await yieldToUi();
+          }
+        }
+      } else {
+        const preparedSales: Sale[] = activeMigration.validItems.map((item: any) => {
           const matchedCustomer = (item.customerPhone && customersByPhone.get(item.customerPhone))
             || (item.customerName && customersByName.get(normalizeKey(item.customerName)));
 
           const normalizedItems = (item.items || []).map((saleItem: any) => {
-            const matches = inventoryByName.get(normalizeKey(saleItem.name)) ?? [];
+            const itemName = String(saleItem.name || '').trim() || 'Imported Item';
+            const matches = inventoryByName.get(normalizeKey(itemName)) ?? [];
             const matchedInventory = matches.length === 1
               ? matches[0]
               : matches.find((inventoryItem) =>
@@ -272,38 +294,51 @@ export default function Settings() {
 
             return {
               ...saleItem,
-              itemId: matchedInventory?.id || saleItem.itemId,
+              name: itemName,
+              itemId: matchedInventory?.id || saleItem.itemId || toStableFallbackId(itemName, saleItem.size),
+              quantity: Number(saleItem.quantity || 1),
+              price: Number(saleItem.price || 0),
             };
           });
 
-          await importHistoricalSale({
+          return {
             id: item.id,
             items: normalizedItems,
             total: item.total,
             discount: item.discount ?? 0,
             discountValue: String(item.discount ?? 0),
             discountType: 'fixed',
-            paymentMode: item.paymentMode,
-            payments: item.payments,
-            customerName: item.customerName || matchedCustomer?.name,
+            paymentMode: item.paymentMode || 'CASH',
+            payments: Array.isArray(item.payments) && item.payments.length
+              ? item.payments
+              : [{ mode: item.paymentMode || 'CASH', amount: item.total }],
+            customerName: item.customerName || matchedCustomer?.name || 'Walk-in Customer',
             customerPhone: item.customerPhone || matchedCustomer?.phone,
             customerId: matchedCustomer?.id,
             footerNote: item.footerNote,
             date: item.date,
             createdAt: item.createdAt,
             sourceMeta: item.sourceMeta,
-          });
+          };
+        });
+
+        const batchSize = 50;
+        for (let start = 0; start < preparedSales.length; start += batchSize) {
+          const chunk = preparedSales.slice(start, start + batchSize);
+          await importHistoricalSalesBatch(chunk);
+          count += chunk.length;
+          setMigrationStatus(`Importing receipts ${count}/${preparedSales.length}...`);
+          await yieldToUi();
         }
-        count++;
-      }));
-      if (migrationData.type === 'sale') {
+
+        setMigrationStatus('Rebuilding customer totals from imported receipts...');
         await rebuildCustomerTotalsFromSales();
       }
-      showToast(`Migration Complete: ${count} ${migrationData.type}s injected.`);
+      showToast(`Migration Complete: ${count} ${activeMigration.type}s injected.`);
     } catch (e: any) {
       showToast(`Partial Failure: ${count} injected. Error: ${e.message}`);
     }
-    setMigrationData(null); setMigrationStatus(null);
+    setMigrationStatus(null);
   };
 
   const handleSaveBackupSettings = async () => {

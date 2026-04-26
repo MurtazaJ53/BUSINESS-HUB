@@ -53,10 +53,17 @@ class DatabaseSingleton {
   private ready = false;
   private booting = false;
   private bootPromise: Promise<void> | null = null;
+  private writeQueue: Promise<void> = Promise.resolve();
   private nativeSqlite: any = null;
   private nativeDb: any = null;
   private webDb: SqlJsDatabase | null = null;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private enqueueWrite<T>(job: () => Promise<T>): Promise<T> {
+    const next = this.writeQueue.then(job, job);
+    this.writeQueue = next.then(() => undefined, () => undefined);
+    return next;
+  }
 
   private scheduleWebPersist(): void {
     if (this.platform !== 'web' || !this.webDb) return;
@@ -146,31 +153,35 @@ class DatabaseSingleton {
 
   async run(sql: string, params?: any[]): Promise<RunResult> {
     this.assertReady();
-    if (this.platform === 'native') {
-      const res = await this.nativeDb.run(sql, params);
-      return { changes: res.changes?.changes ?? 0 };
-    }
-    this.webDb!.run(sql, params);
-    this.scheduleWebPersist();
-    return { changes: 1 };
+    return this.enqueueWrite(async () => {
+      if (this.platform === 'native') {
+        const res = await this.nativeDb.run(sql, params);
+        return { changes: res.changes?.changes ?? 0 };
+      }
+      this.webDb!.run(sql, params);
+      this.scheduleWebPersist();
+      return { changes: 1 };
+    });
   }
 
   async transaction(stmts: Array<{ sql: string; params?: any[] }>): Promise<void> {
     this.assertReady();
-    if (this.platform === 'native') {
-      await this.nativeDb.run('BEGIN TRANSACTION;');
+    return this.enqueueWrite(async () => {
+      if (this.platform === 'native') {
+        await this.nativeDb.run('BEGIN TRANSACTION;');
+        try {
+          for (const s of stmts) await this.nativeDb.run(s.sql, s.params);
+          await this.nativeDb.run('COMMIT;');
+        } catch (e) { await this.nativeDb.run('ROLLBACK;'); throw e; }
+        return;
+      }
+      this.webDb!.run('BEGIN TRANSACTION;');
       try {
-        for (const s of stmts) await this.nativeDb.run(s.sql, s.params);
-        await this.nativeDb.run('COMMIT;');
-      } catch (e) { await this.nativeDb.run('ROLLBACK;'); throw e; }
-      return;
-    }
-    this.webDb!.run('BEGIN TRANSACTION;');
-    try {
-      for (const s of stmts) this.webDb!.run(s.sql, s.params);
-      this.webDb!.run('COMMIT;');
-      await this.flush();
-    } catch (e) { this.webDb!.run('ROLLBACK;'); throw e; }
+        for (const s of stmts) this.webDb!.run(s.sql, s.params);
+        this.webDb!.run('COMMIT;');
+        await this.flush();
+      } catch (e) { this.webDb!.run('ROLLBACK;'); throw e; }
+    });
   }
 
   async flush(): Promise<void> {
