@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { PushNotifications, Token, ActionPerformed } from '@capacitor/push-notifications';
 import { Device } from '@capacitor/device';
 import { Capacitor, PluginListenerHandle } from '@capacitor/core';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+
+const PUSH_NOTIFICATIONS_ENABLED = import.meta.env.VITE_ENABLE_PUSH_NOTIFICATIONS === 'true';
 
 export interface PushConfig {
   shopId: string | null;
@@ -17,11 +19,16 @@ export function usePushNotifications(shopId: string | null) {
   
   // Backwards compatibility for the call in App.tsx which only passes shopId
   // We need the current UID for the user-centric device mapping
-  const uid = Capacitor.isNativePlatform() ? (window as any).firebase?.auth?.currentUser?.uid : null;
+  const uid = Capacitor.isNativePlatform() ? auth.currentUser?.uid ?? null : null;
 
   useEffect(() => {
     // Fail fast if not on mobile or missing core context
-    if (!shopId || !Capacitor.isNativePlatform()) return;
+    if (!shopId || !Capacitor.isNativePlatform() || !PUSH_NOTIFICATIONS_ENABLED) {
+      if (shopId && Capacitor.isNativePlatform() && !PUSH_NOTIFICATIONS_ENABLED) {
+        console.info('[Push Service] Disabled until native push configuration is explicitly enabled.');
+      }
+      return;
+    }
 
     let isMounted = true;
 
@@ -49,7 +56,7 @@ export function usePushNotifications(shopId: string | null) {
             
             try {
               // Architecture Fix: Tie the device token to the specific UID if available
-              const currentUid = uid || (window as any).firebase?.auth?.currentUser?.uid || 'anonymous';
+              const currentUid = uid || auth.currentUser?.uid || 'anonymous';
               const safeTokenId = encodeURIComponent(token.value);
               const tokenRef = doc(db, `shops/${shopId}/staff/${currentUid}/devices/${safeTokenId}`);
               
