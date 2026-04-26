@@ -7,6 +7,41 @@ import { tableEvents } from '../events';
 import type { Sale, SaleItem } from '../../lib/types';
 
 const now = () => Date.now();
+type PaymentMode = Sale['paymentMode'];
+
+export interface SalesRangeFilters {
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface SalesHistoryFilters extends SalesRangeFilters {
+  search?: string;
+}
+
+export interface SaleHistorySummary {
+  id: string;
+  total: number;
+  discount: number;
+  discountValue: number;
+  discountType: 'fixed' | 'percent';
+  paymentMode: PaymentMode;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  customerId?: string | null;
+  footerNote?: string | null;
+  sourceMeta?: Record<string, unknown> | null;
+  date: string;
+  createdAt: number | string;
+  staffId?: string | null;
+  itemQuantity: number;
+  paymentCount: number;
+}
+
+export interface SalesHistoryMetrics {
+  totalCount: number;
+  totalAmount: number;
+}
+
 const parseSourceMeta = (value: unknown): Record<string, unknown> | null => {
   if (!value) return null;
   if (typeof value === 'string') {
@@ -18,6 +53,98 @@ const serializeSourceMeta = (value: unknown): string | null => {
   if (!value) return null;
   if (typeof value === 'string') return value;
   try { return JSON.stringify(value); } catch { return null; }
+};
+
+const buildSalesWhereClause = (
+  filters: SalesHistoryFilters = {},
+): { clause: string; params: Array<string | number> } => {
+  const conditions = ['s.tombstone = 0'];
+  const params: Array<string | number> = [];
+
+  if (filters.search?.trim()) {
+    const like = `%${filters.search.trim().toLowerCase()}%`;
+    conditions.push('(LOWER(s.id) LIKE ? OR LOWER(COALESCE(s.customerName, \'\')) LIKE ?)');
+    params.push(like, like);
+  }
+
+  if (filters.dateFrom) {
+    conditions.push('s.date >= ?');
+    params.push(filters.dateFrom);
+  }
+
+  if (filters.dateTo) {
+    conditions.push('s.date <= ?');
+    params.push(filters.dateTo);
+  }
+
+  return {
+    clause: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '',
+    params,
+  };
+};
+
+const buildRangeClause = (
+  filters: SalesRangeFilters = {},
+): { clause: string; params: Array<string | number> } => {
+  const conditions = ['tombstone = 0'];
+  const params: Array<string | number> = [];
+
+  if (filters.dateFrom) {
+    conditions.push('date >= ?');
+    params.push(filters.dateFrom);
+  }
+
+  if (filters.dateTo) {
+    conditions.push('date <= ?');
+    params.push(filters.dateTo);
+  }
+
+  return {
+    clause: `WHERE ${conditions.join(' AND ')}`,
+    params,
+  };
+};
+
+const hydrateSalesRows = async (rows: any[]): Promise<Sale[]> => {
+  if (!rows.length) return [];
+  const ids = rows.map((row) => row.id);
+  const ph = ids.map(() => '?').join(',');
+
+  const [items, payments] = await Promise.all([
+    Database.query<(SaleItem & { saleId: string })>(
+      `SELECT saleId, itemId, name, quantity, price, costPrice, size, isReturn
+       FROM sale_items
+       WHERE saleId IN (${ph});`,
+      ids,
+    ),
+    Database.query<{ saleId: string; mode: string; amount: number }>(
+      `SELECT saleId, mode, amount
+       FROM sale_payments
+       WHERE saleId IN (${ph});`,
+      ids,
+    ),
+  ]);
+
+  const itemMap = new Map<string, SaleItem[]>();
+  items.forEach(({ saleId, ...item }) => {
+    const bucket = itemMap.get(saleId) ?? [];
+    bucket.push(item);
+    itemMap.set(saleId, bucket);
+  });
+
+  const paymentMap = new Map<string, Array<{ mode: string; amount: number }>>();
+  payments.forEach(({ saleId, ...payment }) => {
+    const bucket = paymentMap.get(saleId) ?? [];
+    bucket.push(payment);
+    paymentMap.set(saleId, bucket);
+  });
+
+  return rows.map((row) => ({
+    ...row,
+    sourceMeta: parseSourceMeta(row.sourceMeta),
+    items: itemMap.get(row.id) ?? [],
+    payments: paymentMap.get(row.id) ?? [],
+  }));
 };
 
 const buildUpsertStatements = (sale: Sale, updatedAt: number, dirty: 0 | 1): Array<{ sql: string; params?: any[] }> => {
@@ -71,20 +198,21 @@ export const salesRepo = {
            FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC;`,
       limitCount ? [limitCount] : [],
     );
+    return hydrateSalesRows(rows);
+  },
 
-    const sales: Sale[] = [];
-    for (const row of rows) {
-      const items = await Database.query<SaleItem>(
-        `SELECT itemId, name, quantity, price, costPrice, size,
-                isReturn
-         FROM sale_items WHERE saleId = ?;`, [row.id],
-      );
-      const payments = await Database.query<{ mode: string; amount: number }>(
-        `SELECT mode, amount FROM sale_payments WHERE saleId = ?;`, [row.id],
-      );
-      sales.push({ ...row, sourceMeta: parseSourceMeta(row.sourceMeta), items, payments });
-    }
-    return sales;
+  async getRange(filters: SalesRangeFilters = {}): Promise<Sale[]> {
+    const { clause, params } = buildRangeClause(filters);
+    const rows = await Database.query<any>(
+      `SELECT id, total, discount, discountValue, discountType,
+              paymentMode, customerName, customerPhone,
+              customerId, footerNote, sourceMeta, date, createdAt, staffId
+       FROM sales
+       ${clause}
+       ORDER BY date DESC, createdAt DESC;`,
+      params,
+    );
+    return hydrateSalesRows(rows);
   },
 
   async getById(id: string): Promise<Sale | null> {
@@ -103,6 +231,102 @@ export const salesRepo = {
       `SELECT mode, amount FROM sale_payments WHERE saleId = ?;`, [id],
     );
     return { ...rows[0], sourceMeta: parseSourceMeta(rows[0].sourceMeta), items, payments };
+  },
+
+  async getByCustomerId(customerId: string): Promise<Sale[]> {
+    const rows = await Database.query<any>(
+      `SELECT id, total, discount, discountValue, discountType,
+              paymentMode, customerName, customerPhone,
+              customerId, footerNote, sourceMeta, date, createdAt, staffId
+       FROM sales
+       WHERE customerId = ? AND tombstone = 0
+       ORDER BY date DESC, createdAt DESC;`,
+      [customerId],
+    );
+    return hydrateSalesRows(rows);
+  },
+
+  async getHistoryPage(
+    filters: SalesHistoryFilters = {},
+    page: number = 1,
+    pageSize: number = 100,
+  ): Promise<SaleHistorySummary[]> {
+    const safePage = Math.max(1, page);
+    const safePageSize = Math.max(1, Math.min(pageSize, 500));
+    const offset = (safePage - 1) * safePageSize;
+    const { clause, params } = buildSalesWhereClause(filters);
+    const rows = await Database.query<any>(
+      `SELECT s.id,
+              s.total,
+              s.discount,
+              s.discountValue,
+              s.discountType,
+              s.paymentMode,
+              s.customerName,
+              s.customerPhone,
+              s.customerId,
+              s.footerNote,
+              s.sourceMeta,
+              s.date,
+              s.createdAt,
+              s.staffId,
+              COALESCE(item_stats.itemQuantity, 0) AS itemQuantity,
+              COALESCE(payment_stats.paymentCount, 0) AS paymentCount
+       FROM sales s
+       LEFT JOIN (
+         SELECT saleId, SUM(quantity) AS itemQuantity
+         FROM sale_items
+         GROUP BY saleId
+       ) item_stats ON item_stats.saleId = s.id
+       LEFT JOIN (
+         SELECT saleId, COUNT(*) AS paymentCount
+         FROM sale_payments
+         GROUP BY saleId
+       ) payment_stats ON payment_stats.saleId = s.id
+       ${clause}
+       ORDER BY s.date DESC, s.createdAt DESC
+       LIMIT ? OFFSET ?;`,
+      [...params, safePageSize, offset],
+    );
+
+    return rows.map((row) => ({
+      ...row,
+      sourceMeta: parseSourceMeta(row.sourceMeta),
+      itemQuantity: Number(row.itemQuantity || 0),
+      paymentCount: Number(row.paymentCount || 0),
+    }));
+  },
+
+  async getHistoryMetrics(filters: SalesHistoryFilters = {}): Promise<SalesHistoryMetrics> {
+    const { clause, params } = buildSalesWhereClause(filters);
+    const rows = await Database.query<{ totalCount: number; totalAmount: number }>(
+      `SELECT COUNT(*) AS totalCount,
+              COALESCE(SUM(s.total), 0) AS totalAmount
+       FROM sales s
+       ${clause};`,
+      params,
+    );
+    return rows[0] ?? { totalCount: 0, totalAmount: 0 };
+  },
+
+  async getCreditAgingMap(): Promise<Record<string, string>> {
+    const rows = await Database.query<{ customerId: string; oldestCreditDate: string }>(
+      `SELECT s.customerId AS customerId,
+              MIN(s.date) AS oldestCreditDate
+       FROM sales s
+       WHERE s.tombstone = 0
+         AND s.customerId IS NOT NULL
+         AND EXISTS (
+           SELECT 1
+           FROM sale_payments sp
+           WHERE sp.saleId = s.id AND sp.mode = 'CREDIT'
+         )
+       GROUP BY s.customerId;`,
+    );
+    return rows.reduce<Record<string, string>>((acc, row) => {
+      if (row.customerId && row.oldestCreditDate) acc[row.customerId] = row.oldestCreditDate;
+      return acc;
+    }, {});
   },
 
   async upsert(sale: Sale): Promise<void> {
@@ -135,18 +359,7 @@ export const salesRepo = {
               updatedAt, tombstone
        FROM sales WHERE dirty = 1;`,
     );
-    const results: any[] = [];
-    for (const row of rows) {
-      const items = await Database.query<SaleItem>(
-        `SELECT itemId, name, quantity, price, costPrice, size, isReturn
-         FROM sale_items WHERE saleId = ?;`, [row.id],
-      );
-      const payments = await Database.query<{ mode: string; amount: number }>(
-        `SELECT mode, amount FROM sale_payments WHERE saleId = ?;`, [row.id],
-      );
-      results.push({ ...row, sourceMeta: parseSourceMeta(row.sourceMeta), items, payments });
-    }
-    return results;
+    return hydrateSalesRows(rows) as Promise<Array<Sale & { tombstone: number; updatedAt: number }>>;
   },
 
   async markClean(ids: string[]): Promise<void> {

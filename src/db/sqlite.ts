@@ -220,6 +220,11 @@ class DatabaseSingleton {
         
         CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items(saleId);
         CREATE INDEX IF NOT EXISTS idx_sale_payments_sale_id ON sale_payments(saleId);
+        CREATE INDEX IF NOT EXISTS idx_sales_date_created_at ON sales(date DESC, createdAt DESC);
+        CREATE INDEX IF NOT EXISTS idx_sales_customer_id ON sales(customerId, date DESC);
+        CREATE INDEX IF NOT EXISTS idx_sales_customer_name ON sales(customerName);
+        CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
+        CREATE INDEX IF NOT EXISTS idx_customer_payments_customer_id ON customer_payments(customerId, createdAt DESC);
         CREATE INDEX IF NOT EXISTS idx_local_backups_created_at ON local_backups(createdAt DESC);
     `;
 

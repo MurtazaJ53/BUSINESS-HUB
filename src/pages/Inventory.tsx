@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { calculateSalesVelocity, calculateDaysRemaining } from '@/lib/analyticsUtils';
 import ErrorModal from '@/components/ErrorModal';
-import { useSqlQuery, useSalesQuery } from '@/db/hooks';
+import { useSalesRangeQuery, useSqlQuery } from '@/db/hooks';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn } from '@/lib/utils';
 import type { InventoryItem, Sale } from '@/lib/types';
@@ -194,7 +194,9 @@ export default function Inventory() {
   const { addInventoryItem, updateInventoryItem, updateStock, deleteInventoryItem, clearInventory, inventorySearchTerm, setInventorySearchTerm, restockItem, role } = useBusinessStore();
   const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
   const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
-  const sales = useSalesQuery();
+  const today = new Date().toISOString().split('T')[0];
+  const last30Days = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+  const sales = useSalesRangeQuery(last30Days, today);
 
   const canViewCost = usePermission('inventory', 'view_cost');
 

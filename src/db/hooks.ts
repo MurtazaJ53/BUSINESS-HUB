@@ -71,3 +71,11 @@ export function useSalesQuery(limitCount?: number): Sale[] {
     [limitCount],
   );
 }
+
+export function useSalesRangeQuery(dateFrom?: string, dateTo?: string): Sale[] {
+  return useLiveQuery(
+    () => salesRepo.getRange({ dateFrom, dateTo }),
+    ['sales', 'sale_items', 'sale_payments'],
+    [dateFrom, dateTo],
+  );
+}

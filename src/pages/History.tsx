@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { 
   Search, 
   Trash2, 
@@ -17,7 +17,8 @@ import {
   ShieldCheck,
   Printer
 } from 'lucide-react';
-import { useSqlQuery, useSalesQuery } from '@/db/hooks';
+import { useLiveQuery, useSqlQuery } from '@/db/hooks';
+import { salesRepo, type SaleHistorySummary } from '@/db/repositories/salesRepo';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { usePermission } from '@/hooks/usePermission';
 import { formatCurrency, cn, toTimestamp } from '@/lib/utils';
@@ -28,18 +29,21 @@ import ReceiptModal from '@/components/ReceiptModal';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
 export default function History() {
-  const { deleteSale, deleteExpense, updateSale, role } = useBusinessStore();
+  const { deleteSale, deleteExpense, updateSale } = useBusinessStore();
   const canEditSale = usePermission('sales', 'edit');
   const canVoidSale = usePermission('sales', 'void_sale');
   const canDeleteExpense = usePermission('expenses', 'delete');
-  const sales = useSalesQuery();
   const expenses = useSqlQuery<Expense>('SELECT * FROM expenses WHERE tombstone = 0 ORDER BY date DESC', [], ['expenses']);
   const [tab, setTab] = useState<'sales' | 'expenses'>('sales');
   const [search, setSearch] = useState('');
+  const deferredSearch = useDeferredValue(search);
   const [viewingSale, setViewingSale] = useState<Sale | null>(null);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
+  const [loadingSaleId, setLoadingSaleId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState<string>('All Time');
+  const [page, setPage] = useState(1);
+  const pageSize = 100;
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -47,23 +51,6 @@ export default function History() {
     paymentMode: '' as Sale['paymentMode'],
     date: ''
   });
-
-  const dailyCustomers = useMemo(() => {
-    return new Set(sales.filter((s: Sale) => s.date === new Date().toISOString().split('T')[0]).map((s: Sale) => s.customerName || 'Walk-in')).size;
-  }, [sales]);
-
-  const dailyRevenue = useMemo(() => {
-    return sales.filter((s: Sale) => s.date === new Date().toISOString().split('T')[0]).reduce((sum: number, s: Sale) => sum + (s.total || 0), 0);
-  }, [sales]);
-
-  const handleEditOpen = (sale: Sale) => {
-    setEditingSale(sale);
-    setEditForm({
-      customerName: sale.customerName || '',
-      paymentMode: sale.paymentMode,
-      date: sale.date
-    });
-  };
 
   const handleUpdate = async () => {
     if (!editingSale) return;
@@ -80,19 +67,72 @@ export default function History() {
   const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
   const last7Days = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
 
-  const filteredSales = sales
-    .filter((s: Sale) => {
-      const matchSearch = s.id.toLowerCase().includes(search.toLowerCase()) || 
-                          (s.customerName?.toLowerCase() ?? '').includes(search.toLowerCase());
-      
-      let matchDate = true;
-      if (dateFilter === 'Today') matchDate = s.date === today;
-      else if (dateFilter === 'Yesterday') matchDate = s.date === yesterday;
-      else if (dateFilter === 'Last 7 Days') matchDate = s.date >= last7Days;
+  const salesFilters = useMemo(() => {
+    const filters: { search?: string; dateFrom?: string; dateTo?: string } = {};
+    if (deferredSearch.trim()) filters.search = deferredSearch.trim();
+    if (dateFilter === 'Today') {
+      filters.dateFrom = today;
+      filters.dateTo = today;
+    } else if (dateFilter === 'Yesterday') {
+      filters.dateFrom = yesterday;
+      filters.dateTo = yesterday;
+    } else if (dateFilter === 'Last 7 Days') {
+      filters.dateFrom = last7Days;
+      filters.dateTo = today;
+    }
+    return filters;
+  }, [dateFilter, deferredSearch, last7Days, today, yesterday]);
 
-      return matchSearch && matchDate;
-    })
-    .sort((a: Sale, b: Sale) => b.date.localeCompare(a.date) || toTimestamp(b.createdAt) - toTimestamp(a.createdAt));
+  const historyMetrics = useLiveQuery(
+    () => salesRepo.getHistoryMetrics(salesFilters).then((metrics) => [{ ...metrics }]),
+    ['sales', 'sale_items', 'sale_payments'],
+    [salesFilters.search || '', salesFilters.dateFrom || '', salesFilters.dateTo || ''],
+  );
+
+  const salesPage = useLiveQuery<SaleHistorySummary>(
+    () => salesRepo.getHistoryPage(salesFilters, page, pageSize),
+    ['sales', 'sale_items', 'sale_payments'],
+    [page, pageSize, salesFilters.search || '', salesFilters.dateFrom || '', salesFilters.dateTo || ''],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [deferredSearch, dateFilter, tab]);
+
+  const openSale = async (saleId: string): Promise<Sale | null> => {
+    setLoadingSaleId(saleId);
+    try {
+      return await salesRepo.getById(saleId);
+    } catch (error) {
+      console.error('[History] Failed to load sale details', error);
+      return null;
+    } finally {
+      setLoadingSaleId(null);
+    }
+  };
+
+  const handleEditOpen = async (saleId: string) => {
+    const sale = await openSale(saleId);
+    if (!sale) return;
+    setEditingSale(sale);
+    setEditForm({
+      customerName: sale.customerName || '',
+      paymentMode: sale.paymentMode,
+      date: sale.date
+    });
+  };
+
+  const handleViewSale = async (saleId: string) => {
+    const sale = await openSale(saleId);
+    if (sale) setViewingSale(sale);
+  };
+
+  const handlePrintSale = async (saleId: string) => {
+    const sale = await openSale(saleId);
+    if (!sale) return;
+    const shop = loadShopSettings();
+    printReceipt(sale, shop);
+  };
 
   const filteredExpenses = expenses
     .filter((e: Expense) => {
@@ -116,8 +156,10 @@ export default function History() {
     }
   };
 
-  const totalSalesAmount = filteredSales.reduce((sum: number, s: Sale) => sum + s.total, 0);
+  const totalSalesAmount = historyMetrics[0]?.totalAmount ?? 0;
+  const filteredSalesCount = historyMetrics[0]?.totalCount ?? 0;
   const totalExpensesAmount = filteredExpenses.reduce((sum: number, e: Expense) => sum + e.amount, 0);
+  const totalPages = Math.max(1, Math.ceil(filteredSalesCount / pageSize));
 
   const dateFilters = ['All Time', 'Today', 'Yesterday', 'Last 7 Days'];
   const paymentModes = ['CASH', 'UPI', 'CARD', 'CREDIT', 'ONLINE', 'OTHERS'];
@@ -145,7 +187,7 @@ export default function History() {
                 "px-2 py-0.5 rounded-full text-[8px] font-bold",
                 tab === 'sales' ? "bg-primary-foreground/20" : "bg-accent/50 text-muted-foreground"
               )}>
-                {filteredSales.length}
+                {filteredSalesCount}
               </span>
             </button>
             <button 
@@ -209,7 +251,7 @@ export default function History() {
                 <IndianRupee className="h-5 w-5 text-primary" />
               </div>
             </div>
-            <p className="text-[10px] font-bold text-primary mt-1 uppercase tracking-widest">{filteredSales.length} Successful Orders</p>
+            <p className="text-[10px] font-bold text-primary mt-1 uppercase tracking-widest">{filteredSalesCount} Successful Orders</p>
           </div>
 
           <div className={cn(
@@ -244,7 +286,7 @@ export default function History() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {filteredSales.length === 0 ? (
+                {salesPage.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-6 py-20 text-center">
                       <div className="flex flex-col items-center justify-center opacity-30">
@@ -254,7 +296,7 @@ export default function History() {
                     </td>
                   </tr>
                 ) : (
-                  filteredSales.map((sale: Sale) => (
+                  salesPage.map((sale) => (
                     <tr key={sale.id} className="group hover:bg-primary/[0.02] transition-colors">
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
@@ -290,7 +332,7 @@ export default function History() {
                       </td>
                       <td className="px-6 py-5 text-center">
                         <span className="text-xs font-black bg-accent px-2.5 py-1 rounded-full">
-                          {sale.items.reduce((acc, i) => acc + i.quantity, 0)}
+                          {sale.itemQuantity}
                         </span>
                       </td>
                       <td className="px-6 py-5">
@@ -298,13 +340,13 @@ export default function History() {
                           <div className={cn(
                             "h-2 w-2 rounded-full",
                             sale.id.startsWith('PAY-') ? "bg-emerald-500 animate-pulse" : 
-                            (sale.payments && sale.payments.length > 1 ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : 
+                            (sale.paymentCount > 1 ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : 
                             (sale.paymentMode === 'CASH' ? "bg-emerald-500" : "bg-primary"))
                           )} />
                           <span className="text-[11px] font-black uppercase tracking-widest leading-none">
                             {sale.id.startsWith('PAY-') 
                               ? 'CASH COLLECTION' 
-                              : (sale.payments && sale.payments.length > 1 
+                              : (sale.paymentCount > 1 
                                   ? 'SPLIT' 
                                   : sale.paymentMode)}
                           </span>
@@ -318,27 +360,27 @@ export default function History() {
                       <td className="px-6 py-5">
                         <div className="flex items-center justify-center gap-2">
                           <button 
-                            onClick={() => {
-                              const shop = loadShopSettings();
-                              printReceipt(sale, shop);
-                            }}
+                            onClick={() => void handlePrintSale(sale.id)}
                             className="p-2 hover:bg-primary/10 hover:text-primary rounded-xl transition-all"
                             title="Print Receipt"
+                            disabled={loadingSaleId === sale.id}
                           >
-                            <Printer className="h-4 w-4" />
+                            <Printer className={cn("h-4 w-4", loadingSaleId === sale.id && "animate-pulse")} />
                           </button>
                           <button 
-                            onClick={() => setViewingSale(sale)}
+                            onClick={() => void handleViewSale(sale.id)}
                             className="p-2 hover:bg-primary/10 hover:text-primary rounded-xl transition-all"
                             title="View Details"
+                            disabled={loadingSaleId === sale.id}
                           >
                             <Eye className="h-4 w-4" />
                           </button>
                           {canEditSale && (
                             <button 
-                              onClick={() => handleEditOpen(sale)}
+                              onClick={() => void handleEditOpen(sale.id)}
                               className="p-2 hover:bg-primary/10 hover:text-primary rounded-xl transition-all"
                               title="Edit Details"
+                              disabled={loadingSaleId === sale.id}
                             >
                               <Pencil className="h-4 w-4" />
                             </button>
@@ -426,6 +468,30 @@ export default function History() {
           )}
         </div>
       </div>
+
+      {tab === 'sales' && totalPages > 1 && (
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            Showing page {page} of {totalPages} · {filteredSalesCount.toLocaleString()} receipts
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page === 1}
+              className="px-4 py-2 rounded-xl border border-border bg-card text-xs font-black uppercase tracking-widest text-muted-foreground transition-all disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              disabled={page === totalPages}
+              className="px-4 py-2 rounded-xl border border-border bg-card text-xs font-black uppercase tracking-widest text-muted-foreground transition-all disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Edit Modal */}
       {editingSale && (

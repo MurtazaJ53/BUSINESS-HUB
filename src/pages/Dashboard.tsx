@@ -23,11 +23,12 @@ import {
   Sparkles,
   ChevronRight
 } from 'lucide-react';
-import { useSqlQuery, useSalesQuery } from '@/db/hooks';
+import { useLiveQuery, useSalesRangeQuery, useSqlQuery } from '@/db/hooks';
+import { salesRepo, type SaleHistorySummary } from '@/db/repositories/salesRepo';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { useAuthStore } from '@/lib/useAuthStore';
 import { usePermission } from '@/hooks/usePermission';
-import { formatCurrency, cn, toTimestamp } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import Modal from '@/components/Modal';
 import Label from '@/components/Label';
 import Input from '@/components/Input';
@@ -84,7 +85,19 @@ function KPICard({
 export default function Dashboard() {
   const navigate = useNavigate();
   const { addExpense, recordAttendance, role, shop, lastBackupDate, setInventorySearchTerm, sidebarOpen } = useBusinessStore();
-  const sales = useSalesQuery();
+  const today = new Date().toISOString().split('T')[0];
+  const last30Days = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+  const sales = useSalesRangeQuery(last30Days, today);
+  const salesTotals = useSqlQuery<{ totalRevenue: number; totalCount: number }>(
+    'SELECT COALESCE(SUM(total), 0) AS totalRevenue, COUNT(*) AS totalCount FROM sales WHERE tombstone = 0',
+    [],
+    ['sales'],
+  );
+  const recentSales = useLiveQuery<SaleHistorySummary>(
+    () => salesRepo.getHistoryPage({}, 1, 10),
+    ['sales', 'sale_items', 'sale_payments'],
+    [],
+  );
   const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
   const expenses = useSqlQuery<Expense>('SELECT * FROM expenses WHERE tombstone = 0 ORDER BY date DESC', [], ['expenses']);
   const attendance = useSqlQuery<Attendance>('SELECT * FROM attendance WHERE tombstone = 0', [], ['attendance']);
@@ -103,7 +116,6 @@ export default function Dashboard() {
   const [expenseForm, setExpenseForm] = useState({ amount: '', category: 'General', description: '' });
   const [isSavingExpense, setIsSavingExpense] = useState(false);
 
-  const today = new Date().toISOString().split('T')[0];
   const myAttendance = attendance.find((a: Attendance) => a.staffId === user?.uid && a.date === today);
   const presentStaffCount = attendance.filter((a: Attendance) => a.date === today && a.status === 'PRESENT').length;
 
@@ -148,8 +160,8 @@ export default function Dashboard() {
   );
   const lowStockItems = inventory.filter((i: InventoryItem) => i.stock !== undefined && i.stock <= 5);
 
-  const totalSalesRevenue = sales.reduce((sum: number, s: Sale) => sum + s.total, 0);
-  const totalSalesCount = sales.length;
+  const totalSalesRevenue = salesTotals[0]?.totalRevenue ?? 0;
+  const totalSalesCount = salesTotals[0]?.totalCount ?? 0;
 
   // Last 7 days sales + Forecast
   const chartDataCombined = useMemo(() => {
@@ -515,32 +527,29 @@ export default function Dashboard() {
               View All History →
             </button>
           </div>
-          {sales.length === 0 ? (
+          {recentSales.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground opacity-40">
               <ShoppingCart className="h-10 w-10 mx-auto mb-3" />
               <p className="text-sm font-bold">No sales yet.</p>
             </div>
           ) : (
             <div className="divide-y divide-border/50">
-              {[...sales]
-                .sort((a, b) => toTimestamp(b.createdAt) - toTimestamp(a.createdAt))
-                .slice(0, 10)
-                .map((sale) => (
+              {recentSales.map((sale) => (
                   <div key={sale.id} className="flex items-center justify-between py-4 hover:bg-accent/10 transition-colors px-2 rounded-xl">
                     <div>
                       <p className="font-semibold text-sm">
                         {sale.customerName ? `Customer: ${sale.customerName}` : 'Walk-in Customer'}
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
-                        <span>{sale.items.length} item{sale.items.length !== 1 ? 's' : ''}</span>
+                        <span>{sale.itemQuantity} item{sale.itemQuantity !== 1 ? 's' : ''}</span>
                         <span className="opacity-30">·</span>
                         <span className={cn(
                           "font-black uppercase tracking-tighter px-1.5 py-0.5 rounded-md",
-                          sale.payments && sale.payments.length > 1 
+                          sale.paymentCount > 1 
                             ? "bg-amber-500/10 text-amber-600 border border-amber-500/10" 
                             : "bg-accent text-muted-foreground"
                         )}>
-                          {sale.payments && sale.payments.length > 1 ? 'SPLIT' : sale.paymentMode}
+                          {sale.paymentCount > 1 ? 'SPLIT' : sale.paymentMode}
                         </span>
                         <span className="opacity-30">·</span>
                         <span>{sale.date}</span>
