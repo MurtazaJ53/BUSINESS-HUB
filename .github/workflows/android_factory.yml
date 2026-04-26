@@ -276,9 +276,11 @@ jobs:
           fi
 
           if gh release view latest --repo "$repo" >/dev/null 2>&1; then
-            gh release edit latest --repo "$repo" --title "Latest Automated Build" --notes-file "$notes_file"
-          else
-            gh release create latest --repo "$repo" --title "Latest Automated Build" --notes-file "$notes_file"
+            gh release delete latest --repo "$repo" --yes
           fi
 
-          gh release upload latest "${files[@]}" --repo "$repo" --clobber
+          gh release create latest \
+            --repo "$repo" \
+            --title "Latest Automated Build" \
+            --notes-file "$notes_file" \
+            "${files[@]}"

@@ -256,9 +256,11 @@ jobs:
           fi
 
           if gh release view "$tag" --repo "$repo" >/dev/null 2>&1; then
-            gh release edit "$tag" --repo "$repo" --title "Business Hub $tag" --notes-file "$notes_file"
-          else
-            gh release create "$tag" --repo "$repo" --title "Business Hub $tag" --notes-file "$notes_file"
+            gh release delete "$tag" --repo "$repo" --yes
           fi
 
-          gh release upload "$tag" "${files[@]}" --repo "$repo" --clobber
+          gh release create "$tag" \
+            --repo "$repo" \
+            --title "Business Hub $tag" \
+            --notes-file "$notes_file" \
+            "${files[@]}"
