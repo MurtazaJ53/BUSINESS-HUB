@@ -24,6 +24,10 @@ export interface ExpenseCategoryTotal {
   total: number;
 }
 
+export interface StaffCompensationExpense extends Expense {
+  amount: number;
+}
+
 const buildExpenseWhereClause = (
   filters: ExpenseListFilters = {},
 ): { clause: string; params: Array<string | number> } => {
@@ -101,6 +105,43 @@ export const expensesRepo = {
        ${clause}
        GROUP BY category
        ORDER BY total DESC;`,
+      params,
+    );
+  },
+
+  async getRange(filters: ExpenseListFilters = {}): Promise<Expense[]> {
+    const { clause, params } = buildExpenseWhereClause(filters);
+    return Database.query<Expense>(
+      `SELECT id, category, amount, description, paymentMethod, paymentReference, date, createdAt
+       FROM expenses
+       ${clause}
+       ORDER BY date DESC, createdAt DESC;`,
+      params,
+    );
+  },
+
+  async getStaffCompensationEntries(dateFrom?: string, dateTo?: string): Promise<StaffCompensationExpense[]> {
+    const params: Array<string | number> = ['Staff Salary', 'Advance Salary'];
+    const conditions = [
+      'tombstone = 0',
+      '(category = ? OR category = ?)',
+    ];
+
+    if (dateFrom) {
+      conditions.push('date >= ?');
+      params.push(dateFrom);
+    }
+
+    if (dateTo) {
+      conditions.push('date <= ?');
+      params.push(dateTo);
+    }
+
+    return Database.query<StaffCompensationExpense>(
+      `SELECT id, category, amount, description, paymentMethod, paymentReference, date, createdAt
+       FROM expenses
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY date DESC, createdAt DESC;`,
       params,
     );
   },

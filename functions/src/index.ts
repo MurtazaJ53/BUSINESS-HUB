@@ -11,14 +11,22 @@ if (admin.apps.length === 0) {
 
 setGlobalOptions({ 
   region: "us-central1",
-  maxInstances: 5,
-  cpu: 0.167,
-  memory: "256MiB"
+  maxInstances: 50,
+  cpu: 1,
+  memory: "512MiB"
 });
 
 // v2 Firestore Triggers
 export { onStaffWrite } from "./staff-claims";
 export { onSaleWrite } from "./aggregates";
+export {
+  onAttendanceWriteSummary,
+  onCustomerPaymentWriteSummary,
+  onCustomerWriteSummary,
+  onExpenseWriteSummary,
+} from "./summaries";
+export { onBackgroundJobWrite } from "./jobs";
+export { emitOperationsHeartbeat } from "./observability";
 
 // v2 Background Computations
 export { computeVelocity } from "./velocity";

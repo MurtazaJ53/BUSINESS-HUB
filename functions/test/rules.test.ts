@@ -13,7 +13,7 @@ import * as path from "path";
  * Firestore Security Rules Assertions
  */
 describe("Firestore Security Rules", () => {
-  let testEnv: RulesTestEnvironment;
+  let testEnv: RulesTestEnvironment | undefined;
 
   beforeAll(async () => {
     testEnv = await initializeTestEnvironment({
@@ -27,10 +27,15 @@ describe("Firestore Security Rules", () => {
   });
 
   afterAll(async () => {
-    await testEnv.cleanup();
+    if (testEnv) {
+      await testEnv.cleanup();
+    }
   });
 
   beforeEach(async () => {
+    if (!testEnv) {
+      throw new Error("Firestore rules test environment did not initialize. Make sure the Firestore emulator is running.");
+    }
     await testEnv.clearFirestore();
   });
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   Users, Clock, CreditCard, Calendar, Search, ChevronRight, Clock3,
   UserPlus, Filter, DollarSign, Download, Clock9, Lock, Unlock,
@@ -9,7 +9,8 @@ import {
 import { doc, deleteDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { verifyAdminPin } from '@/lib/admin';
-import { useSqlQuery } from '@/db/hooks';
+import { useLiveQuery } from '@/db/hooks';
+import { attendanceRepo, expensesRepo, staffPrivateRepo, staffRepo } from '@/db';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { getRolePermissions, normalizePermissionMatrix } from '@/lib/permissions';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -126,6 +127,51 @@ const PermissionTable = ({ permissions = {}, onChange }: { permissions: Permissi
         </tbody>
       </table>
       <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-background pointer-events-none opacity-40" />
+    </div>
+  );
+};
+
+const TEAM_PAGE_SIZE = 24;
+
+const PaginationControls = ({
+  page,
+  totalCount,
+  pageSize = TEAM_PAGE_SIZE,
+  onPageChange,
+  label,
+}: {
+  page: number;
+  totalCount: number;
+  pageSize?: number;
+  onPageChange: (page: number) => void;
+  label: string;
+}) => {
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  if (totalPages <= 1) return null;
+
+  return (
+    <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+        {label} page {page} of {totalPages} - {totalCount} records
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+          disabled={page <= 1}
+          className="rounded-xl border border-border bg-card px-4 py-2 text-[10px] font-black uppercase tracking-widest text-foreground transition-all disabled:opacity-40"
+        >
+          Prev
+        </button>
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+          disabled={page >= totalPages}
+          className="rounded-xl border border-border bg-card px-4 py-2 text-[10px] font-black uppercase tracking-widest text-foreground transition-all disabled:opacity-40"
+        >
+          Next
+        </button>
+      </div>
     </div>
   );
 };
@@ -294,12 +340,6 @@ const getStaffPeriodMetrics = (
 export default function Team() {
   const { addExpense, upsertStaff, recordAttendance, role, shop, updateShop, deleteStaff, invitations, shopId: storeShopId, currentStaff } = useBusinessStore();
   
-  // 📊 Local Database Telemetry
-  const staff = useSqlQuery<Staff>('SELECT * FROM staff WHERE tombstone = 0 ORDER BY name ASC', [], ['staff']);
-  const staffPrivate = useSqlQuery<any>('SELECT * FROM staff_private WHERE tombstone = 0', [], ['staff_private']);
-  const attendance = useSqlQuery<Attendance>('SELECT * FROM attendance WHERE tombstone = 0', [], ['attendance']);
-  const expenses = useSqlQuery<any>('SELECT * FROM expenses WHERE tombstone = 0 ORDER BY date DESC', [], ['expenses']);
-  
   const today = new Date().toISOString().split('T')[0];
   const currentMonth = new Date().toISOString().slice(0, 7);
   const currentMonthRange = buildAnalyticsRange('this_month');
@@ -309,6 +349,9 @@ export default function Team() {
   const [activeSubTab, setActiveSubTab] = useState<'roster' | 'attendance' | 'payroll'>('roster');
   const [attendanceRangePreset, setAttendanceRangePreset] = useState<AnalyticsRangePreset>('today');
   const [payrollRangePreset, setPayrollRangePreset] = useState<AnalyticsRangePreset>('this_month');
+  const [rosterPage, setRosterPage] = useState(1);
+  const [attendancePage, setAttendancePage] = useState(1);
+  const [payrollPage, setPayrollPage] = useState(1);
   
   // Modals
   const [isAddingStaff, setIsAddingStaff] = useState(false);
@@ -338,27 +381,125 @@ export default function Team() {
   const payrollRange = buildAnalyticsRange(payrollRangePreset);
   const standardWorkingHours = shop?.standardWorkingHours || 9;
   const currentMonthPayoutMode = payrollRangePreset === 'this_month';
+  const normalizedSearchTerm = searchTerm.trim();
 
-  const filteredStaff = staff.filter((s: Staff) => {
-    if (!canEditTeam) return currentStaff ? s.id === currentStaff.id : false;
-    return s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.phone.includes(searchTerm);
-  });
+  const staffMetricsData = useLiveQuery<{ totalCount: number; activeCount: number }>(
+    () => canEditTeam
+      ? staffRepo.getMetrics({ search: normalizedSearchTerm }).then((metrics) => [metrics])
+      : Promise.resolve([{ totalCount: currentStaff ? 1 : 0, activeCount: currentStaff?.status === 'active' ? 1 : 0 }]),
+    ['staff'],
+    [canEditTeam, currentStaff?.id, currentStaff?.status, normalizedSearchTerm],
+  );
+  const rosterStaff = useLiveQuery<Staff>(
+    () => canEditTeam
+      ? staffRepo.getPage({ search: normalizedSearchTerm }, rosterPage, TEAM_PAGE_SIZE)
+      : Promise.resolve(currentStaff ? [currentStaff] : []),
+    ['staff'],
+    [canEditTeam, currentStaff?.id, normalizedSearchTerm, rosterPage],
+  );
+  const attendanceStaff = useLiveQuery<Staff>(
+    () => canEditTeam
+      ? staffRepo.getPage({ search: normalizedSearchTerm }, attendancePage, TEAM_PAGE_SIZE)
+      : Promise.resolve(currentStaff ? [currentStaff] : []),
+    ['staff'],
+    [canEditTeam, currentStaff?.id, normalizedSearchTerm, attendancePage],
+  );
+  const payrollStaff = useLiveQuery<Staff>(
+    () => canEditTeam
+      ? staffRepo.getPage({ search: normalizedSearchTerm }, payrollPage, TEAM_PAGE_SIZE)
+      : Promise.resolve(currentStaff ? [currentStaff] : []),
+    ['staff'],
+    [canEditTeam, currentStaff?.id, normalizedSearchTerm, payrollPage],
+  );
+  const staffMetrics = staffMetricsData[0] ?? { totalCount: 0, activeCount: 0 };
+  const activeSummaryStaff = activeSubTab === 'attendance' ? attendanceStaff : activeSubTab === 'payroll' ? payrollStaff : rosterStaff;
+  const rosterStaffIds = useMemo(() => rosterStaff.map((staffMember) => staffMember.id), [rosterStaff]);
+  const attendanceStaffIds = useMemo(() => attendanceStaff.map((staffMember) => staffMember.id), [attendanceStaff]);
+  const payrollStaffIds = useMemo(() => payrollStaff.map((staffMember) => staffMember.id), [payrollStaff]);
+  const activeSummaryStaffIds = useMemo(() => activeSummaryStaff.map((staffMember) => staffMember.id), [activeSummaryStaff]);
+  const relatedStaffIds = useMemo(
+    () => Array.from(new Set([...rosterStaffIds, ...attendanceStaffIds, ...payrollStaffIds, ...(payoutStaff ? [payoutStaff.id] : [])])),
+    [rosterStaffIds, attendanceStaffIds, payrollStaffIds, payoutStaff],
+  );
+
+  const staffPrivate = useLiveQuery<any>(
+    () => staffPrivateRepo.getByIds(relatedStaffIds),
+    ['staff_private'],
+    [relatedStaffIds.join('|')],
+  );
+  const attendanceWindowEntries = useLiveQuery<Attendance>(
+    () => attendanceRepo.getByStaffIdsAndRange(attendanceStaffIds, attendanceRange.start, attendanceRange.end),
+    ['attendance'],
+    [attendanceStaffIds.join('|'), attendanceRange.start, attendanceRange.end],
+  );
+  const payrollWindowEntries = useLiveQuery<Attendance>(
+    () => attendanceRepo.getByStaffIdsAndRange(payrollStaffIds, payrollRange.start, payrollRange.end),
+    ['attendance'],
+    [payrollStaffIds.join('|'), payrollRange.start, payrollRange.end],
+  );
+  const currentMonthEntries = useLiveQuery<Attendance>(
+    () => attendanceRepo.getByStaffIdsAndRange(activeSummaryStaffIds, currentMonthRange.start, currentMonthRange.end),
+    ['attendance'],
+    [activeSummaryStaffIds.join('|'), currentMonthRange.start, currentMonthRange.end],
+  );
+  const payrollCompensationEntries = useLiveQuery<any>(
+    () => expensesRepo.getStaffCompensationEntries(payrollRange.start, payrollRange.end),
+    ['expenses'],
+    [payrollRange.start, payrollRange.end],
+  );
+  const currentMonthCompensationEntries = useLiveQuery<any>(
+    () => expensesRepo.getStaffCompensationEntries(currentMonthRange.start, currentMonthRange.end),
+    ['expenses'],
+    [currentMonthRange.start, currentMonthRange.end],
+  );
+
+  const staffPrivateById = useMemo(
+    () => new Map(staffPrivate.map((entry: any) => [entry.id, entry])),
+    [staffPrivate],
+  );
+  const attendanceEntriesByStaffId = useMemo(() => {
+    const next = new Map<string, Attendance[]>();
+    attendanceWindowEntries.forEach((entry) => {
+      const bucket = next.get(entry.staffId) ?? [];
+      bucket.push(entry);
+      next.set(entry.staffId, bucket);
+    });
+    return next;
+  }, [attendanceWindowEntries]);
+  const payrollEntriesByStaffId = useMemo(() => {
+    const next = new Map<string, Attendance[]>();
+    payrollWindowEntries.forEach((entry) => {
+      const bucket = next.get(entry.staffId) ?? [];
+      bucket.push(entry);
+      next.set(entry.staffId, bucket);
+    });
+    return next;
+  }, [payrollWindowEntries]);
+  const currentMonthEntriesByStaffId = useMemo(() => {
+    const next = new Map<string, Attendance[]>();
+    currentMonthEntries.forEach((entry) => {
+      const bucket = next.get(entry.staffId) ?? [];
+      bucket.push(entry);
+      next.set(entry.staffId, bucket);
+    });
+    return next;
+  }, [currentMonthEntries]);
 
   // 🧮 Payroll Engine
-  const calculateStaffSalary = (staffMember: Staff, range: AnalyticsRange) => {
-    const scopedAttendance = attendance.filter((entry: Attendance) => entry.staffId === staffMember.id && isDateInRange(entry.date, range));
-    const privateData = staffPrivate.find((p: any) => p.id === staffMember.id);
+  const calculateStaffSalary = (staffMember: Staff, range: AnalyticsRange, entriesByStaffId: Map<string, Attendance[]>) => {
+    const scopedAttendance = entriesByStaffId.get(staffMember.id) ?? [];
+    const privateData = staffPrivateById.get(staffMember.id);
     return getStaffPeriodMetrics(scopedAttendance, privateData?.salary || 0, standardWorkingHours, range);
   };
 
-  const totalPayroll = staff.reduce((sum: number, staffMember: Staff) => sum + calculateStaffSalary(staffMember, currentMonthRange).earned, 0);
-  const attendanceInsights = filteredStaff.map((staffMember: Staff) => ({
+  const totalPayroll = activeSummaryStaff.reduce((sum: number, staffMember: Staff) => sum + calculateStaffSalary(staffMember, currentMonthRange, currentMonthEntriesByStaffId).earned, 0);
+  const attendanceInsights = attendanceStaff.map((staffMember: Staff) => ({
     staff: staffMember,
-    metrics: calculateStaffSalary(staffMember, attendanceRange),
+    metrics: calculateStaffSalary(staffMember, attendanceRange, attendanceEntriesByStaffId),
   }));
-  const payrollInsights = filteredStaff.map((staffMember: Staff) => {
-    const metrics = calculateStaffSalary(staffMember, payrollRange);
-    const paidAmount = expenses
+  const payrollInsights = payrollStaff.map((staffMember: Staff) => {
+    const metrics = calculateStaffSalary(staffMember, payrollRange, payrollEntriesByStaffId);
+    const paidAmount = payrollCompensationEntries
       .filter((expense: any) =>
         (expense.category === 'Staff Salary' || expense.category === 'Advance Salary') &&
         expense.description?.includes(staffMember.name) &&
@@ -415,9 +556,9 @@ export default function Team() {
     });
   };
 
-  const payoutSummary = payoutStaff ? calculateStaffSalary(payoutStaff, currentMonthRange) : null;
+  const payoutSummary = payoutStaff ? calculateStaffSalary(payoutStaff, currentMonthRange, currentMonthEntriesByStaffId) : null;
   const payoutReleasedAmount = payoutStaff
-    ? expenses
+    ? currentMonthCompensationEntries
       .filter((expense: any) =>
         (expense.category === 'Staff Salary' || expense.category === 'Advance Salary') &&
         expense.description?.includes(payoutStaff.name) &&
@@ -442,7 +583,7 @@ export default function Team() {
                  <DollarSign className="h-5 w-5 text-emerald-500" />
               </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Est. Liability</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Visible Liability</p>
                 <p className="text-xl font-bold text-foreground">{formatCurrency(totalPayroll)}</p>
               </div>
             </div>
@@ -564,7 +705,12 @@ export default function Team() {
             type="text"
             placeholder="Find by name or phone..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setRosterPage(1);
+              setAttendancePage(1);
+              setPayrollPage(1);
+            }}
             className="w-full bg-card border border-border rounded-xl pl-12 pr-4 py-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm text-foreground"
           />
         </div>
@@ -576,74 +722,82 @@ export default function Team() {
 
 
       {activeSubTab === 'roster' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-          {filteredStaff.length === 0 ? (
-            <div className="col-span-full py-24 text-center bg-card border border-border rounded-3xl shadow-sm">
-              <Users className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
-              <p className="text-muted-foreground font-semibold tracking-widest uppercase text-sm">Zero bio-signatures detected.</p>
-            </div>
-          ) : (
-            filteredStaff.map((s: Staff) => (
-              <div key={s.id} onClick={() => canEditTeam && startEditing(s)} className={cn("bg-card rounded-3xl p-6 border border-border shadow-sm transition-all group relative overflow-hidden", canEditTeam ? "hover:border-primary/40 cursor-pointer hover:shadow-md hover:-translate-y-1" : "cursor-default")}>
-                <div className="flex items-center gap-5 mb-6">
-                  <div className="h-14 w-14 rounded-2xl bg-accent border border-border flex items-center justify-center text-foreground text-xl font-bold shadow-sm">
-                    {s.name.charAt(0)}
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold tracking-tight text-foreground">{s.name}</h3>
-                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mt-0.5">{s.role}</p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <span className={cn("h-2 w-2 rounded-full", s.status === 'active' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] animate-pulse" : "bg-muted-foreground")} />
-                      <span className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">{s.status}</span>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+            {rosterStaff.length === 0 ? (
+              <div className="col-span-full py-24 text-center bg-card border border-border rounded-3xl shadow-sm">
+                <Users className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
+                <p className="text-muted-foreground font-semibold tracking-widest uppercase text-sm">Zero bio-signatures detected.</p>
+              </div>
+            ) : (
+              rosterStaff.map((s: Staff) => (
+                <div key={s.id} onClick={() => canEditTeam && startEditing(s)} className={cn("bg-card rounded-3xl p-6 border border-border shadow-sm transition-all group relative overflow-hidden", canEditTeam ? "hover:border-primary/40 cursor-pointer hover:shadow-md hover:-translate-y-1" : "cursor-default")}>
+                  <div className="flex items-center gap-5 mb-6">
+                    <div className="h-14 w-14 rounded-2xl bg-accent border border-border flex items-center justify-center text-foreground text-xl font-bold shadow-sm">
+                      {s.name.charAt(0)}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold tracking-tight text-foreground">{s.name}</h3>
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mt-0.5">{s.role}</p>
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className={cn("h-2 w-2 rounded-full", s.status === 'active' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] animate-pulse" : "bg-muted-foreground")} />
+                        <span className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">{s.status}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-                {/* Contact Info */}
-                <div className="bg-background p-4 rounded-2xl border border-border">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Comm Link</p>
-                  <p className="text-sm font-semibold text-foreground truncate mt-0.5">{s.phone}</p>
-                  {canViewPayroll && (
-                    <div className="mt-2 pt-2 border-t border-border/50">
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Base Retainer</p>
-                      <p className="text-sm font-bold text-primary">{formatCurrency(staffPrivate.find((p: any) => p.id === s.id)?.salary || 0)}</p>
-                    </div>
-                  )}
-                </div>
-                <div className="mt-6 flex items-center justify-between text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">
-                  <span>Joined {new Date(s.joinedAt).toLocaleDateString()}</span>
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        sendWhatsAppInvite({
-                          phone: s.phone,
-                          staffName: s.name,
-                          inviteCode: invitations[0]?.code || 'HUBPRO',
-                          shopName: shop?.name || 'Our Shop'
-                        });
-                      }}
-                      className="text-primary hover:text-primary/70 transition-colors"
-                    >
-                      WhatsApp
-                    </button>
-                    {canEditTeam && currentStaff?.id !== s.id && (
+                  {/* Contact Info */}
+                  <div className="bg-background p-4 rounded-2xl border border-border">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Comm Link</p>
+                    <p className="text-sm font-semibold text-foreground truncate mt-0.5">{s.phone}</p>
+                    {canViewPayroll && (
+                      <div className="mt-2 pt-2 border-t border-border/50">
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Base Retainer</p>
+                        <p className="text-sm font-bold text-primary">{formatCurrency(staffPrivateById.get(s.id)?.salary || 0)}</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-6 flex items-center justify-between text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">
+                    <span>Joined {new Date(s.joinedAt).toLocaleDateString()}</span>
+                    <div className="flex items-center gap-2">
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
-                          setPinInput('');
-                          setConfirmRemoveStaff(s);
+                          sendWhatsAppInvite({
+                            phone: s.phone,
+                            staffName: s.name,
+                            inviteCode: invitations[0]?.code || 'HUBPRO',
+                            shopName: shop?.name || 'Our Shop'
+                          });
                         }}
-                        className="text-destructive/50 hover:text-destructive transition-colors ml-2"
+                        className="text-primary hover:text-primary/70 transition-colors"
                       >
-                        Remove
+                        WhatsApp
                       </button>
-                    )}
+                      {canEditTeam && currentStaff?.id !== s.id && (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPinInput('');
+                            setConfirmRemoveStaff(s);
+                          }}
+                          className="text-destructive/50 hover:text-destructive transition-colors ml-2"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
-          )}
-        </div>
+              ))
+            )}
+          </div>
+          <PaginationControls
+            page={rosterPage}
+            totalCount={staffMetrics.totalCount}
+            onPageChange={setRosterPage}
+            label="Roster"
+          />
+        </>
       )}
 
       {activeSubTab === 'attendance' && (
@@ -681,7 +835,7 @@ export default function Team() {
               {canEditTeam && (
                 <button
                   onClick={() => {
-                    setManualEntryStaff(staff[0] || null);
+                    setManualEntryStaff(attendanceStaff[0] || null);
                     setManualTimes({ 
                       date: attendanceRange.includesToday ? today : attendanceRange.end, 
                       clockIn: '09:00', 
@@ -731,7 +885,7 @@ export default function Team() {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
               <div className="rounded-[1.75rem] border border-border/50 bg-background p-5">
                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">Logged Staff</p>
-                <p className="text-3xl font-black tracking-tight text-foreground">{attendanceTotals.loggedStaff}<span className="text-sm text-muted-foreground ml-1">/ {filteredStaff.length}</span></p>
+                <p className="text-3xl font-black tracking-tight text-foreground">{attendanceTotals.loggedStaff}<span className="text-sm text-muted-foreground ml-1">/ {attendanceStaff.length}</span></p>
                 <p className="text-[10px] font-semibold text-muted-foreground mt-2">People with at least one record in this window.</p>
               </div>
               <div className="rounded-[1.75rem] border border-border/50 bg-background p-5">
@@ -751,9 +905,9 @@ export default function Team() {
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              {attendanceInsights.map(({ staff: s, metrics }) => {
+            {attendanceInsights.map(({ staff: s, metrics }) => {
                 const record = attendanceRangePreset === 'today'
-                  ? attendance.find((a: Attendance) => a.staffId === s.id && a.date === today)
+                  ? (attendanceEntriesByStaffId.get(s.id) ?? []).find((a: Attendance) => a.date === today)
                   : metrics.latestRecord;
                 const isTodayMode = attendanceRangePreset === 'today';
                 const hasClockedIn = !!record?.clockIn;
@@ -927,6 +1081,12 @@ export default function Team() {
               );
             })}
           </div>
+          <PaginationControls
+            page={attendancePage}
+            totalCount={staffMetrics.totalCount}
+            onPageChange={setAttendancePage}
+            label="Attendance"
+          />
         </div>
       </div>
       )}
@@ -979,7 +1139,7 @@ export default function Team() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             <div className="rounded-[1.75rem] border border-border/50 bg-card p-5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">Gross Liability</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">Visible Liability</p>
               <p className="text-3xl font-black tracking-tight text-foreground">{formatCurrency(payrollTotals.earned)}</p>
               <p className="text-[10px] font-semibold text-muted-foreground mt-2">Computed from attendance, overtime, and bonuses.</p>
             </div>
@@ -1093,6 +1253,12 @@ export default function Team() {
               );
             })}
           </div>
+          <PaginationControls
+            page={payrollPage}
+            totalCount={staffMetrics.totalCount}
+            onPageChange={setPayrollPage}
+            label="Payroll"
+          />
         </div>
       )}
 
@@ -1125,7 +1291,12 @@ export default function Team() {
               e.preventDefault();
               const fd = new FormData(e.currentTarget);
               const phone = fd.get('phone') as string;
-              if (!editingStaff && staff.some(s => s.phone === phone)) return showToast("Comm Link already established!");
+              if (!editingStaff) {
+                const similarStaff = await staffRepo.getPage({ search: phone }, 1, 10);
+                if (similarStaff.some((staffMember) => staffMember.phone === phone)) {
+                  return showToast("Comm Link already established!");
+                }
+              }
               
               const salaryValue = Number(fd.get('salary'));
               const roleValue = fd.get('role') as string;
@@ -1162,7 +1333,7 @@ export default function Team() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-foreground ml-1">Base Retainer ({shop.currency || '₹'})</label>
-                  <input name="salary" type="number" defaultValue={editingStaff ? staffPrivate.find(p => p.id === editingStaff.id)?.salary : ''} required className="w-full bg-background border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-4 py-3.5 font-medium text-sm outline-none transition-all text-foreground" placeholder="Monthly Salary" />
+                  <input name="salary" type="number" defaultValue={editingStaff ? staffPrivateById.get(editingStaff.id)?.salary : ''} required className="w-full bg-background border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-4 py-3.5 font-medium text-sm outline-none transition-all text-foreground" placeholder="Monthly Salary" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-foreground ml-1">Role Classification</label>
@@ -1431,7 +1602,7 @@ export default function Team() {
                 <button 
                   onClick={() => {
                     setIsAdvanceMode(false);
-                    const payroll = calculateStaffSalary(payoutStaff, currentMonthRange);
+                    const payroll = calculateStaffSalary(payoutStaff, currentMonthRange, currentMonthEntriesByStaffId);
                     setCustomAmount(String(payroll.earned));
                   }}
                   className={cn(
@@ -1550,4 +1721,6 @@ export default function Team() {
     </div>
   );
 }
+
+
 

@@ -1,26 +1,60 @@
 import React, { useState, useMemo } from 'react';
 import { TrendingUp, TrendingDown, BarChart3, Target, Calendar, ShoppingCart, Wallet, CheckCircle2 } from 'lucide-react';
-import { useSqlQuery, useSalesQuery } from '@/db/hooks';
-import { useBusinessStore } from '@/lib/useBusinessStore';
+import { documentId, collection, orderBy, query, where } from 'firebase/firestore';
+import { useSqlQuery } from '@/db/hooks';
+import { useAuthStore } from '@/lib/useAuthStore';
 import { usePermission } from '@/hooks/usePermission';
+import { useFirestoreCollectionData } from '@/hooks/useFirestoreLiveData';
+import { db } from '@/lib/firebase';
 import { formatCurrency, cn } from '@/lib/utils';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, LineChart, Line, Area, ComposedChart
 } from 'recharts';
-import { getDeadStock } from '@/lib/analyticsUtils';
 import { calculateForecast } from '@/lib/forecast';
-import type { Sale, InventoryItem, InventoryPrivate, CustomerPayment, Expense, SaleItem } from '@/lib/types';
+import type { InventoryItem, InventoryPrivate } from '@/lib/types';
+
+type DailyAggregateDoc = {
+  id: string;
+  revenue?: number;
+  grossProfit?: number;
+  txCount?: number;
+  expenseTotal?: number;
+  customerPaymentTotal?: number;
+  paymentMix?: Record<string, number>;
+};
+
+type AggregateTotals = {
+  revenue: number;
+  grossProfit: number;
+  txCount: number;
+  expenseTotal: number;
+  customerPaymentTotal: number;
+};
+
+const safeNumber = (value: unknown) => {
+  const numeric = Number(value || 0);
+  return Number.isFinite(numeric) ? numeric : 0;
+};
+
+const sumAggregateTotals = (rows: DailyAggregateDoc[]): AggregateTotals => rows.reduce<AggregateTotals>((summary, row) => ({
+  revenue: summary.revenue + safeNumber(row.revenue),
+  grossProfit: summary.grossProfit + safeNumber(row.grossProfit),
+  txCount: summary.txCount + safeNumber(row.txCount),
+  expenseTotal: summary.expenseTotal + safeNumber(row.expenseTotal),
+  customerPaymentTotal: summary.customerPaymentTotal + safeNumber(row.customerPaymentTotal),
+}), {
+  revenue: 0,
+  grossProfit: 0,
+  txCount: 0,
+  expenseTotal: 0,
+  customerPaymentTotal: 0,
+});
 
 export default function Analytics() {
-  const { role } = useBusinessStore();
+  const { shopId } = useAuthStore();
   const canViewCost = usePermission('inventory', 'view_cost');
   const canViewProfit = usePermission('sales', 'view_profit');
-  const sales = useSalesQuery();
-  const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
-  const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
-  const customerPayments = useSqlQuery<CustomerPayment>('SELECT * FROM customer_payments WHERE tombstone = 0', [], ['customer_payments']);
-  const storeExpenses = useSqlQuery<Expense>('SELECT * FROM expenses WHERE tombstone = 0 ORDER BY date DESC', [], ['expenses']);
   const [period, setPeriod] = useState<'week' | 'month' | 'custom'>('week');
   
   const todayStr = new Date().toISOString().split('T')[0];
@@ -40,9 +74,6 @@ export default function Analytics() {
     }
     return data.filter((s: any) => s.date >= startDate && s.date <= endDate);
   };
-
-  const filteredSalesData = getFilteredData(sales).filter(s => !s.id.startsWith('PAY-'));
-  const filteredPayments = getFilteredData(customerPayments);
 
   const getDateRange = () => {
     const rangeSize = period === 'week' ? 7 : (period === 'month' ? 30 : 0);
@@ -65,16 +96,73 @@ export default function Analytics() {
   };
 
   const currentRange = getDateRange();
+  const rangeStart = currentRange[0] ?? todayStr;
+  const rangeEnd = currentRange[currentRange.length - 1] ?? todayStr;
+  const previousSpan = Math.max(1, currentRange.length || (period === 'week' ? 7 : 30));
+  const previousEndDate = new Date(`${rangeStart}T00:00:00`);
+  previousEndDate.setDate(previousEndDate.getDate() - 1);
+  const previousStartDate = new Date(previousEndDate);
+  previousStartDate.setDate(previousStartDate.getDate() - (previousSpan - 1));
+  const previousRangeStart = previousStartDate.toISOString().split('T')[0];
+  const previousRangeEnd = previousEndDate.toISOString().split('T')[0];
+
+  const aggregateSeries = useFirestoreCollectionData<DailyAggregateDoc>(
+    () => (
+      shopId
+        ? query(
+            collection(db, 'shops', shopId, 'aggregates_daily'),
+            where(documentId(), '>=', rangeStart),
+            where(documentId(), '<=', rangeEnd),
+            orderBy(documentId(), 'asc'),
+          )
+        : null
+    ),
+    [shopId, rangeStart, rangeEnd],
+  );
+  const previousAggregateSeries = useFirestoreCollectionData<DailyAggregateDoc>(
+    () => (
+      shopId
+        ? query(
+            collection(db, 'shops', shopId, 'aggregates_daily'),
+            where(documentId(), '>=', previousRangeStart),
+            where(documentId(), '<=', previousRangeEnd),
+            orderBy(documentId(), 'asc'),
+          )
+        : null
+    ),
+    [shopId, previousRangeStart, previousRangeEnd],
+  );
+  const last30AggregateSeries = useFirestoreCollectionData<DailyAggregateDoc>(
+    () => (
+      shopId
+        ? query(
+            collection(db, 'shops', shopId, 'aggregates_daily'),
+            where(documentId(), '>=', new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]),
+            where(documentId(), '<=', todayStr),
+            orderBy(documentId(), 'asc'),
+          )
+        : null
+    ),
+    [shopId, todayStr],
+  );
+  const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
+  const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
+  const inventoryPrivateById = useMemo(
+    () => new Map(inventoryPrivate.map((entry: InventoryPrivate) => [entry.id, entry])),
+    [inventoryPrivate],
+  );
+  const aggregateByDate = useMemo(
+    () => new Map(aggregateSeries.map((entry) => [entry.id, entry])),
+    [aggregateSeries],
+  );
+  const currentTotals = useMemo(() => sumAggregateTotals(aggregateSeries), [aggregateSeries]);
+  const previousTotals = useMemo(() => sumAggregateTotals(previousAggregateSeries), [previousAggregateSeries]);
+
   const chartData = currentRange.map((date) => {
-    const daySales = filteredSalesData.filter((s: Sale) => s.date === date);
-    const dayRevenue = daySales.reduce((sum: number, s: Sale) => sum + s.total, 0);
-    const dayCost = canViewCost ? daySales.reduce((sum: number, s: Sale) => {
-      return sum + s.items.reduce((itemSum: number, item: SaleItem) => {
-        const privateData = inventoryPrivate.find((p: InventoryPrivate) => p.id === item.itemId);
-        const costPrice = privateData?.costPrice || 0;
-        return itemSum + costPrice * item.quantity;
-      }, 0);
-    }, 0) : 0;
+    const aggregate = aggregateByDate.get(date);
+    const dayRevenue = safeNumber(aggregate?.revenue);
+    const dayGrossProfit = safeNumber(aggregate?.grossProfit);
+    const orderCount = safeNumber(aggregate?.txCount);
 
     return {
       day: new Date(date + 'T00:00:00').toLocaleDateString('en-IN', {
@@ -83,8 +171,8 @@ export default function Analytics() {
         month: period === 'month' || period === 'custom' ? 'short' : undefined,
       }),
       sales: dayRevenue,
-      profit: canViewProfit ? dayRevenue - dayCost : 0,
-      orders: daySales.length,
+      profit: canViewProfit ? dayGrossProfit : 0,
+      orders: orderCount,
     };
   });
 
@@ -97,11 +185,8 @@ export default function Analytics() {
       return d.toISOString().split('T')[0];
     });
 
-    const historicalSeries = historyDates.map(date => {
-      return sales
-        .filter((s: Sale) => s.date === date)
-        .reduce((sum, s) => sum + s.total, 0);
-    });
+    const trailingByDate = new Map(last30AggregateSeries.map((entry) => [entry.id, safeNumber(entry.revenue)]));
+    const historicalSeries = historyDates.map((date) => trailingByDate.get(date) || 0);
 
     if (historicalSeries.filter(v => v > 0).length < 7) return [];
 
@@ -121,73 +206,42 @@ export default function Analytics() {
     } catch (e) {
       return [];
     }
-  }, [sales]);
+  }, [last30AggregateSeries]);
 
   const combinedChartData = [...chartData, ...forecastData];
 
   // ── KPI Stats ─────────────────────────────────────────────────────────────
-  const totalRevenue = sales.reduce((sum: number, s: Sale) => sum + s.total, 0);
-  const totalCost = canViewCost ? sales.reduce((sum: number, s: Sale) => {
-    return sum + s.items.reduce((itemSum: number, item: SaleItem) => {
-      const privateData = inventoryPrivate.find((p: InventoryPrivate) => p.id === item.itemId);
-      const costPrice = privateData?.costPrice || 0;
-      return itemSum + costPrice * item.quantity;
-    }, 0);
-  }, 0) : 0;
-  const totalExpenses = storeExpenses.reduce((sum: number, e: Expense) => sum + e.amount, 0);
+  const totalRevenue = currentTotals.revenue;
+  const totalExpenses = currentTotals.expenseTotal;
   
-  const grossProfit = canViewProfit ? totalRevenue - totalCost : 0;
+  const grossProfit = canViewProfit ? currentTotals.grossProfit : 0;
   const netProfit = canViewProfit ? grossProfit - totalExpenses : 0;
   const profitMargin = totalRevenue > 0 && canViewProfit ? (grossProfit / totalRevenue) * 100 : 0;
 
-  const totalOrders = sales.length;
+  const totalOrders = currentTotals.txCount;
   const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
-  // Previous period comparison
-  const days = period === 'week' ? 7 : (period === 'month' ? 30 : currentRange.length || 7);
-  const now = new Date();
-  const midPoint = new Date();
-  midPoint.setDate(now.getDate() - days);
-  const halfPoint = new Date();
-  halfPoint.setDate(now.getDate() - days * 2);
-
-  const currentPeriodSales = sales.filter((s: Sale) => new Date(s.date) >= midPoint);
-  const prevPeriodSales = sales.filter((s: Sale) => {
-    const d = new Date(s.date);
-    return d >= halfPoint && d < midPoint;
-  });
-
-  const currentRev = (() => {
-    const salesAmount = filteredSalesData.reduce((sum: number, s: Sale) => sum + s.total, 0);
-    const paymentsAmount = filteredPayments.reduce((sum: number, p: CustomerPayment) => sum + p.amount, 0);
-    return salesAmount + paymentsAmount;
-  })();
-  const prevRev = prevPeriodSales.reduce((sum: number, s: Sale) => sum + s.total, 0);
+  const currentRev = currentTotals.revenue + currentTotals.customerPaymentTotal;
+  const prevRev = previousTotals.revenue + previousTotals.customerPaymentTotal;
   const revChange = prevRev > 0 ? ((currentRev - prevRev) / prevRev) * 100 : null;
 
   // ── Top Products & Dead Stock ─────────────────────────────────────────────────────────
-  const productSales: Record<string, { name: string; qty: number; revenue: number }> = {};
-  for (const sale of filteredSalesData) {
-    for (const item of sale.items) {
-      if (item.itemId === 'payment-received') continue;
-      if (!productSales[item.name]) {
-        productSales[item.name] = { name: item.name, qty: 0, revenue: 0 };
-      }
-      productSales[item.name].qty += item.quantity;
-      productSales[item.name].revenue += item.price * item.quantity;
-    }
-  }
-  
-  const allProducts = Object.values(productSales);
-  inventory.forEach((invItem: InventoryItem) => {
-    if (!productSales[invItem.name]) {
-      allProducts.push({ name: invItem.name, qty: 0, revenue: 0 });
-    }
+  const velocityWindow = period === 'week' ? 'last7d' : 'last30d';
+  const allProducts = inventory.map((invItem: InventoryItem) => {
+    const soldQty = velocityWindow === 'last7d'
+      ? safeNumber(invItem.velocity?.last7d)
+      : safeNumber(invItem.velocity?.last30d);
+    return {
+      name: invItem.name,
+      qty: soldQty,
+      revenue: soldQty * safeNumber(invItem.price),
+      itemId: invItem.id,
+    };
   });
 
   const topProducts = [...allProducts]
     .sort((a, b) => b.revenue - a.revenue)
-    .filter(p => p.qty > 0)
+    .filter((product) => product.qty > 0)
     .slice(0, 5);
     
   const lowestProducts = [...allProducts]
@@ -196,24 +250,17 @@ export default function Analytics() {
     
   const maxRevenue = Math.max(...topProducts.map((p) => p.revenue), 1);
 
-  const payModes: Record<string, number> = {};
-  
-  payModes['REPAYMENT'] = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
-
-  for (const sale of filteredSalesData) {
-    if (sale.payments && sale.payments.length > 0) {
-      for (const p of sale.payments) {
-        payModes[p.mode] = (payModes[p.mode] || 0) + p.amount;
-      }
-    } else {
-      payModes[sale.paymentMode] = (payModes[sale.paymentMode] || 0) + sale.total;
-    }
-  }
+  const payModes = aggregateSeries.reduce<Record<string, number>>((summary, entry) => {
+    Object.entries(entry.paymentMix || {}).forEach(([mode, amount]) => {
+      summary[mode] = (summary[mode] || 0) + safeNumber(amount);
+    });
+    return summary;
+  }, { REPAYMENT: currentTotals.customerPaymentTotal });
   const payModeSorted = Object.entries(payModes).filter(entry => entry[1] > 0).sort((a, b) => b[1] - a[1]);
 
   const bestDay = chartData.reduce((best, d) => (d.sales > best.sales ? d : best), chartData[0] ?? { day: '—', sales: 0 });
 
-  const deadStockItems = getDeadStock(inventory, sales);
+  const deadStockItems = inventory.filter((item) => safeNumber(item.velocity?.last30d) <= 0 && (item.stock ?? 0) > 0);
 
   return (
     <div className="space-y-10 pb-20">
@@ -471,10 +518,10 @@ export default function Analytics() {
                   <div className="h-2 w-full bg-accent rounded-full overflow-hidden">
                     <div
                       className="h-full premium-gradient rounded-full"
-                      style={{ width: `${(rev / totalRevenue) * 100}%` }}
+                      style={{ width: `${(rev / Math.max(currentRev, 1)) * 100}%` }}
                     />
                   </div>
-                  <p className="text-[10px] text-muted-foreground">{((rev / totalRevenue) * 100).toFixed(1)}% of revenue</p>
+                  <p className="text-[10px] text-muted-foreground">{((rev / Math.max(currentRev, 1)) * 100).toFixed(1)}% of inflow</p>
                 </div>
               ))}
             </div>
@@ -496,7 +543,7 @@ export default function Analytics() {
             <div className="bg-amber-500/10 border border-amber-500/20 px-4 py-2 rounded-xl">
               <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">
                 Stuck Capital: {formatCurrency(deadStockItems.reduce((s: number, i: InventoryItem) => {
-                  const p = inventoryPrivate.find((pi: any) => pi.id === i.id);
+                  const p = inventoryPrivateById.get(i.id) as InventoryPrivate | undefined;
                   return s + (p?.costPrice || 0) * (i.stock || 0);
                 }, 0))}
               </p>
@@ -512,7 +559,7 @@ export default function Analytics() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {deadStockItems.slice(0, 6).map((item: InventoryItem) => {
-              const privateData = canViewCost ? inventoryPrivate.find((pi: any) => pi.id === item.id) : null;
+              const privateData = canViewCost ? inventoryPrivateById.get(item.id) as InventoryPrivate | undefined : null;
               const clearancePrice = (privateData?.costPrice || 0) * 1.15; // 15% margin for clearance
               return (
                 <div key={item.id} className="p-4 rounded-2xl bg-accent/20 border border-border/50 hover:border-amber-500/30 transition-all group">

@@ -48,6 +48,11 @@ export interface DailySalesSeriesPoint {
   orderCount: number;
 }
 
+export interface ItemVelocityPoint {
+  itemId: string;
+  quantity: number;
+}
+
 const parseSourceMeta = (value: unknown): Record<string, unknown> | null => {
   if (!value) return null;
   if (typeof value === 'string') {
@@ -325,6 +330,28 @@ export const salesRepo = {
        ORDER BY date ASC;`,
       params,
     );
+  },
+
+  async getItemVelocityMap(
+    itemIds: string[],
+    filters: SalesRangeFilters = {},
+  ): Promise<Record<string, number>> {
+    if (!itemIds.length) return {};
+    const placeholders = itemIds.map(() => '?').join(',');
+    const { clause, params } = buildRangeClause(filters);
+    const rows = await Database.query<ItemVelocityPoint>(
+      `SELECT si.itemId AS itemId,
+              COALESCE(SUM(si.quantity), 0) AS quantity
+       FROM sale_items si
+       INNER JOIN sales s ON s.id = si.saleId
+       ${clause.replace('WHERE', 'WHERE')} AND si.itemId IN (${placeholders}) AND COALESCE(si.isReturn, 0) = 0
+       GROUP BY si.itemId;`,
+      [...params, ...itemIds],
+    );
+    return rows.reduce<Record<string, number>>((acc, row) => {
+      acc[row.itemId] = Number(row.quantity || 0);
+      return acc;
+    }, {});
   },
 
   async getCreditAgingMap(): Promise<Record<string, string>> {
