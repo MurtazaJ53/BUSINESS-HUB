@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.adminSequesterData = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const admin = __importStar(require("firebase-admin"));
+const bcrypt = __importStar(require("bcryptjs"));
 exports.adminSequesterData = (0, https_1.onCall)({
     memory: "512MiB",
     timeoutSeconds: 300,
@@ -51,7 +52,7 @@ exports.adminSequesterData = (0, https_1.onCall)({
         throw new https_1.HttpsError("invalid-argument", "ShopID is required for isolation.");
     }
     const db = admin.firestore();
-    if (request.auth.token.role !== 'admin' && request.auth.token.shopId !== shopId) {
+    if (request.auth.token.role !== 'admin' || request.auth.token.shopId !== shopId) {
         throw new https_1.HttpsError("permission-denied", "Only shop administrators can trigger sequestration.");
     }
     const stats = {
@@ -102,10 +103,14 @@ exports.adminSequesterData = (0, https_1.onCall)({
             const settings = ((_a = shopSnap.data()) === null || _a === void 0 ? void 0 : _a.settings) || {};
             if (settings.adminPin || settings.staffPin) {
                 const authRef = db.doc(`${base}/private/auth`);
-                batch.set(authRef, {
-                    adminPin: settings.adminPin || "",
-                    staffPin: settings.staffPin || "",
+                const authPayload = {
                     updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                };
+                if (settings.adminPin) {
+                    authPayload.adminPinHash = await bcrypt.hash(String(settings.adminPin), 12);
+                }
+                batch.set(authRef, {
+                    ...authPayload
                 }, { merge: true });
                 batch.update(shopRef, {
                     "settings.adminPin": admin.firestore.FieldValue.delete(),

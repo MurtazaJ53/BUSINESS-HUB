@@ -57,6 +57,14 @@ class DatabaseSingleton {
   private webDb: SqlJsDatabase | null = null;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
+  private scheduleWebPersist(): void {
+    if (this.platform !== 'web' || !this.webDb) return;
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(async () => {
+      await this.flush();
+    }, 500);
+  }
+
   async boot(): Promise<void> {
     if (this.ready) return;
     if (this.bootPromise) return this.bootPromise;
@@ -92,7 +100,7 @@ class DatabaseSingleton {
       const initSqlJs = (window as any).initSqlJs;
       if (!initSqlJs) throw new Error("SQL.js not loaded.");
       const SQL = await initSqlJs({
-        locateFile: (file: string) => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
+        locateFile: (file: string) => `/${file}`
       });
       const saved = await idbLoad();
       this.webDb = saved ? new SQL.Database(saved) : new SQL.Database();
@@ -136,13 +144,7 @@ class DatabaseSingleton {
       return { changes: res.changes?.changes ?? 0 };
     }
     this.webDb!.run(sql, params);
-    if (this.platform === 'web') {
-      if (this.saveTimer) clearTimeout(this.saveTimer);
-      this.saveTimer = setTimeout(async () => {
-        const data = this.webDb!.export();
-        await idbSave(data);
-      }, 500);
-    }
+    this.scheduleWebPersist();
     return { changes: 1 };
   }
 
@@ -160,7 +162,18 @@ class DatabaseSingleton {
     try {
       for (const s of stmts) this.webDb!.run(s.sql, s.params);
       this.webDb!.run('COMMIT;');
+      await this.flush();
     } catch (e) { this.webDb!.run('ROLLBACK;'); throw e; }
+  }
+
+  async flush(): Promise<void> {
+    if (this.platform !== 'web' || !this.webDb) return;
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+    }
+    const data = this.webDb.export();
+    await idbSave(data);
   }
 
   private async runMigrations(): Promise<void> {
@@ -182,12 +195,14 @@ class DatabaseSingleton {
         CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT, email TEXT, balance REAL, totalSpent REAL, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS customer_payments (id TEXT PRIMARY KEY, customerId TEXT, amount REAL, date TEXT, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         
-        CREATE TABLE IF NOT EXISTS expenses (id TEXT PRIMARY KEY, category TEXT, amount REAL, description TEXT, date TEXT, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS expenses (id TEXT PRIMARY KEY, category TEXT, amount REAL, description TEXT, paymentMethod TEXT DEFAULT 'CASH', paymentReference TEXT, date TEXT, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS attendance (id TEXT PRIMARY KEY, staffId TEXT, date TEXT, clockIn TEXT, clockOut TEXT, totalHours REAL, status TEXT, overtime REAL, bonus REAL, note TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS daily_briefings (id TEXT PRIMARY KEY, summary TEXT, bullets TEXT, metrics TEXT, createdAt INTEGER, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS local_backups (id TEXT PRIMARY KEY, label TEXT NOT NULL, trigger TEXT NOT NULL DEFAULT 'manual', createdAt INTEGER NOT NULL, sizeBytes INTEGER NOT NULL DEFAULT 0, payload TEXT NOT NULL);
         
         CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items(saleId);
         CREATE INDEX IF NOT EXISTS idx_sale_payments_sale_id ON sale_payments(saleId);
+        CREATE INDEX IF NOT EXISTS idx_local_backups_created_at ON local_backups(createdAt DESC);
     `;
 
     try {
@@ -252,6 +267,8 @@ class DatabaseSingleton {
     ]);
 
     await this.migrateLegacyColumns('expenses', [
+      ['paymentMethod', 'TEXT DEFAULT \'CASH\'', 'payment_method'],
+      ['paymentReference', 'TEXT', 'payment_reference'],
       ['createdAt', 'INTEGER', 'created_at'],
       ['updatedAt', 'INTEGER', 'updated_at'],
     ]);
@@ -276,6 +293,11 @@ class DatabaseSingleton {
 
     await this.migrateLegacyColumns('shop_metadata', [
       ['updatedAt', 'INTEGER', 'updated_at'],
+    ]);
+
+    await this.migrateLegacyColumns('local_backups', [
+      ['createdAt', 'INTEGER', 'created_at'],
+      ['sizeBytes', 'INTEGER', 'size_bytes'],
     ]);
 
     await this.migrateLegacyColumns('sync_state', [

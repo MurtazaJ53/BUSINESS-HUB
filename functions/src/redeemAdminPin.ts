@@ -55,6 +55,10 @@ export const redeemAdminPin = onCall<RedeemPinPayload>(
       throw new HttpsError("permission-denied", "User is not recognized in this workspace.");
     }
 
+    if (staffSnap.data()?.status !== 'active') {
+      throw new HttpsError("permission-denied", "Only active staff members can request admin elevation.");
+    }
+
     if (attemptSnap.exists) {
       const data = attemptSnap.data();
       if (data?.lockoutUntil && data.lockoutUntil > now) {
@@ -70,8 +74,10 @@ export const redeemAdminPin = onCall<RedeemPinPayload>(
     if (adminPinHash && typeof adminPinHash === 'string' && adminPinHash.length > 0) {
       isMatch = await bcrypt.compare(pin, adminPinHash);
     } else {
-      // Fallback to default PIN '5253' for uninitialized shops or empty hashes
-      isMatch = (pin === '5253');
+      throw new HttpsError(
+        "failed-precondition",
+        "Admin PIN is not initialized for this workspace."
+      );
     }
 
     // --- PHASE 3: Atomic State Updates & Audit Logging ---

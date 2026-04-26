@@ -18,7 +18,7 @@ android {
     }
     signingConfigs {
         release {
-            storeFile file("business-hub.jks")
+            storeFile file(System.getenv("ANDROID_KEYSTORE_FILE") ?: "business-hub.jks")
             storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD") ?: "businesshubpro"
             keyAlias System.getenv("ANDROID_KEY_ALIAS") ?: "business-hub"
             keyPassword System.getenv("ANDROID_KEY_PASSWORD") ?: "businesshubpro"

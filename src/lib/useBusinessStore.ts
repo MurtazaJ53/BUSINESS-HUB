@@ -37,10 +37,7 @@ const SHOP_DEFAULTS: ShopMetadata = {
   allowStaffAttendance: true,
 };
 
-const PRIVATE_DEFAULTS: ShopPrivate = {
-  adminPin: '5253',
-  staffPin: '1234',
-};
+const PRIVATE_DEFAULTS: ShopPrivate = {};
 
 // ─── UTILITIES ──────────────────────────────────────────────
 
@@ -63,6 +60,7 @@ const enqueueSync = async (
     payload: operation === 'DELETE' ? '{}' : JSON.stringify({ ...payload, updatedAt: ts }),
     createdAt: ts
   });
+  void SyncWorker.requestFlush();
 };
 
 const getInventoryDeltaForSaleItem = (item: SaleItem): number => {
@@ -105,7 +103,8 @@ interface BusinessState {
   setActiveTab: (tab: string) => void;
   setSidebarOpen: (open: boolean) => void;
   setInventorySearchTerm: (term: string) => void;
-  updateShop: (data: Partial<ShopMetadata & ShopPrivate>) => Promise<void>;
+  updateShop: (data: Partial<ShopMetadata>) => Promise<void>;
+  setLastBackupDate: (value: string | null) => void;
   setTheme: (theme: 'dark' | 'light') => void;
 
   // ⚡ Mutations (SQLite + Outbox Delegation)
@@ -173,19 +172,20 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
 
     Database.boot()
       .then(async () => {
-        const [shopMeta, privateMeta] = await Promise.all([
+        const [shopMeta] = await Promise.all([
           Database.query<{ value: string }>('SELECT value FROM shop_metadata WHERE key = ?;', ['settings']),
-          Database.query<{ value: string }>('SELECT value FROM shop_metadata WHERE key = ?;', ['credentials'])
+          Database.run('DELETE FROM shop_metadata WHERE key = ?;', ['credentials'])
         ]);
 
         let shopData = SHOP_DEFAULTS;
-        let privateData = PRIVATE_DEFAULTS;
+        let backupDate: string | null = null;
 
         if (shopMeta.length > 0) {
           try { shopData = { ...SHOP_DEFAULTS, ...JSON.parse(shopMeta[0].value) }; } catch (_) {}
         }
-        if (privateMeta.length > 0) {
-          try { privateData = { ...PRIVATE_DEFAULTS, ...JSON.parse(privateMeta[0].value) }; } catch (_) {}
+        const backupMeta = await Database.query<{ value: string }>('SELECT value FROM shop_metadata WHERE key = ?;', ['last_backup_at']);
+        if (backupMeta.length > 0) {
+          try { backupDate = JSON.parse(backupMeta[0].value)?.iso || null; } catch (_) {}
         }
 
         let currentStaffObj: Staff | null = null;
@@ -195,15 +195,31 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
 
         set({ 
           shop: shopData, 
-          shopPrivate: privateData,
+          shopPrivate: PRIVATE_DEFAULTS,
           currentStaff: currentStaffObj, 
           dbReady: true,
-          dbError: null
+          dbError: null,
+          lastBackupDate: backupDate,
         });
 
         unsubStaff = tableEvents.on('staff', () => {
           void refreshCurrentStaff();
         });
+        const unsubMeta = tableEvents.on('shop_metadata', async () => {
+          const latestBackup = await Database.query<{ value: string }>('SELECT value FROM shop_metadata WHERE key = ?;', ['last_backup_at']);
+          let nextBackupDate: string | null = null;
+          if (latestBackup.length > 0) {
+            try { nextBackupDate = JSON.parse(latestBackup[0].value)?.iso || null; } catch (_) {}
+          }
+          if (isActive && get().shopId === shopId) {
+            set({ lastBackupDate: nextBackupDate });
+          }
+        });
+        const priorUnsubStaff = unsubStaff;
+        unsubStaff = () => {
+          priorUnsubStaff();
+          unsubMeta();
+        };
 
         await SyncWorker.start();
       })
@@ -248,6 +264,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
   setActiveTab: (tab) => set({ activeTab: tab, sidebarOpen: false }),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   setInventorySearchTerm: (term) => set({ inventorySearchTerm: term }),
+  setLastBackupDate: (value) => set({ lastBackupDate: value }),
 
   setTheme: (theme) => {
     set({ theme });
@@ -256,29 +273,19 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
   },
 
   updateShop: async (data) => {
-    const { shopId, shop, shopPrivate } = get();
+    const { shopId, shop } = get();
     if (!shopId) return;
 
-    const { adminPin, staffPin, ...metadata } = data;
     const ts = Date.now();
-    const newShop = { ...shop, ...metadata };
+    const newShop = { ...shop, ...data };
 
     set({ shop: newShop });
     await Database.run('INSERT OR REPLACE INTO shop_metadata (key, value, updatedAt, dirty) VALUES (?, ?, ?, 1);', ['settings', JSON.stringify(newShop), ts]);
     tableEvents.emit('shop_metadata');
 
-    if (adminPin || staffPin) {
-      const newPrivate = { ...shopPrivate, ...(adminPin && { adminPin }), ...(staffPin && { staffPin }) };
-      set({ shopPrivate: newPrivate });
-      await Database.run('INSERT OR REPLACE INTO shop_metadata (key, value, updatedAt, dirty) VALUES (?, ?, ?, 1);', ['credentials', JSON.stringify(newPrivate), ts]);
-      tableEvents.emit('shop_metadata');
-    }
-
     await enqueueSync('shop', shopId, 'UPDATE', { 
-      settings: metadata, 
-      adminPin, 
-      staffPin,
-      name: metadata.name || shop.name 
+      settings: data,
+      name: data.name || shop.name 
     });
   },
 

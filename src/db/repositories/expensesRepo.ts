@@ -11,7 +11,7 @@ const now = () => Date.now();
 export const expensesRepo = {
   async getAll(): Promise<Expense[]> {
     return Database.query<Expense>(
-      `SELECT id, category, amount, description, date, createdAt
+      `SELECT id, category, amount, description, paymentMethod, paymentReference, date, createdAt
        FROM expenses WHERE tombstone = 0 ORDER BY date DESC, createdAt DESC;`,
     );
   },
@@ -20,9 +20,9 @@ export const expensesRepo = {
     const ts = now();
     const ca = typeof expense.createdAt === 'string' ? new Date(expense.createdAt).getTime() : (expense.createdAt || ts);
     await Database.run(
-      `INSERT OR REPLACE INTO expenses (id, category, amount, description, date, createdAt, updatedAt, dirty, tombstone)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0);`,
-      [expense.id, expense.category, expense.amount, expense.description, expense.date, ca, ts],
+      `INSERT OR REPLACE INTO expenses (id, category, amount, description, paymentMethod, paymentReference, date, createdAt, updatedAt, dirty, tombstone)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0);`,
+      [expense.id, expense.category, expense.amount, expense.description, expense.paymentMethod || 'CASH', expense.paymentReference || null, expense.date, ca, ts],
     );
     tableEvents.emit('expenses');
   },
@@ -37,7 +37,7 @@ export const expensesRepo = {
 
   async getDirty(): Promise<Array<Expense & { tombstone: number }>> {
     return Database.query(
-      `SELECT id, category, amount, description, date, createdAt,
+      `SELECT id, category, amount, description, paymentMethod, paymentReference, date, createdAt,
               updatedAt, tombstone
        FROM expenses WHERE dirty = 1;`,
     );
@@ -57,15 +57,15 @@ export const expensesRepo = {
 
     if (existing.length === 0) {
       await Database.run(
-        `INSERT INTO expenses (id, category, amount, description, date, createdAt, updatedAt, dirty, tombstone)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0);`,
-        [expense.id, expense.category, expense.amount, expense.description, expense.date, ca, remoteUpdatedAt],
+        `INSERT INTO expenses (id, category, amount, description, paymentMethod, paymentReference, date, createdAt, updatedAt, dirty, tombstone)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0);`,
+        [expense.id, expense.category, expense.amount, expense.description, expense.paymentMethod || 'CASH', expense.paymentReference || null, expense.date, ca, remoteUpdatedAt],
       );
     } else if (remoteUpdatedAt > existing[0].updatedAt || !existing[0].dirty) {
       await Database.run(
-        `UPDATE expenses SET category=?, amount=?, description=?, date=?,
+        `UPDATE expenses SET category=?, amount=?, description=?, paymentMethod=?, paymentReference=?, date=?,
                 updatedAt=?, dirty=0, tombstone=0 WHERE id=?;`,
-        [expense.category, expense.amount, expense.description, expense.date, remoteUpdatedAt, expense.id],
+        [expense.category, expense.amount, expense.description, expense.paymentMethod || 'CASH', expense.paymentReference || null, expense.date, remoteUpdatedAt, expense.id],
       );
     }
   },
