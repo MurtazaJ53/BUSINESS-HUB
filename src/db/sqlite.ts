@@ -182,17 +182,17 @@ class DatabaseSingleton {
         CREATE TABLE IF NOT EXISTS sync_state (entityType TEXT PRIMARY KEY, lastSyncedAt INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS outbox (opId TEXT PRIMARY KEY, entityType TEXT NOT NULL, entityId TEXT NOT NULL, operation TEXT NOT NULL, payload TEXT NOT NULL, createdAt INTEGER NOT NULL, retries INTEGER DEFAULT 0);
         
-        CREATE TABLE IF NOT EXISTS inventory (id TEXT PRIMARY KEY, name TEXT NOT NULL, price REAL, stock REAL, category TEXT, subcategory TEXT, size TEXT, description TEXT, sku TEXT, createdAt INTEGER, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS inventory (id TEXT PRIMARY KEY, name TEXT NOT NULL, price REAL, stock REAL, category TEXT, subcategory TEXT, size TEXT, description TEXT, sku TEXT, sourceMeta TEXT, createdAt INTEGER, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS inventory_private (id TEXT PRIMARY KEY, costPrice REAL, supplierId TEXT, lastPurchaseDate TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         
-        CREATE TABLE IF NOT EXISTS sales (id TEXT PRIMARY KEY, total REAL NOT NULL, discount REAL, discountValue REAL, discountType TEXT, paymentMode TEXT, customerName TEXT, customerPhone TEXT, customerId TEXT, footerNote TEXT, date TEXT, createdAt INTEGER, updatedAt INTEGER, staffId TEXT, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS sales (id TEXT PRIMARY KEY, total REAL NOT NULL, discount REAL, discountValue REAL, discountType TEXT, paymentMode TEXT, customerName TEXT, customerPhone TEXT, customerId TEXT, footerNote TEXT, sourceMeta TEXT, date TEXT, createdAt INTEGER, updatedAt INTEGER, staffId TEXT, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS sale_items (id TEXT PRIMARY KEY, saleId TEXT, itemId TEXT, name TEXT, quantity REAL, price REAL, costPrice REAL, size TEXT, isReturn INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS sale_payments (id TEXT PRIMARY KEY, saleId TEXT, mode TEXT, amount REAL);
         
         CREATE TABLE IF NOT EXISTS staff (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT, email TEXT, role TEXT, status TEXT, joinedAt TEXT, permissions TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS staff_private (id TEXT PRIMARY KEY, salary REAL, pin TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         
-        CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT, email TEXT, balance REAL, totalSpent REAL, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT, email TEXT, balance REAL, totalSpent REAL, sourceMeta TEXT, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS customer_payments (id TEXT PRIMARY KEY, customerId TEXT, amount REAL, date TEXT, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
         
         CREATE TABLE IF NOT EXISTS expenses (id TEXT PRIMARY KEY, category TEXT, amount REAL, description TEXT, paymentMethod TEXT DEFAULT 'CASH', paymentReference TEXT, date TEXT, createdAt TEXT, updatedAt INTEGER, dirty INTEGER DEFAULT 0, tombstone INTEGER DEFAULT 0);
@@ -219,6 +219,7 @@ class DatabaseSingleton {
     await this.migrateLegacyColumns('inventory', [
       ['createdAt', 'INTEGER', 'created_at'],
       ['updatedAt', 'INTEGER', 'updated_at'],
+      ['sourceMeta', 'TEXT', 'source_meta'],
     ]);
 
     await this.migrateLegacyColumns('inventory_private', [
@@ -237,6 +238,7 @@ class DatabaseSingleton {
       ['customerPhone', 'TEXT', 'customer_phone'],
       ['customerId', 'TEXT', 'customer_id'],
       ['footerNote', 'TEXT', 'footer_note'],
+      ['sourceMeta', 'TEXT', 'source_meta'],
       ['createdAt', 'INTEGER', 'created_at'],
       ['updatedAt', 'INTEGER', 'updated_at'],
       ['staffId', 'TEXT'],
@@ -256,6 +258,7 @@ class DatabaseSingleton {
     await this.migrateLegacyColumns('customers', [
       ['email', 'TEXT'],
       ['totalSpent', 'REAL', 'total_spent'],
+      ['sourceMeta', 'TEXT', 'source_meta'],
       ['createdAt', 'INTEGER', 'created_at'],
       ['updatedAt', 'INTEGER', 'updated_at'],
     ]);

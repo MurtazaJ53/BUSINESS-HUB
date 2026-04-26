@@ -10,6 +10,7 @@ import { httpsCallable } from 'firebase/functions';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth, functions } from '@/lib/firebase';
 import { useLiveQuery, useSqlQuery, useSalesQuery } from '@/db/hooks';
+import { inventoryRepo } from '@/db/repositories/inventoryRepo';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { useAuthStore } from '@/lib/useAuthStore';
 import { downloadFile, convertToCSV, exportSalesReport, generateGSTR1, generateGSTR3B } from '@/lib/exportUtils';
@@ -50,7 +51,7 @@ const SectionHeader = ({ icon: Icon, title, subtitle }: { icon: any, title: stri
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { shop, updateShop, clearInventory, theme, setTheme, addInventoryItem, upsertCustomer, addSale, lastBackupDate, shopId } = useBusinessStore();
+  const { shop, updateShop, clearInventory, theme, setTheme, addInventoryItem, upsertCustomer, importHistoricalSale, rebuildCustomerTotalsFromSales, lastBackupDate, shopId } = useBusinessStore();
   const { role, user } = useAuthStore();
   
   const canEditSettings = usePermission('settings', 'edit') || role === 'admin';
@@ -127,6 +128,10 @@ export default function Settings() {
   }, [shopId, canManageBackups]);
 
   const buildBackupFileName = (label: string) => `${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.json`;
+  const launchImport = (type: 'inventory' | 'customer' | 'sale') => {
+    setImportType(type);
+    requestAnimationFrame(() => fileInputRef.current?.click());
+  };
 
   const queueRestore = (payload: string, label: string) => {
     setPendingRestorePayload(payload);
@@ -202,11 +207,11 @@ export default function Settings() {
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'inventory' | 'customer' | 'sale') => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setMigrationStatus(`Analyzing ${type} data matrix...`);
-    const { parseGenericExcel } = await import('@/lib/migrationEngine');
-    const result = await parseGenericExcel(file, type);
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    setMigrationStatus(`Analyzing ${files.length} ${type === 'sale' ? 'receipt file(s)' : 'file'}...`);
+    const { parseImportFiles } = await import('@/lib/migrationEngine');
+    const result = await parseImportFiles(files, type);
     if (!result.success || result.validItems.length === 0) {
       showToast(`Import Aborted: ${result.errors[0] || 'No valid records detected.'}`);
       setMigrationStatus(null);
@@ -222,13 +227,78 @@ export default function Settings() {
     setMigrationStatus(`Injecting ${migrationData.validItems.length} records...`);
     let count = 0;
     try {
-      await Promise.all(migrationData.validItems.map(async (item, idx) => {
-        const idTs = Date.now();
-        if (migrationData.type === 'inventory') await addInventoryItem({ id: `inv-${idTs}-${idx}`, ...item, createdAt: new Date().toISOString() });
-        else if (migrationData.type === 'customer') await upsertCustomer({ id: `cust-${idTs}-${idx}`, name: item.name, phone: item.phone, balance: item.balance, totalSpent: item.totalSpent, createdAt: new Date().toISOString() });
-        else if (migrationData.type === 'sale') await addSale({ id: `sale-${idTs}-${idx}`, ...item, status: 'COMPLETED' });
+      const normalizeKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      const inventoryRows = await inventoryRepo.getAll();
+      const inventoryByName = new Map<string, InventoryItem[]>();
+      inventoryRows.forEach((item) => {
+        const key = normalizeKey(item.name);
+        const existing = inventoryByName.get(key) ?? [];
+        existing.push(item);
+        inventoryByName.set(key, existing);
+      });
+
+      const customersByPhone = new Map(
+        customers
+          .filter((customer) => customer.phone && customer.phone !== '-')
+          .map((customer) => [customer.phone, customer] as const),
+      );
+      const customersByName = new Map(customers.map((customer) => [normalizeKey(customer.name), customer] as const));
+
+      await Promise.all(migrationData.validItems.map(async (item) => {
+        if (migrationData.type === 'inventory') {
+          await addInventoryItem({ ...item, createdAt: item.createdAt || new Date().toISOString() });
+        } else if (migrationData.type === 'customer') {
+          await upsertCustomer({
+            id: item.id,
+            name: item.name,
+            phone: item.phone,
+            email: item.email,
+            balance: item.balance,
+            totalSpent: item.totalSpent,
+            createdAt: item.createdAt || new Date().toISOString(),
+            sourceMeta: item.sourceMeta,
+          });
+        } else if (migrationData.type === 'sale') {
+          const matchedCustomer = (item.customerPhone && customersByPhone.get(item.customerPhone))
+            || (item.customerName && customersByName.get(normalizeKey(item.customerName)));
+
+          const normalizedItems = (item.items || []).map((saleItem: any) => {
+            const matches = inventoryByName.get(normalizeKey(saleItem.name)) ?? [];
+            const matchedInventory = matches.length === 1
+              ? matches[0]
+              : matches.find((inventoryItem) =>
+                  inventoryItem.size && saleItem.size && normalizeKey(inventoryItem.size) === normalizeKey(saleItem.size),
+                );
+
+            return {
+              ...saleItem,
+              itemId: matchedInventory?.id || saleItem.itemId,
+            };
+          });
+
+          await importHistoricalSale({
+            id: item.id,
+            items: normalizedItems,
+            total: item.total,
+            discount: item.discount ?? 0,
+            discountValue: String(item.discount ?? 0),
+            discountType: 'fixed',
+            paymentMode: item.paymentMode,
+            payments: item.payments,
+            customerName: item.customerName || matchedCustomer?.name,
+            customerPhone: item.customerPhone || matchedCustomer?.phone,
+            customerId: matchedCustomer?.id,
+            footerNote: item.footerNote,
+            date: item.date,
+            createdAt: item.createdAt,
+            sourceMeta: item.sourceMeta,
+          });
+        }
         count++;
       }));
+      if (migrationData.type === 'sale') {
+        await rebuildCustomerTotalsFromSales();
+      }
       showToast(`Migration Complete: ${count} ${migrationData.type}s injected.`);
     } catch (e: any) {
       showToast(`Partial Failure: ${count} injected. Error: ${e.message}`);
@@ -509,6 +579,44 @@ export default function Settings() {
 
         {/* --- RIGHT COLUMN --- */}
         <div className="space-y-10">
+          <section>
+            <SectionHeader icon={FileSpreadsheet} title="Migration Bay" subtitle="Zobaze to Business Hub" />
+            <div className="glass-card rounded-[2.5rem] p-6 space-y-5">
+              <div className="rounded-2xl border border-border bg-accent/30 p-5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">Recommended Order</p>
+                <p className="text-sm font-medium text-foreground">1. Import inventory, 2. import customers, 3. import all monthly receipt files together.</p>
+                <p className="text-[10px] text-muted-foreground font-medium mt-2">Receipt history is imported without changing current stock or current due balances, so Zobaze snapshot stock stays accurate.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <button
+                  onClick={() => launchImport('inventory')}
+                  className="py-4 rounded-2xl bg-accent hover:bg-accent/80 border border-border text-[10px] font-black uppercase tracking-widest text-foreground transition-all"
+                >
+                  Import Inventory
+                </button>
+                <button
+                  onClick={() => launchImport('customer')}
+                  className="py-4 rounded-2xl bg-accent hover:bg-accent/80 border border-border text-[10px] font-black uppercase tracking-widest text-foreground transition-all"
+                >
+                  Import Customers
+                </button>
+                <button
+                  onClick={() => launchImport('sale')}
+                  className="py-4 rounded-2xl premium-gradient text-primary-foreground text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-primary/20"
+                >
+                  Import Receipts
+                </button>
+              </div>
+
+              {migrationStatus && (
+                <div className="rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-primary">{migrationStatus}</p>
+                </div>
+              )}
+            </div>
+          </section>
+
           <section>
             <SectionHeader icon={Archive} title="Backup Vault" subtitle="Daily Local Safety Snapshots" />
             <div className="glass-card rounded-[2.5rem] p-6 space-y-6">
@@ -801,7 +909,7 @@ export default function Settings() {
       </div>
 
       {/* --- INVISIBLE INPUTS & MODALS --- */}
-      <input type="file" ref={fileInputRef} accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => handleFileUpload(e, importType)} />
+      <input type="file" ref={fileInputRef} accept=".xlsx,.xls,.csv" multiple={importType === 'sale'} className="hidden" onChange={(e) => handleFileUpload(e, importType)} />
       <input type="file" ref={backupImportRef} accept=".json,application/json" className="hidden" onChange={handleBackupImport} />
 
       {editOpen && (
@@ -836,7 +944,7 @@ export default function Settings() {
       {migrationData && (
         <ConfirmDialog
           open={!!migrationData} title={`${migrationData.type.toUpperCase()} Analysis Complete`}
-          description={`Neural engine mapping ready. ${migrationData.validItems.length} records verified. Inject into database?`}
+          description={`${migrationData.provider === 'zobaze' ? 'Zobaze' : 'Spreadsheet'} mapping ready. ${migrationData.validItems.length} records verified from ${migrationData.filesProcessed} file(s). ${migrationData.warnings[0] || 'Imported records use stable IDs, so re-running the same file updates instead of duplicating.'}`}
           confirmText="Execute Injection" variant="danger"
           onConfirm={executeMigration} onClose={() => setMigrationData(null)}
         />

@@ -24,6 +24,7 @@ export const inventory = sqliteTable('inventory', {
   size:        text('size'),
   description: text('description'),
   stock:       integer('stock').default(0),
+  sourceMeta:  text('source_meta'),
   createdAt:   integer('created_at').notNull(),        // ms epoch
   updatedAt:   integer('updated_at').notNull(),        // ms epoch
   tombstone:   integer('tombstone').notNull().default(0),
@@ -52,6 +53,7 @@ export const sales = sqliteTable('sales', {
   customerPhone: text('customer_phone'),
   customerId:    text('customer_id'),
   footerNote:    text('footer_note'),
+  sourceMeta:    text('source_meta'),
   date:          text('date').notNull(),              // YYYY-MM-DD display
   createdAt:     integer('created_at').notNull(),
   updatedAt:     integer('updated_at').notNull(),
@@ -87,6 +89,7 @@ export const customers = sqliteTable('customers', {
   email:      text('email'),
   totalSpent: real('total_spent').notNull().default(0),
   balance:    real('balance').notNull().default(0),
+  sourceMeta: text('source_meta'),
   createdAt:  integer('created_at').notNull(),
   updatedAt:  integer('updated_at').notNull(),
   tombstone:  integer('tombstone').notNull().default(0),
