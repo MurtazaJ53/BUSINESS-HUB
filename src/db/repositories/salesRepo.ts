@@ -20,6 +20,43 @@ const serializeSourceMeta = (value: unknown): string | null => {
   try { return JSON.stringify(value); } catch { return null; }
 };
 
+const buildUpsertStatements = (sale: Sale, updatedAt: number, dirty: 0 | 1): Array<{ sql: string; params?: any[] }> => {
+  const createdAt = typeof sale.createdAt === 'string' ? new Date(sale.createdAt).getTime() : (sale.createdAt || updatedAt);
+  const stmts: Array<{ sql: string; params?: any[] }> = [];
+
+  stmts.push({
+    sql: `INSERT OR REPLACE INTO sales
+            (id, total, discount, discountValue, discountType, paymentMode,
+             customerName, customerPhone, customerId, footerNote, sourceMeta, date,
+             createdAt, updatedAt, staffId, dirty, tombstone)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);`,
+    params: [sale.id, sale.total, sale.discount, sale.discountValue, sale.discountType,
+             sale.paymentMode, sale.customerName ?? null, sale.customerPhone ?? null,
+             sale.customerId ?? null, sale.footerNote ?? null, serializeSourceMeta(sale.sourceMeta), sale.date, createdAt, updatedAt, sale.staffId ?? null, dirty],
+  });
+
+  stmts.push({ sql: 'DELETE FROM sale_items WHERE saleId = ?;', params: [sale.id] });
+  sale.items.forEach((item, idx) => {
+    stmts.push({
+      sql: `INSERT INTO sale_items (id, saleId, itemId, name, quantity, price, costPrice, size, isReturn)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      params: [`${sale.id}_${item.itemId}_${idx}`, sale.id, item.itemId, item.name,
+               item.quantity, item.price, item.costPrice ?? null, item.size ?? null,
+               item.isReturn ? 1 : 0],
+    });
+  });
+
+  stmts.push({ sql: 'DELETE FROM sale_payments WHERE saleId = ?;', params: [sale.id] });
+  sale.payments.forEach((pmt, idx) => {
+    stmts.push({
+      sql: `INSERT INTO sale_payments (id, saleId, mode, amount) VALUES (?, ?, ?, ?);`,
+      params: [`${sale.id}_${pmt.mode}_${idx}`, sale.id, pmt.mode, pmt.amount],
+    });
+  });
+
+  return stmts;
+};
+
 export const salesRepo = {
   async getAll(limitCount?: number): Promise<Sale[]> {
     const rows = await Database.query<any>(
@@ -70,39 +107,14 @@ export const salesRepo = {
 
   async upsert(sale: Sale): Promise<void> {
     const ts = now();
-    const ca = typeof sale.createdAt === 'string' ? new Date(sale.createdAt).getTime() : (sale.createdAt || ts);
-    const stmts: Array<{ sql: string; params?: any[] }> = [];
+    await Database.transaction(buildUpsertStatements(sale, ts, 1));
+    tableEvents.emit(['sales', 'sale_items', 'sale_payments']);
+  },
 
-    stmts.push({
-      sql: `INSERT OR REPLACE INTO sales
-              (id, total, discount, discountValue, discountType, paymentMode,
-               customerName, customerPhone, customerId, footerNote, sourceMeta, date,
-               createdAt, updatedAt, staffId, dirty, tombstone)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0);`,
-      params: [sale.id, sale.total, sale.discount, sale.discountValue, sale.discountType,
-               sale.paymentMode, sale.customerName ?? null, sale.customerPhone ?? null,
-               sale.customerId ?? null, sale.footerNote ?? null, serializeSourceMeta(sale.sourceMeta), sale.date, ca, ts, sale.staffId ?? null],
-    });
-
-    stmts.push({ sql: 'DELETE FROM sale_items WHERE saleId = ?;', params: [sale.id] });
-    sale.items.forEach((item, idx) => {
-      stmts.push({
-        sql: `INSERT INTO sale_items (id, saleId, itemId, name, quantity, price, costPrice, size, isReturn)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-        params: [`${sale.id}_${item.itemId}_${idx}`, sale.id, item.itemId, item.name,
-                 item.quantity, item.price, item.costPrice ?? null, item.size ?? null,
-                 item.isReturn ? 1 : 0],
-      });
-    });
-
-    stmts.push({ sql: 'DELETE FROM sale_payments WHERE saleId = ?;', params: [sale.id] });
-    sale.payments.forEach((pmt, idx) => {
-      stmts.push({
-        sql: `INSERT INTO sale_payments (id, saleId, mode, amount) VALUES (?, ?, ?, ?);`,
-        params: [`${sale.id}_${pmt.mode}_${idx}`, sale.id, pmt.mode, pmt.amount],
-      });
-    });
-
+  async upsertMany(sales: Sale[], dirty: 0 | 1 = 1): Promise<void> {
+    if (!sales.length) return;
+    const ts = now();
+    const stmts = sales.flatMap((sale) => buildUpsertStatements(sale, ts, dirty));
     await Database.transaction(stmts);
     tableEvents.emit(['sales', 'sale_items', 'sale_payments']);
   },
@@ -148,40 +160,7 @@ export const salesRepo = {
       'SELECT updatedAt, dirty FROM sales WHERE id = ?;', [sale.id],
     );
     if (existing.length === 0 || remoteUpdatedAt > existing[0].updatedAt || !existing[0].dirty) {
-      const ca = typeof sale.createdAt === 'string' ? new Date(sale.createdAt).getTime() : (sale.createdAt || remoteUpdatedAt);
-      const stmts: Array<{ sql: string; params?: any[] }> = [];
-
-      stmts.push({
-        sql: `INSERT OR REPLACE INTO sales
-                (id, total, discount, discountValue, discountType, paymentMode,
-                 customerName, customerPhone, customerId, footerNote, sourceMeta, date,
-                 createdAt, updatedAt, staffId, dirty, tombstone)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0);`,
-        params: [sale.id, sale.total, sale.discount, sale.discountValue, sale.discountType,
-                 sale.paymentMode, sale.customerName ?? null, sale.customerPhone ?? null,
-                 sale.customerId ?? null, sale.footerNote ?? null, serializeSourceMeta(sale.sourceMeta), sale.date, ca, remoteUpdatedAt, sale.staffId ?? null],
-      });
-
-      stmts.push({ sql: 'DELETE FROM sale_items WHERE saleId = ?;', params: [sale.id] });
-      sale.items.forEach((item, idx) => {
-        stmts.push({
-          sql: `INSERT INTO sale_items (id, saleId, itemId, name, quantity, price, costPrice, size, isReturn)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-          params: [`${sale.id}_${item.itemId}_${idx}`, sale.id, item.itemId, item.name,
-                   item.quantity, item.price, item.costPrice ?? null, item.size ?? null,
-                   item.isReturn ? 1 : 0],
-        });
-      });
-
-      stmts.push({ sql: 'DELETE FROM sale_payments WHERE saleId = ?;', params: [sale.id] });
-      sale.payments.forEach((pmt, idx) => {
-        stmts.push({
-          sql: `INSERT INTO sale_payments (id, saleId, mode, amount) VALUES (?, ?, ?, ?);`,
-          params: [`${sale.id}_${pmt.mode}_${idx}`, sale.id, pmt.mode, pmt.amount],
-        });
-      });
-
-      await Database.transaction(stmts);
+      await Database.transaction(buildUpsertStatements(sale, remoteUpdatedAt, 0));
     }
   },
 };

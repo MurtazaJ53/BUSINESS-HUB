@@ -23,6 +23,17 @@ export const outboxRepo = {
     );
   },
 
+  async enqueueMany(entries: Array<Omit<QueueEntry, 'retries'>>): Promise<void> {
+    if (!entries.length) return;
+    await Database.transaction(
+      entries.map((entry) => ({
+        sql: `INSERT OR REPLACE INTO outbox (opId, entityType, entityId, operation, payload, createdAt, retries)
+              VALUES (?, ?, ?, ?, ?, ?, 0);`,
+        params: [entry.opId, entry.entityType, entry.entityId, entry.operation, entry.payload, entry.createdAt],
+      })),
+    );
+  },
+
   async getAll(): Promise<QueueEntry[]> {
     return Database.query<QueueEntry>(
       `SELECT opId, entityType, entityId, operation, payload, createdAt, retries
