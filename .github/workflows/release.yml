@@ -12,6 +12,16 @@ jobs:
   build-web-android:
     name: Build Web + Android
     runs-on: ubuntu-latest
+    env:
+      VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+      VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+      VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+      VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+      VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+      VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+      VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
+      VITE_RECAPTCHA_SITE_KEY: ${{ secrets.VITE_RECAPTCHA_SITE_KEY }}
+      ANDROID_GOOGLE_SERVICES_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
 
     steps:
       - name: Checkout Code
@@ -31,11 +41,44 @@ jobs:
       - name: Install Dependencies
         run: npm install --legacy-peer-deps
 
+      - name: Verify Production Build Secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for secret_name in \
+            VITE_FIREBASE_API_KEY \
+            VITE_FIREBASE_AUTH_DOMAIN \
+            VITE_FIREBASE_PROJECT_ID \
+            VITE_FIREBASE_STORAGE_BUCKET \
+            VITE_FIREBASE_MESSAGING_SENDER_ID \
+            VITE_FIREBASE_APP_ID \
+            VITE_RECAPTCHA_SITE_KEY \
+            ANDROID_GOOGLE_SERVICES_JSON; do
+            if [ -z "${!secret_name:-}" ]; then
+              echo "$secret_name is missing"
+              missing=1
+            fi
+          done
+          if [ "$missing" -eq 1 ]; then
+            exit 1
+          fi
+
       - name: Build Web Project
         run: npm run build
 
       - name: Sync Capacitor
         run: npx cap sync android
+
+      - name: Restore Android Firebase Config
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "${ANDROID_GOOGLE_SERVICES_JSON}" > android/app/google-services.json
+          if [ ! -s android/app/google-services.json ]; then
+            echo "google-services.json was not restored"
+            exit 1
+          fi
 
       - name: Verify Android Build Secrets
         run: |
@@ -99,6 +142,15 @@ jobs:
   build-desktop:
     name: Build Desktop (${{ matrix.label }})
     runs-on: ${{ matrix.platform }}
+    env:
+      VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+      VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+      VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+      VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+      VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+      VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+      VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
+      VITE_RECAPTCHA_SITE_KEY: ${{ secrets.VITE_RECAPTCHA_SITE_KEY }}
     strategy:
       fail-fast: false
       matrix:
@@ -152,6 +204,28 @@ jobs:
         working-directory: apps/desktop
         run: npm install
 
+      - name: Verify Desktop Build Secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for secret_name in \
+            VITE_FIREBASE_API_KEY \
+            VITE_FIREBASE_AUTH_DOMAIN \
+            VITE_FIREBASE_PROJECT_ID \
+            VITE_FIREBASE_STORAGE_BUCKET \
+            VITE_FIREBASE_MESSAGING_SENDER_ID \
+            VITE_FIREBASE_APP_ID \
+            VITE_RECAPTCHA_SITE_KEY; do
+            if [ -z "${!secret_name:-}" ]; then
+              echo "$secret_name is missing"
+              missing=1
+            fi
+          done
+          if [ "$missing" -eq 1 ]; then
+            exit 1
+          fi
+
       - name: Build Frontend
         run: npm run build
 
@@ -159,61 +233,11 @@ jobs:
         working-directory: apps/desktop
         run: npm run tauri -- build ${{ matrix.bundle_args }}
 
-      - name: Collect Desktop Release Assets
-        shell: bash
-        run: |
-          set -euo pipefail
-          shopt -s globstar nullglob
-          mkdir -p release-assets
-
-          case "${{ matrix.label }}" in
-            Windows)
-              patterns=(
-                apps/desktop/src-tauri/target/release/bundle/**/*.msi
-                apps/desktop/src-tauri/target/release/bundle/**/*.exe
-              )
-              ;;
-            Linux)
-              patterns=(
-                apps/desktop/src-tauri/target/release/bundle/**/*.deb
-                apps/desktop/src-tauri/target/release/bundle/**/*.AppImage
-              )
-              ;;
-            macOS)
-              patterns=(
-                apps/desktop/src-tauri/target/release/bundle/**/*.dmg
-                apps/desktop/src-tauri/target/release/bundle/**/*.app.tar.gz
-              )
-              ;;
-            *)
-              echo "Unsupported desktop target: ${{ matrix.label }}"
-              exit 1
-              ;;
-          esac
-
-          copied=0
-          for pattern in "${patterns[@]}"; do
-            for file in $pattern; do
-              cp "$file" release-assets/
-              if [ -f "${file}.sig" ]; then
-                cp "${file}.sig" release-assets/
-              fi
-              copied=$((copied + 1))
-            done
-          done
-
-          if [ "$copied" -eq 0 ]; then
-            echo "No desktop release assets found for ${{ matrix.label }}"
-            exit 1
-          fi
-
-          ls -la release-assets
-
       - name: Upload Desktop Artifact
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}-${{ github.ref_name }}
-          path: release-assets
+          path: apps/desktop/src-tauri/target/release/bundle
           if-no-files-found: error
 
   publish-release:
@@ -251,7 +275,20 @@ jobs:
           - macOS desktop bundles
           EOF
 
-          mapfile -t files < <(find release-artifacts -type f | sort)
+          mapfile -t files < <(
+            find release-artifacts -type f \
+              \( \
+                -name '*.zip' -o \
+                -name '*.apk' -o \
+                -name '*.msi' -o \
+                -name '*.exe' -o \
+                -name '*.deb' -o \
+                -name '*.AppImage' -o \
+                -name '*.dmg' -o \
+                -name '*.app.tar.gz' -o \
+                -name '*.sig' \
+              \) | sort
+          )
           if [ "${#files[@]}" -eq 0 ]; then
             echo "No release files found"
             exit 1
