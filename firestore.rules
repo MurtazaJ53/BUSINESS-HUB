@@ -88,6 +88,27 @@ service cloud.firestore {
         allow delete: if can(shopId, 'expenses', 'delete');
       }
 
+      // Materialized summaries
+      match /aggregates_daily/{docId} {
+        allow read: if can(shopId, 'analytics', 'view');
+        allow write: if false;
+      }
+
+      match /dashboard_snapshot/{docId} {
+        allow read: if can(shopId, 'analytics', 'view');
+        allow write: if false;
+      }
+
+      match /customer_credit_summary/{docId} {
+        allow read: if can(shopId, 'customers', 'view');
+        allow write: if false;
+      }
+
+      match /staff_payroll_summary/{docId} {
+        allow read: if can(shopId, 'team', 'view_cost');
+        allow write: if false;
+      }
+      
       // Staff (Split Write: Self-update vs Admin)
       match /staff/{member} {
         allow read: if isMember(shopId) || can(shopId, 'team', 'view') || (auth() && get(/databases/$(database)/documents/shops/$(shopId)).data.ownerId == request.auth.uid);
@@ -102,6 +123,15 @@ service cloud.firestore {
       match /attendance/{at} {
         allow read: if isMember(shopId);
         allow write: if isAdmin(shopId) || (auth() && request.auth.uid == request.resource.data.staffId && at.startsWith(request.auth.uid));
+      }
+
+      // Background jobs / imports
+      match /jobs/{jobId} {
+        allow read, create, update, delete: if isAdmin(shopId);
+      }
+
+      match /imports/{importId} {
+        allow read, write: if isAdmin(shopId);
       }
 
       // Invitations

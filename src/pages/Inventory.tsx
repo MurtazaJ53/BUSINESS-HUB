@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useDeferredValue } from 'react';
 import {
   Plus, Minus, Package, Trash2, Pencil, Search, Tag, Database,
   X, FileText, ClipboardPaste, Copy, AlertCircle, AlertTriangle, Sparkles, Loader2,
@@ -6,10 +6,12 @@ import {
 } from 'lucide-react';
 import { calculateDaysRemaining } from '@/lib/analyticsUtils';
 import ErrorModal from '@/components/ErrorModal';
-import { useSalesRangeQuery, useSqlQuery } from '@/db/hooks';
+import { useLiveQuery } from '@/db/hooks';
+import { inventoryRepo, type InventoryCategorySummary, type InventoryMetrics, type InventoryProductSummary } from '@/db/repositories/inventoryRepo';
+import { salesRepo } from '@/db/repositories/salesRepo';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn } from '@/lib/utils';
-import type { InventoryItem, Sale } from '@/lib/types';
+import type { InventoryItem } from '@/lib/types';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { useAuthStore } from '@/lib/useAuthStore';
 import Modal from '@/components/Modal';
@@ -191,29 +193,15 @@ const InventoryCard = ({
 
 export default function Inventory() {
   const { addInventoryItem, updateInventoryItem, updateStock, deleteInventoryItem, clearInventory, inventorySearchTerm, setInventorySearchTerm, restockItem, role } = useBusinessStore();
-  const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
-  const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
   const today = new Date().toISOString().split('T')[0];
   const last30Days = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
-  const sales = useSalesRangeQuery(last30Days, today);
-
   const canViewCost = usePermission('inventory', 'view_cost');
-  const inventoryPrivateById = useMemo(
-    () => new Map(inventoryPrivate.map((entry: any) => [entry.id, entry])),
-    [inventoryPrivate],
-  );
-
-  const inventoryWithPrivate = useMemo(() => {
-    if (!canViewCost) return inventory;
-    return inventory.map((item: InventoryItem) => ({
-      ...item,
-      costPrice: inventoryPrivateById.get(item.id)?.costPrice
-    }));
-  }, [inventory, inventoryPrivateById, canViewCost]);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [search, setSearch] = useState('');
   const [localSearch, setLocalSearch] = useState('');
+  const deferredSearch = useDeferredValue(search);
+  const deferredLocalSearch = useDeferredValue(localSearch);
   const [addOpen, setAddOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [restockOpen, setRestockOpen] = useState<InventoryItem | null>(null);
@@ -226,13 +214,122 @@ export default function Inventory() {
   const [variantMatrix, setVariantMatrix] = useState<MatrixRow[]>([]);
   const [bulkRows, setBulkRows] = useState<BulkRow[]>(Array(5).fill(null).map(emptyBulkRow));
   const [toast, setToast] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string>('All');
+  const [page, setPage] = useState(1);
+  const pageSize = 24;
 
   // ─── Drill-down / Navigation State ──────────────────────────────────────
   const [drillDepth, setDrillDepth] = useState<0 | 1 | 2>(0);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [activeProductName, setActiveProductName] = useState<string | null>(null);
+
+  const inventoryMetrics = useLiveQuery<InventoryMetrics>(
+    () => inventoryRepo.getMetrics(Boolean(canViewCost)).then((metrics) => [{ ...metrics }]),
+    ['inventory', 'inventory_private'],
+    [canViewCost],
+  );
+
+  const categoryPage = useLiveQuery<InventoryCategorySummary>(
+    () => (!deferredSearch.trim() && drillDepth === 0
+      ? inventoryRepo.getCategoryPage(deferredLocalSearch.trim(), page, pageSize)
+      : Promise.resolve([])),
+    ['inventory'],
+    [deferredSearch.trim(), deferredLocalSearch.trim(), drillDepth, page, pageSize],
+  );
+
+  const categoryCount = useLiveQuery<{ total: number }>(
+    () => (!deferredSearch.trim() && drillDepth === 0
+      ? inventoryRepo.getCategoryCount(deferredLocalSearch.trim()).then((total) => [{ total }])
+      : Promise.resolve([{ total: 0 }])),
+    ['inventory'],
+    [deferredSearch.trim(), deferredLocalSearch.trim(), drillDepth],
+  );
+
+  const productPage = useLiveQuery<InventoryProductSummary>(
+    () => (!deferredSearch.trim() && drillDepth === 1 && activeCategory
+      ? inventoryRepo.getProductPage(activeCategory, deferredLocalSearch.trim(), page, pageSize, Boolean(canViewCost))
+      : Promise.resolve([])),
+    ['inventory', 'inventory_private'],
+    [deferredSearch.trim(), deferredLocalSearch.trim(), drillDepth, activeCategory || '', page, pageSize, Boolean(canViewCost)],
+  );
+
+  const productCount = useLiveQuery<{ total: number }>(
+    () => (!deferredSearch.trim() && drillDepth === 1 && activeCategory
+      ? inventoryRepo.getProductCount(activeCategory, deferredLocalSearch.trim()).then((total) => [{ total }])
+      : Promise.resolve([{ total: 0 }])),
+    ['inventory'],
+    [deferredSearch.trim(), deferredLocalSearch.trim(), drillDepth, activeCategory || ''],
+  );
+
+  const variantPage = useLiveQuery<InventoryItem>(
+    () => (!deferredSearch.trim() && drillDepth === 2 && activeCategory && activeProductName
+      ? inventoryRepo.getVariantPage(activeCategory, activeProductName, deferredLocalSearch.trim(), page, pageSize, Boolean(canViewCost))
+      : Promise.resolve([])),
+    ['inventory', 'inventory_private'],
+    [deferredSearch.trim(), deferredLocalSearch.trim(), drillDepth, activeCategory || '', activeProductName || '', page, pageSize, Boolean(canViewCost)],
+  );
+
+  const variantCount = useLiveQuery<{ total: number }>(
+    () => (!deferredSearch.trim() && drillDepth === 2 && activeCategory && activeProductName
+      ? inventoryRepo.getVariantCount(activeCategory, activeProductName, deferredLocalSearch.trim()).then((total) => [{ total }])
+      : Promise.resolve([{ total: 0 }])),
+    ['inventory'],
+    [deferredSearch.trim(), deferredLocalSearch.trim(), drillDepth, activeCategory || '', activeProductName || ''],
+  );
+
+  const searchResults = useLiveQuery<InventoryItem>(
+    () => (deferredSearch.trim()
+      ? inventoryRepo.searchPage(deferredSearch.trim(), page, pageSize, Boolean(canViewCost))
+      : Promise.resolve([])),
+    ['inventory', 'inventory_private'],
+    [deferredSearch.trim(), page, pageSize, Boolean(canViewCost)],
+  );
+
+  const searchCount = useLiveQuery<{ total: number }>(
+    () => (deferredSearch.trim()
+      ? inventoryRepo.searchCount(deferredSearch.trim()).then((total) => [{ total }])
+      : Promise.resolve([{ total: 0 }])),
+    ['inventory'],
+    [deferredSearch.trim()],
+  );
+
+  const visibleItems = useMemo(() => {
+    if (deferredSearch.trim()) return searchResults;
+    if (drillDepth === 2) return variantPage;
+    return [];
+  }, [deferredSearch, drillDepth, searchResults, variantPage]);
+
+  const velocityEntries = useLiveQuery<{ id: string; quantity: number }>(
+    () => salesRepo
+      .getItemVelocityMap(
+        visibleItems.map((item) => item.id),
+        { dateFrom: last30Days, dateTo: today },
+      )
+      .then((velocityMap) => Object.entries(velocityMap).map(([id, quantity]) => ({ id, quantity }))),
+    ['sales', 'sale_items'],
+    [visibleItems.map((item) => item.id).join('|'), last30Days, today],
+  );
+
+  const velocityByItemId = useMemo(
+    () => new Map(velocityEntries.map((entry) => [entry.id, entry.quantity])),
+    [velocityEntries],
+  );
+
+  const stats = inventoryMetrics[0] ?? {
+    totalItems: 0,
+    totalStock: 0,
+    inventoryValue: 0,
+    potentialProfit: 0,
+    lowStock: 0,
+  };
+
+  const totalVisibleCount = deferredSearch.trim()
+    ? (searchCount[0]?.total ?? 0)
+    : drillDepth === 0
+      ? (categoryCount[0]?.total ?? 0)
+      : drillDepth === 1
+        ? (productCount[0]?.total ?? 0)
+        : (variantCount[0]?.total ?? 0);
+  const totalPages = Math.max(1, Math.ceil(totalVisibleCount / pageSize));
 
   // Sync with Browser History (Back Button Support)
   useEffect(() => {
@@ -256,6 +353,7 @@ export default function Inventory() {
     setActiveCategory(cat);
     setActiveProductName(prod);
     setLocalSearch('');
+    setPage(1);
     window.history.pushState({ depth, category: cat, product: prod }, '');
   };
 
@@ -264,80 +362,48 @@ export default function Inventory() {
     setTimeout(() => setToast(''), 3000);
   };
 
-  const velocityByItemId = useMemo(() => {
-    const totals = new Map<string, number>();
-    sales.forEach((sale: Sale) => {
-      sale.items.forEach((item) => {
-        if (item.isReturn) return;
-        totals.set(item.itemId, (totals.get(item.itemId) || 0) + item.quantity);
-      });
-    });
-    return totals;
-  }, [sales]);
+  useEffect(() => {
+    setPage(1);
+  }, [deferredSearch, deferredLocalSearch, drillDepth, activeCategory, activeProductName]);
+
+  const legacyVelocityByItemId = velocityByItemId;
 
   // ── Autocomplete data ──
   const uniqueCategoriesSummary = useMemo(() => {
-    const productSets = new Map<string, Set<string>>();
-    inventoryWithPrivate.forEach((item: InventoryItem) => {
-      const cat = item.category || 'General';
-      const names = productSets.get(cat) ?? new Set<string>();
-      names.add(item.name);
-      productSets.set(cat, names);
-    });
-    return Array.from(productSets.entries()).reduce<Record<string, number>>((acc, [category, names]) => {
-      acc[category] = names.size;
+    return categoryPage.reduce<Record<string, number>>((acc, entry) => {
+      acc[entry.category] = entry.productCount;
       return acc;
     }, {});
-  }, [inventoryWithPrivate]);
+  }, [categoryPage]);
 
   const filteredCategoriesSummary = useMemo(() => {
-    if (!localSearch) return uniqueCategoriesSummary;
-    const filtered: Record<string, number> = {};
-    Object.entries(uniqueCategoriesSummary).forEach(([cat, count]) => {
-      if (cat.toLowerCase().includes(localSearch.toLowerCase())) {
-        filtered[cat] = count;
-      }
-    });
-    return filtered;
-  }, [uniqueCategoriesSummary, localSearch]);
+    return uniqueCategoriesSummary;
+  }, [uniqueCategoriesSummary]);
 
   const productNamesInCategory = useMemo(() => {
-    if (!activeCategory) return {};
-    const groups: Record<string, { items: InventoryItem[], totalStock: number, totalCost: number, totalValue: number }> = {};
-    inventoryWithPrivate.filter((i: InventoryItem) => (i.category || 'General') === activeCategory).forEach((item: InventoryItem) => {
-      if (!groups[item.name]) groups[item.name] = { items: [], totalStock: 0, totalCost: 0, totalValue: 0 };
-      groups[item.name].items.push(item);
-      groups[item.name].totalStock += (item.stock || 0);
-      groups[item.name].totalCost += (item.costPrice || 0) * (item.stock || 0);
-      groups[item.name].totalValue += (item.price || 0) * (item.stock || 0);
-    });
-    return groups;
-  }, [inventoryWithPrivate, activeCategory]);
+    return productPage.reduce<Record<string, { items: InventoryItem[]; totalStock: number; totalCost: number; totalValue: number; variantCount: number }>>((acc, entry) => {
+      acc[entry.name] = {
+        items: [],
+        totalStock: entry.totalStock,
+        totalCost: entry.totalCost,
+        totalValue: entry.totalValue,
+        variantCount: entry.variantCount,
+      };
+      return acc;
+    }, {});
+  }, [productPage]);
 
   const filteredProductNamesInCategory = useMemo(() => {
-    if (!localSearch) return productNamesInCategory;
-    const filtered: Record<string, { items: InventoryItem[], totalStock: number, totalCost: number, totalValue: number }> = {};
-    Object.entries(productNamesInCategory).forEach(([name, data]) => {
-       if (name.toLowerCase().includes(localSearch.toLowerCase())) {
-         filtered[name] = data;
-       }
-    });
-    return filtered;
-  }, [productNamesInCategory, localSearch]);
+    return productNamesInCategory;
+  }, [productNamesInCategory]);
 
   const itemsInSelectedProduct = useMemo(() => {
-    if (!activeCategory || !activeProductName) return [];
-    return inventoryWithPrivate.filter((i: any) => (i.category || 'General') === activeCategory && i.name === activeProductName);
-  }, [inventoryWithPrivate, activeCategory, activeProductName]);
+    return variantPage;
+  }, [variantPage]);
 
   const filteredItemsInSelectedProduct = useMemo(() => {
-    if (!localSearch) return itemsInSelectedProduct;
-    return itemsInSelectedProduct.filter((i: any) => 
-      i.name.toLowerCase().includes(localSearch.toLowerCase()) || 
-      (i.sku?.toLowerCase() ?? '').includes(localSearch.toLowerCase()) ||
-      (i.size?.toLowerCase() ?? '').includes(localSearch.toLowerCase())
-    );
-  }, [itemsInSelectedProduct, localSearch]);
+    return itemsInSelectedProduct;
+  }, [itemsInSelectedProduct]);
 
   // ── Variant matrix sync ──
   useEffect(() => {
@@ -378,28 +444,10 @@ export default function Inventory() {
   }, [inventorySearchTerm, setInventorySearchTerm]);
 
   // ── Filtered list ──
-  const filtered = useMemo(() =>
-    inventoryWithPrivate.filter((i: any) => {
-      const matchesSearch = i.name.toLowerCase().includes(search.toLowerCase()) || 
-                           i.sku?.toLowerCase().includes(search.toLowerCase());
-      const matchesCategory = selectedCategory === 'all' || i.category === selectedCategory;
-      const matchesSubcategory = selectedSubcategory === 'all' || i.subcategory === selectedSubcategory;
-      return matchesSearch && matchesCategory && matchesSubcategory;
-    }),
-    [inventoryWithPrivate, search, selectedCategory, selectedSubcategory]
-  );
+  const filtered = useMemo(() => searchResults, [searchResults]);
 
   // ── Stats ──
-  const stats = useMemo(() => ({
-    totalItems: inventoryWithPrivate.length,
-    totalStock: inventoryWithPrivate.reduce((s: number, i: any) => s + (i.stock || 0), 0),
-    inventoryValue: inventoryWithPrivate.reduce((s: number, i: any) => s + i.price * (i.stock || 0), 0),
-    potentialProfit: inventoryWithPrivate.reduce((s: number, i: any) => {
-      if (i.costPrice !== undefined && i.stock !== undefined) return s + (i.price - i.costPrice) * i.stock;
-      return s;
-    }, 0),
-    lowStock: inventoryWithPrivate.filter((i: any) => i.stock !== undefined && i.stock <= 5).length,
-  }), [inventoryWithPrivate]);
+  const legacyStats = useMemo(() => stats, [stats]);
 
   // ── Add (single / variant) ──
   const handleAdd = async () => {
@@ -614,7 +662,7 @@ export default function Inventory() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-border/50">
         <div>
           <h1 className="text-3xl md:text-5xl font-black tracking-tighter leading-none mb-2">Shop Inventory</h1>
-          <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest opacity-70">{inventoryWithPrivate.length} Products in Catalog</p>
+          <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest opacity-70">{stats.totalItems} Products in Catalog</p>
         </div>
       </div>
 
@@ -822,7 +870,7 @@ export default function Inventory() {
                     <p className="font-black text-base uppercase tracking-tight truncate w-full">{name}</p>
                     <div className="flex justify-between items-center mt-2">
                        <p className="text-xs font-black text-muted-foreground uppercase opacity-40 tracking-widest">
-                        {data.items.length} Variants
+                        {data.variantCount || data.items.length} Variants
                       </p>
                       <p className={`text-sm font-bold ${data.totalStock <= 5 ? 'text-destructive' : 'text-primary'}`}>
                         {data.totalStock} units
@@ -867,6 +915,30 @@ export default function Inventory() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            Showing page {page} of {totalPages} - {totalVisibleCount.toLocaleString()} results
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page === 1}
+              className="px-4 py-2 rounded-xl border border-border bg-card text-xs font-black uppercase tracking-widest text-muted-foreground transition-all disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              disabled={page === totalPages}
+              className="px-4 py-2 rounded-xl border border-border bg-card text-xs font-black uppercase tracking-widest text-muted-foreground transition-all disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
 
@@ -1223,7 +1295,7 @@ export default function Inventory() {
           showToast('Inventory wiped!');
         }}
         title="Wipe Entire Stock?"
-        description={`You are about to permanently delete all ${inventory.length} items. This action cannot be reversed.`}
+        description={`You are about to permanently delete all ${stats.totalItems} items. This action cannot be reversed.`}
         confirmText="Yes, Wipe All"
         variant="danger"
       />

@@ -8,7 +8,10 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "npm run test:unit && npm run test:rules",
+    "test:unit": "vitest run --passWithNoTests --exclude functions/test/rules.test.ts",
+    "test:rules": "node scripts/run-rules-tests.mjs",
+    "test:load-fixture": "node scripts/generate-scale-fixture.mjs",
     "backfill": "tsx scripts/backfill-aggregates.ts && tsx scripts/backfill-velocity.ts"
   },
   "dependencies": {

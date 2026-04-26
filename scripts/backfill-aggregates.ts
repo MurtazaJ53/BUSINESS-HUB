@@ -27,9 +27,13 @@ async function main() {
   const db = admin.firestore();
   console.log(`Starting backfill for shop: ${shopId}`);
 
-  // 1. Fetch all sales for the shop
-  const salesSnapshot = await db.collection(`shops/${shopId}/sales`).orderBy('date').get();
-  console.log(`Found ${salesSnapshot.size} sales.`);
+  // 1. Fetch all source rows for the shop
+  const [salesSnapshot, expensesSnapshot, customerPaymentsSnapshot] = await Promise.all([
+    db.collection(`shops/${shopId}/sales`).orderBy('date').get(),
+    db.collection(`shops/${shopId}/expenses`).orderBy('date').get(),
+    db.collection(`shops/${shopId}/customer_payments`).orderBy('date').get(),
+  ]);
+  console.log(`Found ${salesSnapshot.size} sales, ${expensesSnapshot.size} expenses, ${customerPaymentsSnapshot.size} customer payments.`);
 
   const dailyGroups: Record<string, any[]> = {};
 
@@ -42,17 +46,46 @@ async function main() {
     dailyGroups[date].push(data);
   });
 
+  expensesSnapshot.docs.forEach((doc) => {
+    const data = doc.data();
+    const date = (data.date || '').split('T')[0];
+    if (!date) return;
+    if (!dailyGroups[date]) dailyGroups[date] = [];
+    dailyGroups[date].push({ __kind: 'expense', ...data });
+  });
+
+  customerPaymentsSnapshot.docs.forEach((doc) => {
+    const data = doc.data();
+    const date = (data.date || '').split('T')[0];
+    if (!date) return;
+    if (!dailyGroups[date]) dailyGroups[date] = [];
+    dailyGroups[date].push({ __kind: 'customer_payment', ...data });
+  });
+
   // 2. Process each day
   for (const [date, sales] of Object.entries(dailyGroups)) {
     console.log(`Processing ${date} (${sales.length} sales)`);
 
     let revenue = 0;
     let cogs = 0;
+    let expenseTotal = 0;
+    let customerPaymentTotal = 0;
+    let txCount = 0;
     const unitsByCategory: Record<string, number> = {};
     const paymentMix: Record<string, number> = {};
 
     sales.forEach(sale => {
+      if (sale.__kind === 'expense') {
+        expenseTotal += sale.amount || 0;
+        return;
+      }
+      if (sale.__kind === 'customer_payment') {
+        customerPaymentTotal += sale.amount || 0;
+        return;
+      }
+
       revenue += sale.total || 0;
+      txCount += 1;
       
       (sale.items || []).forEach((item: any) => {
         const qty = item.quantity || 0;
@@ -76,7 +109,9 @@ async function main() {
       revenue,
       cogs,
       grossProfit: revenue - cogs,
-      txCount: sales.length,
+      txCount,
+      expenseTotal,
+      customerPaymentTotal,
       unitsByCategory,
       paymentMix,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()

@@ -198,6 +198,29 @@ export const customerPaymentsRepo = {
     );
   },
 
+  async getRange(dateFrom?: string, dateTo?: string): Promise<CustomerPayment[]> {
+    const conditions = ['tombstone = 0'];
+    const params: Array<string | number> = [];
+
+    if (dateFrom) {
+      conditions.push('date >= ?');
+      params.push(dateFrom);
+    }
+
+    if (dateTo) {
+      conditions.push('date <= ?');
+      params.push(dateTo);
+    }
+
+    return Database.query<CustomerPayment>(
+      `SELECT id, customerId, amount, date, createdAt
+       FROM customer_payments
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY date DESC, createdAt DESC;`,
+      params,
+    );
+  },
+
   async getByCustomerId(customerId: string): Promise<CustomerPayment[]> {
     return Database.query<CustomerPayment>(
       `SELECT id, customerId, amount, date, createdAt

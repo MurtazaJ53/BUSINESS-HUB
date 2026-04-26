@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.runPermissionsMigration = exports.adminSequesterData = exports.setAdminPin = exports.redeemAdminPin = exports.runAgent = exports.agentTool = exports.onAlertCreated = exports.computeVelocity = exports.onSaleWrite = exports.onStaffWrite = void 0;
+exports.runPermissionsMigration = exports.adminSequesterData = exports.setAdminPin = exports.redeemAdminPin = exports.runAgent = exports.agentTool = exports.onAlertCreated = exports.computeVelocity = exports.emitOperationsHeartbeat = exports.onBackgroundJobWrite = exports.onExpenseWriteSummary = exports.onCustomerWriteSummary = exports.onCustomerPaymentWriteSummary = exports.onAttendanceWriteSummary = exports.onSaleWrite = exports.onStaffWrite = void 0;
 const admin = __importStar(require("firebase-admin"));
 const https_1 = require("firebase-functions/v2/https");
 const migratePermissions_1 = require("./migratePermissions");
@@ -43,14 +43,23 @@ if (admin.apps.length === 0) {
 }
 (0, v2_1.setGlobalOptions)({
     region: "us-central1",
-    maxInstances: 5,
-    cpu: 0.167,
-    memory: "256MiB"
+    maxInstances: 50,
+    cpu: 1,
+    memory: "512MiB"
 });
 var staff_claims_1 = require("./staff-claims");
 Object.defineProperty(exports, "onStaffWrite", { enumerable: true, get: function () { return staff_claims_1.onStaffWrite; } });
 var aggregates_1 = require("./aggregates");
 Object.defineProperty(exports, "onSaleWrite", { enumerable: true, get: function () { return aggregates_1.onSaleWrite; } });
+var summaries_1 = require("./summaries");
+Object.defineProperty(exports, "onAttendanceWriteSummary", { enumerable: true, get: function () { return summaries_1.onAttendanceWriteSummary; } });
+Object.defineProperty(exports, "onCustomerPaymentWriteSummary", { enumerable: true, get: function () { return summaries_1.onCustomerPaymentWriteSummary; } });
+Object.defineProperty(exports, "onCustomerWriteSummary", { enumerable: true, get: function () { return summaries_1.onCustomerWriteSummary; } });
+Object.defineProperty(exports, "onExpenseWriteSummary", { enumerable: true, get: function () { return summaries_1.onExpenseWriteSummary; } });
+var jobs_1 = require("./jobs");
+Object.defineProperty(exports, "onBackgroundJobWrite", { enumerable: true, get: function () { return jobs_1.onBackgroundJobWrite; } });
+var observability_1 = require("./observability");
+Object.defineProperty(exports, "emitOperationsHeartbeat", { enumerable: true, get: function () { return observability_1.emitOperationsHeartbeat; } });
 var velocity_1 = require("./velocity");
 Object.defineProperty(exports, "computeVelocity", { enumerable: true, get: function () { return velocity_1.computeVelocity; } });
 var messaging_1 = require("./messaging");

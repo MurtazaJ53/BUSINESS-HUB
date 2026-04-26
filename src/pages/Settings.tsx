@@ -8,8 +8,10 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { sendPasswordResetEmail } from 'firebase/auth';
-import { auth, functions } from '@/lib/firebase';
+import { collection, limit, orderBy, query } from 'firebase/firestore';
+import { auth, db, functions } from '@/lib/firebase';
 import { useLiveQuery, useSqlQuery } from '@/db/hooks';
+import { useFirestoreCollectionData } from '@/hooks/useFirestoreLiveData';
 import { inventoryPrivateRepo, inventoryRepo } from '@/db/repositories/inventoryRepo';
 import { customersRepo } from '@/db/repositories/customersRepo';
 import { salesRepo } from '@/db/repositories/salesRepo';
@@ -39,6 +41,7 @@ import {
   type BackupSettings,
 } from '@/lib/backup';
 import { logAuditEntry } from '@/lib/audit';
+import { enqueueImportRun, mapImportRun, type ImportRunRecord } from '@/lib/backgroundJobs';
 
 const SectionHeader = ({ icon: Icon, title, subtitle }: { icon: any, title: string, subtitle?: string }) => (
   <div className="flex items-center gap-4 mb-6 animate-in fade-in slide-in-from-left-4">
@@ -54,7 +57,7 @@ const SectionHeader = ({ icon: Icon, title, subtitle }: { icon: any, title: stri
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { shop, updateShop, clearInventory, theme, setTheme, addInventoryItem, upsertCustomer, importHistoricalSalesBatch, rebuildCustomerTotalsFromSales, lastBackupDate, shopId } = useBusinessStore();
+  const { shop, updateShop, clearInventory, theme, setTheme, lastBackupDate, shopId } = useBusinessStore();
   const { role, user } = useAuthStore();
   
   const canEditSettings = usePermission('settings', 'edit') || role === 'admin';
@@ -101,6 +104,15 @@ export default function Settings() {
 
   const [editForm, setEditForm] = useState({ ...shop });
   const backups = useLiveQuery<BackupRecord>(() => listBackups(), ['local_backups']);
+  const recentImports = useFirestoreCollectionData<ImportRunRecord>(
+    () => (
+      shopId && canEditSettings
+        ? query(collection(db, 'shops', shopId, 'imports'), orderBy('createdAt', 'desc'), limit(6))
+        : null
+    ),
+    [shopId, canEditSettings],
+    mapImportRun,
+  );
 
   useEffect(() => setEditForm({ ...shop }), [shop]);
   useEffect(() => {
@@ -138,7 +150,6 @@ export default function Settings() {
     setImportType(type);
     requestAnimationFrame(() => fileInputRef.current?.click());
   };
-  const yieldToUi = () => new Promise<void>((resolve) => window.setTimeout(resolve, 0));
 
   const queueRestore = (payload: string, label: string) => {
     setPendingRestorePayload(payload);
@@ -284,59 +295,33 @@ export default function Settings() {
     if (!migrationData) return;
     const activeMigration = migrationData;
     setMigrationData(null);
-    setMigrationStatus(`Injecting ${activeMigration.validItems.length} records...`);
-    let count = 0;
+    setMigrationStatus(`Queueing ${activeMigration.validItems.length} records for background import...`);
     try {
       const normalizeKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
       const toStableFallbackId = (name: string, size?: string) => {
         const base = normalizeKey(`${name} ${size || ''}`) || 'unknown-item';
         return `legacy-${base.replace(/\s+/g, '-')}`;
       };
-      const inventoryRows = await inventoryRepo.getAll();
-      const inventoryByName = new Map<string, InventoryItem[]>();
-      inventoryRows.forEach((item) => {
-        const key = normalizeKey(item.name);
-        const existing = inventoryByName.get(key) ?? [];
-        existing.push(item);
-        inventoryByName.set(key, existing);
-      });
+      let importRecords: any[] = activeMigration.validItems;
 
-      const customerRows = await customersRepo.getAll();
-      const customersByPhone = new Map(
-        customerRows
-          .filter((customer) => customer.phone && customer.phone !== '-')
-          .map((customer) => [customer.phone, customer] as const),
-      );
-      const customersByName = new Map(customerRows.map((customer) => [normalizeKey(customer.name), customer] as const));
+      if (activeMigration.type === 'sale') {
+        const inventoryRows = await inventoryRepo.getAll();
+        const inventoryByName = new Map<string, InventoryItem[]>();
+        inventoryRows.forEach((item) => {
+          const key = normalizeKey(item.name);
+          const existing = inventoryByName.get(key) ?? [];
+          existing.push(item);
+          inventoryByName.set(key, existing);
+        });
 
-      if (activeMigration.type === 'inventory') {
-        for (const item of activeMigration.validItems) {
-          await addInventoryItem({ ...item, createdAt: item.createdAt || new Date().toISOString() });
-          count++;
-          if (count % 25 === 0) {
-            setMigrationStatus(`Importing inventory ${count}/${activeMigration.validItems.length}...`);
-            await yieldToUi();
-          }
-        }
-      } else if (activeMigration.type === 'customer') {
-        for (const item of activeMigration.validItems) {
-          await upsertCustomer({
-            id: item.id,
-            name: item.name,
-            phone: item.phone,
-            email: item.email,
-            balance: item.balance,
-            totalSpent: item.totalSpent,
-            createdAt: item.createdAt || new Date().toISOString(),
-            sourceMeta: item.sourceMeta,
-          });
-          count++;
-          if (count % 25 === 0) {
-            setMigrationStatus(`Importing customers ${count}/${activeMigration.validItems.length}...`);
-            await yieldToUi();
-          }
-        }
-      } else {
+        const customerRows = await customersRepo.getAll();
+        const customersByPhone = new Map(
+          customerRows
+            .filter((customer) => customer.phone && customer.phone !== '-')
+            .map((customer) => [customer.phone, customer] as const),
+        );
+        const customersByName = new Map(customerRows.map((customer) => [normalizeKey(customer.name), customer] as const));
+
         const preparedSales: Sale[] = activeMigration.validItems.map((item: any) => {
           const matchedCustomer = (item.customerPhone && customersByPhone.get(item.customerPhone))
             || (item.customerName && customersByName.get(normalizeKey(item.customerName)));
@@ -379,19 +364,23 @@ export default function Settings() {
             sourceMeta: item.sourceMeta,
           };
         });
-
-        const batchSize = 50;
-        for (let start = 0; start < preparedSales.length; start += batchSize) {
-          const chunk = preparedSales.slice(start, start + batchSize);
-          await importHistoricalSalesBatch(chunk);
-          count += chunk.length;
-          setMigrationStatus(`Importing receipts ${count}/${preparedSales.length}...`);
-          await yieldToUi();
-        }
-
-        setMigrationStatus('Rebuilding customer totals from imported receipts...');
-        await rebuildCustomerTotalsFromSales();
+        importRecords = preparedSales;
       }
+
+      if (!shopId || !user?.uid) throw new Error('Shop session is not ready for background import.');
+
+      const { importId, totalJobs } = await enqueueImportRun({
+        shopId,
+        userId: user.uid,
+        userEmail: user.email,
+        type: activeMigration.type,
+        provider: activeMigration.provider,
+        filesProcessed: activeMigration.filesProcessed,
+        items: importRecords,
+      });
+
+      const count = importRecords.length;
+      setMigrationStatus(`Queued import ${importId.slice(0, 8)} with ${totalJobs} background jobs. Sync and summaries will update automatically.`);
 
       if (shopId && user?.uid) {
         await logAuditEntry(
@@ -399,20 +388,21 @@ export default function Settings() {
           user.uid,
           user.email || 'unknown',
           'BULK_IMPORT',
-          `${activeMigration.type} import completed`,
+          `${activeMigration.type} import queued`,
           {
             count,
             provider: activeMigration.provider,
             filesProcessed: activeMigration.filesProcessed,
             importType: activeMigration.type,
+            importId,
+            totalJobs,
           },
         );
       }
-      showToast(`Migration complete: ${count} ${activeMigration.type}${count === 1 ? '' : 's'} imported.`);
+      showToast(`Import queued: ${count} ${activeMigration.type}${count === 1 ? '' : 's'} across ${totalJobs} background jobs.`);
     } catch (e: any) {
-      showToast(`Partial Failure: ${count} injected. Error: ${e.message}`);
+      showToast(`Import queue failed: ${e.message}`);
     }
-    setMigrationStatus(null);
   };
 
   const handleSaveBackupSettings = async () => {
@@ -721,6 +711,53 @@ export default function Settings() {
               {migrationStatus && (
                 <div className="rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3">
                   <p className="text-[10px] font-black uppercase tracking-widest text-primary">{migrationStatus}</p>
+                </div>
+              )}
+
+              {recentImports.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Recent Background Imports</p>
+                  {recentImports.map((importRun) => {
+                    const progress = importRun.totalJobs > 0
+                      ? Math.min(100, Math.round(((importRun.completedJobs + importRun.failedJobs) / importRun.totalJobs) * 100))
+                      : 0;
+                    const tone = importRun.status === 'failed'
+                      ? 'border-destructive/20 bg-destructive/5 text-destructive'
+                      : importRun.status === 'completed'
+                        ? 'border-emerald-500/20 bg-emerald-500/5 text-emerald-600'
+                        : 'border-primary/20 bg-primary/5 text-primary';
+
+                    return (
+                      <div key={importRun.id} className={cn("rounded-2xl border p-4", tone)}>
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest">
+                              {importRun.importType} import - {importRun.provider}
+                            </p>
+                            <p className="text-sm font-bold text-foreground">
+                              {importRun.processedItems}/{importRun.totalItems} rows processed
+                            </p>
+                            <p className="text-[10px] font-medium text-muted-foreground mt-1">
+                              {importRun.completedJobs}/{importRun.totalJobs} jobs complete
+                              {importRun.failedJobs > 0 ? ` • ${importRun.failedJobs} failed` : ''}
+                            </p>
+                            {importRun.errorSummary && (
+                              <p className="text-[10px] font-medium mt-2">{importRun.errorSummary}</p>
+                            )}
+                          </div>
+                          <div className="min-w-[160px]">
+                            <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest mb-2">
+                              <span>{importRun.status}</span>
+                              <span>{progress}%</span>
+                            </div>
+                            <div className="h-2 w-full rounded-full bg-accent/60 overflow-hidden">
+                              <div className="h-full premium-gradient rounded-full transition-all" style={{ width: `${progress}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1054,7 +1091,7 @@ export default function Settings() {
         <ConfirmDialog
           open={!!migrationData} title={`${migrationData.type.toUpperCase()} Analysis Complete`}
           description={`${migrationData.provider === 'zobaze' ? 'Zobaze' : 'Spreadsheet'} mapping ready. ${migrationData.validItems.length} records verified from ${migrationData.filesProcessed} file(s). ${migrationData.warnings[0] || 'Imported records use stable IDs, so re-running the same file updates instead of duplicating.'}`}
-          confirmText="Execute Injection" variant="danger"
+          confirmText="Queue Background Import" variant="danger"
           onConfirm={executeMigration} onClose={() => setMigrationData(null)}
         />
       )}
