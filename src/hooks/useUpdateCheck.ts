@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-const CURRENT_VERSION = import.meta.env.VITE_APP_VERSION || '1.0.1';
+const CURRENT_VERSION = import.meta.env.VITE_APP_VERSION || '1.3.6';
 const BACKGROUND_POLL_INTERVAL = 1000 * 60 * 60 * 4; // 4 Hours
 
 const REMOTE_VERSION_URL = import.meta.env.VITE_UPDATE_URL || 'https://raw.githubusercontent.com/MurtazaJ53/BUSINESS-HUB/main/version.json';

@@ -36,7 +36,7 @@ const getReadableError = (error: unknown): string => {
 
 export default function AuthPage() {
   const navigate = useNavigate();
-  const { user, shopId, initialized } = useAuthStore();
+  const { user, shopId, initialized, error: authStoreError } = useAuthStore();
   
   // UI State
   const [mode, setMode] = useState<AuthMode>('login');
@@ -55,6 +55,7 @@ export default function AuthPage() {
   });
 
   const needsShopSetup = user && !shopId && initialized;
+  const visibleError = error || authStoreError;
 
   const updateForm = (field: keyof typeof formData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -424,10 +425,10 @@ export default function AuthPage() {
           </div>
 
           {/* Error Banner */}
-          {error && (
+          {visibleError && (
             <div className="mb-6 p-4 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
               <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-              <p className="text-destructive text-xs font-bold leading-relaxed">{error}</p>
+              <p className="text-destructive text-xs font-bold leading-relaxed">{visibleError}</p>
             </div>
           )}
 

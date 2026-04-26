@@ -3,6 +3,8 @@ import { devtools } from 'zustand/middleware';
 import { auth } from './firebase';
 import { onIdTokenChanged, User } from 'firebase/auth';
 
+const AUTH_INIT_TIMEOUT_MS = 12000;
+
 // 1. Strict Type Definitions matching our Backend Claims
 export type AppRole = 'admin' | 'staff' | 'manager' | 'suspended' | null;
 
@@ -63,8 +65,25 @@ export const useAuthStore = create<AuthState>()(
       initialize: () => {
         const { unsubscribe: existingUnsub, clearSession } = get();
         if (existingUnsub) existingUnsub();
+        set({ loading: true, initialized: false, error: null }, false, 'auth/booting');
+
+        let authInitTimeout: number | null = null;
+        const clearInitTimeout = () => {
+          if (authInitTimeout) {
+            clearTimeout(authInitTimeout);
+            authInitTimeout = null;
+          }
+        };
+
+        if (typeof window !== 'undefined') {
+          authInitTimeout = window.setTimeout(() => {
+            console.error('[Auth Initialization Timeout] Session bootstrap exceeded 12 seconds.');
+            clearSession('Session startup timed out on this device. Please sign in again.');
+          }, AUTH_INIT_TIMEOUT_MS);
+        }
 
         const unsub = onIdTokenChanged(auth, async (user) => {
+          clearInitTimeout();
           if (!get().initialized) set({ loading: true }, false, 'auth/loading');
 
           try {
@@ -113,7 +132,12 @@ export const useAuthStore = create<AuthState>()(
           }
         });
 
-        set({ unsubscribe: unsub }, false, 'auth/setUnsubscribe');
+        set({
+          unsubscribe: () => {
+            clearInitTimeout();
+            unsub();
+          }
+        }, false, 'auth/setUnsubscribe');
       },
 
       cleanup: () => {
