@@ -6,15 +6,27 @@ import { getStorage, connectStorageEmulator } from "firebase/storage";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import { Capacitor } from '@capacitor/core';
 
+// Public client-side Firebase identifiers can safely live in the app bundle.
+const firebasePublicDefaults = {
+  apiKey: 'AIzaSyDHSGEIdDt1m-Iu3swFoKlwNA28Xck41fM',
+  authDomain: 'business-hub-pro.firebaseapp.com',
+  projectId: 'business-hub-pro',
+  storageBucket: 'business-hub-pro.firebasestorage.app',
+  messagingSenderId: '631267912572',
+  appId: '1:631267912572:web:663c0732dc25fd714f12f9',
+  measurementId: 'G-MKZVQ6EYZT',
+  recaptchaSiteKey: '6Lff9MUsAAAAACFLJG0zYTgf57KpeQ9e0YHOo2sw'
+};
+
 // 1. Environment Variable Protection
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || firebasePublicDefaults.apiKey,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || firebasePublicDefaults.authDomain,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || firebasePublicDefaults.projectId,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || firebasePublicDefaults.storageBucket,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || firebasePublicDefaults.messagingSenderId,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || firebasePublicDefaults.appId,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || firebasePublicDefaults.measurementId
 };
 
 // 2. Hot-Reload Protection
@@ -22,7 +34,7 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // 3. Platform-Aware App Check
 if (typeof window !== 'undefined' && import.meta.env.PROD) {
-  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || firebasePublicDefaults.recaptchaSiteKey;
   const isLocalPreviewOrigin = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
     || window.location.protocol === 'file:';
   
