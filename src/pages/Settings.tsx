@@ -9,8 +9,9 @@ import { useNavigate } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth, functions } from '@/lib/firebase';
-import { useLiveQuery, useSqlQuery, useSalesQuery } from '@/db/hooks';
+import { useLiveQuery, useSqlQuery } from '@/db/hooks';
 import { inventoryRepo } from '@/db/repositories/inventoryRepo';
+import { salesRepo } from '@/db/repositories/salesRepo';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { useAuthStore } from '@/lib/useAuthStore';
 import { downloadFile, convertToCSV, exportSalesReport, generateGSTR1, generateGSTR3B } from '@/lib/exportUtils';
@@ -60,7 +61,7 @@ export default function Settings() {
   
   const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
   const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
-  const sales = useSalesQuery();
+  const salesStats = useSqlQuery<{ total: number }>('SELECT COUNT(*) AS total FROM sales WHERE tombstone = 0', [], ['sales']);
   const customers = useSqlQuery<Customer>('SELECT * FROM customers WHERE tombstone = 0 ORDER BY name ASC', [], ['customers']);
 
   const [toast, setToast] = useState('');
@@ -201,10 +202,43 @@ export default function Settings() {
     setTimeout(() => setExporting(null), 1000);
   };
 
-  const handleSalesCSV = () => {
+  const loadSalesExportData = async () => {
+    setMigrationStatus('Preparing sales export package...');
+    try {
+      return await salesRepo.getAll();
+    } finally {
+      setMigrationStatus(null);
+    }
+  };
+
+  const handleSalesCSV = async () => {
     setExporting('sales-csv');
-    exportSalesReport(sales);
-    setTimeout(() => setExporting(null), 1000);
+    try {
+      const exportSales = await loadSalesExportData();
+      exportSalesReport(exportSales);
+    } finally {
+      setTimeout(() => setExporting(null), 1000);
+    }
+  };
+
+  const handleExportGstr1 = async () => {
+    setExporting('gstr1');
+    try {
+      const exportSales = await loadSalesExportData();
+      generateGSTR1(exportSales, shop.gst);
+    } finally {
+      setTimeout(() => setExporting(null), 1000);
+    }
+  };
+
+  const handleExportGstr3b = async () => {
+    setExporting('gstr3b');
+    try {
+      const exportSales = await loadSalesExportData();
+      generateGSTR3B(exportSales);
+    } finally {
+      setTimeout(() => setExporting(null), 1000);
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'inventory' | 'customer' | 'sale') => {
@@ -334,7 +368,7 @@ export default function Settings() {
         setMigrationStatus('Rebuilding customer totals from imported receipts...');
         await rebuildCustomerTotalsFromSales();
       }
-      showToast(`Migration Complete: ${count} ${activeMigration.type}s injected.`);
+      showToast(`Migration complete: ${count} ${activeMigration.type}${count === 1 ? '' : 's'} imported.`);
     } catch (e: any) {
       showToast(`Partial Failure: ${count} injected. Error: ${e.message}`);
     }
@@ -545,7 +579,7 @@ export default function Settings() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-8 mt-8 border-t border-border relative z-10">
           {[
             { label: 'Total Assets', value: inventory.length },
-            { label: 'Transactions', value: sales.length },
+            { label: 'Transactions', value: salesStats[0]?.total ?? 0 },
             { label: 'Client Base', value: customers.length },
             { label: 'Gross Value', value: `₹${inventory.reduce((sum: number, i: InventoryItem) => sum + (i.price * (i.stock || 0)), 0).toLocaleString()}`, highlight: true },
             { label: 'Shift Duration', value: `${shop.standardWorkingHours || 9}H` }
@@ -884,7 +918,7 @@ export default function Settings() {
                   <Download className="h-4 w-4 text-muted-foreground group-hover:text-emerald-500" />
                 </button>
                 
-                <button onClick={handleSalesCSV} disabled={exporting === 'sales-csv'} className="w-full flex items-center justify-between p-4 bg-accent/50 hover:bg-accent rounded-2xl transition-all border border-border group">
+                <button onClick={() => void handleSalesCSV()} disabled={exporting === 'sales-csv'} className="w-full flex items-center justify-between p-4 bg-accent/50 hover:bg-accent rounded-2xl transition-all border border-border group">
                   <div className="flex items-center gap-4">
                     <div className="p-2 bg-primary/10 rounded-lg text-primary"><RefreshCcw className="h-4 w-4" /></div>
                     <div className="text-left"><p className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">Transaction History (CSV)</p></div>
@@ -893,8 +927,8 @@ export default function Settings() {
                 </button>
 
                 <div className="grid grid-cols-2 gap-3 pt-3 mt-3 border-t border-border">
-                   <button onClick={() => generateGSTR1(sales, shop.gst)} className="py-3 bg-accent/50 hover:bg-accent text-foreground rounded-xl border border-border text-[9px] font-black uppercase tracking-widest transition-all">Export GSTR-1</button>
-                   <button onClick={() => generateGSTR3B(sales)} className="py-3 bg-accent/50 hover:bg-accent text-foreground rounded-xl border border-border text-[9px] font-black uppercase tracking-widest transition-all">Export GSTR-3B</button>
+                <button onClick={() => void handleExportGstr1()} disabled={exporting === 'gstr1'} className="py-3 bg-accent/50 hover:bg-accent text-foreground rounded-xl border border-border text-[9px] font-black uppercase tracking-widest transition-all disabled:opacity-60">Export GSTR-1</button>
+                <button onClick={() => void handleExportGstr3b()} disabled={exporting === 'gstr3b'} className="py-3 bg-accent/50 hover:bg-accent text-foreground rounded-xl border border-border text-[9px] font-black uppercase tracking-widest transition-all disabled:opacity-60">Export GSTR-3B</button>
                 </div>
              </div>
           </section>

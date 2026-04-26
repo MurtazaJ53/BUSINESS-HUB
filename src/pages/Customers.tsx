@@ -15,7 +15,8 @@ import {
   History,
   X
 } from 'lucide-react';
-import { useSqlQuery, useSalesQuery } from '@/db/hooks';
+import { useLiveQuery, useSqlQuery } from '@/db/hooks';
+import { salesRepo } from '@/db/repositories/salesRepo';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, isValidIndianPhone, sanitizePhone, toTimestamp } from '@/lib/utils';
 import type { Customer, Sale, CustomerPayment } from '@/lib/types';
@@ -24,11 +25,17 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 export default function Customers() {
   const { upsertCustomer, deleteCustomer, addCustomerPayment } = useBusinessStore();
   const customers = useSqlQuery<Customer>('SELECT * FROM customers WHERE tombstone = 0 ORDER BY name ASC', [], ['customers']);
-  const sales = useSalesQuery();
   const customerPayments = useSqlQuery<CustomerPayment>('SELECT * FROM customer_payments WHERE tombstone = 0', [], ['customer_payments']);
+  const creditAgingMap = useLiveQuery(
+    () => salesRepo.getCreditAgingMap().then((value) => [value]),
+    ['sales', 'sale_payments'],
+    [],
+  )[0] ?? {};
   const [search, setSearch] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null);
+  const [historyEntries, setHistoryEntries] = useState<Array<(Sale & { type: 'SALE' }) | (CustomerPayment & { type: 'PAYMENT' })>>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [paymentCustomerId, setPaymentCustomerId] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -44,14 +51,31 @@ export default function Customers() {
     c.phone.includes(search)
   ).sort((a: Customer, b: Customer) => b.balance - a.balance);
 
-  const getCustomerHistory = (customerId: string) => {
-    const customerSales = sales.filter((s: Sale) => s.customerId === customerId)
-                               .map((s: Sale) => ({ ...s, type: 'SALE' as const }));
-    const payments = customerPayments.filter((p: CustomerPayment) => p.customerId === customerId)
-                                     .map((p: CustomerPayment) => ({ ...p, type: 'PAYMENT' as const }));
-    
-    return [...customerSales, ...payments]
-           .sort((a: any, b: any) => toTimestamp(b.createdAt) - toTimestamp(a.createdAt));
+  const openCustomerHistory = async (customer: Customer) => {
+    setHistoryCustomer(customer);
+    setHistoryLoading(true);
+    try {
+      const [customerSales, payments] = await Promise.all([
+        salesRepo.getByCustomerId(customer.id),
+        Promise.resolve(
+          customerPayments
+            .filter((payment: CustomerPayment) => payment.customerId === customer.id)
+            .map((payment: CustomerPayment) => ({ ...payment, type: 'PAYMENT' as const })),
+        ),
+      ]);
+
+      const combined = [
+        ...customerSales.map((sale: Sale) => ({ ...sale, type: 'SALE' as const })),
+        ...payments,
+      ].sort((a: any, b: any) => toTimestamp(b.createdAt) - toTimestamp(a.createdAt));
+
+      setHistoryEntries(combined);
+    } catch (error) {
+      console.error('[Customers] Failed to load customer history', error);
+      setHistoryEntries([]);
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const stats = {
@@ -166,13 +190,9 @@ export default function Customers() {
                 let agingTag = null;
                 if (hasCredit) {
                   // Check for Udhaar sales in the multi-payment array
-                  const customerSales = sales.filter((s: Sale) => 
-                    s.customerId === customer.id && 
-                    s.payments?.some((p: any) => p.mode === 'CREDIT')
-                  );
-                  if (customerSales.length > 0) {
-                    const oldestCredit = customerSales.sort((a: Sale, b: Sale) => a.date.localeCompare(b.date))[0];
-                    const days = Math.floor((Date.now() - new Date(oldestCredit.date).getTime()) / (1000 * 60 * 60 * 24));
+                  const oldestCreditDate = creditAgingMap[customer.id];
+                  if (oldestCreditDate) {
+                    const days = Math.floor((Date.now() - new Date(oldestCreditDate).getTime()) / (1000 * 60 * 60 * 24));
                     if (days >= 30) agingTag = { label: '30d+', color: 'bg-red-500/20 text-red-600' };
                     else if (days >= 15) agingTag = { label: '15d+', color: 'bg-amber-500/20 text-amber-600' };
                     else if (days >= 7) agingTag = { label: '7d+', color: 'bg-blue-500/20 text-blue-600' };
@@ -227,7 +247,7 @@ export default function Customers() {
                           </button>
                         )}
                         <button 
-                          onClick={() => setHistoryCustomer(customer)}
+                          onClick={() => void openCustomerHistory(customer)}
                           className="p-2 hover:bg-primary/10 hover:text-primary rounded-xl transition-all"
                           title="View History"
                         >
@@ -330,26 +350,31 @@ export default function Customers() {
       {/* History Slide-over/Modal */}
       {historyCustomer && (
         <div className="fixed inset-0 z-[150] flex items-center justify-end">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setHistoryCustomer(null)} />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => { setHistoryCustomer(null); setHistoryEntries([]); }} />
           <div className="relative z-10 w-full max-w-lg h-full glass-card border-l border-border shadow-2xl animate-in p-8 flex flex-col">
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h2 className="text-2xl font-black">Transaction History</h2>
                 <p className="text-sm font-bold text-primary uppercase tracking-widest">{historyCustomer.name}</p>
               </div>
-              <button onClick={() => setHistoryCustomer(null)} className="p-2 hover:bg-accent rounded-xl transition-all">
+              <button onClick={() => { setHistoryCustomer(null); setHistoryEntries([]); }} className="p-2 hover:bg-accent rounded-xl transition-all">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-              {getCustomerHistory(historyCustomer.id).length === 0 ? (
+              {historyLoading ? (
+                <div className="text-center py-20 opacity-50">
+                  <Clock className="h-12 w-12 mx-auto mb-3 animate-pulse" />
+                  <p className="text-sm font-bold uppercase tracking-widest">Loading history</p>
+                </div>
+              ) : historyEntries.length === 0 ? (
                 <div className="text-center py-20 opacity-30">
                   <Clock className="h-12 w-12 mx-auto mb-3" />
                   <p className="text-sm font-bold uppercase tracking-widest">No history found</p>
                 </div>
               ) : (
-                getCustomerHistory(historyCustomer.id).map((item, idx) => {
+                historyEntries.map((item, idx) => {
                   const isSale = 'type' in item && item.type === 'SALE';
                   const sale = item as any; // Cast for simplicity in render
                   
