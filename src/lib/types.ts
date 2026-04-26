@@ -48,6 +48,8 @@ export interface Expense {
   description: string;
   date: string;
   createdAt: string;
+  paymentMethod?: 'CASH' | 'UPI' | 'BANK' | 'CARD' | 'OTHER';
+  paymentReference?: string;
 }
 
 export interface ShopMetadata {

@@ -109,6 +109,11 @@ service cloud.firestore {
         allow read, write: if isAdmin(shopId);
       }
 
+      // Backup archives metadata
+      match /backup_archives/{backupId} {
+        allow read, write: if isAdmin(shopId);
+      }
+
       // Private Vault (Blocked for read, only admins can write auth via client if needed)
       match /private/auth {
         allow read: if false;

@@ -45,6 +45,7 @@ import {
   Area
 } from 'recharts';
 import { calculateForecast } from '@/lib/forecast';
+import { showAppPopup } from '@/lib/popup';
 
 function KPICard({
   title,
@@ -337,7 +338,12 @@ export default function Dashboard() {
           onClick={() => {
             if (role === 'staff' && user) {
               if (!shop?.allowStaffAttendance) {
-                alert("Admin restricted manual clock-in. Contact Admin.");
+                showAppPopup({
+                  title: 'Attendance Locked',
+                  message: 'Admin restricted manual clock-in. Contact admin.',
+                  variant: 'warning',
+                  confirmText: 'Understood',
+                });
                 return;
               }
               const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });

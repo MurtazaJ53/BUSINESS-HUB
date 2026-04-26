@@ -1,0 +1,19 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function auth() {
+      return request.auth != null;
+    }
+
+    function isAdmin(shopId) {
+      return auth()
+        && firestore.exists(/databases/(default)/documents/shops/$(shopId)/staff/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/shops/$(shopId)/staff/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    match /shops/{shopId}/backup_archives/{fileName} {
+      allow read, write: if isAdmin(shopId);
+    }
+  }
+}

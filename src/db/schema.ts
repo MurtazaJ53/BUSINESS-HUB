@@ -111,6 +111,8 @@ export const expenses = sqliteTable('expenses', {
   category:    text('category').notNull(),
   amount:      real('amount').notNull().default(0),
   description: text('description').notNull().default(''),
+  paymentMethod: text('payment_method').default('CASH'),
+  paymentReference: text('payment_reference'),
   date:        text('date').notNull(),
   createdAt:   integer('created_at').notNull(),
   updatedAt:   integer('updated_at').notNull(),
@@ -167,6 +169,15 @@ export const shopMetadata = sqliteTable('shop_metadata', {
   value:     text('value').notNull(),              // JSON
   updatedAt: integer('updated_at').notNull(),
   dirty:     integer('dirty').notNull().default(0),
+});
+
+export const localBackups = sqliteTable('local_backups', {
+  id:         text('id').primaryKey(),
+  label:      text('label').notNull(),
+  trigger:    text('trigger').notNull().default('manual'),
+  createdAt:  integer('created_at').notNull(),
+  sizeBytes:  integer('size_bytes').notNull().default(0),
+  payload:    text('payload').notNull(),
 });
 
 // ─── SYNC INFRASTRUCTURE ───────────────────────────────────

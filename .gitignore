@@ -38,7 +38,14 @@ android/app/google-services.json
 .firebase/
 firebase-debug.log*
 
+# Local tool caches
+.gradle-home/
+
 # Archives
 *.zip
 *.tar.gz
+
+# Local release outputs
+*.apk
+release-artifacts/
 

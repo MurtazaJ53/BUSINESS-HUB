@@ -1,5 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
+import * as bcrypt from "bcryptjs";
 
 /**
  * adminSequesterData
@@ -26,7 +27,7 @@ export const adminSequesterData = onCall({
   const db = admin.firestore();
   
   // Verify Admin Status via Custom Claims
-  if (request.auth.token.role !== 'admin' && request.auth.token.shopId !== shopId) {
+  if (request.auth.token.role !== 'admin' || request.auth.token.shopId !== shopId) {
      throw new HttpsError("permission-denied", "Only shop administrators can trigger sequestration.");
   }
 
@@ -90,10 +91,16 @@ export const adminSequesterData = onCall({
       const settings = shopSnap.data()?.settings || {};
       if (settings.adminPin || settings.staffPin) {
         const authRef = db.doc(`${base}/private/auth`);
-        batch.set(authRef, {
-          adminPin: settings.adminPin || "",
-          staffPin: settings.staffPin || "",
+        const authPayload: Record<string, unknown> = {
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        };
+
+        if (settings.adminPin) {
+          authPayload.adminPinHash = await bcrypt.hash(String(settings.adminPin), 12);
+        }
+
+        batch.set(authRef, {
+          ...authPayload
         }, { merge: true });
 
         // Wipe from public settings

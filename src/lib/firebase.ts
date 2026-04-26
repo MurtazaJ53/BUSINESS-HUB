@@ -1,7 +1,8 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, connectAuthEmulator } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache, persistentSingleTabManager, persistentMultipleTabManager, connectFirestoreEmulator } from 'firebase/firestore';
+import { initializeFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
+import { getStorage, connectStorageEmulator } from "firebase/storage";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import { Capacitor } from '@capacitor/core';
 
@@ -44,15 +45,8 @@ if (typeof window !== 'undefined' && import.meta.env.PROD) {
 
 // 4. Core Service Initialization
 export const auth = getAuth(app);
-
-// Capacitor/WebView doesn't support SharedWorker (required by multiple tab manager)
-const tabManager = Capacitor.isNativePlatform() 
-  ? persistentSingleTabManager({}) 
-  : persistentMultipleTabManager();
-
-export const db = initializeFirestore(app, { 
-  localCache: persistentLocalCache({ tabManager }) 
-});
+export const db = initializeFirestore(app, {});
+export const storage = getStorage(app);
 
 // 5. Regional Optimization
 // Currently set to us-central1 for quota stability. 
@@ -73,6 +67,7 @@ if (import.meta.env.MODE === 'development' && import.meta.env.VITE_USE_EMULATORS
     connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
     connectFirestoreEmulator(db, host, 8080);
     connectFunctionsEmulator(functions, host, 5001);
+    connectStorageEmulator(storage, host, 9199);
   } catch (err) {
     console.warn("Emulators already connected or failed to attach.");
   }
