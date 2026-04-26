@@ -14,7 +14,7 @@ export default defineConfig({
     react(), 
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg', 'sql-wasm.wasm'],
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg', 'sql-wasm.wasm', 'sql-wasm-browser.wasm'],
       manifest: {
         name: 'Business Hub ERP',
         short_name: 'BizHub',
@@ -42,9 +42,6 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  optimizeDeps: {
-    exclude: ['sql.js'],
-  },
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(pkg.version),
   },
@@ -53,11 +50,7 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      external: ['sql.js'],
       output: {
-        globals: {
-          'sql.js': 'initSqlJs'
-        },
         manualChunks(id) {
           if (id.includes('firebase')) return 'vendor-firebase';
           if (id.includes('recharts') || id.includes('d3-')) return 'vendor-charts';

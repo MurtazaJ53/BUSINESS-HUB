@@ -7,3 +7,4 @@ declare module '*.sql?raw' {
 }
 declare module 'sql.js';
 declare module 'sql.js/dist/sql-wasm.js';
+declare module 'sql.js/dist/sql-wasm-browser.js';

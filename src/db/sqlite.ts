@@ -6,6 +6,7 @@
  */
 
 import { Capacitor } from '@capacitor/core';
+import initSqlJsModule from 'sql.js/dist/sql-wasm-browser.js';
 
 export interface RunResult { changes: number; }
 
@@ -97,14 +98,20 @@ class DatabaseSingleton {
 
   private async bootWeb(): Promise<void> {
     try {
-      const initSqlJs = (window as any).initSqlJs;
-      if (!initSqlJs) throw new Error("SQL.js not loaded.");
+      const initSqlJs = (initSqlJsModule as any)?.default ?? initSqlJsModule;
+      if (typeof initSqlJs !== 'function') {
+        throw new Error('Local SQL engine bundle is unavailable.');
+      }
       const SQL = await initSqlJs({
-        locateFile: (file: string) => `/${file}`
+        locateFile: (file: string) => `${import.meta.env.BASE_URL}${file}`
       });
       const saved = await idbLoad();
       this.webDb = saved ? new SQL.Database(saved) : new SQL.Database();
-    } catch (err) { console.error("Web Boot Error:", err); }
+    } catch (err) {
+      console.error('Web Boot Error:', err);
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`Web database engine failed to load. ${message}`);
+    }
   }
 
   async query<T = Record<string, unknown>>(sql: string, params?: any[]): Promise<T[]> {
@@ -206,12 +213,16 @@ class DatabaseSingleton {
     `;
 
     try {
+        if (this.platform === 'web' && !this.webDb) {
+          throw new Error('Web database engine was not initialized.');
+        }
         if (this.platform === 'native') await this.nativeDb.execute(coreSchema);
         else this.webDb!.run(coreSchema);
         await this.ensureLegacyCompatibility();
     } catch (schemaError) {
         console.error('[DB] Schema Error:', schemaError);
-        throw new Error('Database schema compilation failed.');
+        const message = schemaError instanceof Error ? schemaError.message : String(schemaError);
+        throw new Error(message || 'Database schema compilation failed.');
     }
   }
 
