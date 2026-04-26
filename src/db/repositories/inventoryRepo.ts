@@ -7,24 +7,37 @@ import { tableEvents } from '../events';
 import type { InventoryItem, InventoryPrivate } from '../../lib/types';
 
 const now = () => Date.now();
+const parseSourceMeta = (value: unknown): Record<string, unknown> | null => {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    try { return JSON.parse(value); } catch { return null; }
+  }
+  return typeof value === 'object' ? value as Record<string, unknown> : null;
+};
+const serializeSourceMeta = (value: unknown): string | null => {
+  if (!value) return null;
+  if (typeof value === 'string') return value;
+  try { return JSON.stringify(value); } catch { return null; }
+};
 
 export const inventoryRepo = {
   // ─── READ ────────────────────────────────────────────────
 
   async getAll(): Promise<InventoryItem[]> {
-    return Database.query<InventoryItem>(
-      `SELECT id, name, price, sku, category, subcategory, size, description, stock, createdAt
+    const rows = await Database.query<any>(
+      `SELECT id, name, price, sku, category, subcategory, size, description, stock, sourceMeta, createdAt
        FROM inventory WHERE tombstone = 0 ORDER BY name ASC;`,
     );
+    return rows.map((row) => ({ ...row, sourceMeta: parseSourceMeta(row.sourceMeta) }));
   },
 
   async getById(id: string): Promise<InventoryItem | null> {
-    const rows = await Database.query<InventoryItem>(
-      `SELECT id, name, price, sku, category, subcategory, size, description, stock, createdAt
+    const rows = await Database.query<any>(
+      `SELECT id, name, price, sku, category, subcategory, size, description, stock, sourceMeta, createdAt
        FROM inventory WHERE id = ? AND tombstone = 0;`,
       [id],
     );
-    return rows[0] ?? null;
+    return rows[0] ? { ...rows[0], sourceMeta: parseSourceMeta(rows[0].sourceMeta) } : null;
   },
 
   // ─── WRITE ───────────────────────────────────────────────
@@ -34,10 +47,10 @@ export const inventoryRepo = {
     const ca = typeof item.createdAt === 'string' ? new Date(item.createdAt).getTime() : (item.createdAt || ts);
     await Database.run(
       `INSERT OR REPLACE INTO inventory
-         (id, name, price, sku, category, subcategory, size, description, stock, createdAt, updatedAt, dirty, tombstone)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0);`,
+         (id, name, price, sku, category, subcategory, size, description, stock, sourceMeta, createdAt, updatedAt, dirty, tombstone)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0);`,
       [item.id, item.name, item.price, item.sku ?? null, item.category, item.subcategory ?? null,
-       item.size ?? null, item.description ?? null, item.stock ?? 0, ca, ts],
+       item.size ?? null, item.description ?? null, item.stock ?? 0, serializeSourceMeta(item.sourceMeta), ca, ts],
     );
     tableEvents.emit('inventory');
   },
@@ -71,9 +84,9 @@ export const inventoryRepo = {
   async getDirty(): Promise<Array<InventoryItem & { tombstone: number }>> {
     return Database.query(
       `SELECT id, name, price, sku, category, subcategory, size, description, stock,
-              createdAt, updatedAt, tombstone
+              sourceMeta, createdAt, updatedAt, tombstone
        FROM inventory WHERE dirty = 1;`,
-    );
+    ).then((rows: any[]) => rows.map((row) => ({ ...row, sourceMeta: parseSourceMeta(row.sourceMeta) })));
   },
 
   async markClean(ids: string[]): Promise<void> {
@@ -90,18 +103,18 @@ export const inventoryRepo = {
 
     if (existing.length === 0) {
       await Database.run(
-        `INSERT INTO inventory (id, name, price, sku, category, subcategory, size, description, stock, createdAt, updatedAt, dirty, tombstone)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0);`,
+        `INSERT INTO inventory (id, name, price, sku, category, subcategory, size, description, stock, sourceMeta, createdAt, updatedAt, dirty, tombstone)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0);`,
         [item.id, item.name, item.price, item.sku ?? null, item.category, item.subcategory ?? null,
-         item.size ?? null, item.description ?? null, item.stock ?? 0, ca, remoteUpdatedAt],
+         item.size ?? null, item.description ?? null, item.stock ?? 0, serializeSourceMeta(item.sourceMeta), ca, remoteUpdatedAt],
       );
     } else if (remoteUpdatedAt > existing[0].updatedAt || !existing[0].dirty) {
       await Database.run(
         `UPDATE inventory SET name=?, price=?, sku=?, category=?, subcategory=?, size=?,
-                description=?, stock=?, updatedAt=?, dirty=0, tombstone=0
+                description=?, stock=?, sourceMeta=?, updatedAt=?, dirty=0, tombstone=0
          WHERE id=?;`,
         [item.name, item.price, item.sku ?? null, item.category, item.subcategory ?? null,
-         item.size ?? null, item.description ?? null, item.stock ?? 0, remoteUpdatedAt, item.id],
+         item.size ?? null, item.description ?? null, item.stock ?? 0, serializeSourceMeta(item.sourceMeta), remoteUpdatedAt, item.id],
       );
     }
   },

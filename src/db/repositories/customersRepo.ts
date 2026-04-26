@@ -7,31 +7,44 @@ import { tableEvents } from '../events';
 import type { Customer, CustomerPayment } from '../../lib/types';
 
 const now = () => Date.now();
+const parseSourceMeta = (value: unknown): Record<string, unknown> | null => {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    try { return JSON.parse(value); } catch { return null; }
+  }
+  return typeof value === 'object' ? value as Record<string, unknown> : null;
+};
+const serializeSourceMeta = (value: unknown): string | null => {
+  if (!value) return null;
+  if (typeof value === 'string') return value;
+  try { return JSON.stringify(value); } catch { return null; }
+};
 
 export const customersRepo = {
   async getAll(): Promise<Customer[]> {
-    return Database.query<Customer>(
-      `SELECT id, name, phone, email, totalSpent, balance, createdAt
+    const rows = await Database.query<any>(
+      `SELECT id, name, phone, email, totalSpent, balance, sourceMeta, createdAt
        FROM customers WHERE tombstone = 0 ORDER BY name ASC;`,
     );
+    return rows.map((row) => ({ ...row, sourceMeta: parseSourceMeta(row.sourceMeta) }));
   },
 
   async getById(id: string): Promise<Customer | null> {
-    const rows = await Database.query<Customer>(
-      `SELECT id, name, phone, email, totalSpent, balance, createdAt
+    const rows = await Database.query<any>(
+      `SELECT id, name, phone, email, totalSpent, balance, sourceMeta, createdAt
        FROM customers WHERE id = ? AND tombstone = 0;`, [id],
     );
-    return rows[0] ?? null;
+    return rows[0] ? { ...rows[0], sourceMeta: parseSourceMeta(rows[0].sourceMeta) } : null;
   },
 
   async upsert(customer: Customer): Promise<void> {
     const ts = now();
     const ca = typeof customer.createdAt === 'string' ? new Date(customer.createdAt).getTime() : (customer.createdAt || ts);
     await Database.run(
-      `INSERT OR REPLACE INTO customers (id, name, phone, email, totalSpent, balance, createdAt, updatedAt, dirty, tombstone)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0);`,
+      `INSERT OR REPLACE INTO customers (id, name, phone, email, totalSpent, balance, sourceMeta, createdAt, updatedAt, dirty, tombstone)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0);`,
       [customer.id, customer.name, customer.phone, customer.email ?? null,
-       customer.totalSpent, customer.balance, ca, ts],
+       customer.totalSpent, customer.balance, serializeSourceMeta(customer.sourceMeta), ca, ts],
     );
     tableEvents.emit('customers');
   },
@@ -55,10 +68,10 @@ export const customersRepo = {
 
   async getDirty(): Promise<Array<Customer & { tombstone: number }>> {
     return Database.query(
-      `SELECT id, name, phone, email, totalSpent, balance, createdAt,
+      `SELECT id, name, phone, email, totalSpent, balance, sourceMeta, createdAt,
               updatedAt, tombstone
        FROM customers WHERE dirty = 1;`,
-    );
+    ).then((rows: any[]) => rows.map((row) => ({ ...row, sourceMeta: parseSourceMeta(row.sourceMeta) })));
   },
 
   async markClean(ids: string[]): Promise<void> {
@@ -75,17 +88,17 @@ export const customersRepo = {
 
     if (existing.length === 0) {
       await Database.run(
-        `INSERT INTO customers (id, name, phone, email, totalSpent, balance, createdAt, updatedAt, dirty, tombstone)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0);`,
+        `INSERT INTO customers (id, name, phone, email, totalSpent, balance, sourceMeta, createdAt, updatedAt, dirty, tombstone)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0);`,
         [customer.id, customer.name, customer.phone, customer.email ?? null,
-         customer.totalSpent, customer.balance, ca, remoteUpdatedAt],
+         customer.totalSpent, customer.balance, serializeSourceMeta(customer.sourceMeta), ca, remoteUpdatedAt],
       );
     } else if (remoteUpdatedAt > existing[0].updatedAt || !existing[0].dirty) {
       await Database.run(
-        `UPDATE customers SET name=?, phone=?, email=?, totalSpent=?, balance=?,
+        `UPDATE customers SET name=?, phone=?, email=?, totalSpent=?, balance=?, sourceMeta=?,
                 updatedAt=?, dirty=0, tombstone=0 WHERE id=?;`,
         [customer.name, customer.phone, customer.email ?? null,
-         customer.totalSpent, customer.balance, remoteUpdatedAt, customer.id],
+         customer.totalSpent, customer.balance, serializeSourceMeta(customer.sourceMeta), remoteUpdatedAt, customer.id],
       );
     }
   },

@@ -7,6 +7,18 @@ import { tableEvents } from '../events';
 import type { Sale, SaleItem } from '../../lib/types';
 
 const now = () => Date.now();
+const parseSourceMeta = (value: unknown): Record<string, unknown> | null => {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    try { return JSON.parse(value); } catch { return null; }
+  }
+  return typeof value === 'object' ? value as Record<string, unknown> : null;
+};
+const serializeSourceMeta = (value: unknown): string | null => {
+  if (!value) return null;
+  if (typeof value === 'string') return value;
+  try { return JSON.stringify(value); } catch { return null; }
+};
 
 export const salesRepo = {
   async getAll(limitCount?: number): Promise<Sale[]> {
@@ -14,11 +26,11 @@ export const salesRepo = {
       limitCount
         ? `SELECT id, total, discount, discountValue, discountType,
                   paymentMode, customerName, customerPhone,
-                  customerId, footerNote, date, createdAt, staffId
+                  customerId, footerNote, sourceMeta, date, createdAt, staffId
            FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC LIMIT ?;`
         : `SELECT id, total, discount, discountValue, discountType,
                   paymentMode, customerName, customerPhone,
-                  customerId, footerNote, date, createdAt, staffId
+                  customerId, footerNote, sourceMeta, date, createdAt, staffId
            FROM sales WHERE tombstone = 0 ORDER BY createdAt DESC;`,
       limitCount ? [limitCount] : [],
     );
@@ -33,7 +45,7 @@ export const salesRepo = {
       const payments = await Database.query<{ mode: string; amount: number }>(
         `SELECT mode, amount FROM sale_payments WHERE saleId = ?;`, [row.id],
       );
-      sales.push({ ...row, items, payments });
+      sales.push({ ...row, sourceMeta: parseSourceMeta(row.sourceMeta), items, payments });
     }
     return sales;
   },
@@ -42,7 +54,7 @@ export const salesRepo = {
     const rows = await Database.query<any>(
       `SELECT id, total, discount, discountValue, discountType,
               paymentMode, customerName, customerPhone,
-              customerId, footerNote, date, createdAt, staffId
+              customerId, footerNote, sourceMeta, date, createdAt, staffId
        FROM sales WHERE id = ? AND tombstone = 0;`, [id],
     );
     if (!rows.length) return null;
@@ -53,7 +65,7 @@ export const salesRepo = {
     const payments = await Database.query<{ mode: string; amount: number }>(
       `SELECT mode, amount FROM sale_payments WHERE saleId = ?;`, [id],
     );
-    return { ...rows[0], items, payments };
+    return { ...rows[0], sourceMeta: parseSourceMeta(rows[0].sourceMeta), items, payments };
   },
 
   async upsert(sale: Sale): Promise<void> {
@@ -64,12 +76,12 @@ export const salesRepo = {
     stmts.push({
       sql: `INSERT OR REPLACE INTO sales
               (id, total, discount, discountValue, discountType, paymentMode,
-               customerName, customerPhone, customerId, footerNote, date,
+               customerName, customerPhone, customerId, footerNote, sourceMeta, date,
                createdAt, updatedAt, staffId, dirty, tombstone)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0);`,
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0);`,
       params: [sale.id, sale.total, sale.discount, sale.discountValue, sale.discountType,
                sale.paymentMode, sale.customerName ?? null, sale.customerPhone ?? null,
-               sale.customerId ?? null, sale.footerNote ?? null, sale.date, ca, ts, sale.staffId ?? null],
+               sale.customerId ?? null, sale.footerNote ?? null, serializeSourceMeta(sale.sourceMeta), sale.date, ca, ts, sale.staffId ?? null],
     });
 
     stmts.push({ sql: 'DELETE FROM sale_items WHERE saleId = ?;', params: [sale.id] });
@@ -107,7 +119,7 @@ export const salesRepo = {
     const rows = await Database.query<any>(
       `SELECT id, total, discount, discountValue, discountType,
               paymentMode, customerName, customerPhone,
-              customerId, footerNote, date, createdAt, staffId,
+              customerId, footerNote, sourceMeta, date, createdAt, staffId,
               updatedAt, tombstone
        FROM sales WHERE dirty = 1;`,
     );
@@ -120,7 +132,7 @@ export const salesRepo = {
       const payments = await Database.query<{ mode: string; amount: number }>(
         `SELECT mode, amount FROM sale_payments WHERE saleId = ?;`, [row.id],
       );
-      results.push({ ...row, items, payments });
+      results.push({ ...row, sourceMeta: parseSourceMeta(row.sourceMeta), items, payments });
     }
     return results;
   },
@@ -142,12 +154,12 @@ export const salesRepo = {
       stmts.push({
         sql: `INSERT OR REPLACE INTO sales
                 (id, total, discount, discountValue, discountType, paymentMode,
-                 customerName, customerPhone, customerId, footerNote, date,
+                 customerName, customerPhone, customerId, footerNote, sourceMeta, date,
                  createdAt, updatedAt, staffId, dirty, tombstone)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0);`,
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0);`,
         params: [sale.id, sale.total, sale.discount, sale.discountValue, sale.discountType,
                  sale.paymentMode, sale.customerName ?? null, sale.customerPhone ?? null,
-                 sale.customerId ?? null, sale.footerNote ?? null, sale.date, ca, remoteUpdatedAt, sale.staffId ?? null],
+                 sale.customerId ?? null, sale.footerNote ?? null, serializeSourceMeta(sale.sourceMeta), sale.date, ca, remoteUpdatedAt, sale.staffId ?? null],
       });
 
       stmts.push({ sql: 'DELETE FROM sale_items WHERE saleId = ?;', params: [sale.id] });

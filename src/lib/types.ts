@@ -21,6 +21,7 @@ export interface InventoryItem {
     xyz: 'X' | 'Y' | 'Z';
   };
   createdAt: string;
+  sourceMeta?: Record<string, unknown> | null;
   [key: string]: any; // allow dynamic deletion of undefined keys
 }
 
@@ -39,6 +40,7 @@ export interface Customer {
   totalSpent: number;
   balance: number; // For Udhaar/Credit
   createdAt: string;
+  sourceMeta?: Record<string, unknown> | null;
 }
 
 export interface Expense {
@@ -96,6 +98,7 @@ export interface Sale {
   date: string;
   createdAt: string;
   staffId?: string;
+  sourceMeta?: Record<string, unknown> | null;
 }
 
 export type Action = 'view'|'create'|'edit'|'delete'|'export'|'override_price'|'void_sale'|'view_cost'|'view_profit'|'approve_credit';

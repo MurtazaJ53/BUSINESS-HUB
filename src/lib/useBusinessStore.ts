@@ -115,12 +115,14 @@ interface BusinessState {
   clearInventory: () => Promise<void>;
   
   addSale: (sale: Sale) => Promise<void>;
+  importHistoricalSale: (sale: Sale) => Promise<void>;
   updateSale: (sale: Sale) => Promise<void>;
   deleteSale: (id: string) => Promise<void>;
   
   upsertCustomer: (customer: Customer) => Promise<void>;
   deleteCustomer: (id: string) => Promise<void>;
   addCustomerPayment: (customerId: string, amount: number) => Promise<void>;
+  rebuildCustomerTotalsFromSales: () => Promise<void>;
   
   addExpense: (expense: Expense) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
@@ -443,6 +445,13 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     await enqueueSync('sales', finalSale.id, 'CREATE', finalSale);
   },
 
+  importHistoricalSale: async (sale) => {
+    const { shopId } = get(); if (!shopId) return;
+    const existing = await salesRepo.getById(sale.id);
+    await salesRepo.upsert(sale);
+    await enqueueSync('sales', sale.id, existing ? 'UPDATE' : 'CREATE', sale);
+  },
+
   updateSale: async (newSale) => {
     const { shopId } = get(); if (!shopId) return;
     const oldSale = await salesRepo.getById(newSale.id);
@@ -544,6 +553,29 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     await enqueueSync('customer_payments', paymentId, 'CREATE', payment);
     const updatedCust = await customersRepo.getById(customerId);
     if (updatedCust) await enqueueSync('customers', customerId, 'UPDATE', updatedCust);
+  },
+
+  rebuildCustomerTotalsFromSales: async () => {
+    const { shopId } = get(); if (!shopId) return;
+    const ts = Date.now();
+    await Database.run(
+      `UPDATE customers
+         SET totalSpent = COALESCE((
+           SELECT SUM(total)
+           FROM sales
+           WHERE sales.customerId = customers.id AND sales.tombstone = 0
+         ), 0),
+             updatedAt = ?,
+             dirty = 1
+       WHERE tombstone = 0;`,
+      [ts],
+    );
+    tableEvents.emit('customers');
+
+    const currentCustomers = await customersRepo.getAll();
+    await Promise.all(currentCustomers.map(async (customer) => {
+      await enqueueSync('customers', customer.id, 'UPDATE', customer);
+    }));
   },
 
   addExpense: async (expense) => {
