@@ -43,7 +43,7 @@ if (admin.apps.length === 0) {
 }
 (0, v2_1.setGlobalOptions)({
     region: "us-central1",
-    maxInstances: 50,
+    maxInstances: 20,
     cpu: 1,
     memory: "512MiB"
 });
