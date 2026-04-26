@@ -42,6 +42,12 @@ export interface SalesHistoryMetrics {
   totalAmount: number;
 }
 
+export interface DailySalesSeriesPoint {
+  date: string;
+  total: number;
+  orderCount: number;
+}
+
 const parseSourceMeta = (value: unknown): Record<string, unknown> | null => {
   if (!value) return null;
   if (typeof value === 'string') {
@@ -270,19 +276,17 @@ export const salesRepo = {
               s.date,
               s.createdAt,
               s.staffId,
-              COALESCE(item_stats.itemQuantity, 0) AS itemQuantity,
-              COALESCE(payment_stats.paymentCount, 0) AS paymentCount
+              COALESCE((
+                SELECT SUM(si.quantity)
+                FROM sale_items si
+                WHERE si.saleId = s.id
+              ), 0) AS itemQuantity,
+              COALESCE((
+                SELECT COUNT(*)
+                FROM sale_payments sp
+                WHERE sp.saleId = s.id
+              ), 0) AS paymentCount
        FROM sales s
-       LEFT JOIN (
-         SELECT saleId, SUM(quantity) AS itemQuantity
-         FROM sale_items
-         GROUP BY saleId
-       ) item_stats ON item_stats.saleId = s.id
-       LEFT JOIN (
-         SELECT saleId, COUNT(*) AS paymentCount
-         FROM sale_payments
-         GROUP BY saleId
-       ) payment_stats ON payment_stats.saleId = s.id
        ${clause}
        ORDER BY s.date DESC, s.createdAt DESC
        LIMIT ? OFFSET ?;`,
@@ -307,6 +311,20 @@ export const salesRepo = {
       params,
     );
     return rows[0] ?? { totalCount: 0, totalAmount: 0 };
+  },
+
+  async getDailySeries(filters: SalesRangeFilters = {}): Promise<DailySalesSeriesPoint[]> {
+    const { clause, params } = buildRangeClause(filters);
+    return Database.query<DailySalesSeriesPoint>(
+      `SELECT date,
+              COALESCE(SUM(total), 0) AS total,
+              COUNT(*) AS orderCount
+       FROM sales
+       ${clause}
+       GROUP BY date
+       ORDER BY date ASC;`,
+      params,
+    );
   },
 
   async getCreditAgingMap(): Promise<Record<string, string>> {

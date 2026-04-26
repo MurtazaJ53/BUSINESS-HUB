@@ -23,8 +23,8 @@ import {
   Sparkles,
   ChevronRight
 } from 'lucide-react';
-import { useLiveQuery, useSalesRangeQuery, useSqlQuery } from '@/db/hooks';
-import { salesRepo, type SaleHistorySummary } from '@/db/repositories/salesRepo';
+import { useLiveQuery, useSqlQuery } from '@/db/hooks';
+import { salesRepo, type DailySalesSeriesPoint, type SaleHistorySummary } from '@/db/repositories/salesRepo';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { useAuthStore } from '@/lib/useAuthStore';
 import { usePermission } from '@/hooks/usePermission';
@@ -32,7 +32,7 @@ import { formatCurrency, cn } from '@/lib/utils';
 import Modal from '@/components/Modal';
 import Label from '@/components/Label';
 import Input from '@/components/Input';
-import type { Expense, Sale, InventoryItem, InventoryPrivate, Attendance, SaleItem } from '@/lib/types';
+import type { Expense, InventoryItem, InventoryPrivate, Attendance } from '@/lib/types';
 import {
   BarChart,
   Bar,
@@ -87,11 +87,15 @@ export default function Dashboard() {
   const { addExpense, recordAttendance, role, shop, lastBackupDate, setInventorySearchTerm, sidebarOpen } = useBusinessStore();
   const today = new Date().toISOString().split('T')[0];
   const last30Days = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
-  const sales = useSalesRangeQuery(last30Days, today);
   const salesTotals = useSqlQuery<{ totalRevenue: number; totalCount: number }>(
     'SELECT COALESCE(SUM(total), 0) AS totalRevenue, COUNT(*) AS totalCount FROM sales WHERE tombstone = 0',
     [],
     ['sales'],
+  );
+  const salesSeries = useLiveQuery<DailySalesSeriesPoint>(
+    () => salesRepo.getDailySeries({ dateFrom: last30Days, dateTo: today }),
+    ['sales'],
+    [last30Days, today],
   );
   const recentSales = useLiveQuery<SaleHistorySummary>(
     () => salesRepo.getHistoryPage({}, 1, 10),
@@ -104,6 +108,10 @@ export default function Dashboard() {
   const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
   const briefings = useSqlQuery<any>('SELECT * FROM daily_briefings ORDER BY id DESC LIMIT 1', [], ['daily_briefings']);
   const briefing = briefings[0];
+  const inventoryPrivateById = useMemo(
+    () => new Map(inventoryPrivate.map((entry: { id: string }) => [entry.id, entry])),
+    [inventoryPrivate],
+  );
   const { user } = useAuthStore();
   const canViewInventoryCost = usePermission('inventory', 'view_cost');
   const canViewInventory = usePermission('inventory', 'view');
@@ -151,7 +159,7 @@ export default function Dashboard() {
 
   // KPI calculations from real data
   const totalStockValue = inventory.reduce((sum: number, i: InventoryItem) => {
-    const p = canViewInventoryCost ? inventoryPrivate.find((pi: InventoryPrivate) => pi.id === i.id) : null;
+    const p = canViewInventoryCost ? inventoryPrivateById.get(i.id) as InventoryPrivate | undefined : null;
     return sum + (p?.costPrice || 0) * (i.stock || 0);
   }, 0);
   const potentialRevenue = inventory.reduce(
@@ -172,11 +180,9 @@ export default function Dashboard() {
       return d.toISOString().split('T')[0];
     });
 
-    const historicalSeries = dates.map(date => {
-      return sales
-        .filter((s: Sale) => s.date === date)
-        .reduce((sum, s) => sum + s.total, 0);
-    });
+    const totalsByDate = new Map(salesSeries.map((entry) => [entry.date, entry.total]));
+
+    const historicalSeries = dates.map((date) => totalsByDate.get(date) || 0);
 
     // Main display data (last 7 days of historical)
     const historyData = dates.slice(-7).map((date, i) => ({
@@ -205,7 +211,7 @@ export default function Dashboard() {
       }
     }
     return historyData;
-  }, [sales]);
+  }, [salesSeries]);
 
   return (
     <div className="space-y-10 pb-20">

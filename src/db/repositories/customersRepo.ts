@@ -7,6 +7,36 @@ import { tableEvents } from '../events';
 import type { Customer, CustomerPayment } from '../../lib/types';
 
 const now = () => Date.now();
+
+export interface CustomerListFilters {
+  search?: string;
+}
+
+export interface CustomerListMetrics {
+  total: number;
+  activeCredits: number;
+  totalCreditAmount: number;
+}
+
+const buildCustomerWhereClause = (
+  filters: CustomerListFilters = {},
+): { clause: string; params: Array<string | number> } => {
+  const conditions = ['tombstone = 0'];
+  const params: Array<string | number> = [];
+
+  if (filters.search?.trim()) {
+    const phoneLike = `%${filters.search.trim()}%`;
+    const textLike = `%${filters.search.trim().toLowerCase()}%`;
+    conditions.push('(LOWER(name) LIKE ? OR phone LIKE ?)');
+    params.push(textLike, phoneLike);
+  }
+
+  return {
+    clause: `WHERE ${conditions.join(' AND ')}`,
+    params,
+  };
+};
+
 const parseSourceMeta = (value: unknown): Record<string, unknown> | null => {
   if (!value) return null;
   if (typeof value === 'string') {
@@ -27,6 +57,60 @@ export const customersRepo = {
        FROM customers WHERE tombstone = 0 ORDER BY name ASC;`,
     );
     return rows.map((row) => ({ ...row, sourceMeta: parseSourceMeta(row.sourceMeta) }));
+  },
+
+  async getPage(
+    filters: CustomerListFilters = {},
+    page: number = 1,
+    pageSize: number = 100,
+  ): Promise<Customer[]> {
+    const safePage = Math.max(1, page);
+    const safePageSize = Math.max(1, Math.min(pageSize, 500));
+    const offset = (safePage - 1) * safePageSize;
+    const { clause, params } = buildCustomerWhereClause(filters);
+    const rows = await Database.query<any>(
+      `SELECT id, name, phone, email, totalSpent, balance, sourceMeta, createdAt
+       FROM customers
+       ${clause}
+       ORDER BY balance DESC, name ASC
+       LIMIT ? OFFSET ?;`,
+      [...params, safePageSize, offset],
+    );
+    return rows.map((row) => ({ ...row, sourceMeta: parseSourceMeta(row.sourceMeta) }));
+  },
+
+  async getMetrics(filters: CustomerListFilters = {}): Promise<CustomerListMetrics> {
+    const { clause, params } = buildCustomerWhereClause(filters);
+    const rows = await Database.query<CustomerListMetrics>(
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN balance > 0 THEN 1 ELSE 0 END) AS activeCredits,
+              COALESCE(SUM(balance), 0) AS totalCreditAmount
+       FROM customers
+       ${clause};`,
+      params,
+    );
+    return rows[0] ?? { total: 0, activeCredits: 0, totalCreditAmount: 0 };
+  },
+
+  async findByPhoneOrName(phone?: string, name?: string): Promise<Customer | null> {
+    const normalizedPhone = phone?.trim() || '';
+    const normalizedName = name?.trim().toLowerCase() || '';
+    if (!normalizedPhone && !normalizedName) return null;
+
+    const rows = await Database.query<any>(
+      `SELECT id, name, phone, email, totalSpent, balance, sourceMeta, createdAt
+       FROM customers
+       WHERE tombstone = 0
+         AND (
+           (? <> '' AND phone = ?)
+           OR (? <> '' AND LOWER(name) = ?)
+         )
+       ORDER BY CASE WHEN (? <> '' AND phone = ?) THEN 0 ELSE 1 END
+       LIMIT 1;`,
+      [normalizedPhone, normalizedPhone, normalizedName, normalizedName, normalizedPhone, normalizedPhone],
+    );
+
+    return rows[0] ? { ...rows[0], sourceMeta: parseSourceMeta(rows[0].sourceMeta) } : null;
   },
 
   async getById(id: string): Promise<Customer | null> {
@@ -111,6 +195,16 @@ export const customerPaymentsRepo = {
     return Database.query<CustomerPayment>(
       `SELECT id, customerId, amount, date, createdAt
        FROM customer_payments WHERE tombstone = 0 ORDER BY createdAt DESC;`,
+    );
+  },
+
+  async getByCustomerId(customerId: string): Promise<CustomerPayment[]> {
+    return Database.query<CustomerPayment>(
+      `SELECT id, customerId, amount, date, createdAt
+       FROM customer_payments
+       WHERE customerId = ? AND tombstone = 0
+       ORDER BY createdAt DESC;`,
+      [customerId],
     );
   },
 

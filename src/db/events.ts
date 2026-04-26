@@ -6,21 +6,33 @@ type Listener = () => void;
 
 class TableEventBus {
   private listeners: Map<string, Set<Listener>> = new Map();
+  private pendingListeners: Set<Listener> = new Set();
+  private flushQueued = false;
+
+  private scheduleFlush(): void {
+    if (this.flushQueued) return;
+    this.flushQueued = true;
+
+    queueMicrotask(() => {
+      this.flushQueued = false;
+      const listeners = Array.from(this.pendingListeners);
+      this.pendingListeners.clear();
+      listeners.forEach((listener) => listener());
+    });
+  }
 
   /** Emit a change event for one or more tables. */
   emit(tables: string | string[]): void {
     const tableList = Array.isArray(tables) ? tables : [tables];
-    const uniqueListeners = new Set<Listener>();
 
     for (const table of tableList) {
       const set = this.listeners.get(table);
       if (set) {
-        set.forEach(l => uniqueListeners.add(l));
+        set.forEach((listener) => this.pendingListeners.add(listener));
       }
     }
 
-    // Call all unique listeners once
-    uniqueListeners.forEach(l => l());
+    this.scheduleFlush();
   }
 
   /** Subscribe to changes on specific tables. */

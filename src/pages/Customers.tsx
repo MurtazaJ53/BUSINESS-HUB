@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { 
   Users, 
   Search, 
@@ -15,7 +15,8 @@ import {
   History,
   X
 } from 'lucide-react';
-import { useLiveQuery, useSqlQuery } from '@/db/hooks';
+import { useLiveQuery } from '@/db/hooks';
+import { customerPaymentsRepo, customersRepo } from '@/db/repositories/customersRepo';
 import { salesRepo } from '@/db/repositories/salesRepo';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, isValidIndianPhone, sanitizePhone, toTimestamp } from '@/lib/utils';
@@ -24,14 +25,13 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 
 export default function Customers() {
   const { upsertCustomer, deleteCustomer, addCustomerPayment } = useBusinessStore();
-  const customers = useSqlQuery<Customer>('SELECT * FROM customers WHERE tombstone = 0 ORDER BY name ASC', [], ['customers']);
-  const customerPayments = useSqlQuery<CustomerPayment>('SELECT * FROM customer_payments WHERE tombstone = 0', [], ['customer_payments']);
   const creditAgingMap = useLiveQuery(
     () => salesRepo.getCreditAgingMap().then((value) => [value]),
     ['sales', 'sale_payments'],
     [],
   )[0] ?? {};
   const [search, setSearch] = useState('');
+  const deferredSearch = useDeferredValue(search);
   const [isAdding, setIsAdding] = useState(false);
   const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null);
   const [historyEntries, setHistoryEntries] = useState<Array<(Sale & { type: 'SALE' }) | (CustomerPayment & { type: 'PAYMENT' })>>([]);
@@ -39,6 +39,8 @@ export default function Customers() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [paymentCustomerId, setPaymentCustomerId] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 100;
   
   const [formData, setFormData] = useState({
     name: '',
@@ -46,10 +48,26 @@ export default function Customers() {
     email: ''
   });
 
-  const filtered = customers.filter((c: Customer) => 
-    c.name.toLowerCase().includes(search.toLowerCase()) || 
-    c.phone.includes(search)
-  ).sort((a: Customer, b: Customer) => b.balance - a.balance);
+  const customerFilters = useMemo(
+    () => ({ search: deferredSearch.trim() || undefined }),
+    [deferredSearch],
+  );
+
+  const customerMetrics = useLiveQuery(
+    () => customersRepo.getMetrics(customerFilters).then((metrics) => [{ ...metrics }]),
+    ['customers'],
+    [customerFilters.search || ''],
+  );
+
+  const customersPage = useLiveQuery<Customer>(
+    () => customersRepo.getPage(customerFilters, page, pageSize),
+    ['customers'],
+    [page, pageSize, customerFilters.search || ''],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [deferredSearch]);
 
   const openCustomerHistory = async (customer: Customer) => {
     setHistoryCustomer(customer);
@@ -57,10 +75,8 @@ export default function Customers() {
     try {
       const [customerSales, payments] = await Promise.all([
         salesRepo.getByCustomerId(customer.id),
-        Promise.resolve(
-          customerPayments
-            .filter((payment: CustomerPayment) => payment.customerId === customer.id)
-            .map((payment: CustomerPayment) => ({ ...payment, type: 'PAYMENT' as const })),
+        customerPaymentsRepo.getByCustomerId(customer.id).then((rows) =>
+          rows.map((payment: CustomerPayment) => ({ ...payment, type: 'PAYMENT' as const })),
         ),
       ]);
 
@@ -79,10 +95,11 @@ export default function Customers() {
   };
 
   const stats = {
-    total: customers.length,
-    activeCredits: customers.filter((c: Customer) => c.balance > 0).length,
-    totalCreditAmount: customers.reduce((sum: number, c: Customer) => sum + c.balance, 0)
+    total: customerMetrics[0]?.total ?? 0,
+    activeCredits: customerMetrics[0]?.activeCredits ?? 0,
+    totalCreditAmount: customerMetrics[0]?.totalCreditAmount ?? 0,
   };
+  const totalPages = Math.max(1, Math.ceil(stats.total / pageSize));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -183,7 +200,7 @@ export default function Customers() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
-              {filtered.map((customer: Customer) => {
+              {customersPage.map((customer: Customer) => {
                 const hasCredit = customer.balance > 0;
                 
                 // Aging Logic
@@ -266,13 +283,37 @@ export default function Customers() {
               })}
             </tbody>
           </table>
-          {filtered.length === 0 && (
+          {customersPage.length === 0 && (
             <div className="text-center py-20 text-muted-foreground italic">
               No customers found in the system.
             </div>
           )}
         </div>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            Showing page {page} of {totalPages} · {stats.total.toLocaleString()} customers
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page === 1}
+              className="px-4 py-2 rounded-xl border border-border bg-card text-xs font-black uppercase tracking-widest text-muted-foreground transition-all disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              disabled={page === totalPages}
+              className="px-4 py-2 rounded-xl border border-border bg-card text-xs font-black uppercase tracking-widest text-muted-foreground transition-all disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Add Modal */}
       {isAdding && (

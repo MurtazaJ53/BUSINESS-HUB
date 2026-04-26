@@ -221,10 +221,19 @@ class DatabaseSingleton {
         CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items(saleId);
         CREATE INDEX IF NOT EXISTS idx_sale_payments_sale_id ON sale_payments(saleId);
         CREATE INDEX IF NOT EXISTS idx_sales_date_created_at ON sales(date DESC, createdAt DESC);
+        CREATE INDEX IF NOT EXISTS idx_sales_tombstone_date_created_at ON sales(tombstone, date DESC, createdAt DESC);
         CREATE INDEX IF NOT EXISTS idx_sales_customer_id ON sales(customerId, date DESC);
         CREATE INDEX IF NOT EXISTS idx_sales_customer_name ON sales(customerName);
+        CREATE INDEX IF NOT EXISTS idx_sales_customer_phone ON sales(customerPhone);
+        CREATE INDEX IF NOT EXISTS idx_inventory_tombstone_name ON inventory(tombstone, name);
+        CREATE INDEX IF NOT EXISTS idx_inventory_category_name ON inventory(category, name);
+        CREATE INDEX IF NOT EXISTS idx_inventory_stock ON inventory(stock);
+        CREATE INDEX IF NOT EXISTS idx_expenses_tombstone_date_created_at ON expenses(tombstone, date DESC, createdAt DESC);
+        CREATE INDEX IF NOT EXISTS idx_customers_tombstone_name ON customers(tombstone, name);
         CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
+        CREATE INDEX IF NOT EXISTS idx_staff_tombstone_name ON staff(tombstone, name);
         CREATE INDEX IF NOT EXISTS idx_customer_payments_customer_id ON customer_payments(customerId, createdAt DESC);
+        CREATE INDEX IF NOT EXISTS idx_outbox_created_at ON outbox(createdAt ASC);
         CREATE INDEX IF NOT EXISTS idx_local_backups_created_at ON local_backups(createdAt DESC);
     `;
 

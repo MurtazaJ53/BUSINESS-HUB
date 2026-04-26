@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { 
+import {
   TrendingUp, 
   Plus, 
   Trash2, 
@@ -13,7 +13,8 @@ import {
   Wallet,
   PieChart
 } from 'lucide-react';
-import { useSqlQuery } from '@/db/hooks';
+import { useLiveQuery } from '@/db/hooks';
+import { expensesRepo } from '@/db/repositories/expensesRepo';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn } from '@/lib/utils';
 import type { Expense } from '@/lib/types';
@@ -32,10 +33,11 @@ const CATEGORIES = [
 
 export default function Expenses() {
   const { addExpense, deleteExpense } = useBusinessStore();
-  const expenses = useSqlQuery<Expense>('SELECT * FROM expenses WHERE tombstone = 0 ORDER BY date DESC', [], ['expenses']);
   const [isAdding, setIsAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [errorModal, setErrorModal] = useState({ show: false, title: '', message: '' });
+  const [page, setPage] = useState(1);
+  const pageSize = 100;
   
   const [formData, setFormData] = useState({
     amount: '',
@@ -79,15 +81,42 @@ export default function Expenses() {
     }
   };
 
-  const currentMonth = new Date().toISOString().split('-').slice(0, 2).join('-');
-  const monthTotal = expenses
-    .filter((e: Expense) => e.date.startsWith(currentMonth))
-    .reduce((sum: number, e: Expense) => sum + e.amount, 0);
+  const today = new Date().toISOString().split('T')[0];
+  const currentMonth = today.split('-').slice(0, 2).join('-');
+  const monthStart = `${currentMonth}-01`;
+
+  const expenseMetrics = useLiveQuery(
+    () => expensesRepo.getMetrics().then((metrics) => [{ ...metrics }]),
+    ['expenses'],
+    [],
+  );
+
+  const monthMetrics = useLiveQuery(
+    () => expensesRepo.getMetrics({ dateFrom: monthStart, dateTo: today }).then((metrics) => [{ ...metrics }]),
+    ['expenses'],
+    [monthStart, today],
+  );
+
+  const categoryTotalsData = useLiveQuery(
+    () => expensesRepo.getCategoryTotals(),
+    ['expenses'],
+    [],
+  );
+
+  const expensePage = useLiveQuery<Expense>(
+    () => expensesRepo.getPage({}, page, pageSize),
+    ['expenses'],
+    [page, pageSize],
+  );
+
+  const monthTotal = monthMetrics[0]?.totalAmount ?? 0;
 
   const categoryTotals = CATEGORIES.map(cat => ({
     ...cat,
-    total: expenses.filter((e: Expense) => e.category === cat.name).reduce((sum: number, e: Expense) => sum + e.amount, 0)
+    total: categoryTotalsData.find((entry) => entry.category === cat.name)?.total ?? 0,
   })).sort((a: any, b: any) => b.total - a.total);
+  const totalExpenseCount = expenseMetrics[0]?.totalCount ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalExpenseCount / pageSize));
 
   return (
     <div className="space-y-10 pb-20">
@@ -145,7 +174,7 @@ export default function Expenses() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
-              {expenses.length === 0 ? (
+              {expensePage.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-24 text-center">
                     <div className="flex flex-col items-center justify-center opacity-30">
@@ -155,9 +184,7 @@ export default function Expenses() {
                   </td>
                 </tr>
             ) : (
-              expenses
-                .sort((a: Expense, b: Expense) => b.date.localeCompare(a.date))
-                .map((exp: Expense) => {
+              expensePage.map((exp: Expense) => {
                   const CategoryIcon = CATEGORIES.find(c => c.name === exp.category)?.icon || MoreHorizontal;
                   return (
                     <tr key={exp.id} className="group hover:bg-red-500/[0.02] transition-colors">
@@ -199,6 +226,30 @@ export default function Expenses() {
           </table>
         </div>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            Showing page {page} of {totalPages} · {totalExpenseCount.toLocaleString()} expenses
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page === 1}
+              className="px-4 py-2 rounded-xl border border-border bg-card text-xs font-black uppercase tracking-widest text-muted-foreground transition-all disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              disabled={page === totalPages}
+              className="px-4 py-2 rounded-xl border border-border bg-card text-xs font-black uppercase tracking-widest text-muted-foreground transition-all disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Add Modal */}
       {isAdding && (

@@ -10,7 +10,8 @@ import { httpsCallable } from 'firebase/functions';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth, functions } from '@/lib/firebase';
 import { useLiveQuery, useSqlQuery } from '@/db/hooks';
-import { inventoryRepo } from '@/db/repositories/inventoryRepo';
+import { inventoryPrivateRepo, inventoryRepo } from '@/db/repositories/inventoryRepo';
+import { customersRepo } from '@/db/repositories/customersRepo';
 import { salesRepo } from '@/db/repositories/salesRepo';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { useAuthStore } from '@/lib/useAuthStore';
@@ -37,6 +38,7 @@ import {
   type BackupRecord,
   type BackupSettings,
 } from '@/lib/backup';
+import { logAuditEntry } from '@/lib/audit';
 
 const SectionHeader = ({ icon: Icon, title, subtitle }: { icon: any, title: string, subtitle?: string }) => (
   <div className="flex items-center gap-4 mb-6 animate-in fade-in slide-in-from-left-4">
@@ -59,10 +61,13 @@ export default function Settings() {
   const canViewInventoryCost = usePermission('inventory', 'view_cost') || role === 'admin';
   const canManageBackups = role === 'admin';
   
-  const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
-  const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
   const salesStats = useSqlQuery<{ total: number }>('SELECT COUNT(*) AS total FROM sales WHERE tombstone = 0', [], ['sales']);
-  const customers = useSqlQuery<Customer>('SELECT * FROM customers WHERE tombstone = 0 ORDER BY name ASC', [], ['customers']);
+  const inventoryStats = useSqlQuery<{ total: number; grossValue: number }>(
+    'SELECT COUNT(*) AS total, COALESCE(SUM(price * COALESCE(stock, 0)), 0) AS grossValue FROM inventory WHERE tombstone = 0',
+    [],
+    ['inventory'],
+  );
+  const customerStats = useSqlQuery<{ total: number }>('SELECT COUNT(*) AS total FROM customers WHERE tombstone = 0', [], ['customers']);
 
   const [toast, setToast] = useState('');
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
@@ -194,12 +199,30 @@ export default function Settings() {
 
   const handleInventoryCSV = () => {
     setExporting('inv-csv');
-    const csvData = inventory.map((i: InventoryItem) => {
-      const privateData = canViewInventoryCost ? inventoryPrivate.find((pi: any) => pi.id === i.id) : null;
-      return { Name: i.name, SKU: i.sku || 'N/A', Category: i.category, CostPrice: privateData?.costPrice || 0, SellPrice: i.price, Stock: i.stock ?? 0, AddedOn: i.createdAt };
-    });
-    downloadFile(convertToCSV(csvData), `Zarra_Inventory_Master_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
-    setTimeout(() => setExporting(null), 1000);
+    void (async () => {
+      try {
+        const [inventory, inventoryPrivate] = await Promise.all([
+          inventoryRepo.getAll(),
+          canViewInventoryCost ? inventoryPrivateRepo.getAll() : Promise.resolve([]),
+        ]);
+        const inventoryPrivateById = new Map(inventoryPrivate.map((entry: any) => [entry.id, entry]));
+        const csvData = inventory.map((item: InventoryItem) => {
+          const privateData = canViewInventoryCost ? inventoryPrivateById.get(item.id) : null;
+          return {
+            Name: item.name,
+            SKU: item.sku || 'N/A',
+            Category: item.category,
+            CostPrice: privateData?.costPrice || 0,
+            SellPrice: item.price,
+            Stock: item.stock ?? 0,
+            AddedOn: item.createdAt,
+          };
+        });
+        downloadFile(convertToCSV(csvData), `Zarra_Inventory_Master_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
+      } finally {
+        setTimeout(() => setExporting(null), 1000);
+      }
+    })();
   };
 
   const loadSalesExportData = async () => {
@@ -278,12 +301,13 @@ export default function Settings() {
         inventoryByName.set(key, existing);
       });
 
+      const customerRows = await customersRepo.getAll();
       const customersByPhone = new Map(
-        customers
+        customerRows
           .filter((customer) => customer.phone && customer.phone !== '-')
           .map((customer) => [customer.phone, customer] as const),
       );
-      const customersByName = new Map(customers.map((customer) => [normalizeKey(customer.name), customer] as const));
+      const customersByName = new Map(customerRows.map((customer) => [normalizeKey(customer.name), customer] as const));
 
       if (activeMigration.type === 'inventory') {
         for (const item of activeMigration.validItems) {
@@ -367,6 +391,22 @@ export default function Settings() {
 
         setMigrationStatus('Rebuilding customer totals from imported receipts...');
         await rebuildCustomerTotalsFromSales();
+      }
+
+      if (shopId && user?.uid) {
+        await logAuditEntry(
+          shopId,
+          user.uid,
+          user.email || 'unknown',
+          'BULK_IMPORT',
+          `${activeMigration.type} import completed`,
+          {
+            count,
+            provider: activeMigration.provider,
+            filesProcessed: activeMigration.filesProcessed,
+            importType: activeMigration.type,
+          },
+        );
       }
       showToast(`Migration complete: ${count} ${activeMigration.type}${count === 1 ? '' : 's'} imported.`);
     } catch (e: any) {
@@ -578,10 +618,10 @@ export default function Settings() {
         
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-8 mt-8 border-t border-border relative z-10">
           {[
-            { label: 'Total Assets', value: inventory.length },
+            { label: 'Total Assets', value: inventoryStats[0]?.total ?? 0 },
             { label: 'Transactions', value: salesStats[0]?.total ?? 0 },
-            { label: 'Client Base', value: customers.length },
-            { label: 'Gross Value', value: `₹${inventory.reduce((sum: number, i: InventoryItem) => sum + (i.price * (i.stock || 0)), 0).toLocaleString()}`, highlight: true },
+            { label: 'Client Base', value: customerStats[0]?.total ?? 0 },
+            { label: 'Gross Value', value: `₹${Math.round(inventoryStats[0]?.grossValue ?? 0).toLocaleString()}`, highlight: true },
             { label: 'Shift Duration', value: `${shop.standardWorkingHours || 9}H` }
           ].map((stat, i) => (
             <div key={i} className="bg-accent/50 p-4 rounded-2xl border border-border">
