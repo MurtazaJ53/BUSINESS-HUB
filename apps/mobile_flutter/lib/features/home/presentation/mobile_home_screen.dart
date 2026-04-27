@@ -1,66 +1,100 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 class MobileHomeScreen extends StatelessWidget {
   const MobileHomeScreen({super.key});
 
+  Future<Map<String, dynamic>> _loadSession() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return const {};
+
+    final token = await user.getIdTokenResult(true);
+    return {
+      'email': user.email ?? '',
+      'uid': user.uid,
+      'role': token.claims?['role']?.toString() ?? 'unknown',
+      'shopId': token.claims?['shopId']?.toString() ?? 'unassigned',
+    };
+  }
+
+  Future<void> _signOut(BuildContext context) async {
+    await FirebaseAuth.instance.signOut();
+    if (context.mounted) {
+      context.go('/');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Business Hub Mobile')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: const [
-          _HeroCard(),
-          SizedBox(height: 16),
-          _RouteCard(
-            title: 'Dashboard',
-            subtitle: 'Lightweight summary tiles backed by precomputed metrics.',
-            route: '/dashboard',
-          ),
-          SizedBox(height: 12),
-          _RouteCard(
-            title: 'Inventory',
-            subtitle: 'Paged catalog and virtualized lists for large stock sets.',
-            route: '/inventory',
-          ),
-          SizedBox(height: 12),
-          _RouteCard(
-            title: 'POS',
-            subtitle: 'Fast local-first cart and stock access with SQLite reads.',
-            route: '/pos',
+      appBar: AppBar(
+        title: const Text('Business Hub Mobile'),
+        actions: [
+          IconButton(
+            tooltip: 'Sign out',
+            onPressed: () => _signOut(context),
+            icon: const Icon(Icons.logout),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _HeroCard extends StatelessWidget {
-  const _HeroCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Flutter mobile rewrite',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
+      body: FutureBuilder<Map<String, dynamic>>(
+        future: _loadSession(),
+        builder: (context, snapshot) {
+          final session = snapshot.data ?? const <String, dynamic>{};
+          return ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Flutter mobile beta',
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Signed in as ${session['email'] ?? 'Unknown'}',
+                      ),
+                      const SizedBox(height: 8),
+                      Text('Role: ${session['role'] ?? 'unknown'}'),
+                      const SizedBox(height: 4),
+                      Text('Shop: ${session['shopId'] ?? 'unassigned'}'),
+                      const SizedBox(height: 4),
+                      Text('UID: ${session['uid'] ?? 'n/a'}'),
+                    ],
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'This app is being rebuilt for smoother Android performance with local SQLite, background sync, and mobile-first rendering.',
-              style: theme.textTheme.bodyMedium,
-            ),
-          ],
-        ),
+              const SizedBox(height: 16),
+              const _RouteCard(
+                title: 'Dashboard',
+                subtitle:
+                    'Mobile-first summary surface. Native KPI flow lands here next.',
+                route: '/dashboard',
+              ),
+              const SizedBox(height: 12),
+              const _RouteCard(
+                title: 'Inventory',
+                subtitle:
+                    'Paged inventory browsing will replace full catalog loading.',
+                route: '/inventory',
+              ),
+              const SizedBox(height: 12),
+              const _RouteCard(
+                title: 'POS',
+                subtitle:
+                    'The first major native performance win will be the new POS.',
+                route: '/pos',
+              ),
+            ],
+          );
+        },
       ),
     );
   }
