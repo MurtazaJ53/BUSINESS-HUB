@@ -361,6 +361,74 @@ export const inventoryRepo = {
     return rows[0] ? mapInventoryRows([rows[0]])[0] : null;
   },
 
+  async getByIds(ids: string[], includeCost: boolean = false): Promise<InventoryPageRow[]> {
+    if (!ids.length) return [];
+
+    const placeholders = ids.map(() => '?').join(',');
+    const rows = await Database.query<Record<string, unknown>>(
+      includeCost
+        ? `SELECT i.id, i.name, i.price, i.sku, i.category, i.subcategory, i.size, i.description,
+                  i.stock, i.sourceMeta, i.createdAt, ip.costPrice
+           FROM inventory i
+           LEFT JOIN inventory_private ip ON ip.id = i.id AND ip.tombstone = 0
+           WHERE i.tombstone = 0 AND i.id IN (${placeholders});`
+        : `SELECT id, name, price, sku, category, subcategory, size, description, stock, sourceMeta, createdAt
+           FROM inventory
+           WHERE tombstone = 0 AND id IN (${placeholders});`,
+      ids,
+    );
+    return mapInventoryRows(rows);
+  },
+
+  async findBySkuOrId(identifier: string, includeCost: boolean = false): Promise<InventoryPageRow | null> {
+    const value = identifier.trim();
+    if (!value) return null;
+
+    const rows = await Database.query<Record<string, unknown>>(
+      includeCost
+        ? `SELECT i.id, i.name, i.price, i.sku, i.category, i.subcategory, i.size, i.description,
+                  i.stock, i.sourceMeta, i.createdAt, ip.costPrice
+           FROM inventory i
+           LEFT JOIN inventory_private ip ON ip.id = i.id AND ip.tombstone = 0
+           WHERE i.tombstone = 0
+             AND (i.id = ? OR COALESCE(i.sku, '') = ?)
+           ORDER BY CASE WHEN COALESCE(i.sku, '') = ? THEN 0 ELSE 1 END
+           LIMIT 1;`
+        : `SELECT i.id, i.name, i.price, i.sku, i.category, i.subcategory, i.size, i.description,
+                  i.stock, i.sourceMeta, i.createdAt
+           FROM inventory i
+           WHERE i.tombstone = 0
+             AND (i.id = ? OR COALESCE(i.sku, '') = ?)
+           ORDER BY CASE WHEN COALESCE(i.sku, '') = ? THEN 0 ELSE 1 END
+           LIMIT 1;`,
+      [value, value, value],
+    );
+
+    return rows[0] ? mapInventoryRows([rows[0]])[0] : null;
+  },
+
+  async getLatestPage(limit: number = 10, includeCost: boolean = false): Promise<InventoryPageRow[]> {
+    const safeLimit = Math.max(1, Math.min(limit, 100));
+    const rows = await Database.query<Record<string, unknown>>(
+      includeCost
+        ? `SELECT i.id, i.name, i.price, i.sku, i.category, i.subcategory, i.size, i.description,
+                  i.stock, i.sourceMeta, i.createdAt, ip.costPrice
+           FROM inventory i
+           LEFT JOIN inventory_private ip ON ip.id = i.id AND ip.tombstone = 0
+           WHERE i.tombstone = 0
+           ORDER BY i.createdAt DESC, i.name ASC
+           LIMIT ?;`
+        : `SELECT i.id, i.name, i.price, i.sku, i.category, i.subcategory, i.size, i.description,
+                  i.stock, i.sourceMeta, i.createdAt
+           FROM inventory i
+           WHERE i.tombstone = 0
+           ORDER BY i.createdAt DESC, i.name ASC
+           LIMIT ?;`,
+      [safeLimit],
+    );
+    return mapInventoryRows(rows);
+  },
+
   async upsert(item: InventoryItem): Promise<void> {
     const ts = now();
     const createdAt = typeof item.createdAt === 'string' ? new Date(item.createdAt).getTime() : (item.createdAt || ts);
