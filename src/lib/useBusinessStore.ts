@@ -270,15 +270,29 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
         }
       });
 
-    const inviteQuery = query(
-      collection(db, `shops/${shopId}/invitations`),
-      orderBy('createdAt', 'desc')
-    );
+    let unsubInv = () => {};
+    if (effectiveRole === 'admin') {
+      const inviteQuery = query(
+        collection(db, `shops/${shopId}/invitations`),
+        orderBy('createdAt', 'desc')
+      );
 
-    const unsubInv = onSnapshot(inviteQuery, (snap) => {
-      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Invitation));
-      set({ invitations: docs });
-    });
+      unsubInv = onSnapshot(
+        inviteQuery,
+        (snap) => {
+          const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Invitation));
+          set({ invitations: docs });
+        },
+        (error) => {
+          console.warn('[Invitations] Snapshot disabled:', error);
+          if (isActive && get().shopId === shopId) {
+            set({ invitations: [] });
+          }
+        },
+      );
+    } else {
+      set({ invitations: [] });
+    }
 
     return () => { 
       isActive = false;
