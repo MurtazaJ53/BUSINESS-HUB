@@ -5,10 +5,4 @@
 .pub/
 .pub-cache/
 build/
-android/
-ios/
-linux/
-macos/
-windows/
-web/
 coverage/
