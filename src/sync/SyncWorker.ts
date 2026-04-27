@@ -72,6 +72,35 @@ class SyncWorkerEngine {
     return Date.now();
   }
 
+  private async handleAuthState(shopId: string | null, role: AppRole) {
+    if (shopId && role && (shopId !== this.currentShopId || role !== this.currentRole)) {
+      this.currentShopId = shopId;
+      this.currentRole = role;
+      this.setStatus(this.isOnline ? 'syncing' : 'offline');
+
+      await this.startPull(shopId, role);
+
+      if (this.pushIntervalId) clearInterval(this.pushIntervalId);
+      this.pushIntervalId = setInterval(async () => {
+        if (this.isOnline && this.currentShopId) await this.drainQueue(this.currentShopId);
+      }, CONFIG.PUSH_INTERVAL_MS);
+
+      if (this.isOnline) {
+        await this.drainQueue(shopId);
+        this.setStatus('idle');
+      }
+      return;
+    }
+
+    if (!shopId && this.currentShopId) {
+      this.currentShopId = null;
+      this.currentRole = null;
+      if (this.pushIntervalId) clearInterval(this.pushIntervalId);
+      this.pushIntervalId = null;
+      this.stop();
+    }
+  }
+
   // ─── LIFECYCLE ────────────────────────────────────────────
 
   async start() {
@@ -104,33 +133,13 @@ class SyncWorkerEngine {
 
     // 2. Auth State Reactor
     const unsubAuth = useAuthStore.subscribe(async (state) => {
-      if (state.shopId && state.role && (state.shopId !== this.currentShopId || state.role !== this.currentRole)) {
-        this.currentShopId = state.shopId;
-        this.currentRole = state.role;
-        this.setStatus(this.isOnline ? 'syncing' : 'offline');
-        
-        await this.startPull(state.shopId, state.role);
-        
-        if (this.pushIntervalId) clearInterval(this.pushIntervalId);
-        this.pushIntervalId = setInterval(async () => {
-          if (this.isOnline && this.currentShopId) await this.drainQueue(this.currentShopId);
-        }, CONFIG.PUSH_INTERVAL_MS);
-
-        if (this.isOnline) {
-          await this.drainQueue(state.shopId);
-          this.setStatus('idle');
-        }
-      } else if (!state.shopId && this.currentShopId) {
-        // Logout sequence
-        this.currentShopId = null;
-        this.currentRole = null;
-        if (this.pushIntervalId) clearInterval(this.pushIntervalId);
-        this.pushIntervalId = null;
-        this.stop(); 
-      }
+      await this.handleAuthState(state.shopId, state.role);
     });
 
     this.unsubscribers.push(unsubAuth);
+
+    const currentAuth = useAuthStore.getState();
+    await this.handleAuthState(currentAuth.shopId, currentAuth.role);
   }
 
   stop() {

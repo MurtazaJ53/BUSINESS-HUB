@@ -84,6 +84,7 @@ const enqueueSyncMany = async (
       createdAt: ts + index,
     })),
   );
+  void SyncWorker.requestFlush();
 };
 
 const getInventoryDeltaForSaleItem = (item: SaleItem): number => {
