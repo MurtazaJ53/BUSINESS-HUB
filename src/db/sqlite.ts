@@ -56,6 +56,22 @@ async function purgeCachedWasmAssets(): Promise<void> {
   }));
 }
 
+export async function clearWebRuntimeCaches(): Promise<void> {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  if ('serviceWorker' in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.unregister().catch(() => false)));
+  }
+
+  if ('caches' in window) {
+    const cacheNames = await caches.keys();
+    await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName).catch(() => false)));
+  }
+}
+
 async function idbSave(data: Uint8Array): Promise<void> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(IDB_NAME, 1);
@@ -168,6 +184,7 @@ class DatabaseSingleton {
         if (!recoveredAt || Date.now() - recoveredAt > 30000) {
           sessionStorage.setItem(WASM_BOOT_RECOVERY_KEY, String(Date.now()));
           await purgeCachedWasmAssets();
+          await clearWebRuntimeCaches();
           window.location.reload();
           return new Promise(() => {});
         }
@@ -451,6 +468,8 @@ class DatabaseSingleton {
       } catch (e) { console.error('Reset failed:', e); }
     } else {
       localStorage.clear();
+      sessionStorage.clear();
+      await clearWebRuntimeCaches();
       const req = indexedDB.deleteDatabase(IDB_NAME);
       await new Promise(r => req.onsuccess = r);
     }

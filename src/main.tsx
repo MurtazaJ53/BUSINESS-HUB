@@ -3,11 +3,13 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App.tsx'
 import './index.css'
-import { Database } from './db/sqlite'
+import { Database, clearWebRuntimeCaches } from './db/sqlite'
 import { ShieldAlert } from 'lucide-react'
 import AppPopupHost from './components/AppPopupHost'
 
 const CHUNK_RECOVERY_KEY = 'hub_chunk_recovery_at';
+const WEB_RUNTIME_RESET_KEY = 'hub_web_runtime_reset_version';
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || 'dev';
 
 const isChunkLoadError = (error: unknown): boolean => {
   const message = error instanceof Error ? error.message : String(error || '');
@@ -54,6 +56,35 @@ if (typeof window !== 'undefined') {
     }
   });
 }
+
+const maybeResetLegacyWebRuntime = async (): Promise<void> => {
+  if (typeof window === 'undefined' || (!('serviceWorker' in navigator) && !('caches' in window))) {
+    return;
+  }
+
+  const lastResetVersion = localStorage.getItem(WEB_RUNTIME_RESET_KEY);
+  if (lastResetVersion === APP_VERSION) {
+    return;
+  }
+
+  let hasLegacyRuntimeState = false;
+
+  if ('serviceWorker' in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    hasLegacyRuntimeState = registrations.length > 0;
+  }
+
+  if (!hasLegacyRuntimeState && 'caches' in window) {
+    const cacheNames = await caches.keys();
+    hasLegacyRuntimeState = cacheNames.length > 0;
+  }
+
+  if (hasLegacyRuntimeState) {
+    await clearWebRuntimeCaches();
+  }
+
+  localStorage.setItem(WEB_RUNTIME_RESET_KEY, APP_VERSION);
+};
 
 // Professional "Rescue UI" - Prevents White Screen of Death
 class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: any, recovering: boolean}> {
@@ -165,13 +196,25 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
   }
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <BrowserRouter>
-        <AppPopupHost />
-        <App />
-      </BrowserRouter>
-    </ErrorBoundary>
-  </React.StrictMode>,
-)
+const renderApp = () => {
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <BrowserRouter>
+          <AppPopupHost />
+          <App />
+        </BrowserRouter>
+      </ErrorBoundary>
+    </React.StrictMode>,
+  );
+};
+
+void (async () => {
+  try {
+    await maybeResetLegacyWebRuntime();
+  } catch (error) {
+    console.warn('[Web Runtime] Legacy cache cleanup skipped:', error);
+  } finally {
+    renderApp();
+  }
+})();
