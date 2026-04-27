@@ -91,7 +91,18 @@ export default function AppLayout() {
 
   // 📊 Local Database Queries
   const sales = useSqlQuery<Sale>('SELECT * FROM sales WHERE tombstone = 0 AND date = ?', [new Date().toISOString().split('T')[0]], ['sales']);
-  const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 AND stock <= 5 ORDER BY name ASC', [], ['inventory']);
+  const criticalStockItems = useSqlQuery<InventoryItem>(
+    'SELECT * FROM inventory WHERE tombstone = 0 AND stock <= 5 ORDER BY stock ASC, name ASC LIMIT 12',
+    [],
+    ['inventory']
+  );
+  const criticalStockCountRows = useSqlQuery<{ total: number }>(
+    'SELECT COUNT(*) as total FROM inventory WHERE tombstone = 0 AND stock <= 5',
+    [],
+    ['inventory']
+  );
+  const criticalStockCount = Number(criticalStockCountRows[0]?.total ?? 0);
+  const hasMoreCriticalStock = criticalStockCount > criticalStockItems.length;
   
   const todayRevenue = sales.reduce((sum, s) => sum + s.total, 0);
 
@@ -146,7 +157,11 @@ export default function AppLayout() {
     return () => { document.body.style.overflow = ''; document.body.style.touchAction = ''; };
   }, [sidebarOpen]);
 
-  useEffect(() => setSidebarOpen(false), [location.pathname, setSidebarOpen]);
+  useEffect(() => {
+    setSidebarOpen(false);
+    setNotifOpen(false);
+    setProfileOpen(false);
+  }, [location.pathname, setSidebarOpen]);
 
   // --- 🛡️ OFFLINE-FIRST ADMIN HEALING ---
   useEffect(() => {
@@ -407,33 +422,76 @@ export default function AppLayout() {
 
             {/* Notification Node */}
             <div className="relative" ref={notifRef}>
-              <button onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); }} className={cn("relative p-2.5 rounded-xl transition-all border border-transparent", notifOpen ? "bg-primary/10 text-primary border-primary/20" : "bg-accent hover:bg-accent text-muted-foreground border-border")}>
+              <button
+                type="button"
+                onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); }}
+                className={cn("relative p-2.5 rounded-xl transition-all border border-transparent", notifOpen ? "bg-primary/10 text-primary border-primary/20" : "bg-accent hover:bg-accent text-muted-foreground border-border")}
+              >
                 <Bell className={cn("h-4 w-4", notifOpen && "animate-pulse")} />
-                {inventory.length > 0 && <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-4 ring-background" />}
+                {criticalStockCount > 0 && <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-4 ring-background" />}
               </button>
 
               {notifOpen && (
-                <div className="absolute right-0 mt-3 w-80 bg-card rounded-[1.5rem] p-5 shadow-2xl animate-in zoom-in-95 duration-200 z-[100] border border-border">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">System Alerts</h3>
-                    <span className="text-[9px] font-black bg-red-500/10 text-red-500 px-2 py-0.5 rounded-full">{inventory.length} Critical</span>
-                  </div>
-                  <div className="space-y-2 max-h-[300px] overflow-y-auto no-scrollbar">
-                    {inventory.length === 0 ? (
-                      <p className="text-xs text-muted-foreground text-center py-6 font-medium">All telemetry nominal.</p>
-                    ) : (
-                      inventory.map(item => (
-                        <button key={item.id} onClick={() => { navigate('/inventory'); setNotifOpen(false); }} className="w-full flex items-center gap-3 p-3 rounded-xl bg-accent hover:bg-accent border border-border transition-all text-left">
-                          <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-foreground truncate">{item.name}</p>
-                            <p className="text-[10px] text-red-400/80 font-medium">Stock Depleted: {item.stock}</p>
+                <>
+                  <button
+                    type="button"
+                    aria-label="Dismiss notifications"
+                    className="fixed inset-0 z-[95] bg-background/70 backdrop-blur-sm md:hidden"
+                    onClick={() => setNotifOpen(false)}
+                  />
+                  <div className="fixed inset-x-4 top-24 bottom-4 z-[100] md:absolute md:inset-x-auto md:top-full md:bottom-auto md:right-0 md:mt-3 md:w-80">
+                    <div className="flex h-full flex-col overflow-hidden rounded-[1.5rem] border border-border bg-card p-5 shadow-2xl animate-in zoom-in-95 duration-200 md:h-auto">
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">System Alerts</h3>
+                        <span className="whitespace-nowrap rounded-full bg-red-500/10 px-2 py-0.5 text-[9px] font-black text-red-500">
+                          {criticalStockCount} Critical
+                        </span>
+                      </div>
+
+                      <div className="flex-1 space-y-2 overflow-y-auto no-scrollbar md:max-h-[300px]">
+                        {criticalStockCount === 0 ? (
+                          <p className="py-6 text-center text-xs font-medium text-muted-foreground">All telemetry nominal.</p>
+                        ) : (
+                          criticalStockItems.map(item => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => { navigate('/stock-alerts'); setNotifOpen(false); }}
+                              className="w-full rounded-xl border border-border bg-accent p-3 text-left transition-all hover:bg-accent"
+                            >
+                              <div className="flex items-center gap-3">
+                                <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+                                <div className="min-w-0">
+                                  <p className="truncate text-xs font-bold text-foreground">{item.name}</p>
+                                  <p className="text-[10px] font-medium text-red-400/80">Stock Remaining: {item.stock}</p>
+                                </div>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+
+                      {criticalStockCount > 0 && (
+                        <div className="mt-4 border-t border-border/80 pt-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                              {hasMoreCriticalStock
+                                ? `Showing ${criticalStockItems.length} of ${criticalStockCount}`
+                                : `${criticalStockCount} active alert${criticalStockCount === 1 ? '' : 's'}`}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => { navigate('/stock-alerts'); setNotifOpen(false); }}
+                              className="rounded-xl border border-primary/20 bg-primary/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-primary transition-all hover:bg-primary/15"
+                            >
+                              Open Alerts
+                            </button>
                           </div>
-                        </button>
-                      ))
-                    )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                </>
               )}
             </div>
 

@@ -7,7 +7,6 @@ import {
 import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 import { useLiveQuery, useSqlQuery } from '@/db/hooks';
 import { customersRepo } from '@/db/repositories/customersRepo';
-import { verifyAdminPin } from '@/lib/admin';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn, isValidIndianPhone, sanitizePhone } from '@/lib/utils';
 import ReceiptModal from '@/components/ReceiptModal';
@@ -20,7 +19,7 @@ type PayMode = 'CASH' | 'UPI' | 'CARD' | 'CREDIT' | 'ONLINE' | 'OTHERS';
 const PAY_MODES: PayMode[] = ['CASH', 'UPI', 'CARD', 'CREDIT', 'ONLINE', 'OTHERS'];
 
 export default function POS() {
-  const { addSale, shop, role, currentStaff, shopId } = useBusinessStore();
+  const { addSale, shop, role, currentStaff } = useBusinessStore();
   
   const canViewCost = usePermission('inventory', 'view_cost');
   const canOverridePrice = usePermission('sales', 'override_price');
@@ -52,8 +51,6 @@ export default function POS() {
   const [errorModal, setErrorModal] = useState({ show: false, title: '', message: '' });
   const [terminalStep, setTerminalStep] = useState<'catalog' | 'checkout'>('catalog');
   const [toast, setToast] = useState('');
-  const [pinInput, setPinInput] = useState('');
-  const [showPinField, setShowPinField] = useState(false);
 
   // ─── Drill-down / Navigation State ──────────────────────────────────────
   const [drillDepth, setDrillDepth] = useState<0 | 1 | 2>(0);
@@ -368,26 +365,7 @@ export default function POS() {
       }
     }
 
-    // PIN Verification for Force Sale
-    if (force) {
-      if (!shopId) {
-        setToast('Workspace unavailable');
-        setIsProcessing(false);
-        return;
-      }
-
-      try {
-        await verifyAdminPin(pinInput, shopId);
-      } catch (error: any) {
-        setToast(error?.message || 'Invalid Manager PIN');
-        setIsProcessing(false);
-        return;
-      }
-    }
-
     setStockWarningItems([]);
-    setPinInput('');
-    setShowPinField(false);
 
     const total = calcTotal();
     const discountAmount = subTotal() - total;
@@ -1200,7 +1178,7 @@ export default function POS() {
 
       {stockWarningItems.length > 0 && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 overflow-y-auto">
-          <div className="absolute inset-0 bg-background/80 backdrop-blur-xl" onClick={() => { setStockWarningItems([]); setShowPinField(false); setPinInput(''); }} />
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-xl" onClick={() => setStockWarningItems([])} />
           <div className="relative z-10 w-full max-w-md bg-card rounded-[2.5rem] p-8 border border-destructive/20 shadow-2xl animate-in zoom-in-95 duration-300">
             <div className="flex items-center gap-4 text-destructive mb-8">
               <div className="h-14 w-14 rounded-3xl bg-destructive/10 flex items-center justify-center">
@@ -1232,51 +1210,27 @@ export default function POS() {
               })}
             </div>
 
-            {!showPinField ? (
-              <div className="grid grid-cols-2 gap-4">
-                <button 
-                  onClick={() => { setStockWarningItems([]); setPinInput(''); }} 
-                  className="py-4 rounded-2xl font-black text-xs uppercase tracking-widest border border-border/50 hover:bg-accent transition-all active:scale-95"
-                >
-                  Go back
-                </button>
-                <button 
-                  onClick={() => setShowPinField(true)} 
-                  className="py-4 rounded-2xl font-black text-xs uppercase tracking-widest premium-gradient text-white shadow-xl shadow-primary/20 hover:-translate-y-1 active:scale-95 transition-all"
-                >
-                  Force Sale
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4 animate-in slide-in-from-bottom-5">
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-muted-foreground opacity-50">PIN</span>
-                  <input
-                    type="password"
-                    placeholder="Enter Manager PIN"
-                    autoFocus
-                    value={pinInput}
-                    onChange={(e) => setPinInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleCheckout(true)}
-                    className="w-full pl-12 pr-4 py-4 bg-accent/40 border-2 border-primary/20 rounded-2xl text-sm font-black outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all text-center tracking-[1em]"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <button 
-                    onClick={() => setShowPinField(false)} 
-                    className="py-4 rounded-2xl font-black text-xs uppercase tracking-widest border border-border/50 hover:bg-accent transition-all"
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    onClick={() => handleCheckout(true)} 
-                    className="py-4 rounded-2xl font-black text-xs uppercase tracking-widest premium-gradient text-white shadow-lg shadow-primary/20 hover:-translate-y-1 transition-all"
-                  >
-                    Authorize Sale
-                  </button>
-                </div>
-              </div>
-            )}
+            <div className="mb-6 rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Force Sale Override</p>
+              <p className="mt-2 text-xs font-medium text-muted-foreground">
+                This override now works without a PIN. Continue only if you want to save the sale with negative stock.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={() => setStockWarningItems([])}
+                className="py-4 rounded-2xl font-black text-xs uppercase tracking-widest border border-border/50 hover:bg-accent transition-all active:scale-95"
+              >
+                Go back
+              </button>
+              <button
+                onClick={() => handleCheckout(true)}
+                className="py-4 rounded-2xl font-black text-xs uppercase tracking-widest premium-gradient text-white shadow-xl shadow-primary/20 hover:-translate-y-1 active:scale-95 transition-all"
+              >
+                Force Sale Anyway
+              </button>
+            </div>
           </div>
         </div>
       )}
