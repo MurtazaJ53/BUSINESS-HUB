@@ -58,6 +58,35 @@ const chunkSizeByImportType: Record<ImportFlowType, number> = {
   sale: 10,
 };
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> => (
+  typeof value === 'object'
+  && value !== null
+  && Object.getPrototypeOf(value) === Object.prototype
+);
+
+export const sanitizeFirestoreValue = <T>(value: T): T => {
+  if (value === undefined) {
+    return undefined as T;
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => sanitizeFirestoreValue(entry))
+      .filter((entry) => entry !== undefined) as T;
+  }
+
+  if (isPlainObject(value)) {
+    const sanitizedEntries = Object.entries(value).flatMap(([key, entry]) => {
+      const sanitized = sanitizeFirestoreValue(entry);
+      return sanitized === undefined ? [] : [[key, sanitized] as const];
+    });
+
+    return Object.fromEntries(sanitizedEntries) as T;
+  }
+
+  return value;
+};
+
 export async function enqueueImportRun(options: {
   shopId: string;
   userId: string;
@@ -70,7 +99,8 @@ export async function enqueueImportRun(options: {
   const { shopId, userId, userEmail, type, provider, filesProcessed, items } = options;
   const importRef = doc(collection(db, 'shops', shopId, 'imports'));
   const importId = importRef.id;
-  const chunks = chunk(items, chunkSizeByImportType[type]);
+  const sanitizedItems = sanitizeFirestoreValue(items);
+  const chunks = chunk(sanitizedItems, chunkSizeByImportType[type]);
   const totalJobs = chunks.length;
 
   await setDoc(importRef, {
@@ -78,7 +108,7 @@ export async function enqueueImportRun(options: {
     status: 'queued',
     provider,
     filesProcessed,
-    totalItems: items.length,
+    totalItems: sanitizedItems.length,
     totalJobs,
     dataJobCount: totalJobs,
     completedJobs: 0,
@@ -92,7 +122,7 @@ export async function enqueueImportRun(options: {
     updatedAt: serverTimestamp(),
   }, { merge: true });
 
-  await Promise.all(
+  const jobResults = await Promise.allSettled(
     chunks.map((records, index) => addDoc(collection(db, 'shops', shopId, 'jobs'), {
       type: jobTypeByImportType[type],
       status: 'queued',
@@ -106,11 +136,28 @@ export async function enqueueImportRun(options: {
       createdByEmail: userEmail || 'unknown',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      payload: type === 'sale'
+      payload: sanitizeFirestoreValue(type === 'sale'
         ? { sales: records }
-        : { items: records },
+        : { items: records }),
     })),
   );
+
+  const failedJobWrites = jobResults.filter((result) => result.status === 'rejected');
+  if (failedJobWrites.length > 0) {
+    const primaryError = failedJobWrites[0].reason instanceof Error
+      ? failedJobWrites[0].reason
+      : new Error(String(failedJobWrites[0].reason));
+
+    await setDoc(importRef, {
+      status: 'failed',
+      failedJobs: failedJobWrites.length,
+      errorSummary: primaryError.message,
+      finishedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+
+    throw primaryError;
+  }
 
   return { importId, totalJobs };
 }

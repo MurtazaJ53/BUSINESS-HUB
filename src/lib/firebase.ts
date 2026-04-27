@@ -57,7 +57,9 @@ if (typeof window !== 'undefined' && import.meta.env.PROD) {
 
 // 4. Core Service Initialization
 export const auth = getAuth(app);
-export const db = initializeFirestore(app, {});
+export const db = initializeFirestore(app, {
+  ignoreUndefinedProperties: true,
+});
 export const storage = getStorage(app);
 
 // 5. Regional Optimization
