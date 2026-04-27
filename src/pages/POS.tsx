@@ -1,11 +1,16 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import {
   Plus, Minus, Trash2, ShoppingCart, Search, Check,
   Printer, RotateCcw, Package, User, Phone, Percent, AlertCircle, AlertTriangle, Calendar,
   ArrowRight, CheckCircle2, Sparkles, PlusCircle, X, Database, Scan
 } from 'lucide-react';
 import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
-import { useLiveQuery, useSqlQuery } from '@/db/hooks';
+import { useLiveQuery } from '@/db/hooks';
+import {
+  inventoryRepo,
+  type InventoryCategorySummary,
+  type InventoryProductSummary,
+} from '@/db/repositories/inventoryRepo';
 import { customersRepo } from '@/db/repositories/customersRepo';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { formatCurrency, cn, isValidIndianPhone, sanitizePhone } from '@/lib/utils';
@@ -15,6 +20,7 @@ import type { Sale, Customer, SaleItem, InventoryItem } from '@/lib/types';
 import { usePermission } from '@/hooks/usePermission';
 
 type PayMode = 'CASH' | 'UPI' | 'CARD' | 'CREDIT' | 'ONLINE' | 'OTHERS';
+type PosInventoryItem = InventoryItem & { costPrice?: number };
 
 const PAY_MODES: PayMode[] = ['CASH', 'UPI', 'CARD', 'CREDIT', 'ONLINE', 'OTHERS'];
 
@@ -25,13 +31,9 @@ export default function POS() {
   const canOverridePrice = usePermission('sales', 'override_price');
   const maxDiscount = canOverridePrice === true ? Infinity : (canOverridePrice ? (canOverridePrice as any).max : 0);
 
-  const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
-  const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
-
   const [cart, setCart] = useState<SaleItem[]>([]);
   const [search, setSearch] = useState('');
   const [localSearch, setLocalSearch] = useState('');
-  const [category, setCategory] = useState('All');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
@@ -51,6 +53,10 @@ export default function POS() {
   const [errorModal, setErrorModal] = useState({ show: false, title: '', message: '' });
   const [terminalStep, setTerminalStep] = useState<'catalog' | 'checkout'>('catalog');
   const [toast, setToast] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 48;
+  const deferredSearch = useDeferredValue(search.trim());
+  const deferredLocalSearch = useDeferredValue(localSearch.trim());
 
   // ─── Drill-down / Navigation State ──────────────────────────────────────
   const [drillDepth, setDrillDepth] = useState<0 | 1 | 2>(0);
@@ -78,6 +84,8 @@ export default function POS() {
     setDrillDepth(depth);
     setActiveCategory(cat);
     setActiveProductName(prod);
+    setLocalSearch('');
+    setPage(1);
     window.history.pushState({ depth, category: cat, product: prod }, '');
   };
 
@@ -125,103 +133,103 @@ export default function POS() {
     }
   }, [shop.footer]);
 
-  const inventoryPrivateById = useMemo(
-    () => new Map(inventoryPrivate.map((entry: any) => [entry.id, entry])),
-    [inventoryPrivate],
+  useEffect(() => {
+    setPage(1);
+  }, [deferredSearch, deferredLocalSearch, drillDepth, activeCategory, activeProductName]);
+
+  const categoryPage = useLiveQuery<InventoryCategorySummary>(
+    () => (!deferredSearch && drillDepth === 0
+      ? inventoryRepo.getCategoryPage(deferredLocalSearch, page, pageSize)
+      : Promise.resolve([])),
+    ['inventory'],
+    [deferredSearch, deferredLocalSearch, drillDepth, page, pageSize],
+  );
+
+  const categoryCount = useLiveQuery<{ total: number }>(
+    () => (!deferredSearch && drillDepth === 0
+      ? inventoryRepo.getCategoryCount(deferredLocalSearch).then((total) => [{ total }])
+      : Promise.resolve([{ total: 0 }])),
+    ['inventory'],
+    [deferredSearch, deferredLocalSearch, drillDepth],
+  );
+
+  const productPage = useLiveQuery<InventoryProductSummary>(
+    () => (!deferredSearch && drillDepth === 1 && activeCategory
+      ? inventoryRepo.getProductPage(activeCategory, deferredLocalSearch, page, pageSize, Boolean(canViewCost))
+      : Promise.resolve([])),
+    ['inventory', 'inventory_private'],
+    [deferredSearch, deferredLocalSearch, drillDepth, activeCategory || '', page, pageSize, Boolean(canViewCost)],
+  );
+
+  const productCount = useLiveQuery<{ total: number }>(
+    () => (!deferredSearch && drillDepth === 1 && activeCategory
+      ? inventoryRepo.getProductCount(activeCategory, deferredLocalSearch).then((total) => [{ total }])
+      : Promise.resolve([{ total: 0 }])),
+    ['inventory'],
+    [deferredSearch, deferredLocalSearch, drillDepth, activeCategory || ''],
+  );
+
+  const variantPage = useLiveQuery<PosInventoryItem>(
+    () => (!deferredSearch && drillDepth === 2 && activeCategory && activeProductName
+      ? inventoryRepo.getVariantPage(activeCategory, activeProductName, deferredLocalSearch, page, pageSize, Boolean(canViewCost))
+      : Promise.resolve([])),
+    ['inventory', 'inventory_private'],
+    [deferredSearch, deferredLocalSearch, drillDepth, activeCategory || '', activeProductName || '', page, pageSize, Boolean(canViewCost)],
+  );
+
+  const variantCount = useLiveQuery<{ total: number }>(
+    () => (!deferredSearch && drillDepth === 2 && activeCategory && activeProductName
+      ? inventoryRepo.getVariantCount(activeCategory, activeProductName, deferredLocalSearch).then((total) => [{ total }])
+      : Promise.resolve([{ total: 0 }])),
+    ['inventory'],
+    [deferredSearch, deferredLocalSearch, drillDepth, activeCategory || '', activeProductName || ''],
+  );
+
+  const searchResults = useLiveQuery<PosInventoryItem>(
+    () => (deferredSearch
+      ? inventoryRepo.searchPage(deferredSearch, page, pageSize, Boolean(canViewCost))
+      : Promise.resolve([])),
+    ['inventory', 'inventory_private'],
+    [deferredSearch, page, pageSize, Boolean(canViewCost)],
+  );
+
+  const searchCount = useLiveQuery<{ total: number }>(
+    () => (deferredSearch
+      ? inventoryRepo.searchCount(deferredSearch).then((total) => [{ total }])
+      : Promise.resolve([{ total: 0 }])),
+    ['inventory'],
+    [deferredSearch],
+  );
+
+  const cartInventoryRows = useLiveQuery<InventoryItem>(
+    () => {
+      const ids = Array.from(
+        new Set(
+          cart
+            .filter((item) => !item.itemId.startsWith('custom-'))
+            .map((item) => item.itemId),
+        ),
+      );
+      return ids.length ? inventoryRepo.getByIds(ids) : Promise.resolve([]);
+    },
+    ['inventory'],
+    [cart.map((item) => item.itemId).join('|')],
   );
 
   const inventoryById = useMemo(
-    () => new Map(inventory.map((item) => [item.id, item])),
-    [inventory],
+    () => new Map(cartInventoryRows.map((item) => [item.id, item])),
+    [cartInventoryRows],
   );
 
-  const inventoryBySku = useMemo(() => {
-    const map = new Map<string, InventoryItem>();
-    inventory.forEach((item) => {
-      if (item.sku) map.set(item.sku, item);
-      map.set(item.id, item);
-    });
-    return map;
-  }, [inventory]);
-
-  const uniqueCategoriesSummary = useMemo(() => {
-    const productSets = new Map<string, Set<string>>();
-    inventory.forEach((item: InventoryItem) => {
-      const cat = item.category || 'General';
-      const names = productSets.get(cat) ?? new Set<string>();
-      names.add(item.name);
-      productSets.set(cat, names);
-    });
-    return Array.from(productSets.entries()).reduce<Record<string, number>>((acc, [category, names]) => {
-      acc[category] = names.size;
-      return acc;
-    }, {});
-  }, [inventory]);
-
-  const filteredCategoriesSummary = useMemo(() => {
-    if (!localSearch) return uniqueCategoriesSummary;
-    const filtered: Record<string, number> = {};
-    Object.entries(uniqueCategoriesSummary).forEach(([cat, count]) => {
-      if (cat.toLowerCase().includes(localSearch.toLowerCase())) {
-        filtered[cat] = count;
-      }
-    });
-    return filtered;
-  }, [uniqueCategoriesSummary, localSearch]);
-
-  const productNamesInCategory = useMemo(() => {
-    if (!activeCategory) return {};
-    const groups: Record<string, { items: InventoryItem[], totalStock: number, count: number, inStock: number }> = {};
-    inventory.filter((i: InventoryItem) => (i.category || 'General') === activeCategory).forEach((item: InventoryItem) => {
-      if (!groups[item.name]) groups[item.name] = { items: [], totalStock: 0, count: 0, inStock: 0 };
-      groups[item.name].items.push(item);
-      groups[item.name].totalStock += (item.stock || 0);
-      groups[item.name].count += 1;
-      groups[item.name].inStock += (item.stock || 0);
-    });
-    return groups;
-  }, [inventory, activeCategory]);
-
-  const filteredProductNamesInCategory = useMemo(() => {
-    if (!localSearch) return productNamesInCategory;
-    const filtered: Record<string, any> = {};
-    Object.entries(productNamesInCategory).forEach(([name, data]: [string, any]) => {
-      if (name.toLowerCase().includes(localSearch.toLowerCase())) {
-        filtered[name] = data;
-      }
-    });
-    return filtered;
-  }, [productNamesInCategory, localSearch]);
-
-  const itemsInSelectedProduct = useMemo(() => {
-    if (!activeCategory || !activeProductName) return [];
-    return inventory.filter((i: InventoryItem) => (i.category || 'General') === activeCategory && i.name === activeProductName);
-  }, [inventory, activeCategory, activeProductName]);
-
-  const filteredItemsInSelectedProduct = useMemo(() => {
-    if (!localSearch) return itemsInSelectedProduct;
-    return itemsInSelectedProduct.filter((i: InventoryItem) => 
-      i.name.toLowerCase().includes(localSearch.toLowerCase()) || 
-      (i.sku?.toLowerCase() ?? '').includes(localSearch.toLowerCase()) ||
-      (i.size?.toLowerCase() ?? '').includes(localSearch.toLowerCase())
-    );
-  }, [itemsInSelectedProduct, localSearch]);
-
-  const filtered = useMemo(() =>
-    inventory.filter((p: InventoryItem) => {
-      const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
-        p.category.toLowerCase().includes(search.toLowerCase()) ||
-        (p.sku?.toLowerCase() ?? '').includes(search.toLowerCase());
-      return matchSearch;
-    }),
-    [inventory, search]
-  );
-
-  const latestProducts = useMemo(() => {
-    return [...inventory]
-      .sort((a: InventoryItem, b: InventoryItem) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 10); // Show top 10 newest arrivals
-  }, [inventory]);
+  const hasSearch = deferredSearch.length > 0;
+  const totalVisibleCount = hasSearch
+    ? (searchCount[0]?.total ?? 0)
+    : drillDepth === 0
+      ? (categoryCount[0]?.total ?? 0)
+      : drillDepth === 1
+        ? (productCount[0]?.total ?? 0)
+        : (variantCount[0]?.total ?? 0);
+  const totalPages = Math.max(1, Math.ceil(totalVisibleCount / pageSize));
   
   // CUSTOMER AUTOCOMPLETE ENGINE
   const filteredCustomers = useLiveQuery<Customer>(
@@ -233,10 +241,8 @@ export default function POS() {
     [customerName, selectedCustomerId],
   );
 
-  const addToCart = (product: typeof inventory[0], isReturn: boolean = false) => {
-    // Find costPrice from private collection if permitted
-    const privateData = canViewCost ? inventoryPrivateById.get(product.id) : null;
-    const costPrice = privateData?.costPrice;
+  const addToCart = (product: PosInventoryItem, isReturn: boolean = false) => {
+    const costPrice = canViewCost ? product.costPrice : undefined;
 
     setCart((prev) => {
       const existing = prev.find((c) => c.itemId === product.id && c.isReturn === isReturn);
@@ -450,7 +456,7 @@ export default function POS() {
       const { barcodes } = await BarcodeScanner.scan();
       if (barcodes.length > 0) {
         const val = barcodes[0].displayValue;
-        const found = val ? inventoryBySku.get(val) : undefined;
+        const found = val ? await inventoryRepo.findBySkuOrId(val, Boolean(canViewCost)) : null;
         if (found) {
           addToCart(found);
           showToast(`Added: ${found.name}`);
@@ -674,128 +680,14 @@ export default function POS() {
           </button>
         </div>
 
-        {filtered.length === 0 ? (
-          <div className="text-center py-20 text-muted-foreground opacity-40">
-            <Package className="h-16 w-16 mx-auto mb-3" />
-            <p className="font-bold">No products found.</p>
-          </div>
-        ) : !search ? (
-          <>
-            {/* LEVEL 0: CATEGORIES */}
-            {drillDepth === 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-                {Object.entries(filteredCategoriesSummary).map(([cat, count]: [string, any]) => (
-                  <button
-                    key={cat}
-                    onClick={() => navigateTo(1, cat)}
-                    className="glass-card p-6 rounded-3xl text-left transition-all hover:shadow-2xl hover:-translate-y-1 hover:border-primary/30 group active:scale-95"
-                  >
-                    <div className="h-12 w-12 premium-gradient rounded-2xl flex items-center justify-center shadow-lg mb-4 group-hover:scale-110 transition-transform">
-                      <Sparkles className="h-6 w-6 text-primary-foreground" />
-                    </div>
-                    <h3 className="font-black text-sm uppercase tracking-tighter leading-tight break-words">{cat}</h3>
-                    <p className="text-[10px] text-muted-foreground font-bold mt-1 uppercase tracking-widest">{count} Products</p>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* LEVEL 1: PRODUCT NAMES IN CATEGORY */}
-            {drillDepth === 1 && activeCategory && (
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-                {Object.entries(filteredProductNamesInCategory).map(([name, data]: [string, any]) => (
-                  <button
-                    key={name}
-                    onClick={() => navigateTo(2, activeCategory, name)}
-                    className="glass-card p-6 rounded-3xl text-left transition-all hover:shadow-2xl hover:-translate-y-1 hover:border-primary/30 group active:scale-95"
-                  >
-                    <div className="h-12 w-12 bg-accent/50 rounded-2xl flex items-center justify-center border border-border/50 mb-4 group-hover:scale-110 transition-transform">
-                      <Package className="h-6 w-6 text-primary" />
-                    </div>
-                    <h3 className="font-black text-sm uppercase tracking-tighter leading-tight">{name}</h3>
-                    <div className="flex items-center gap-2 mt-2">
-                       <span className="text-[10px] font-black uppercase bg-primary/10 text-primary px-2 py-0.5 rounded-lg">
-                        {data.items.length} Variants
-                      </span>
-                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg ${data.totalStock > 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
-                        Stk: {data.totalStock}
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* LEVEL 2: VARIANTS OF SELECTED PRODUCT */}
-            {drillDepth === 2 && activeCategory && activeProductName && (
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {filteredItemsInSelectedProduct.map((product: InventoryItem) => {
-                  const outOfStock = product.stock !== undefined && product.stock <= 0;
-                  return (
-                    <div
-                      key={product.id}
-                      onClick={() => {
-                        if (outOfStock) setToast("Warning: Adding out-of-stock item!");
-                        addToCart(product);
-                      }}
-                      className={`glass-card p-4 rounded-3xl text-left transition-all duration-300 group relative cursor-pointer active:scale-95 ${
-                        outOfStock ? 'opacity-80 hover:border-red-500/30' : 'hover:shadow-2xl hover:-translate-y-1 hover:border-primary/30'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="h-10 w-10 premium-gradient rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
-                          <Package className="h-5 w-5 text-primary-foreground" />
-                        </div>
-                        <div className="flex gap-1.5 grayscale group-hover:grayscale-0 transition-all">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); addToCart(product, true); }}
-                            className="h-8 w-8 rounded-xl bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-all shadow-sm"
-                            title="Add as Return"
-                          >
-                            <RotateCcw className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5 mt-1">
-                        <h3 className="font-extrabold text-[12px] uppercase tracking-tight truncate leading-tight">{product.name}</h3>
-                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                          {product.size && (
-                            <span className="px-3 py-1 bg-purple-500/10 text-purple-500 text-[12px] font-black uppercase rounded-lg border border-purple-500/20 shadow-sm leading-none">
-                              {product.size}
-                            </span>
-                          )}
-                          <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-lg border ${
-                            outOfStock ? 'bg-destructive/10 text-destructive border-destructive/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                          }`}>
-                            Stk: {product.stock || 0}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="flex justify-between items-end mt-4 pt-2 border-t border-border/10">
-                        <p className="font-black text-xl tracking-tighter text-foreground leading-none">
-                          {formatCurrency(product.price)}
-                        </p>
-                        <div className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
-                          <Plus className="h-4 w-4" />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </>
-        ) : (
-          /* SEARCH RESULTS (FLAT LIST BYPASS) */
+        {hasSearch ? (
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-            {filtered.length === 0 ? (
+            {searchResults.length === 0 ? (
               <div className="col-span-full text-center py-20 text-muted-foreground opacity-40">
                 <Package className="h-16 w-16 mx-auto mb-3" />
                 <p className="font-bold">No matches found for "{search}"</p>
               </div>
-            ) : filtered.map((product: InventoryItem) => {
+            ) : searchResults.map((product) => {
               const outOfStock = product.stock !== undefined && product.stock <= 0;
               return (
                 <div
@@ -853,6 +745,156 @@ export default function POS() {
                 </div>
               );
             })}
+          </div>
+        ) : (
+          <>
+            {drillDepth === 0 && categoryPage.length === 0 && (
+              <div className="text-center py-20 text-muted-foreground opacity-40">
+                <Package className="h-16 w-16 mx-auto mb-3" />
+                <p className="font-bold">No categories found.</p>
+              </div>
+            )}
+
+            {drillDepth === 0 && categoryPage.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                {categoryPage.map(({ category: categoryName, productCount }) => (
+                  <button
+                    key={categoryName}
+                    onClick={() => navigateTo(1, categoryName)}
+                    className="glass-card p-6 rounded-3xl text-left transition-all hover:shadow-2xl hover:-translate-y-1 hover:border-primary/30 group active:scale-95"
+                  >
+                    <div className="h-12 w-12 premium-gradient rounded-2xl flex items-center justify-center shadow-lg mb-4 group-hover:scale-110 transition-transform">
+                      <Sparkles className="h-6 w-6 text-primary-foreground" />
+                    </div>
+                    <h3 className="font-black text-sm uppercase tracking-tighter leading-tight break-words">{categoryName}</h3>
+                    <p className="text-[10px] text-muted-foreground font-bold mt-1 uppercase tracking-widest">{productCount} Products</p>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {drillDepth === 1 && activeCategory && productPage.length === 0 && (
+              <div className="text-center py-20 text-muted-foreground opacity-40">
+                <Package className="h-16 w-16 mx-auto mb-3" />
+                <p className="font-bold">No products found in this category.</p>
+              </div>
+            )}
+
+            {drillDepth === 1 && activeCategory && productPage.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                {productPage.map((productSummary) => (
+                  <button
+                    key={productSummary.name}
+                    onClick={() => navigateTo(2, activeCategory, productSummary.name)}
+                    className="glass-card p-6 rounded-3xl text-left transition-all hover:shadow-2xl hover:-translate-y-1 hover:border-primary/30 group active:scale-95"
+                  >
+                    <div className="h-12 w-12 bg-accent/50 rounded-2xl flex items-center justify-center border border-border/50 mb-4 group-hover:scale-110 transition-transform">
+                      <Package className="h-6 w-6 text-primary" />
+                    </div>
+                    <h3 className="font-black text-sm uppercase tracking-tighter leading-tight">{productSummary.name}</h3>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="text-[10px] font-black uppercase bg-primary/10 text-primary px-2 py-0.5 rounded-lg">
+                        {productSummary.variantCount} Variants
+                      </span>
+                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg ${productSummary.totalStock > 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                        Stk: {productSummary.totalStock}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {drillDepth === 2 && activeCategory && activeProductName && variantPage.length === 0 && (
+              <div className="text-center py-20 text-muted-foreground opacity-40">
+                <Package className="h-16 w-16 mx-auto mb-3" />
+                <p className="font-bold">No variants found.</p>
+              </div>
+            )}
+
+            {drillDepth === 2 && activeCategory && activeProductName && variantPage.length > 0 && (
+              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {variantPage.map((product) => {
+                  const outOfStock = product.stock !== undefined && product.stock <= 0;
+                  return (
+                    <div
+                      key={product.id}
+                      onClick={() => {
+                        if (outOfStock) setToast("Warning: Adding out-of-stock item!");
+                        addToCart(product);
+                      }}
+                      className={`glass-card p-4 rounded-3xl text-left transition-all duration-300 group relative cursor-pointer active:scale-95 ${
+                        outOfStock ? 'opacity-80 hover:border-red-500/30' : 'hover:shadow-2xl hover:-translate-y-1 hover:border-primary/30'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="h-10 w-10 premium-gradient rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
+                          <Package className="h-5 w-5 text-primary-foreground" />
+                        </div>
+                        <div className="flex gap-1.5 grayscale group-hover:grayscale-0 transition-all">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); addToCart(product, true); }}
+                            className="h-8 w-8 rounded-xl bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-all shadow-sm"
+                            title="Add as Return"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5 mt-1">
+                        <h3 className="font-extrabold text-[12px] uppercase tracking-tight truncate leading-tight">{product.name}</h3>
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          {product.size && (
+                            <span className="px-3 py-1 bg-purple-500/10 text-purple-500 text-[12px] font-black uppercase rounded-lg border border-purple-500/20 shadow-sm leading-none">
+                              {product.size}
+                            </span>
+                          )}
+                          <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-lg border ${
+                            outOfStock ? 'bg-destructive/10 text-destructive border-destructive/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                          }`}>
+                            Stk: {product.stock || 0}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex justify-between items-end mt-4 pt-2 border-t border-border/10">
+                        <p className="font-black text-xl tracking-tighter text-foreground leading-none">
+                          {formatCurrency(product.price)}
+                        </p>
+                        <div className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
+                          <Plus className="h-4 w-4" />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-accent/20 px-4 py-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+              Page {page} of {totalPages}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page === 1}
+                className="rounded-xl border border-border/60 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-foreground transition-all hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Prev
+              </button>
+              <button
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={page >= totalPages}
+                className="rounded-xl border border-border/60 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-foreground transition-all hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>

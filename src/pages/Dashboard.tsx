@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp,
@@ -7,7 +7,6 @@ import {
   ArrowUpRight,
   AlertTriangle,
   ShoppingBag,
-  BarChart3,
   Clock,
   ShieldCheck,
   ShieldAlert,
@@ -35,27 +34,12 @@ import Modal from '@/components/Modal';
 import Label from '@/components/Label';
 import Input from '@/components/Input';
 import type { Expense, InventoryItem, Attendance } from '@/lib/types';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  ComposedChart,
-  Area
-} from 'recharts';
 import { calculateForecast } from '@/lib/forecast';
 import { showAppPopup } from '@/lib/popup';
 import { scheduleIdleWork } from '@/lib/idle';
+import type { RevenuePulsePoint } from '@/components/dashboard/RevenuePulseCard';
 
-type RevenuePulsePoint = {
-  day: string;
-  sales?: number;
-  forecast?: number;
-  high?: number;
-};
+const RevenuePulseCard = React.lazy(() => import('@/components/dashboard/RevenuePulseCard'));
 
 function KPICard({
   title,
@@ -243,6 +227,31 @@ export default function Dashboard() {
 
     return historyData;
   }, [salesSeries]);
+  const revenueChartSkeleton = (
+    <div className="lg:col-span-4 glass-card rounded-3xl p-8">
+      <div className="mb-6 flex items-center justify-between">
+        <h3 className="flex items-center gap-2 text-sm font-black uppercase tracking-widest">
+          <TrendingUp className="h-4 w-4 text-primary" />
+          7-Day Revenue Pulse
+        </h3>
+      </div>
+      <div className="h-[260px] rounded-[1.5rem] border border-border/50 bg-accent/20 p-6">
+        <div className="h-full animate-pulse space-y-4">
+          <div className="h-4 w-32 rounded-full bg-accent" />
+          <div className="flex h-[190px] items-end gap-3">
+            {Array.from({ length: 7 }).map((_, index) => (
+              <div key={index} className="flex flex-1 items-end justify-center">
+                <div
+                  className="w-full rounded-t-2xl bg-primary/20"
+                  style={{ height: `${40 + ((index % 4) * 28)}px` }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-10 pb-20">
@@ -441,104 +450,28 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
-        {/* Bar Chart - ADMIN ONLY */}
         {canViewAnalytics && (
-          <div className="lg:col-span-4 glass-card rounded-3xl p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                7-Day Revenue Pulse
-              </h3>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5">
-                  <div className="h-2 w-2 rounded-full bg-primary" />
-                  <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">Actual</span>
-                </div>
-                <div className="flex items-center gap-1.5 border-l border-border pl-3">
-                  <div className="h-2 w-2 rounded-full bg-purple-500" />
-                  <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">AI Forecast</span>
-                </div>
-              </div>
-            </div>
-            {totalSalesRevenue === 0 ? (
-              <div className="h-[260px] flex flex-col items-center justify-center text-center text-muted-foreground opacity-40">
-                <BarChart3 className="h-12 w-12 mb-3" />
-                <p className="text-sm font-bold">No sales recorded yet</p>
-              </div>
-            ) : !showRevenueChart ? (
-              <div className="h-[260px] rounded-[1.5rem] border border-border/50 bg-accent/20 p-6">
-                <div className="h-full animate-pulse space-y-4">
-                  <div className="h-4 w-32 rounded-full bg-accent" />
-                  <div className="flex h-[190px] items-end gap-3">
-                    {Array.from({ length: 7 }).map((_, index) => (
-                      <div key={index} className="flex flex-1 items-end justify-center">
-                        <div
-                          className="w-full rounded-t-2xl bg-primary/20"
-                          style={{ height: `${40 + ((index % 4) * 28)}px` }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="h-[260px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartDataCombined}>
-                    <defs>
-                      <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="hsl(199,89%,48%)" stopOpacity={1} />
-                        <stop offset="100%" stopColor="hsl(199,89%,48%)" stopOpacity={0.5} />
-                      </linearGradient>
-                      <linearGradient id="forecastArea" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#a855f7" stopOpacity={0.2} />
-                        <stop offset="100%" stopColor="#a855f7" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-                    <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700 }} />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fontWeight: 700 }}
-                      tickFormatter={(v) => `₹${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '16px',
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                        color: 'hsl(var(--foreground))',
-                        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                      }}
-                      formatter={(v: any, name: any) => [formatCurrency(Number(v)), name]}
-                      cursor={{ fill: 'rgba(14,165,233,0.08)' }}
-                    />
-                    <Bar dataKey="sales" name="Actual Sales" fill="url(#barGrad)" radius={[6, 6, 0, 0]} barSize={35} />
-                    <Area dataKey="forecast" name="AI Forecast" fill="url(#forecastArea)" stroke="#a855f7" strokeWidth={2} strokeDasharray="5 5" />
-                    <Area dataKey="high" name="Confidence Band" fill="#a855f7" stroke="none" fillOpacity={0.05} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
+          !showRevenueChart ? (
+            revenueChartSkeleton
+          ) : (
+            <Suspense fallback={revenueChartSkeleton}>
+              <RevenuePulseCard totalSalesRevenue={totalSalesRevenue} data={chartDataCombined} />
+            </Suspense>
+          )
         )}
 
-        {/* Low Stock Alerts */}
         <div className="lg:col-span-3 glass-card rounded-3xl p-8">
-          <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-2 mb-6">
+          <h3 className="mb-6 flex items-center gap-2 text-sm font-black uppercase tracking-widest">
             <AlertTriangle className="h-4 w-4 text-destructive" />
             Restock Required
           </h3>
           {lowStockCount === 0 ? (
-            <div className="flex flex-col items-center justify-center h-48 text-center opacity-30">
-              <ShoppingCart className="h-12 w-12 mb-3" />
+            <div className="flex h-48 flex-col items-center justify-center text-center opacity-30">
+              <ShoppingCart className="mb-3 h-12 w-12" />
               <p className="text-sm font-bold">All stock levels healthy</p>
             </div>
           ) : (
-            <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+            <div className="max-h-64 space-y-3 overflow-y-auto pr-1">
               {lowStockItems.map((item: InventoryItem) => (
                 <button
                   key={item.id}
@@ -546,17 +479,17 @@ export default function Dashboard() {
                     setInventorySearchTerm(item.name);
                     navigate('/inventory');
                   }}
-                  className="w-full flex items-center justify-between p-3 rounded-2xl bg-destructive/5 border border-destructive/10 hover:bg-destructive/10 transition-all hover:scale-[1.02] active:scale-[0.98] group"
+                  className="group flex w-full items-center justify-between rounded-2xl border border-destructive/10 bg-destructive/5 p-3 transition-all hover:scale-[1.02] hover:bg-destructive/10 active:scale-[0.98]"
                 >
                   <div className="min-w-0 text-left">
-                    <p className="font-bold text-sm truncate group-hover:text-destructive transition-colors text-foreground">{item.name}</p>
-                    <p className="text-[10px] text-foreground/60 uppercase tracking-widest">
+                    <p className="truncate text-sm font-bold text-foreground transition-colors group-hover:text-destructive">{item.name}</p>
+                    <p className="text-[10px] uppercase tracking-widest text-foreground/60">
                       {item.category}{item.sku ? ` · ${item.sku}` : ''}
                     </p>
                   </div>
-                  <div className="text-right shrink-0 ml-3">
+                  <div className="ml-3 shrink-0 text-right">
                     <p className="text-sm font-black text-destructive">{item.stock ?? '?'} left</p>
-                    <p className="text-[9px] text-primary uppercase font-black">Refill now →</p>
+                    <p className="text-[9px] font-black uppercase text-primary">Refill now →</p>
                   </div>
                 </button>
               ))}
@@ -585,7 +518,7 @@ export default function Dashboard() {
               onClick={() => navigate('/history')}
               className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline"
             >
-              View All History →
+              View All History â†’
             </button>
           </div>
           {recentSales.length === 0 ? (
@@ -603,7 +536,7 @@ export default function Dashboard() {
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
                         <span>{sale.itemQuantity} item{sale.itemQuantity !== 1 ? 's' : ''}</span>
-                        <span className="opacity-30">·</span>
+                        <span className="opacity-30">Â·</span>
                         <span className={cn(
                           "font-black uppercase tracking-tighter px-1.5 py-0.5 rounded-md",
                           sale.paymentCount > 1 
@@ -612,7 +545,7 @@ export default function Dashboard() {
                         )}>
                           {sale.paymentCount > 1 ? 'SPLIT' : sale.paymentMode}
                         </span>
-                        <span className="opacity-30">·</span>
+                        <span className="opacity-30">Â·</span>
                         <span>{sale.date}</span>
                       </p>
                     </div>
@@ -651,7 +584,7 @@ export default function Dashboard() {
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-[10px] uppercase font-black text-muted-foreground">Amount (₹) *</Label>
+            <Label className="text-[10px] uppercase font-black text-muted-foreground">Amount (â‚¹) *</Label>
             <Input 
               autoFocus
               type="number" 
@@ -689,10 +622,11 @@ export default function Dashboard() {
             disabled={!expenseForm.amount || isSavingExpense}
             className="w-full premium-gradient text-white py-4 rounded-2xl font-black text-xs hover:shadow-xl transition-all flex items-center justify-center gap-2 uppercase tracking-widest disabled:opacity-50"
           >
-            {isSavingExpense ? 'Saving...' : 'Record Expense ✨'}
+            {isSavingExpense ? 'Saving...' : 'Record Expense âœ¨'}
           </button>
         </div>
       </Modal>
     </div>
   );
 }
+

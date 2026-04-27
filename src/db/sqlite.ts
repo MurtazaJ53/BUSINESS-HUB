@@ -20,9 +20,28 @@ interface SqlJsDatabase {
 const IDB_NAME = 'business_hub_sqljs';
 const IDB_STORE = 'databases';
 const IDB_KEY = 'main';
-const PREFER_WEB_DB_ON_ANDROID = import.meta.env.VITE_ANDROID_DB_MODE !== 'native';
 const WASM_BOOT_RECOVERY_KEY = 'hub_wasm_boot_recovery_at';
 const WASM_ASSET_VERSION = import.meta.env.VITE_APP_VERSION || 'dev';
+const ANDROID_DB_MODE = import.meta.env.VITE_ANDROID_DB_MODE === 'web' ? 'web' : 'native';
+const ANDROID_DB_FALLBACK_KEY = `hub_android_db_mode_${WASM_ASSET_VERSION}`;
+
+const getAndroidDbMode = (): 'web' | 'native' => {
+  if (ANDROID_DB_MODE === 'web') return 'web';
+  if (typeof window !== 'undefined' && window.localStorage.getItem(ANDROID_DB_FALLBACK_KEY) === 'web') {
+    return 'web';
+  }
+  return 'native';
+};
+
+const markAndroidDbFallback = () => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(ANDROID_DB_FALLBACK_KEY, 'web');
+};
+
+const clearAndroidDbFallback = () => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(ANDROID_DB_FALLBACK_KEY);
+};
 
 const isWasmCspError = (error: unknown): boolean => {
   const message = error instanceof Error ? error.message : String(error ?? '');
@@ -138,15 +157,32 @@ class DatabaseSingleton {
       const capacitorPlatform = Capacitor.getPlatform();
       const shouldUseWebDb =
         capacitorPlatform === 'web' ||
-        (capacitorPlatform === 'android' && PREFER_WEB_DB_ON_ANDROID);
+        (capacitorPlatform === 'android' && getAndroidDbMode() === 'web');
 
       this.platform = shouldUseWebDb ? 'web' : 'native';
       if (capacitorPlatform === 'android' && this.platform === 'web') {
-        console.info('[DB] Using WebView SQL engine on Android for stability.');
+        console.info('[DB] Using WebView SQL engine on Android.');
       }
 
-      if (this.platform === 'native') await this.bootNative();
-      else await this.bootWeb();
+      if (this.platform === 'native') {
+        try {
+          await this.bootNative();
+          if (capacitorPlatform === 'android') {
+            clearAndroidDbFallback();
+          }
+        } catch (err) {
+          if (capacitorPlatform !== 'android') {
+            throw err;
+          }
+
+          console.warn('[DB] Native Android SQLite boot failed, falling back to WebView SQL engine.', err);
+          markAndroidDbFallback();
+          this.platform = 'web';
+          await this.bootWeb();
+        }
+      } else {
+        await this.bootWeb();
+      }
       await this.runMigrations();
       this.ready = true;
       this.booting = false;
