@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import { useLiveQuery, useSqlQuery } from '@/db/hooks';
 import { salesRepo, type DailySalesSeriesPoint, type SaleHistorySummary } from '@/db/repositories/salesRepo';
+import { inventoryRepo, type InventoryMetrics } from '@/db/repositories/inventoryRepo';
+import { attendanceRepo } from '@/db/repositories/staffRepo';
 import { useBusinessStore } from '@/lib/useBusinessStore';
 import { useAuthStore } from '@/lib/useAuthStore';
 import { usePermission } from '@/hooks/usePermission';
@@ -32,7 +34,7 @@ import { formatCurrency, cn } from '@/lib/utils';
 import Modal from '@/components/Modal';
 import Label from '@/components/Label';
 import Input from '@/components/Input';
-import type { Expense, InventoryItem, InventoryPrivate, Attendance } from '@/lib/types';
+import type { Expense, InventoryItem, Attendance } from '@/lib/types';
 import {
   BarChart,
   Bar,
@@ -42,7 +44,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   ComposedChart,
-  Line,
   Area
 } from 'recharts';
 import { calculateForecast } from '@/lib/forecast';
@@ -97,21 +98,6 @@ export default function Dashboard() {
     ['sales'],
     [last30Days, today],
   );
-  const recentSales = useLiveQuery<SaleHistorySummary>(
-    () => salesRepo.getHistoryPage({}, 1, 10),
-    ['sales', 'sale_items', 'sale_payments'],
-    [],
-  );
-  const inventory = useSqlQuery<InventoryItem>('SELECT * FROM inventory WHERE tombstone = 0 ORDER BY name ASC', [], ['inventory']);
-  const expenses = useSqlQuery<Expense>('SELECT * FROM expenses WHERE tombstone = 0 ORDER BY date DESC', [], ['expenses']);
-  const attendance = useSqlQuery<Attendance>('SELECT * FROM attendance WHERE tombstone = 0', [], ['attendance']);
-  const inventoryPrivate = useSqlQuery<any>('SELECT * FROM inventory_private WHERE tombstone = 0', [], ['inventory_private']);
-  const briefings = useSqlQuery<any>('SELECT * FROM daily_briefings ORDER BY id DESC LIMIT 1', [], ['daily_briefings']);
-  const briefing = briefings[0];
-  const inventoryPrivateById = useMemo(
-    () => new Map(inventoryPrivate.map((entry: { id: string }) => [entry.id, entry])),
-    [inventoryPrivate],
-  );
   const { user } = useAuthStore();
   const canViewInventoryCost = usePermission('inventory', 'view_cost');
   const canViewInventory = usePermission('inventory', 'view');
@@ -120,9 +106,42 @@ export default function Dashboard() {
   const canViewSales = usePermission('sales', 'view');
   const canCreateSales = usePermission('sales', 'create');
   const canCreateCustomers = usePermission('customers', 'create');
+  const recentSales = useLiveQuery<SaleHistorySummary>(
+    () => canViewSales ? salesRepo.getHistoryPage({}, 1, 10) : Promise.resolve([]),
+    ['sales', 'sale_items', 'sale_payments'],
+    [canViewSales],
+  );
+  const inventoryMetricsRows = useLiveQuery<InventoryMetrics>(
+    async () => [await inventoryRepo.getMetrics(Boolean(canViewInventoryCost))],
+    ['inventory', 'inventory_private'],
+    [canViewInventoryCost],
+  );
+  const lowStockItems = useSqlQuery<InventoryItem>(
+    `SELECT id, name, price, sku, category, subcategory, size, description, stock, sourceMeta, createdAt
+     FROM inventory
+     WHERE tombstone = 0 AND stock <= 5
+     ORDER BY stock ASC, name ASC
+     LIMIT 12`,
+    [],
+    ['inventory'],
+  );
+  const attendance = useLiveQuery<Attendance>(
+    () => attendanceRepo.getAll(today),
+    ['attendance'],
+    [today],
+  );
+  const briefings = useSqlQuery<any>('SELECT * FROM daily_briefings ORDER BY id DESC LIMIT 1', [], ['daily_briefings']);
+  const briefing = briefings[0];
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
   const [expenseForm, setExpenseForm] = useState({ amount: '', category: 'General', description: '' });
   const [isSavingExpense, setIsSavingExpense] = useState(false);
+  const inventoryMetrics = inventoryMetricsRows[0] ?? {
+    totalItems: 0,
+    totalStock: 0,
+    inventoryValue: 0,
+    potentialProfit: 0,
+    lowStock: 0,
+  };
 
   const myAttendance = attendance.find((a: Attendance) => a.staffId === user?.uid && a.date === today);
   const presentStaffCount = attendance.filter((a: Attendance) => a.date === today && a.status === 'PRESENT').length;
@@ -158,22 +177,19 @@ export default function Dashboard() {
   }, [lastBackupDate]);
 
   // KPI calculations from real data
-  const totalStockValue = inventory.reduce((sum: number, i: InventoryItem) => {
-    const p = canViewInventoryCost ? inventoryPrivateById.get(i.id) as InventoryPrivate | undefined : null;
-    return sum + (p?.costPrice || 0) * (i.stock || 0);
-  }, 0);
-  const potentialRevenue = inventory.reduce(
-    (sum: number, i: InventoryItem) => sum + i.price * (i.stock || 0),
-    0
-  );
-  const lowStockItems = inventory.filter((i: InventoryItem) => i.stock !== undefined && i.stock <= 5);
+  const totalStockValue = canViewInventoryCost
+    ? Math.max(0, inventoryMetrics.inventoryValue - inventoryMetrics.potentialProfit)
+    : 0;
+  const potentialRevenue = inventoryMetrics.inventoryValue;
+  const lowStockCount = inventoryMetrics.lowStock;
+  const hasMoreLowStock = lowStockCount > lowStockItems.length;
 
   const totalSalesRevenue = salesTotals[0]?.totalRevenue ?? 0;
   const totalSalesCount = salesTotals[0]?.totalCount ?? 0;
 
   // Last 7 days sales + Forecast
   const chartDataCombined = useMemo(() => {
-    const historyDays = 21; // More data for better forecast
+    const historyDays = 21;
     const dates = Array.from({ length: historyDays }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (historyDays - 1 - i));
@@ -181,35 +197,34 @@ export default function Dashboard() {
     });
 
     const totalsByDate = new Map(salesSeries.map((entry) => [entry.date, entry.total]));
-
     const historicalSeries = dates.map((date) => totalsByDate.get(date) || 0);
 
-    // Main display data (last 7 days of historical)
     const historyData = dates.slice(-7).map((date, i) => ({
       day: new Date(date).toLocaleDateString('en-IN', { weekday: 'short' }),
       sales: historicalSeries[historyDays - 7 + i],
     }));
 
-    // Forecast next 7 days
-    if (historicalSeries.filter(v => v > 0).length >= 7) {
+    if (historicalSeries.filter((value) => value > 0).length >= 7) {
       try {
         const forecast = calculateForecast(historicalSeries, 7);
-        const forecastPoints = forecast.next7.map((val, i) => {
+        const forecastPoints = forecast.next7.map((value, i) => {
           const d = new Date();
           d.setDate(d.getDate() + i + 1);
           return {
             day: d.toLocaleDateString('en-IN', { weekday: 'short' }),
-            forecast: val,
+            forecast: value,
             low: forecast.confidenceBand.low[i],
             high: forecast.confidenceBand.high[i],
-            isForecast: true
+            isForecast: true,
           };
         });
+
         return [...historyData, ...forecastPoints];
-      } catch (e) {
+      } catch {
         return historyData;
       }
     }
+
     return historyData;
   }, [salesSeries]);
 
@@ -328,25 +343,25 @@ export default function Dashboard() {
               </div>
               <p className="text-[8px] text-muted-foreground font-black uppercase tracking-[0.2em] opacity-80 text-center">Stock Val.</p>
               <p className="text-lg font-black mt-0.5 text-primary tracking-tighter">{formatCurrency(totalStockValue)}</p>
-              <p className="text-[8px] text-muted-foreground/60 mt-1 font-bold text-center">{inventory.length} SKUs</p>
+              <p className="text-[8px] text-muted-foreground/60 mt-1 font-bold text-center">{inventoryMetrics.totalItems} SKUs</p>
             </div>
           </>
         )}
 
         {/* ALERTS: RESTOCK */}
         <div 
-          onClick={() => { if (lowStockItems.length > 0) navigate('/inventory'); }}
+          onClick={() => { if (lowStockCount > 0) navigate('/inventory'); }}
           className={cn(
             "flex flex-col items-center justify-center aspect-square p-4 rounded-3xl border transition-all hover:scale-105 cursor-pointer",
-            lowStockItems.length > 0 ? "bg-red-500/10 border-red-500/30 shadow-red-500/10" : "glass-card"
+            lowStockCount > 0 ? "bg-red-500/10 border-red-500/30 shadow-red-500/10" : "glass-card"
           )}
         >
-          <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center mb-3", lowStockItems.length > 0 ? "bg-red-500/20" : "bg-primary/10")}>
-            <AlertTriangle className={cn("h-5 w-5", lowStockItems.length > 0 ? "text-red-500" : "text-primary")} />
+          <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center mb-3", lowStockCount > 0 ? "bg-red-500/20" : "bg-primary/10")}>
+            <AlertTriangle className={cn("h-5 w-5", lowStockCount > 0 ? "text-red-500" : "text-primary")} />
           </div>
           <p className="text-[8px] text-muted-foreground font-black uppercase tracking-[0.2em] opacity-80 text-center">Alerts</p>
-          <p className={cn("text-2xl font-black mt-0.5", lowStockItems.length > 0 ? "text-red-500" : "text-primary")}>
-            {lowStockItems.length}
+          <p className={cn("text-2xl font-black mt-0.5", lowStockCount > 0 ? "text-red-500" : "text-primary")}>
+            {lowStockCount}
           </p>
           <p className="text-[8px] text-muted-foreground/60 mt-1 font-bold text-center">Stock Low</p>
         </div>
@@ -485,7 +500,7 @@ export default function Dashboard() {
             <AlertTriangle className="h-4 w-4 text-destructive" />
             Restock Required
           </h3>
-          {lowStockItems.length === 0 ? (
+          {lowStockCount === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-center opacity-30">
               <ShoppingCart className="h-12 w-12 mb-3" />
               <p className="text-sm font-bold">All stock levels healthy</p>
@@ -513,6 +528,14 @@ export default function Dashboard() {
                   </div>
                 </button>
               ))}
+              {hasMoreLowStock && (
+                <button
+                  onClick={() => navigate('/stock-alerts')}
+                  className="w-full rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-primary transition-all hover:bg-primary/10"
+                >
+                  View remaining {lowStockCount - lowStockItems.length} alerts
+                </button>
+              )}
             </div>
           )}
         </div>

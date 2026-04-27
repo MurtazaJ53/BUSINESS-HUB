@@ -11,19 +11,9 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { maybeRunScheduledBackup } from './lib/backup';
 
-// Lazy load components outside the component to prevent re-creation
-const Dashboard = React.lazy(() => import('@/pages/Dashboard'));
-const Inventory = React.lazy(() => import('@/pages/Inventory'));
-const POS = React.lazy(() => import('@/pages/POS'));
-const Customers = React.lazy(() => import('@/pages/Customers'));
-const History = React.lazy(() => import('@/pages/History'));
-const Expenses = React.lazy(() => import('@/pages/Expenses'));
-const StockAlerts = React.lazy(() => import('@/pages/StockAlerts'));
-const Analytics = React.lazy(() => import('@/pages/Analytics'));
-const Team = React.lazy(() => import('@/pages/Team'));
-const Settings = React.lazy(() => import('@/pages/Settings'));
-const MigrationTool = React.lazy(() => import('@/pages/MigrationTool'));
-const Agents = React.lazy(() => import('@/pages/Agents'));
+const preloadDashboard = () => import('@/pages/Dashboard');
+const preloadInventory = () => import('@/pages/Inventory');
+const preloadPOS = () => import('@/pages/POS');
 
 import { Database } from '@/db/sqlite';
 
@@ -74,6 +64,19 @@ export default function App() {
       return () => unsub();
     }
   }, [shopId, role, initStore]);
+
+  useEffect(() => {
+    if (!user || !shopId) return;
+
+    void preloadDashboard();
+
+    const delayedPreload = window.setTimeout(() => {
+      void preloadInventory();
+      void preloadPOS();
+    }, 1200);
+
+    return () => window.clearTimeout(delayedPreload);
+  }, [user, shopId]);
 
   useEffect(() => {
     if (!shopId || !dbReady) return;
