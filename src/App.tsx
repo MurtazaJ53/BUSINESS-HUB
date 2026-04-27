@@ -10,6 +10,7 @@ import { Sparkles, ShieldAlert } from 'lucide-react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { maybeRunScheduledBackup } from './lib/backup';
+import { scheduleIdleWork } from './lib/idle';
 
 const preloadDashboard = () => import('@/pages/Dashboard');
 const preloadInventory = () => import('@/pages/Inventory');
@@ -70,12 +71,12 @@ export default function App() {
 
     void preloadDashboard();
 
-    const delayedPreload = window.setTimeout(() => {
+    const cancelDelayedPreload = scheduleIdleWork(() => {
       void preloadInventory();
       void preloadPOS();
-    }, 1200);
+    }, 3500, 9000);
 
-    return () => window.clearTimeout(delayedPreload);
+    return () => cancelDelayedPreload();
   }, [user, shopId]);
 
   useEffect(() => {
@@ -91,13 +92,16 @@ export default function App() {
       }
     };
 
-    void checkBackup();
+    const cancelInitialBackupCheck = scheduleIdleWork(() => {
+      void checkBackup();
+    }, 6000, 12000);
     const intervalId = window.setInterval(() => {
       void checkBackup();
     }, 60000);
 
     return () => {
       active = false;
+      cancelInitialBackupCheck();
       window.clearInterval(intervalId);
     };
   }, [shopId, dbReady]);

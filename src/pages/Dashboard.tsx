@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp,
@@ -48,6 +48,14 @@ import {
 } from 'recharts';
 import { calculateForecast } from '@/lib/forecast';
 import { showAppPopup } from '@/lib/popup';
+import { scheduleIdleWork } from '@/lib/idle';
+
+type RevenuePulsePoint = {
+  day: string;
+  sales?: number;
+  forecast?: number;
+  high?: number;
+};
 
 function KPICard({
   title,
@@ -135,6 +143,7 @@ export default function Dashboard() {
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
   const [expenseForm, setExpenseForm] = useState({ amount: '', category: 'General', description: '' });
   const [isSavingExpense, setIsSavingExpense] = useState(false);
+  const [showRevenueChart, setShowRevenueChart] = useState(false);
   const inventoryMetrics = inventoryMetricsRows[0] ?? {
     totalItems: 0,
     totalStock: 0,
@@ -187,8 +196,15 @@ export default function Dashboard() {
   const totalSalesRevenue = salesTotals[0]?.totalRevenue ?? 0;
   const totalSalesCount = salesTotals[0]?.totalCount ?? 0;
 
+  useEffect(() => {
+    const cancelDeferredChart = scheduleIdleWork(() => {
+      setShowRevenueChart(true);
+    }, 1200, 4000);
+    return () => cancelDeferredChart();
+  }, []);
+
   // Last 7 days sales + Forecast
-  const chartDataCombined = useMemo(() => {
+  const chartDataCombined = useMemo<RevenuePulsePoint[]>(() => {
     const historyDays = 21;
     const dates = Array.from({ length: historyDays }, (_, i) => {
       const d = new Date();
@@ -448,6 +464,22 @@ export default function Dashboard() {
               <div className="h-[260px] flex flex-col items-center justify-center text-center text-muted-foreground opacity-40">
                 <BarChart3 className="h-12 w-12 mb-3" />
                 <p className="text-sm font-bold">No sales recorded yet</p>
+              </div>
+            ) : !showRevenueChart ? (
+              <div className="h-[260px] rounded-[1.5rem] border border-border/50 bg-accent/20 p-6">
+                <div className="h-full animate-pulse space-y-4">
+                  <div className="h-4 w-32 rounded-full bg-accent" />
+                  <div className="flex h-[190px] items-end gap-3">
+                    {Array.from({ length: 7 }).map((_, index) => (
+                      <div key={index} className="flex flex-1 items-end justify-center">
+                        <div
+                          className="w-full rounded-t-2xl bg-primary/20"
+                          style={{ height: `${40 + ((index % 4) * 28)}px` }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="h-[260px]">
