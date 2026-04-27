@@ -114,9 +114,14 @@ export default function App() {
 
   // Handle DB Boot Failure
   if (dbError) {
+    const isCspWasmError = /content security policy|csp|wasm-unsafe-eval|unsafe-eval/i.test(dbError);
     const isWasmError = dbError.toLowerCase().includes('webassembly') || dbError.includes('magic word');
     
     const handleEmergencyReset = async () => {
+      if (isCspWasmError) {
+        window.location.reload();
+        return;
+      }
       try {
         await Database.nuclearReset();
       } catch (e) {
@@ -133,7 +138,9 @@ export default function App() {
           <div className="space-y-2">
             <h1 className="text-xl font-black text-foreground uppercase tracking-tighter">Database Boot Error</h1>
             <p className="text-sm text-muted-foreground font-medium leading-relaxed">
-              {isWasmError 
+              {isCspWasmError
+                ? "The browser security policy blocked the secure vault engine. The server must allow WebAssembly before the app can boot."
+                : isWasmError 
                 ? "The secure vault's binary module is corrupted in your browser cache. A deep reset is required."
                 : dbError}
               <br /><br />
@@ -145,7 +152,7 @@ export default function App() {
               onClick={handleEmergencyReset}
               className="w-full py-4 bg-destructive text-destructive-foreground rounded-2xl font-black text-[10px] uppercase tracking-widest hover:brightness-110 transition-all shadow-[0_0_20px_rgba(239,68,68,0.2)]"
             >
-              {isWasmError ? 'Execute Emergency Reset' : 'Attempt System Recovery'}
+              {isCspWasmError ? 'Reload After Server Fix' : isWasmError ? 'Execute Emergency Reset' : 'Attempt System Recovery'}
             </button>
             <button 
               onClick={() => window.location.reload()}
@@ -154,7 +161,7 @@ export default function App() {
               Standard Reload
             </button>
           </div>
-          {isWasmError && (
+          {isWasmError && !isCspWasmError && (
              <p className="text-[9px] text-muted-foreground/60 uppercase tracking-widest font-bold">
                This will clear your local session but fix the loading loop.
              </p>

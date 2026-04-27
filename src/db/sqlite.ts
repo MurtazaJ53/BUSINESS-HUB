@@ -24,6 +24,11 @@ const PREFER_WEB_DB_ON_ANDROID = import.meta.env.VITE_ANDROID_DB_MODE !== 'nativ
 const WASM_BOOT_RECOVERY_KEY = 'hub_wasm_boot_recovery_at';
 const WASM_ASSET_VERSION = import.meta.env.VITE_APP_VERSION || 'dev';
 
+const isWasmCspError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /content security policy|csp|wasm-unsafe-eval|unsafe-eval/i.test(message);
+};
+
 const isWasmBootError = (error: unknown): boolean => {
   const message = error instanceof Error ? error.message : String(error ?? '');
   return /webassembly|magic word|compileerror|failed to asynchronously prepare wasm|incorrect response mime type/i.test(message);
@@ -179,7 +184,7 @@ class DatabaseSingleton {
       }
     } catch (err) {
       console.error('Web Boot Error:', err);
-      if (typeof window !== 'undefined' && isWasmBootError(err)) {
+      if (typeof window !== 'undefined' && isWasmBootError(err) && !isWasmCspError(err)) {
         const recoveredAt = Number(sessionStorage.getItem(WASM_BOOT_RECOVERY_KEY) || '0');
         if (!recoveredAt || Date.now() - recoveredAt > 30000) {
           sessionStorage.setItem(WASM_BOOT_RECOVERY_KEY, String(Date.now()));
@@ -190,6 +195,9 @@ class DatabaseSingleton {
         }
       }
       const message = err instanceof Error ? err.message : String(err);
+      if (isWasmCspError(err)) {
+        throw new Error(`WebAssembly blocked by Content Security Policy. ${message}`);
+      }
       throw new Error(`Web database engine failed to load. ${message}`);
     }
   }
