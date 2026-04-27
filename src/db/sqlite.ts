@@ -21,6 +21,40 @@ const IDB_NAME = 'business_hub_sqljs';
 const IDB_STORE = 'databases';
 const IDB_KEY = 'main';
 const PREFER_WEB_DB_ON_ANDROID = import.meta.env.VITE_ANDROID_DB_MODE !== 'native';
+const WASM_BOOT_RECOVERY_KEY = 'hub_wasm_boot_recovery_at';
+const WASM_ASSET_VERSION = import.meta.env.VITE_APP_VERSION || 'dev';
+
+const isWasmBootError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /webassembly|magic word|compileerror|failed to asynchronously prepare wasm|incorrect response mime type/i.test(message);
+};
+
+const buildWasmAssetUrl = (file: string): string => (
+  `${import.meta.env.BASE_URL}${file}?v=${encodeURIComponent(WASM_ASSET_VERSION)}`
+);
+
+async function purgeCachedWasmAssets(): Promise<void> {
+  if (typeof window === 'undefined' || !('caches' in window)) {
+    return;
+  }
+
+  const cacheNames = await caches.keys();
+  await Promise.all(cacheNames.map(async (cacheName) => {
+    const cache = await caches.open(cacheName);
+    const requests = await cache.keys();
+    await Promise.all(
+      requests
+        .filter((request) => {
+          try {
+            return /sql-wasm(?:-browser)?\.wasm$/i.test(new URL(request.url).pathname);
+          } catch {
+            return false;
+          }
+        })
+        .map((request) => cache.delete(request)),
+    );
+  }));
+}
 
 async function idbSave(data: Uint8Array): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -120,12 +154,24 @@ class DatabaseSingleton {
         throw new Error('Local SQL engine bundle is unavailable.');
       }
       const SQL = await initSqlJs({
-        locateFile: (file: string) => `${import.meta.env.BASE_URL}${file}`
+        locateFile: (file: string) => buildWasmAssetUrl(file),
       });
       const saved = await idbLoad();
       this.webDb = saved ? new SQL.Database(saved) : new SQL.Database();
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem(WASM_BOOT_RECOVERY_KEY);
+      }
     } catch (err) {
       console.error('Web Boot Error:', err);
+      if (typeof window !== 'undefined' && isWasmBootError(err)) {
+        const recoveredAt = Number(sessionStorage.getItem(WASM_BOOT_RECOVERY_KEY) || '0');
+        if (!recoveredAt || Date.now() - recoveredAt > 30000) {
+          sessionStorage.setItem(WASM_BOOT_RECOVERY_KEY, String(Date.now()));
+          await purgeCachedWasmAssets();
+          window.location.reload();
+          return new Promise(() => {});
+        }
+      }
       const message = err instanceof Error ? err.message : String(err);
       throw new Error(`Web database engine failed to load. ${message}`);
     }
