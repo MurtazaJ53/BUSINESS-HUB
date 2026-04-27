@@ -72,6 +72,13 @@ class SyncWorkerEngine {
     return Date.now();
   }
 
+  private isPermissionDenied(error: unknown): boolean {
+    return typeof error === 'object'
+      && error !== null
+      && 'code' in error
+      && (error as { code?: string }).code === 'permission-denied';
+  }
+
   private async handleAuthState(shopId: string | null, role: AppRole) {
     if (shopId && role && (shopId !== this.currentShopId || role !== this.currentRole)) {
       this.currentShopId = shopId;
@@ -280,23 +287,31 @@ class SyncWorkerEngine {
 
     // 1. Meta Subscription
     this.pullUnsubscribers.push(
-      onSnapshot(doc(firestoreDb, 'shops', shopId), async (snap) => {
-        if (!snap.exists()) return;
-        const data = snap.data();
-        const settings = { ...data.settings, name: data.name };
-        
-        // Strip sensitive fields before local caching in general settings
-        delete settings.adminPin; 
-        delete settings.staffPin;
+      onSnapshot(
+        doc(firestoreDb, 'shops', shopId),
+        async (snap) => {
+          if (!snap.exists()) return;
+          const data = snap.data();
+          const settings = { ...data.settings, name: data.name };
+          
+          // Strip sensitive fields before local caching in general settings
+          delete settings.adminPin; 
+          delete settings.staffPin;
 
-        await Database.run(`DELETE FROM shop_metadata WHERE key = 'credentials';`);
+          await Database.run(`DELETE FROM shop_metadata WHERE key = 'credentials';`);
 
-        await Database.run(
-          `INSERT OR REPLACE INTO shop_metadata (key, value, updatedAt, dirty) VALUES ('settings', ?, ?, 0);`,
-          [JSON.stringify(settings), Date.now()]
-        );
-        tableEvents.emit('shop_metadata');
-      })
+          await Database.run(
+            `INSERT OR REPLACE INTO shop_metadata (key, value, updatedAt, dirty) VALUES ('settings', ?, ?, 0);`,
+            [JSON.stringify(settings), Date.now()]
+          );
+          tableEvents.emit('shop_metadata');
+        },
+        (error) => {
+          if (!this.isPermissionDenied(error)) {
+            console.warn('[Sync] Shop metadata listener stopped:', error);
+          }
+        },
+      )
     );
 
     // 2. Collection Subscriptions
@@ -308,52 +323,61 @@ class SyncWorkerEngine {
         : query(collRef, where('updatedAt', '>', watermark));
 
       this.pullUnsubscribers.push(
-        onSnapshot(q, { includeMetadataChanges: true }, async (snap) => {
-          let latestSeenTimestamp = watermark;
-          let hasChanges = false;
+        onSnapshot(
+          q,
+          { includeMetadataChanges: true },
+          async (snap) => {
+            let latestSeenTimestamp = watermark;
+            let hasChanges = false;
 
-          // Group promises to prevent blocking the UI thread on large initial pulls
-          const writePromises: Promise<any>[] = [];
+            // Group promises to prevent blocking the UI thread on large initial pulls
+            const writePromises: Promise<any>[] = [];
 
-          for (const ch of snap.docChanges()) {
-            if (ch.doc.metadata.hasPendingWrites) continue;
+            for (const ch of snap.docChanges()) {
+              if (ch.doc.metadata.hasPendingWrites) continue;
 
-            hasChanges = true;
-            const d = ch.doc.data();
-            const ts = this.toEpoch(d.updatedAt || d.createdAt || 0);
-            const isTombstone = ch.type === 'removed' || d.tombstone === true;
+              hasChanges = true;
+              const d = ch.doc.data();
+              const ts = this.toEpoch(d.updatedAt || d.createdAt || 0);
+              const isTombstone = ch.type === 'removed' || d.tombstone === true;
 
-            // Secure Payload Stripping
-            if (coll.key === 'inventory') delete d.costPrice;
-            if (coll.key === 'staff') { delete d.salary; delete d.pin; }
+              // Secure Payload Stripping
+              if (coll.key === 'inventory') delete d.costPrice;
+              if (coll.key === 'staff') { delete d.salary; delete d.pin; }
 
-            if (isTombstone) {
-              writePromises.push(
-                coll.key === 'staff' 
-                  ? staffRepo.hardDelete(ch.doc.id)
-                  : Database.run(`UPDATE ${coll.key} SET tombstone=1, updatedAt=? WHERE id=? AND dirty=0;`, [ts, ch.doc.id])
-              );
-            } else {
-              writePromises.push(coll.repo.mergeRemote({ id: ch.doc.id, ...d } as any, ts));
+              if (isTombstone) {
+                writePromises.push(
+                  coll.key === 'staff' 
+                    ? staffRepo.hardDelete(ch.doc.id)
+                    : Database.run(`UPDATE ${coll.key} SET tombstone=1, updatedAt=? WHERE id=? AND dirty=0;`, [ts, ch.doc.id])
+                );
+              } else {
+                writePromises.push(coll.repo.mergeRemote({ id: ch.doc.id, ...d } as any, ts));
+              }
+
+              if (ts > latestSeenTimestamp) latestSeenTimestamp = ts;
             }
 
-            if (ts > latestSeenTimestamp) latestSeenTimestamp = ts;
-          }
+            if (hasChanges) {
+              // Await all local SQLite transactions concurrently
+              await Promise.all(writePromises);
+              
+              if (latestSeenTimestamp > watermark) {
+                watermark = latestSeenTimestamp; // Update local memory watermark
+                await this.updateWatermark(coll.key, latestSeenTimestamp);
+              }
 
-          if (hasChanges) {
-            // Await all local SQLite transactions concurrently
-            await Promise.all(writePromises);
-            
-            if (latestSeenTimestamp > watermark) {
-              watermark = latestSeenTimestamp; // Update local memory watermark
-              await this.updateWatermark(coll.key, latestSeenTimestamp);
+              // Throttled UI Event Emission (Fires ONCE per snapshot, not per document)
+              tableEvents.emit(coll.key);
+              if (coll.key === 'sales') tableEvents.emit(['sale_items', 'sale_payments']);
             }
-
-            // Throttled UI Event Emission (Fires ONCE per snapshot, not per document)
-            tableEvents.emit(coll.key);
-            if (coll.key === 'sales') tableEvents.emit(['sale_items', 'sale_payments']);
-          }
-        })
+          },
+          (error) => {
+            if (!this.isPermissionDenied(error)) {
+              console.warn(`[Sync] ${coll.key} listener stopped:`, error);
+            }
+          },
+        )
       );
     }
   }
