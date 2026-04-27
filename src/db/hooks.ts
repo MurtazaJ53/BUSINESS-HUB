@@ -2,7 +2,7 @@
  * DB Hooks — Reactive React hooks for SQLite
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { startTransition, useState, useEffect, useRef } from 'react';
 import { tableEvents } from './events';
 import { Database } from './sqlite';
 import { salesRepo } from './repositories/salesRepo';
@@ -33,7 +33,11 @@ export function useLiveQuery<T>(
       const runId = ++activeRunIdRef.current;
       try {
         const results = await queryFnRef.current();
-        if (active && runId === activeRunIdRef.current) setData(results);
+        if (active && runId === activeRunIdRef.current) {
+          startTransition(() => {
+            setData(results);
+          });
+        }
       } catch (err) {
         console.error('[useLiveQuery] Error:', err);
       }

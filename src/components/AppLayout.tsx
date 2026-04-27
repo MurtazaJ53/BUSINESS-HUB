@@ -17,7 +17,7 @@ import { auth } from '@/lib/firebase';
 import { verifyAdminPin as verifyAdminPinCode } from '@/lib/admin';
 import { ADMIN_PERMISSION_TEMPLATE } from '@/lib/permissions';
 import { formatCurrency, cn } from '@/lib/utils';
-import type { InventoryItem, Sale } from '@/lib/types';
+import type { InventoryItem } from '@/lib/types';
 
 // --- 🗺️ NAVIGATION CONFIGURATION ---
 const NAV_ITEMS = [
@@ -90,9 +90,13 @@ export default function AppLayout() {
   })));
 
   // 📊 Local Database Queries
-  const sales = useSqlQuery<Sale>('SELECT * FROM sales WHERE tombstone = 0 AND date = ?', [new Date().toISOString().split('T')[0]], ['sales']);
-  const criticalStockItems = useSqlQuery<InventoryItem>(
-    'SELECT * FROM inventory WHERE tombstone = 0 AND stock <= 5 ORDER BY stock ASC, name ASC LIMIT 12',
+  const todayRevenueRows = useSqlQuery<{ totalRevenue: number }>(
+    'SELECT COALESCE(SUM(total), 0) AS totalRevenue FROM sales WHERE tombstone = 0 AND date = ?',
+    [new Date().toISOString().split('T')[0]],
+    ['sales']
+  );
+  const criticalStockItems = useSqlQuery<Pick<InventoryItem, 'id' | 'name' | 'stock'>>(
+    'SELECT id, name, stock FROM inventory WHERE tombstone = 0 AND stock <= 5 ORDER BY stock ASC, name ASC LIMIT 8',
     [],
     ['inventory']
   );
@@ -104,7 +108,7 @@ export default function AppLayout() {
   const criticalStockCount = Number(criticalStockCountRows[0]?.total ?? 0);
   const hasMoreCriticalStock = criticalStockCount > criticalStockItems.length;
   
-  const todayRevenue = sales.reduce((sum, s) => sum + s.total, 0);
+  const todayRevenue = Number(todayRevenueRows[0]?.totalRevenue ?? 0);
 
   // 🔒 Permissions
   const canViewProfit = usePermission('sales', 'view_profit');
