@@ -129,18 +129,12 @@ class LowStockItem {
 }
 
 class PosPayment {
-  const PosPayment({
-    required this.mode,
-    required this.amount,
-  });
+  const PosPayment({required this.mode, required this.amount});
 
   final String mode;
   final double amount;
 
-  Map<String, dynamic> toJson() => {
-        'mode': mode,
-        'amount': amount,
-      };
+  Map<String, dynamic> toJson() => {'mode': mode, 'amount': amount};
 }
 
 class PosCartItem {
@@ -193,13 +187,13 @@ class PosCartItem {
   }
 
   Map<String, dynamic> toSaleJson() => {
-        'itemId': id,
-        'name': name,
-        'quantity': quantity,
-        'price': price,
-        'size': size,
-        'costPrice': costPrice,
-      };
+    'itemId': id,
+    'name': name,
+    'quantity': quantity,
+    'price': price,
+    'size': size,
+    'costPrice': costPrice,
+  };
 }
 
 class RecentSaleSummary {
@@ -250,20 +244,20 @@ class LocalSaleCommit {
   final Map<String, int> inventoryDeltas;
 
   Map<String, dynamic> toFirestorePayload({String? staffId}) => {
-        'id': saleId,
-        'items': items,
-        'total': total,
-        'discount': discount,
-        'discountValue': discount.toStringAsFixed(2),
-        'discountType': discountType,
-        'paymentMode': paymentMode,
-        'payments': payments,
-        'customerName': customerName ?? '',
-        'customerPhone': customerPhone ?? '',
-        'footerNote': footerNote ?? '',
-        'date': date,
-        'createdAt': createdAt,
-        'staffId': staffId ?? '',
-        'updatedAt': DateTime.now().millisecondsSinceEpoch,
-      };
+    'id': saleId,
+    'items': items,
+    'total': total,
+    'discount': discount,
+    'discountValue': discount.toStringAsFixed(2),
+    'discountType': discountType,
+    'paymentMode': paymentMode,
+    'payments': payments,
+    'customerName': customerName ?? '',
+    'customerPhone': customerPhone ?? '',
+    'footerNote': footerNote ?? '',
+    'date': date,
+    'createdAt': createdAt,
+    'staffId': staffId ?? '',
+    'updatedAt': DateTime.now().millisecondsSinceEpoch,
+  };
 }

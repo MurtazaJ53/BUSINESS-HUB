@@ -108,23 +108,63 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen> {
         title: 'Starting Business Hub Mobile',
         subtitle: 'Restoring your secure session...',
       ),
-      error: (error, _) => _CenteredStatus(
-        title: 'Session error',
-        subtitle: error.toString(),
-      ),
+      error: (error, _) =>
+          _CenteredStatus(title: 'Session error', subtitle: error.toString()),
       data: (session) {
         if (session != null) {
-          if (!_redirecting) {
+          if (session.hasShop && !_redirecting) {
             _redirecting = true;
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) {
-                context.go('/home');
+                context.go('/dashboard');
               }
             });
           }
+          if (!session.hasShop) {
+            _redirecting = false;
+            return Scaffold(
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.sync_problem_rounded,
+                        size: 42,
+                        color: Colors.amber,
+                      ),
+                      const SizedBox(height: 22),
+                      Text(
+                        'Workspace recovery in progress',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Your account is signed in, but the mobile app is still recovering the shop link. If this stays here, sign out and sign back in once so we can refresh the workspace context.',
+                        style: theme.textTheme.bodyMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 22),
+                      FilledButton.tonalIcon(
+                        onPressed: () async {
+                          await FirebaseAuth.instance.signOut();
+                        },
+                        icon: const Icon(Icons.logout_rounded),
+                        label: const Text('Sign out'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
           return const _CenteredStatus(
             title: 'Welcome back',
-            subtitle: 'Opening the Flutter mobile workspace...',
+            subtitle: 'Opening your mobile workspace...',
           );
         }
 
@@ -220,8 +260,9 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen> {
                               FilledButton(
                                 onPressed: _submitting ? null : _signIn,
                                 child: Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 14),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
                                   child: _submitting
                                       ? const SizedBox(
                                           height: 20,
@@ -255,10 +296,7 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen> {
 }
 
 class _CenteredStatus extends StatelessWidget {
-  const _CenteredStatus({
-    required this.title,
-    required this.subtitle,
-  });
+  const _CenteredStatus({required this.title, required this.subtitle});
 
   final String title;
   final String subtitle;

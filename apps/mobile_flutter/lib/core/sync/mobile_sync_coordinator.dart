@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
@@ -11,8 +12,8 @@ import '../session/mobile_session_controller.dart';
 
 final syncStatusProvider =
     NotifierProvider<SyncStatusNotifier, MobileSyncStatus>(
-  SyncStatusNotifier.new,
-);
+      SyncStatusNotifier.new,
+    );
 
 class SyncStatusNotifier extends Notifier<MobileSyncStatus> {
   @override
@@ -42,12 +43,7 @@ final mobileSyncCoordinatorProvider = Provider<MobileSyncCoordinator>((ref) {
   return coordinator;
 });
 
-enum MobileSyncStatus {
-  idle,
-  syncing,
-  offline,
-  error,
-}
+enum MobileSyncStatus { idle, syncing, offline, error }
 
 class MobileSyncCoordinator {
   MobileSyncCoordinator({
@@ -56,10 +52,10 @@ class MobileSyncCoordinator {
     required InventoryRepository inventoryRepository,
     required SalesRepository salesRepository,
     required this.setStatus,
-  })  : _firestore = firestore,
-        _shopRepository = shopRepository,
-        _inventoryRepository = inventoryRepository,
-        _salesRepository = salesRepository;
+  }) : _firestore = firestore,
+       _shopRepository = shopRepository,
+       _inventoryRepository = inventoryRepository,
+       _salesRepository = salesRepository;
 
   final FirebaseFirestore _firestore;
   final ShopRepository _shopRepository;
@@ -70,8 +66,13 @@ class MobileSyncCoordinator {
   MobileSession? _session;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
 
-  Future<void> handleSession(MobileSession? session) async {
-    if (session?.shopId == _session?.shopId && session?.role == _session?.role) {
+  Future<void> handleSession(
+    MobileSession? session, {
+    bool force = false,
+  }) async {
+    if (!force &&
+        session?.shopId == _session?.shopId &&
+        session?.role == _session?.role) {
       return;
     }
 
@@ -85,68 +86,56 @@ class MobileSyncCoordinator {
 
     setStatus(MobileSyncStatus.syncing);
     final shopId = session.shopId!;
+    await _ensureAdminBootstrap(session, shopId);
 
     _subscriptions.add(
-      _firestore.doc('shops/$shopId').snapshots().listen(
-        (snapshot) async {
-          if (!snapshot.exists || snapshot.data() == null) return;
-          await _shopRepository.saveShopDocument(snapshot.data()!);
-          setStatus(MobileSyncStatus.idle);
-        },
-        onError: (error, stackTrace) {
-          debugPrint('Shop sync failed: $error');
-          setStatus(MobileSyncStatus.error);
-        },
-      ),
+      _firestore
+          .doc('shops/$shopId')
+          .snapshots()
+          .listen(
+            (snapshot) async {
+              if (!snapshot.exists || snapshot.data() == null) return;
+              await _shopRepository.saveShopDocument(snapshot.data()!);
+              setStatus(MobileSyncStatus.idle);
+            },
+            onError: (error, stackTrace) {
+              debugPrint('Shop sync failed: $error');
+              setStatus(MobileSyncStatus.error);
+            },
+          ),
     );
 
     _subscriptions.add(
-      _firestore.collection('shops/$shopId/inventory').snapshots().listen(
-        (snapshot) async {
-          for (final change in snapshot.docChanges) {
-            if (change.doc.metadata.hasPendingWrites) continue;
-            final data = change.doc.data() ?? <String, dynamic>{};
-            if (change.type == DocumentChangeType.removed) {
-              data['tombstone'] = true;
-            }
-            await _inventoryRepository.mergeInventoryDocument(
-              change.doc.id,
-              data,
-              updatedAt: _toEpoch(data['updatedAt'] ?? data['createdAt']),
-            );
-          }
-          setStatus(MobileSyncStatus.idle);
-        },
-        onError: (error, stackTrace) {
-          debugPrint('Inventory sync failed: $error');
-          setStatus(MobileSyncStatus.error);
-        },
-      ),
+      _firestore
+          .collection('shops/$shopId/inventory')
+          .snapshots()
+          .listen(
+            (snapshot) async {
+              await _mergeInventoryChanges(snapshot.docChanges);
+              setStatus(MobileSyncStatus.idle);
+            },
+            onError: (error, stackTrace) {
+              debugPrint('Inventory sync failed: $error');
+              setStatus(MobileSyncStatus.error);
+            },
+          ),
     );
 
     if (session.canViewCost) {
       _subscriptions.add(
-        _firestore.collection('shops/$shopId/inventory_private').snapshots().listen(
-          (snapshot) async {
-            for (final change in snapshot.docChanges) {
-              if (change.doc.metadata.hasPendingWrites) continue;
-              final data = change.doc.data() ?? <String, dynamic>{};
-              if (change.type == DocumentChangeType.removed) {
-                data['tombstone'] = true;
-              }
-              await _inventoryRepository.mergeInventoryPrivateDocument(
-                change.doc.id,
-                data,
-                updatedAt: _toEpoch(data['updatedAt'] ?? data['lastPurchaseDate']),
-              );
-            }
-            setStatus(MobileSyncStatus.idle);
-          },
-          onError: (error, stackTrace) {
-            debugPrint('Inventory private sync failed: $error');
-            setStatus(MobileSyncStatus.error);
-          },
-        ),
+        _firestore
+            .collection('shops/$shopId/inventory_private')
+            .snapshots()
+            .listen(
+              (snapshot) async {
+                await _mergeInventoryPrivateChanges(snapshot.docChanges);
+                setStatus(MobileSyncStatus.idle);
+              },
+              onError: (error, stackTrace) {
+                debugPrint('Inventory private sync failed: $error');
+                setStatus(MobileSyncStatus.error);
+              },
+            ),
       );
     }
 
@@ -156,28 +145,19 @@ class MobileSyncCoordinator {
           .limit(500)
           .snapshots()
           .listen(
-        (snapshot) async {
-          for (final change in snapshot.docChanges) {
-            if (change.doc.metadata.hasPendingWrites) continue;
-            final data = change.doc.data() ?? <String, dynamic>{};
-            if (change.type == DocumentChangeType.removed) {
-              data['tombstone'] = true;
-            }
-            await _salesRepository.mergeRemoteSaleDocument(
-              change.doc.id,
-              data,
-              updatedAt: _toEpoch(data['updatedAt'] ?? data['createdAt']),
-            );
-          }
-          setStatus(MobileSyncStatus.idle);
-        },
-        onError: (error, stackTrace) {
-          debugPrint('Sales sync failed: $error');
-          setStatus(MobileSyncStatus.error);
-        },
-      ),
+            (snapshot) async {
+              await _mergeSalesChanges(snapshot.docChanges);
+              setStatus(MobileSyncStatus.idle);
+            },
+            onError: (error, stackTrace) {
+              debugPrint('Sales sync failed: $error');
+              setStatus(MobileSyncStatus.error);
+            },
+          ),
     );
   }
+
+  Future<void> refresh() => handleSession(_session, force: true);
 
   Future<void> submitSale(LocalSaleCommit commit) async {
     final session = _session;
@@ -196,14 +176,10 @@ class MobileSyncCoordinator {
 
     for (final entry in commit.inventoryDeltas.entries) {
       final ref = _firestore.doc('shops/$shopId/inventory/${entry.key}');
-      batch.set(
-        ref,
-        {
-          'stock': FieldValue.increment(entry.value),
-          'updatedAt': DateTime.now().millisecondsSinceEpoch,
-        },
-        SetOptions(merge: true),
-      );
+      batch.set(ref, {
+        'stock': FieldValue.increment(entry.value),
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      }, SetOptions(merge: true));
     }
 
     try {
@@ -226,6 +202,131 @@ class MobileSyncCoordinator {
     _subscriptions.clear();
   }
 
+  Future<void> _ensureAdminBootstrap(
+    MobileSession session,
+    String shopId,
+  ) async {
+    if (!(session.isAdmin || session.isElevatedAdmin)) {
+      return;
+    }
+
+    final timestamp = DateTime.now();
+    final isoTimestamp = timestamp.toIso8601String();
+    final updatedAt = timestamp.millisecondsSinceEpoch;
+
+    try {
+      await _firestore.doc('users/${session.uid}').set({
+        'email': session.email,
+        'shopId': shopId,
+        'role': 'admin',
+        'updatedAt': isoTimestamp,
+      }, SetOptions(merge: true));
+    } catch (error) {
+      debugPrint('User profile sync skipped: $error');
+    }
+
+    try {
+      await _firestore.doc('shops/$shopId/staff/${session.uid}').set({
+        'id': session.uid,
+        'name':
+            session.user.displayName ??
+            (session.email.isNotEmpty
+                ? session.email.split('@').first
+                : 'Admin'),
+        'email': session.email,
+        'phone': '-',
+        'role': 'admin',
+        'status': 'active',
+        'joinedAt': isoTimestamp,
+        'permissions': _adminPermissionTemplate,
+        'updatedAt': updatedAt,
+      }, SetOptions(merge: true));
+    } catch (error) {
+      debugPrint('Admin staff heal skipped: $error');
+    }
+  }
+
+  Future<void> _mergeInventoryChanges(
+    List<DocumentChange<Map<String, dynamic>>> changes,
+  ) async {
+    final tasks = <Future<void>>[];
+    for (final change in changes) {
+      if (change.doc.metadata.hasPendingWrites) {
+        continue;
+      }
+      final data = Map<String, dynamic>.from(
+        change.doc.data() ?? const <String, dynamic>{},
+      );
+      if (change.type == DocumentChangeType.removed) {
+        data['tombstone'] = true;
+      }
+      tasks.add(
+        _inventoryRepository.mergeInventoryDocument(
+          change.doc.id,
+          data,
+          updatedAt: _toEpoch(data['updatedAt'] ?? data['createdAt']),
+        ),
+      );
+    }
+    if (tasks.isNotEmpty) {
+      await Future.wait(tasks);
+    }
+  }
+
+  Future<void> _mergeInventoryPrivateChanges(
+    List<DocumentChange<Map<String, dynamic>>> changes,
+  ) async {
+    final tasks = <Future<void>>[];
+    for (final change in changes) {
+      if (change.doc.metadata.hasPendingWrites) {
+        continue;
+      }
+      final data = Map<String, dynamic>.from(
+        change.doc.data() ?? const <String, dynamic>{},
+      );
+      if (change.type == DocumentChangeType.removed) {
+        data['tombstone'] = true;
+      }
+      tasks.add(
+        _inventoryRepository.mergeInventoryPrivateDocument(
+          change.doc.id,
+          data,
+          updatedAt: _toEpoch(data['updatedAt'] ?? data['lastPurchaseDate']),
+        ),
+      );
+    }
+    if (tasks.isNotEmpty) {
+      await Future.wait(tasks);
+    }
+  }
+
+  Future<void> _mergeSalesChanges(
+    List<DocumentChange<Map<String, dynamic>>> changes,
+  ) async {
+    final tasks = <Future<void>>[];
+    for (final change in changes) {
+      if (change.doc.metadata.hasPendingWrites) {
+        continue;
+      }
+      final data = Map<String, dynamic>.from(
+        change.doc.data() ?? const <String, dynamic>{},
+      );
+      if (change.type == DocumentChangeType.removed) {
+        data['tombstone'] = true;
+      }
+      tasks.add(
+        _salesRepository.mergeRemoteSaleDocument(
+          change.doc.id,
+          data,
+          updatedAt: _toEpoch(data['updatedAt'] ?? data['createdAt']),
+        ),
+      );
+    }
+    if (tasks.isNotEmpty) {
+      await Future.wait(tasks);
+    }
+  }
+
   int _toEpoch(Object? value) {
     if (value is Timestamp) return value.millisecondsSinceEpoch;
     if (value is int) return value;
@@ -238,3 +339,26 @@ class MobileSyncCoordinator {
     return DateTime.now().millisecondsSinceEpoch;
   }
 }
+
+final Map<String, dynamic> _adminPermissionTemplate = UnmodifiableMapView({
+  'inventory': {
+    'view': true,
+    'create': true,
+    'edit': true,
+    'delete': true,
+    'view_cost': true,
+  },
+  'sales': {
+    'view': true,
+    'create': true,
+    'edit': true,
+    'void_sale': true,
+    'view_profit': true,
+    'override_price': true,
+  },
+  'customers': {'view': true, 'create': true, 'edit': true, 'delete': true},
+  'expenses': {'view': true, 'create': true, 'delete': true},
+  'team': {'view': true, 'edit': true, 'view_cost': true},
+  'analytics': {'view': true},
+  'settings': {'view': true, 'edit': true},
+});

@@ -24,9 +24,9 @@ class ShopRepository {
   final BusinessHubDatabase _db;
 
   Stream<ShopInfo> watchShopInfo() {
-    final query = (_db.select(_db.shopSettingsEntries)
-          ..where((tbl) => tbl.key.equals('settings')))
-        .watchSingleOrNull();
+    final query = (_db.select(
+      _db.shopSettingsEntries,
+    )..where((tbl) => tbl.key.equals('settings'))).watchSingleOrNull();
 
     return query.map((row) {
       if (row == null) {
@@ -53,9 +53,12 @@ class ShopRepository {
     final settings = Map<String, dynamic>.from(
       rawData['settings'] is Map ? rawData['settings'] as Map : const {},
     );
-    settings['name'] = rawData['name'] ?? settings['name'] ?? 'Business Hub Pro';
+    settings['name'] =
+        rawData['name'] ?? settings['name'] ?? 'Business Hub Pro';
 
-    await _db.into(_db.shopSettingsEntries).insertOnConflictUpdate(
+    await _db
+        .into(_db.shopSettingsEntries)
+        .insertOnConflictUpdate(
           ShopSettingsEntriesCompanion.insert(
             key: 'settings',
             value: jsonEncode(settings),
@@ -74,7 +77,8 @@ class InventoryRepository {
     required bool includeCost,
   }) {
     final today = DateTime.now().toIso8601String().split('T').first;
-    final sql = '''
+    final sql =
+        '''
       SELECT
         COUNT(i.id) AS total_items,
         COALESCE(SUM(i.stock), 0) AS total_stock,
@@ -100,20 +104,20 @@ class InventoryRepository {
         )
         .watchSingle()
         .map((row) {
-      final metrics = InventoryMetrics(
-        totalItems: row.read<int>('total_items'),
-        totalStock: row.read<int>('total_stock'),
-        inventoryValue: row.read<double>('inventory_value'),
-        potentialProfit: row.read<double>('potential_profit'),
-        lowStock: row.read<int>('low_stock'),
-      );
+          final metrics = InventoryMetrics(
+            totalItems: row.read<int>('total_items'),
+            totalStock: row.read<int>('total_stock'),
+            inventoryValue: row.read<double>('inventory_value'),
+            potentialProfit: row.read<double>('potential_profit'),
+            lowStock: row.read<int>('low_stock'),
+          );
 
-      return DashboardOverview(
-        metrics: metrics,
-        todaySalesCount: row.read<int>('today_sales'),
-        todayRevenue: row.read<double>('today_revenue'),
-      );
-    });
+          return DashboardOverview(
+            metrics: metrics,
+            todaySalesCount: row.read<int>('today_sales'),
+            todayRevenue: row.read<double>('today_revenue'),
+          );
+        });
   }
 
   Stream<List<LowStockItem>> watchLowStockPreview({int limit = 8}) {
@@ -239,7 +243,8 @@ class InventoryRepository {
         ..add(Variable<String>(like));
     }
 
-    final sql = '''
+    final sql =
+        '''
       SELECT
         i.id,
         i.name,
@@ -281,8 +286,9 @@ class InventoryRepository {
     final value = lookup.trim().toLowerCase();
     if (value.isEmpty) return null;
 
-    final rows = await _db.customSelect(
-      '''
+    final rows = await _db
+        .customSelect(
+          '''
         SELECT
           i.id,
           i.name,
@@ -305,9 +311,10 @@ class InventoryRepository {
           )
         LIMIT 1;
       ''',
-      variables: [Variable<String>(value), Variable<String>(value)],
-      readsFrom: {_db.inventoryEntries, _db.inventoryPrivateEntries},
-    ).get();
+          variables: [Variable<String>(value), Variable<String>(value)],
+          readsFrom: {_db.inventoryEntries, _db.inventoryPrivateEntries},
+        )
+        .get();
 
     if (rows.isEmpty) return null;
     return _mapCatalogRow(rows.first);
@@ -319,7 +326,9 @@ class InventoryRepository {
     required int updatedAt,
   }) async {
     final createdAt = _asEpoch(data['createdAt']) ?? updatedAt;
-    await _db.into(_db.inventoryEntries).insertOnConflictUpdate(
+    await _db
+        .into(_db.inventoryEntries)
+        .insertOnConflictUpdate(
           InventoryEntriesCompanion.insert(
             id: id,
             name: (data['name'] ?? 'Unnamed item').toString(),
@@ -373,7 +382,9 @@ class InventoryRepository {
       description: row.readNullable<String>('description'),
       stock: row.read<int>('stock'),
       sourceMeta: row.readNullable<String>('source_meta'),
-      createdAt: DateTime.fromMillisecondsSinceEpoch(row.read<int>('created_at')),
+      createdAt: DateTime.fromMillisecondsSinceEpoch(
+        row.read<int>('created_at'),
+      ),
       costPrice: row.readNullable<double>('cost_price'),
     );
   }
@@ -414,17 +425,23 @@ class SalesRepository {
     final payments = data['payments'] is List
         ? jsonEncode(data['payments'])
         : jsonEncode(const []);
-    final items = data['items'] is List ? jsonEncode(data['items']) : jsonEncode(const []);
+    final items = data['items'] is List
+        ? jsonEncode(data['items'])
+        : jsonEncode(const []);
 
-    await _db.into(_db.salesEntries).insertOnConflictUpdate(
+    await _db
+        .into(_db.salesEntries)
+        .insertOnConflictUpdate(
           SalesEntriesCompanion.insert(
             id: id,
             total: _asDouble(data['total']),
             discount: Value(_asDouble(data['discount'])),
             discountType: Value((data['discountType'] ?? 'fixed').toString()),
             paymentMode: Value((data['paymentMode'] ?? 'CASH').toString()),
-            date: (data['date'] ?? DateTime.now().toIso8601String().split('T').first)
-                .toString(),
+            date:
+                (data['date'] ??
+                        DateTime.now().toIso8601String().split('T').first)
+                    .toString(),
             createdAt: createdAt,
             updatedAt: Value(updatedAt),
             customerName: Value(_asStringOrNull(data['customerName'])),
@@ -452,19 +469,27 @@ class SalesRepository {
     final createdAt = now.toIso8601String();
     final date = createdAt.split('T').first;
     final inventoryDeltas = <String, int>{};
-    final totalBeforeDiscount =
-        items.fold<double>(0, (sum, item) => sum + item.lineTotal);
+    final totalBeforeDiscount = items.fold<double>(
+      0,
+      (sum, item) => sum + item.lineTotal,
+    );
     final total = totalBeforeDiscount - discount;
-    final encodedItems = items.map((item) => item.toSaleJson()).toList(growable: false);
-    final encodedPayments =
-        payments.map((payment) => payment.toJson()).toList(growable: false);
+    final encodedItems = items
+        .map((item) => item.toSaleJson())
+        .toList(growable: false);
+    final encodedPayments = payments
+        .map((payment) => payment.toJson())
+        .toList(growable: false);
 
     for (final item in items) {
-      inventoryDeltas[item.id] = (inventoryDeltas[item.id] ?? 0) - item.quantity;
+      inventoryDeltas[item.id] =
+          (inventoryDeltas[item.id] ?? 0) - item.quantity;
     }
 
     await _db.transaction(() async {
-      await _db.into(_db.salesEntries).insert(
+      await _db
+          .into(_db.salesEntries)
+          .insert(
             SalesEntriesCompanion.insert(
               id: saleId,
               total: total,
@@ -483,7 +508,9 @@ class SalesRepository {
           );
 
       for (final item in items) {
-        await (_db.update(_db.inventoryEntries)..where((tbl) => tbl.id.equals(item.id))).write(
+        await (_db.update(
+          _db.inventoryEntries,
+        )..where((tbl) => tbl.id.equals(item.id))).write(
           InventoryEntriesCompanion(
             stock: Value(item.stock - item.quantity),
             updatedAt: Value(now.millisecondsSinceEpoch),
