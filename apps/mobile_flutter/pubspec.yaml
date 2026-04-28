@@ -1,7 +1,7 @@
 name: business_hub_mobile
 description: Flutter mobile app for Business Hub.
 publish_to: "none"
-version: 1.3.6+5
+version: 1.3.6+6
 
 environment:
   sdk: ">=3.8.0 <4.0.0"

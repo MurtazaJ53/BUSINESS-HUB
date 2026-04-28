@@ -11,7 +11,7 @@ Future<void> bootstrapApplication() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await FirebaseBootstrap.initialize();
-  await const LocalDatabaseController().initialize();
+  await LocalDatabaseController.instance.initialize();
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
