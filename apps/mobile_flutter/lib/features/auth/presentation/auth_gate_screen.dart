@@ -1,15 +1,18 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class AuthGateScreen extends StatefulWidget {
+import '../../../core/session/mobile_session_controller.dart';
+
+class AuthGateScreen extends ConsumerStatefulWidget {
   const AuthGateScreen({super.key});
 
   @override
-  State<AuthGateScreen> createState() => _AuthGateScreenState();
+  ConsumerState<AuthGateScreen> createState() => _AuthGateScreenState();
 }
 
-class _AuthGateScreenState extends State<AuthGateScreen> {
+class _AuthGateScreenState extends ConsumerState<AuthGateScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
@@ -98,18 +101,19 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final sessionAsync = ref.watch(mobileSessionProvider);
 
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const _CenteredStatus(
-            title: 'Starting Business Hub Mobile',
-            subtitle: 'Restoring your secure session...',
-          );
-        }
-
-        if (snapshot.hasData) {
+    return sessionAsync.when(
+      loading: () => const _CenteredStatus(
+        title: 'Starting Business Hub Mobile',
+        subtitle: 'Restoring your secure session...',
+      ),
+      error: (error, _) => _CenteredStatus(
+        title: 'Session error',
+        subtitle: error.toString(),
+      ),
+      data: (session) {
+        if (session != null) {
           if (!_redirecting) {
             _redirecting = true;
             WidgetsBinding.instance.addPostFrameCallback((_) {

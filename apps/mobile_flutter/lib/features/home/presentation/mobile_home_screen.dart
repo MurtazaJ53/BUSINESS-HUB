@@ -1,47 +1,41 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class MobileHomeScreen extends StatelessWidget {
+import '../../../core/database/mobile_repository.dart';
+import '../../../core/session/mobile_session_controller.dart';
+import '../../../core/sync/mobile_sync_coordinator.dart';
+
+class MobileHomeScreen extends ConsumerWidget {
   const MobileHomeScreen({super.key});
 
-  Future<Map<String, dynamic>> _loadSession() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return const {};
-
-    final token = await user.getIdTokenResult(true);
-    return {
-      'email': user.email ?? '',
-      'uid': user.uid,
-      'role': token.claims?['role']?.toString() ?? 'unknown',
-      'shopId': token.claims?['shopId']?.toString() ?? 'unassigned',
-    };
-  }
-
-  Future<void> _signOut(BuildContext context) async {
-    await FirebaseAuth.instance.signOut();
-    if (context.mounted) {
-      context.go('/');
-    }
-  }
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(mobileSessionProvider).asData?.value;
+    final shopStream = ref.watch(shopRepositoryProvider).watchShopInfo();
+    final syncStatus = ref.watch(syncStatusProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Business Hub Mobile'),
         actions: [
           IconButton(
             tooltip: 'Sign out',
-            onPressed: () => _signOut(context),
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (context.mounted) {
+                context.go('/');
+              }
+            },
             icon: const Icon(Icons.logout),
           ),
         ],
       ),
-      body: FutureBuilder<Map<String, dynamic>>(
-        future: _loadSession(),
+      body: StreamBuilder(
+        stream: shopStream,
         builder: (context, snapshot) {
-          final session = snapshot.data ?? const <String, dynamic>{};
+          final shop = snapshot.data;
           return ListView(
             padding: const EdgeInsets.all(20),
             children: [
@@ -59,14 +53,18 @@ class MobileHomeScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Signed in as ${session['email'] ?? 'Unknown'}',
+                        'Signed in as ${session?.email.isNotEmpty == true ? session!.email : 'Unknown'}',
                       ),
                       const SizedBox(height: 8),
-                      Text('Role: ${session['role'] ?? 'unknown'}'),
+                      Text('Role: ${session?.role ?? 'unknown'}'),
                       const SizedBox(height: 4),
-                      Text('Shop: ${session['shopId'] ?? 'unassigned'}'),
+                      Text('Shop: ${session?.shopId ?? 'unassigned'}'),
                       const SizedBox(height: 4),
-                      Text('UID: ${session['uid'] ?? 'n/a'}'),
+                      Text('UID: ${session?.uid ?? 'n/a'}'),
+                      const SizedBox(height: 10),
+                      Text('Workspace: ${shop?.name ?? 'Loading...'}'),
+                      const SizedBox(height: 4),
+                      Text('Sync: ${syncStatus.name.toUpperCase()}'),
                     ],
                   ),
                 ),
