@@ -86,10 +86,10 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 140),
         children: <Widget>[
           MobileHeroBanner(
-            eyebrow: 'Native checkout',
-            title: 'Faster billing, lighter opening.',
+            eyebrow: 'Sales hub',
+            title: 'Premium checkout, native speed.',
             subtitle:
-                'This POS searches the local catalog first so the screen stays usable even while cloud sync is still catching up.',
+                'The cart opens from local SQLite first, then Firestore sync keeps the mobile checkout aligned with your live workspace.',
             trailing: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: <Widget>[
@@ -111,70 +111,166 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             ),
           ),
           const SizedBox(height: 18),
-          if (_cart.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 18),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0D1A11),
-                  borderRadius: BorderRadius.circular(26),
-                  border: Border.all(
-                    color: const Color(0xFF22C55E).withValues(alpha: 0.18),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Row(
+          MobilePanel(
+            title: 'Cart pulse',
+            action: MobileTag(
+              label: _cart.isEmpty ? 'AWAITING ITEMS' : 'CHECKOUT READY',
+              icon: _cart.isEmpty
+                  ? Icons.hourglass_top_rounded
+                  : Icons.shopping_bag_rounded,
+              accent: _cart.isEmpty
+                  ? const Color(0xFFA78BFA)
+                  : const Color(0xFF22C55E),
+            ),
+            child: _cart.isEmpty
+                ? const MobileEmptyState(
+                    icon: Icons.shopping_cart_outlined,
+                    title: 'Your cart is clear',
+                    body:
+                        'Search the local catalog below and tap products to begin billing.',
+                  )
+                : Column(
                     children: <Widget>[
-                      Container(
-                        width: 46,
-                        height: 46,
+                      DecoratedBox(
                         decoration: BoxDecoration(
-                          color: const Color(
-                            0xFF22C55E,
-                          ).withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(16),
+                          color: const Color(0xFF0D1A11),
+                          borderRadius: BorderRadius.circular(26),
+                          border: Border.all(
+                            color: const Color(
+                              0xFF22C55E,
+                            ).withValues(alpha: 0.18),
+                          ),
                         ),
-                        child: const Icon(
-                          Icons.payments_rounded,
-                          color: Color(0xFF22C55E),
+                        child: Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: Row(
+                            children: <Widget>[
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFF22C55E,
+                                  ).withValues(alpha: 0.14),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: const Icon(
+                                  Icons.payments_rounded,
+                                  color: Color(0xFF22C55E),
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: <Widget>[
+                                    Text(
+                                      'Current cart ready',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${_cart.length} lines staged for checkout',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.62,
+                                            ),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Text(
+                                formatCurrency(_cartTotal),
+                                style: Theme.of(context).textTheme.titleLarge
+                                    ?.copyWith(
+                                      color: const Color(0xFF22C55E),
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              'Current cart ready',
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w800),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${_cart.length} lines staged for checkout',
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.62),
-                                    fontWeight: FontWeight.w600,
+                      const SizedBox(height: 14),
+                      ..._cart
+                          .take(3)
+                          .map(
+                            (item) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0A1220),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.05),
                                   ),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(14),
+                                  child: Row(
+                                    children: <Widget>[
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: <Widget>[
+                                            Text(
+                                              item.name,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .titleMedium
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.w800,
+                                                  ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              '${item.quantity} x ${formatCurrency(item.price)}',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color: Colors.white
+                                                        .withValues(
+                                                          alpha: 0.58,
+                                                        ),
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Text(
+                                        formatCurrency(item.lineTotal),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .labelLarge
+                                            ?.copyWith(
+                                              color: const Color(0xFF22C55E),
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Text(
-                        formatCurrency(_cartTotal),
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: const Color(0xFF22C55E),
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
+                          ),
                     ],
                   ),
-                ),
-              ),
-            ),
+          ),
+          const SizedBox(height: 18),
           MobilePanel(
             title: 'Search and add',
             action: MobileTag(

@@ -273,114 +273,138 @@ class _ShellHeader extends StatelessWidget {
       MobileSyncStatus.idle => 'Live',
     };
 
-    return Row(
-      children: <Widget>[
-        _HeaderIconButton(
-          icon: canGoBack ? Icons.arrow_back_rounded : Icons.grid_view_rounded,
-          onPressed: canGoBack ? onBackPressed : null,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            Color(0xFF07101B),
+            Color(0xFF0C1524),
+            Color(0xFF101827),
+          ],
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                title,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.4,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                _HeaderIconButton(
+                  icon: canGoBack
+                      ? Icons.arrow_back_rounded
+                      : Icons.grid_view_rounded,
+                  onPressed: canGoBack ? onBackPressed : null,
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.62),
-                  fontWeight: FontWeight.w600,
+                const Spacer(),
+                _StatusSignalChip(
+                  tone: statusTone,
+                  label: statusLabel.toUpperCase(),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: <Widget>[
-                  Flexible(
-                    child: Text(
-                      workspaceName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.84),
-                        fontWeight: FontWeight.w800,
-                      ),
+                const SizedBox(width: 10),
+                _HeaderIconButton(
+                  icon: Icons.sync_rounded,
+                  onPressed: () {
+                    onRefreshPressed();
+                  },
+                ),
+                const SizedBox(width: 10),
+                _HeaderIconButton(
+                  icon: Icons.logout_rounded,
+                  onPressed: onSignOutPressed,
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(22),
+                    gradient: const LinearGradient(
+                      colors: <Color>[Color(0xFF60A5FA), Color(0xFF2563EB)],
                     ),
                   ),
-                  if (workspaceTagline.isNotEmpty) ...<Widget>[
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        workspaceTagline,
+                  child: const Icon(
+                    Icons.storefront_rounded,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'Business Hub Pro',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        workspaceTagline.isNotEmpty
+                            ? workspaceTagline.toUpperCase()
+                            : 'ZARRA ECOSYSTEM',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.46),
-                          letterSpacing: 1.2,
-                          fontWeight: FontWeight.w700,
+                          color: Colors.white.withValues(alpha: 0.52),
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.8,
                         ),
                       ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 14),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: statusTone.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: statusTone.withValues(alpha: 0.22)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Text(
-                  statusLabel.toUpperCase(),
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: statusTone,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: statusTone,
-                    shape: BoxShape.circle,
+                      const SizedBox(height: 12),
+                      Text(
+                        title,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          height: 0.98,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.68),
+                          fontWeight: FontWeight.w600,
+                          height: 1.45,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: <Widget>[
+                _StatusStrip(
+                  accent: const Color(0xFF22C55E),
+                  title: 'DATA SECURE',
+                  subtitle: 'Local vault mounted',
+                ),
+                _StatusStrip(
+                  accent: statusTone,
+                  title: statusLabel.toUpperCase(),
+                  subtitle: workspaceName,
+                ),
+              ],
+            ),
+          ],
         ),
-        const SizedBox(width: 10),
-        _HeaderIconButton(
-          icon: Icons.sync_rounded,
-          onPressed: () {
-            onRefreshPressed();
-          },
-        ),
-        const SizedBox(width: 10),
-        _HeaderIconButton(
-          icon: Icons.logout_rounded,
-          onPressed: onSignOutPressed,
-        ),
-      ],
+      ),
     );
   }
 }
@@ -405,6 +429,96 @@ class _HeaderIconButton extends StatelessWidget {
         onPressed: onPressed,
         icon: Icon(icon),
         color: Colors.white,
+      ),
+    );
+  }
+}
+
+class _StatusSignalChip extends StatelessWidget {
+  const _StatusSignalChip({required this.tone, required this.label});
+
+  final Color tone;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: tone.withValues(alpha: 0.2)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Container(
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(color: tone, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: tone,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.2,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusStrip extends StatelessWidget {
+  const _StatusStrip({
+    required this.accent,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final Color accent;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: accent.withValues(alpha: 0.18)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              title,
+              style: TextStyle(
+                color: accent,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.35,
+                fontSize: 10,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -503,20 +617,20 @@ class _ShellNavItem {
 const List<_ShellNavItem> _navItems = <_ShellNavItem>[
   _ShellNavItem(
     label: 'Overview',
-    title: 'Command Center',
-    subtitle: 'Real-time pulse with faster local data opening first.',
+    title: 'Shop Command Center',
+    subtitle: 'Real-time metrics, live sync, and premium mobile control.',
     icon: Icons.grid_view_rounded,
   ),
   _ShellNavItem(
     label: 'Inventory',
-    title: 'Inventory Deck',
-    subtitle: 'Scroll-fast catalog, category filters, and stock health.',
+    title: 'Inventory Command Deck',
+    subtitle: 'Scroll-fast catalog, category filters, and stock watch.',
     icon: Icons.inventory_2_rounded,
   ),
   _ShellNavItem(
     label: 'POS',
     title: 'Sales Hub',
-    subtitle: 'Native checkout flow built for faster mobile billing.',
+    subtitle: 'Native checkout flow built for faster, smoother billing.',
     icon: Icons.point_of_sale_rounded,
   ),
 ];

@@ -16,7 +16,7 @@ class ShopInfo {
   factory ShopInfo.fallback() {
     return const ShopInfo(
       name: 'Business Hub Pro',
-      tagline: 'Flutter mobile beta',
+      tagline: 'ZARRA ECOSYSTEM',
       footer: 'Thank you for your business!',
       currency: 'INR',
       phone: '',

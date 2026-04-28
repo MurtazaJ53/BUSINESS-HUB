@@ -74,6 +74,40 @@ Future<_RecoveredWorkspaceContext?> _recoverWorkspaceContext(
   }
 
   try {
+    final staffMembershipQuery = await firestore
+        .collectionGroup('staff')
+        .where('id', isEqualTo: user.uid)
+        .limit(1)
+        .get();
+
+    if (staffMembershipQuery.docs.isNotEmpty) {
+      final staffDoc = staffMembershipQuery.docs.first;
+      final staffData = staffDoc.data();
+      final shopId = staffDoc.reference.parent.parent?.id;
+      if (shopId != null && shopId.isNotEmpty) {
+        await firestore.doc('users/${user.uid}').set({
+          'email': user.email,
+          'shopId': shopId,
+          'role': staffData['role'] ?? 'staff',
+          'updatedAt': DateTime.now().toIso8601String(),
+        }, SetOptions(merge: true));
+
+        return _RecoveredWorkspaceContext(
+          shopId: shopId,
+          role: staffData['role']?.toString(),
+          permissions: staffData['permissions'] is Map
+              ? Map<String, dynamic>.from(staffData['permissions'] as Map)
+              : null,
+          isElevatedAdmin:
+              (staffData['role']?.toString() ?? '').toLowerCase() == 'admin',
+        );
+      }
+    }
+  } catch (_) {
+    // Fall back to owner-based recovery.
+  }
+
+  try {
     final ownedShopQuery = await firestore
         .collection('shops')
         .where('ownerId', isEqualTo: user.uid)

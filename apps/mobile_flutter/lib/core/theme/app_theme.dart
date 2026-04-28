@@ -13,6 +13,7 @@ final class AppTheme {
         primary: _primary,
         secondary: const Color(0xFF38BDF8),
         surface: _darkCard,
+        tertiary: const Color(0xFF22C55E),
       ),
       textTheme: base.textTheme.copyWith(
         headlineLarge: base.textTheme.headlineLarge?.copyWith(
@@ -43,6 +44,25 @@ final class AppTheme {
         elevation: 0,
         margin: EdgeInsets.zero,
       ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: const Color(0xFF111827),
+        contentTextStyle: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        behavior: SnackBarBehavior.floating,
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: Color(0xFF0A1220),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: const Color(0xFF0B121F),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: _darkBackground,
         elevation: 0,
@@ -53,7 +73,7 @@ final class AppTheme {
           backgroundColor: const Color(0xFF2563EB),
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(20),
           ),
           textStyle: const TextStyle(
             fontWeight: FontWeight.w800,
@@ -66,7 +86,7 @@ final class AppTheme {
           foregroundColor: Colors.white,
           side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(20),
           ),
           textStyle: const TextStyle(fontWeight: FontWeight.w700),
         ),

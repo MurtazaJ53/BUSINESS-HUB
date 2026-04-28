@@ -70,6 +70,7 @@ class MobileSyncCoordinator {
     MobileSession? session, {
     bool force = false,
   }) async {
+    final previousShopId = _session?.shopId;
     if (!force &&
         session?.shopId == _session?.shopId &&
         session?.role == _session?.role) {
@@ -77,6 +78,11 @@ class MobileSyncCoordinator {
     }
 
     await _cancelSubscriptions();
+
+    if (force || previousShopId != session?.shopId || session == null) {
+      await _clearWorkspaceCache();
+    }
+
     _session = session;
 
     if (session == null || !session.hasShop) {
@@ -87,6 +93,7 @@ class MobileSyncCoordinator {
     setStatus(MobileSyncStatus.syncing);
     final shopId = session.shopId!;
     await _ensureAdminBootstrap(session, shopId);
+    await _primeWorkspaceSnapshot(shopId, includeCost: session.canViewCost);
 
     _subscriptions.add(
       _firestore
@@ -142,7 +149,8 @@ class MobileSyncCoordinator {
     _subscriptions.add(
       _firestore
           .collection('shops/$shopId/sales')
-          .limit(500)
+          .orderBy('date', descending: true)
+          .limit(1500)
           .snapshots()
           .listen(
             (snapshot) async {
@@ -155,6 +163,8 @@ class MobileSyncCoordinator {
             },
           ),
     );
+
+    setStatus(MobileSyncStatus.idle);
   }
 
   Future<void> refresh() => handleSession(_session, force: true);
@@ -194,6 +204,56 @@ class MobileSyncCoordinator {
   }
 
   Future<void> dispose() => _cancelSubscriptions();
+
+  Future<void> _clearWorkspaceCache() async {
+    await Future.wait<void>([
+      _shopRepository.clearWorkspace(),
+      _inventoryRepository.clearWorkspace(),
+      _salesRepository.clearWorkspace(),
+    ]);
+  }
+
+  Future<void> _primeWorkspaceSnapshot(
+    String shopId, {
+    required bool includeCost,
+  }) async {
+    try {
+      final snapshotFutures = await Future.wait([
+        _firestore.doc('shops/$shopId').get(),
+        _firestore.collection('shops/$shopId/inventory').get(),
+        _firestore
+            .collection('shops/$shopId/sales')
+            .orderBy('date', descending: true)
+            .limit(1500)
+            .get(),
+        if (includeCost)
+          _firestore.collection('shops/$shopId/inventory_private').get(),
+      ]);
+
+      final shopSnapshot =
+          snapshotFutures[0] as DocumentSnapshot<Map<String, dynamic>>;
+      final inventorySnapshot =
+          snapshotFutures[1] as QuerySnapshot<Map<String, dynamic>>;
+      final salesSnapshot =
+          snapshotFutures[2] as QuerySnapshot<Map<String, dynamic>>;
+      final inventoryPrivateSnapshot = includeCost
+          ? snapshotFutures[3] as QuerySnapshot<Map<String, dynamic>>
+          : null;
+
+      if (shopSnapshot.exists && shopSnapshot.data() != null) {
+        await _shopRepository.saveShopDocument(shopSnapshot.data()!);
+      }
+
+      await _mergeInventoryDocuments(inventorySnapshot.docs);
+      if (inventoryPrivateSnapshot != null) {
+        await _mergeInventoryPrivateDocuments(inventoryPrivateSnapshot.docs);
+      }
+      await _mergeSalesDocuments(salesSnapshot.docs);
+    } catch (error) {
+      debugPrint('Initial workspace bootstrap failed: $error');
+      setStatus(MobileSyncStatus.error);
+    }
+  }
 
   Future<void> _cancelSubscriptions() async {
     for (final subscription in _subscriptions) {
@@ -273,6 +333,25 @@ class MobileSyncCoordinator {
     }
   }
 
+  Future<void> _mergeInventoryDocuments(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) async {
+    final tasks = <Future<void>>[];
+    for (final doc in docs) {
+      final data = Map<String, dynamic>.from(doc.data());
+      tasks.add(
+        _inventoryRepository.mergeInventoryDocument(
+          doc.id,
+          data,
+          updatedAt: _toEpoch(data['updatedAt'] ?? data['createdAt']),
+        ),
+      );
+    }
+    if (tasks.isNotEmpty) {
+      await Future.wait(tasks);
+    }
+  }
+
   Future<void> _mergeInventoryPrivateChanges(
     List<DocumentChange<Map<String, dynamic>>> changes,
   ) async {
@@ -300,6 +379,25 @@ class MobileSyncCoordinator {
     }
   }
 
+  Future<void> _mergeInventoryPrivateDocuments(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) async {
+    final tasks = <Future<void>>[];
+    for (final doc in docs) {
+      final data = Map<String, dynamic>.from(doc.data());
+      tasks.add(
+        _inventoryRepository.mergeInventoryPrivateDocument(
+          doc.id,
+          data,
+          updatedAt: _toEpoch(data['updatedAt'] ?? data['lastPurchaseDate']),
+        ),
+      );
+    }
+    if (tasks.isNotEmpty) {
+      await Future.wait(tasks);
+    }
+  }
+
   Future<void> _mergeSalesChanges(
     List<DocumentChange<Map<String, dynamic>>> changes,
   ) async {
@@ -317,6 +415,25 @@ class MobileSyncCoordinator {
       tasks.add(
         _salesRepository.mergeRemoteSaleDocument(
           change.doc.id,
+          data,
+          updatedAt: _toEpoch(data['updatedAt'] ?? data['createdAt']),
+        ),
+      );
+    }
+    if (tasks.isNotEmpty) {
+      await Future.wait(tasks);
+    }
+  }
+
+  Future<void> _mergeSalesDocuments(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) async {
+    final tasks = <Future<void>>[];
+    for (final doc in docs) {
+      final data = Map<String, dynamic>.from(doc.data());
+      tasks.add(
+        _salesRepository.mergeRemoteSaleDocument(
+          doc.id,
           data,
           updatedAt: _toEpoch(data['updatedAt'] ?? data['createdAt']),
         ),

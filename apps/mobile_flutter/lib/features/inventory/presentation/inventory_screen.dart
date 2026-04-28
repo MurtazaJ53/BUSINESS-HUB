@@ -63,10 +63,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             return Column(
               children: <Widget>[
                 MobileHeroBanner(
-                  eyebrow: 'Inventory operations',
-                  title: 'Inventory built for quick scrolling.',
+                  eyebrow: 'Inventory deck',
+                  title: 'Scroll-fast stock command',
                   subtitle:
-                      'The catalog opens from local SQLite first, then keeps filling from cloud sync in the background.',
+                      'The catalog opens from local SQLite, then keeps absorbing Firestore updates without freezing the whole screen.',
                   trailing: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: <Widget>[
@@ -84,37 +84,42 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   ),
                 ),
                 const SizedBox(height: 18),
-                GridView.count(
-                  crossAxisCount: 3,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                  childAspectRatio: 0.96,
-                  children: <Widget>[
-                    MobileMetricCard(
-                      label: 'Items',
-                      value: '${metrics.totalItems}',
-                      caption: 'Catalog size',
-                      icon: Icons.apps_rounded,
-                    ),
-                    MobileMetricCard(
-                      label: 'Low stock',
-                      value: '${metrics.lowStock}',
-                      caption: 'Watchlist',
-                      icon: Icons.error_outline_rounded,
-                      accent: const Color(0xFFFB7185),
-                    ),
-                    MobileMetricCard(
-                      label: 'Value',
-                      value: formatCurrency(metrics.inventoryValue),
-                      caption: syncStatus == MobileSyncStatus.syncing
-                          ? 'Syncing now'
-                          : 'Local total',
-                      icon: Icons.currency_rupee_rounded,
-                      accent: const Color(0xFF22C55E),
-                    ),
-                  ],
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final count = constraints.maxWidth > 520 ? 3 : 2;
+                    return GridView.count(
+                      crossAxisCount: count,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      childAspectRatio: 1.02,
+                      children: <Widget>[
+                        MobileMetricCard(
+                          label: 'Items',
+                          value: '${metrics.totalItems}',
+                          caption: 'Catalog size',
+                          icon: Icons.apps_rounded,
+                        ),
+                        MobileMetricCard(
+                          label: 'Low stock',
+                          value: '${metrics.lowStock}',
+                          caption: 'Watchlist',
+                          icon: Icons.error_outline_rounded,
+                          accent: const Color(0xFFFB7185),
+                        ),
+                        MobileMetricCard(
+                          label: 'Value',
+                          value: formatCurrency(metrics.inventoryValue),
+                          caption: syncStatus == MobileSyncStatus.syncing
+                              ? 'Syncing now'
+                              : 'Local total',
+                          icon: Icons.currency_rupee_rounded,
+                          accent: const Color(0xFF22C55E),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             );
@@ -124,7 +129,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         MobilePanel(
           title: 'Catalog controls',
           action: MobileTag(
-            label: _lowStockOnly ? 'Low stock filter on' : 'All catalog',
+            label: _lowStockOnly ? 'LOW STOCK ONLY' : 'ALL CATALOG',
             icon: _lowStockOnly ? Icons.filter_alt_rounded : Icons.tune_rounded,
           ),
           child: Column(
@@ -217,7 +222,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 ? 1
                 : (totalCount / _pageSize).ceil();
             return MobilePanel(
-              title: 'Catalog stream',
+              title: 'Inventory stream',
               action: MobileTag(
                 label: '$totalCount visible',
                 icon: Icons.view_agenda_rounded,
@@ -366,8 +371,8 @@ class _InventoryRow extends StatelessWidget {
         child: Row(
           children: <Widget>[
             Container(
-              width: 46,
-              height: 46,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 color: priceTone.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(16),

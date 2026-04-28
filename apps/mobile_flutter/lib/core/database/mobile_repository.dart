@@ -37,7 +37,7 @@ class ShopRepository {
         final decoded = jsonDecode(row.value) as Map<String, dynamic>;
         return ShopInfo(
           name: (decoded['name'] ?? 'Business Hub Pro').toString(),
-          tagline: (decoded['tagline'] ?? 'Flutter mobile beta').toString(),
+          tagline: (decoded['tagline'] ?? 'ZARRA ECOSYSTEM').toString(),
           footer: (decoded['footer'] ?? 'Thank you for your business!')
               .toString(),
           currency: (decoded['currency'] ?? 'INR').toString(),
@@ -55,6 +55,17 @@ class ShopRepository {
     );
     settings['name'] =
         rawData['name'] ?? settings['name'] ?? 'Business Hub Pro';
+    settings['tagline'] =
+        settings['tagline'] ??
+        rawData['tagline'] ??
+        rawData['ecosystem'] ??
+        'ZARRA ECOSYSTEM';
+    settings['footer'] =
+        settings['footer'] ??
+        rawData['footer'] ??
+        'Thank you for your business!';
+    settings['currency'] = settings['currency'] ?? rawData['currency'] ?? 'INR';
+    settings['phone'] = settings['phone'] ?? rawData['phone'] ?? '';
 
     await _db
         .into(_db.shopSettingsEntries)
@@ -65,6 +76,10 @@ class ShopRepository {
             updatedAt: DateTime.now().millisecondsSinceEpoch,
           ),
         );
+  }
+
+  Future<void> clearWorkspace() async {
+    await _db.delete(_db.shopSettingsEntries).go();
   }
 }
 
@@ -388,6 +403,13 @@ class InventoryRepository {
       costPrice: row.readNullable<double>('cost_price'),
     );
   }
+
+  Future<void> clearWorkspace() async {
+    await _db.transaction(() async {
+      await _db.delete(_db.inventoryPrivateEntries).go();
+      await _db.delete(_db.inventoryEntries).go();
+    });
+  }
 }
 
 class SalesRepository {
@@ -534,6 +556,10 @@ class SalesRepository {
       footerNote: footerNote,
       inventoryDeltas: inventoryDeltas,
     );
+  }
+
+  Future<void> clearWorkspace() async {
+    await _db.delete(_db.salesEntries).go();
   }
 }
 

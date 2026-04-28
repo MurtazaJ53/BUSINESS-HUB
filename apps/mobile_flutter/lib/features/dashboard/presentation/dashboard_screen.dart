@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
@@ -27,15 +28,70 @@ class DashboardScreen extends ConsumerWidget {
       stream: overviewStream,
       builder: (context, overviewSnapshot) {
         final overview = overviewSnapshot.data ?? DashboardOverview.empty();
+        final actionCards = <Widget>[
+          MobileActionCard(
+            kicker: 'POS HUB',
+            title: 'Start sale',
+            subtitle:
+                'Open the native billing flow and move instantly into checkout.',
+            icon: Icons.point_of_sale_rounded,
+            accent: const Color(0xFF60A5FA),
+            onTap: () => context.go('/pos'),
+          ),
+          MobileActionCard(
+            kicker: 'CATALOG',
+            title: 'Inventory',
+            subtitle:
+                'Browse products, stock signals, and filters without the web lag.',
+            icon: Icons.inventory_2_rounded,
+            accent: const Color(0xFF1D4ED8),
+            onTap: () => context.go('/inventory'),
+          ),
+        ];
+
+        final metricCards = <Widget>[
+          MobileMetricCard(
+            label: 'Revenue',
+            value: formatCurrency(overview.todayRevenue),
+            caption: '${overview.todaySalesCount} sales today',
+            icon: Icons.trending_up_rounded,
+            accent: const Color(0xFF38BDF8),
+          ),
+          MobileMetricCard(
+            label: 'Potential',
+            value: session?.canViewCost == true
+                ? formatCurrency(overview.metrics.potentialProfit)
+                : 'Locked',
+            caption: session?.canViewCost == true
+                ? 'Margin projection'
+                : 'Admin view required',
+            icon: Icons.wallet_rounded,
+            accent: const Color(0xFF22C55E),
+          ),
+          MobileMetricCard(
+            label: 'Stock value',
+            value: formatCurrency(overview.metrics.inventoryValue),
+            caption: '${overview.metrics.totalItems} active SKUs',
+            icon: Icons.inventory_2_rounded,
+            accent: const Color(0xFF38BDF8),
+          ),
+          MobileMetricCard(
+            label: 'Alerts',
+            value: '${overview.metrics.lowStock}',
+            caption: 'Restock required',
+            icon: Icons.warning_amber_rounded,
+            accent: const Color(0xFFFB7185),
+          ),
+        ];
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
           children: <Widget>[
             MobileHeroBanner(
-              eyebrow: 'Live operations',
-              title: 'Shop pulse, ready in motion.',
+              eyebrow: 'Command center',
+              title: 'Shop Command Center',
               subtitle:
-                  'Local SQLite opens this dashboard first, then Firestore sync fills in the latest shop activity behind it.',
+                  'Real-time metrics, live sync status, and instant action cards tuned for a faster mobile Business Hub experience.',
               trailing: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: <Widget>[
@@ -46,59 +102,22 @@ class DashboardScreen extends ConsumerWidget {
                   const SizedBox(height: 10),
                   MobileTag(
                     label: syncStatus == MobileSyncStatus.syncing
-                        ? 'Syncing workspace'
-                        : 'Workspace live',
+                        ? 'Workspace syncing'
+                        : 'Live link active',
                     icon: syncStatus == MobileSyncStatus.syncing
                         ? Icons.sync_rounded
                         : Icons.wifi_tethering_rounded,
                     accent: syncStatus == MobileSyncStatus.error
                         ? const Color(0xFFFB7185)
-                        : const Color(0xFF38BDF8),
+                        : const Color(0xFF22C55E),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 18),
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 1.02,
-              children: <Widget>[
-                MobileMetricCard(
-                  label: 'Catalog',
-                  value: '${overview.metrics.totalItems}',
-                  caption: '${overview.metrics.totalStock} units on hand',
-                  icon: Icons.grid_view_rounded,
-                ),
-                MobileMetricCard(
-                  label: 'Today revenue',
-                  value: formatCurrency(overview.todayRevenue),
-                  caption: '${overview.todaySalesCount} sales today',
-                  icon: Icons.trending_up_rounded,
-                  accent: const Color(0xFF22C55E),
-                ),
-                MobileMetricCard(
-                  label: 'Inventory value',
-                  value: formatCurrency(overview.metrics.inventoryValue),
-                  caption: '${overview.metrics.lowStock} low stock alerts',
-                  icon: Icons.currency_rupee_rounded,
-                ),
-                MobileMetricCard(
-                  label: 'Potential profit',
-                  value: session?.canViewCost == true
-                      ? formatCurrency(overview.metrics.potentialProfit)
-                      : 'Locked',
-                  caption: session?.canViewCost == true
-                      ? 'Margin projection'
-                      : 'Admin view required',
-                  icon: Icons.insights_rounded,
-                  accent: const Color(0xFFA78BFA),
-                ),
-              ],
-            ),
+            _ResponsiveGrid(minItemWidth: 170, children: actionCards),
+            const SizedBox(height: 18),
+            _ResponsiveGrid(minItemWidth: 155, children: metricCards),
             const SizedBox(height: 18),
             StreamBuilder<List<LowStockItem>>(
               stream: lowStockStream,
@@ -106,9 +125,9 @@ class DashboardScreen extends ConsumerWidget {
                 final lowStock =
                     lowStockSnapshot.data ?? const <LowStockItem>[];
                 return MobilePanel(
-                  title: 'Critical stock watch',
+                  title: 'Restock required',
                   action: MobileTag(
-                    label: '${overview.metrics.lowStock} open',
+                    label: '${overview.metrics.lowStock} live',
                     icon: Icons.warning_amber_rounded,
                     accent: const Color(0xFFFB7185),
                   ),
@@ -118,11 +137,11 @@ class DashboardScreen extends ConsumerWidget {
                               ? Icons.sync_rounded
                               : Icons.verified_rounded,
                           title: syncStatus == MobileSyncStatus.syncing
-                              ? 'Syncing inventory now'
-                              : 'Stock levels look stable',
+                              ? 'Hydrating stock watch'
+                              : 'No urgent stock alerts',
                           body: syncStatus == MobileSyncStatus.syncing
-                              ? 'Your workspace is still hydrating from Firestore. Low-stock alerts will appear here as soon as the first inventory batch lands.'
-                              : 'No urgent stock alerts are active in the local mobile catalog.',
+                              ? 'The mobile vault is still pulling inventory into local storage.'
+                              : 'Current local inventory does not have any low-stock items.',
                         )
                       : Column(
                           children: lowStock
@@ -148,7 +167,7 @@ class DashboardScreen extends ConsumerWidget {
                 final sales =
                     recentSalesSnapshot.data ?? const <RecentSaleSummary>[];
                 return MobilePanel(
-                  title: 'Recent sales',
+                  title: 'Recent sale feed',
                   action: MobileTag(
                     label: '${sales.length} recent',
                     icon: Icons.shopping_bag_rounded,
@@ -161,10 +180,10 @@ class DashboardScreen extends ConsumerWidget {
                               : Icons.receipt_long_rounded,
                           title: syncStatus == MobileSyncStatus.syncing
                               ? 'Sales are still landing'
-                              : 'No sales synced yet',
+                              : 'No synced sale feed yet',
                           body: syncStatus == MobileSyncStatus.syncing
-                              ? 'Give the app a moment while recent sales are pulled into local storage.'
-                              : 'Once sales are recorded or synced, this feed will show the latest receipts here.',
+                              ? 'Give the app a moment while recent sales finish syncing into local storage.'
+                              : 'Once billing activity syncs, the latest receipts will appear here.',
                         )
                       : Column(
                           children: sales
@@ -183,6 +202,31 @@ class DashboardScreen extends ConsumerWidget {
               },
             ),
           ],
+        );
+      },
+    );
+  }
+}
+
+class _ResponsiveGrid extends StatelessWidget {
+  const _ResponsiveGrid({required this.minItemWidth, required this.children});
+
+  final double minItemWidth;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final count = (constraints.maxWidth / minItemWidth).floor().clamp(1, 3);
+        return GridView.count(
+          crossAxisCount: count,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 0.96,
+          children: children,
         );
       },
     );
@@ -218,8 +262,8 @@ class _DashboardRow extends StatelessWidget {
           child: Row(
             children: <Widget>[
               Container(
-                width: 10,
-                height: 10,
+                width: 12,
+                height: 12,
                 decoration: BoxDecoration(
                   color: accent,
                   shape: BoxShape.circle,

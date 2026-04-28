@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/session/mobile_session_controller.dart';
+import '../../shell/presentation/mobile_surface.dart';
 
 class AuthGateScreen extends ConsumerStatefulWidget {
   const AuthGateScreen({super.key});
@@ -19,6 +20,7 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen> {
 
   bool _submitting = false;
   bool _obscurePassword = true;
+  bool _recoveryMode = false;
   String? _error;
   bool _redirecting = false;
 
@@ -30,7 +32,9 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen> {
   }
 
   Future<void> _signIn() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
     setState(() {
       _submitting = true;
@@ -69,7 +73,7 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen> {
     final email = _emailController.text.trim();
     if (email.isEmpty) {
       setState(() {
-        _error = 'Enter your email first, then tap reset password.';
+        _error = 'Enter your email first, then tap recovery.';
       });
       return;
     }
@@ -81,10 +85,15 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen> {
 
     try {
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Password reset email sent.')),
       );
+      setState(() {
+        _recoveryMode = false;
+      });
     } on FirebaseAuthException catch (error) {
       setState(() {
         _error = error.message ?? 'Could not send reset email.';
@@ -100,16 +109,25 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final sessionAsync = ref.watch(mobileSessionProvider);
 
     return sessionAsync.when(
-      loading: () => const _CenteredStatus(
-        title: 'Starting Business Hub Mobile',
-        subtitle: 'Restoring your secure session...',
+      loading: () => const _AuthScaffold(
+        child: _BrandedStatus(
+          icon: Icons.lock_clock_rounded,
+          eyebrow: 'Secure handoff',
+          title: 'Starting Business Hub Pro',
+          subtitle: 'Restoring your workspace vault and checking live access.',
+        ),
       ),
-      error: (error, _) =>
-          _CenteredStatus(title: 'Session error', subtitle: error.toString()),
+      error: (error, _) => _AuthScaffold(
+        child: _BrandedStatus(
+          icon: Icons.error_outline_rounded,
+          eyebrow: 'Session issue',
+          title: 'We could not restore the session',
+          subtitle: error.toString(),
+        ),
+      ),
       data: (session) {
         if (session != null) {
           if (session.hasShop && !_redirecting) {
@@ -120,173 +138,74 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen> {
               }
             });
           }
+
           if (!session.hasShop) {
             _redirecting = false;
-            return Scaffold(
-              body: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.sync_problem_rounded,
-                        size: 42,
-                        color: Colors.amber,
-                      ),
-                      const SizedBox(height: 22),
-                      Text(
-                        'Workspace recovery in progress',
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Your account is signed in, but the mobile app is still recovering the shop link. If this stays here, sign out and sign back in once so we can refresh the workspace context.',
-                        style: theme.textTheme.bodyMedium,
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 22),
-                      FilledButton.tonalIcon(
-                        onPressed: () async {
-                          await FirebaseAuth.instance.signOut();
-                        },
-                        icon: const Icon(Icons.logout_rounded),
-                        label: const Text('Sign out'),
-                      ),
-                    ],
+            return _AuthScaffold(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  const _BrandedStatus(
+                    icon: Icons.sync_problem_rounded,
+                    eyebrow: 'Workspace recovery',
+                    title: 'Your account is in, shop link is still healing',
+                    subtitle:
+                        'The mobile app is refreshing workspace ownership and staff membership so your Business Hub data can attach correctly.',
                   ),
-                ),
+                  const SizedBox(height: 18),
+                  FilledButton.tonalIcon(
+                    onPressed: () async {
+                      await FirebaseAuth.instance.signOut();
+                    },
+                    icon: const Icon(Icons.logout_rounded),
+                    label: const Text('Sign out'),
+                  ),
+                ],
               ),
             );
           }
-          return const _CenteredStatus(
-            title: 'Welcome back',
-            subtitle: 'Opening your mobile workspace...',
+
+          return const _AuthScaffold(
+            child: _BrandedStatus(
+              icon: Icons.verified_user_rounded,
+              eyebrow: 'Access granted',
+              title: 'Opening your command center',
+              subtitle:
+                  'Business Hub is mounting the local vault and hydrating the mobile workspace.',
+            ),
           );
         }
 
         _redirecting = false;
-        return Scaffold(
-          body: SafeArea(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 440),
-                child: ListView(
-                  padding: const EdgeInsets.all(24),
-                  children: [
-                    const SizedBox(height: 24),
-                    Text(
-                      'Business Hub Mobile',
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Flutter mobile beta. Faster local-first Android experience powered by native SQLite and Firebase sync.',
-                      style: theme.textTheme.bodyMedium,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 28),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text(
-                                'Sign in',
-                                style: theme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                controller: _emailController,
-                                keyboardType: TextInputType.emailAddress,
-                                autocorrect: false,
-                                decoration: const InputDecoration(
-                                  labelText: 'Email',
-                                ),
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return 'Email is required';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 14),
-                              TextFormField(
-                                controller: _passwordController,
-                                obscureText: _obscurePassword,
-                                decoration: InputDecoration(
-                                  labelText: 'Password',
-                                  suffixIcon: IconButton(
-                                    onPressed: () {
-                                      setState(() {
-                                        _obscurePassword = !_obscurePassword;
-                                      });
-                                    },
-                                    icon: Icon(
-                                      _obscurePassword
-                                          ? Icons.visibility
-                                          : Icons.visibility_off,
-                                    ),
-                                  ),
-                                ),
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Password is required';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              if (_error != null) ...[
-                                const SizedBox(height: 14),
-                                Text(
-                                  _error!,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.error,
-                                  ),
-                                ),
-                              ],
-                              const SizedBox(height: 20),
-                              FilledButton(
-                                onPressed: _submitting ? null : _signIn,
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  child: _submitting
-                                      ? const SizedBox(
-                                          height: 20,
-                                          width: 20,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2.2,
-                                          ),
-                                        )
-                                      : const Text('Sign in'),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              TextButton(
-                                onPressed: _submitting ? null : _sendResetEmail,
-                                child: const Text('Reset password'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+        return _AuthScaffold(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Column(
+              children: <Widget>[
+                const _AuthHero(),
+                const SizedBox(height: 18),
+                _AuthCard(
+                  emailController: _emailController,
+                  passwordController: _passwordController,
+                  formKey: _formKey,
+                  submitting: _submitting,
+                  obscurePassword: _obscurePassword,
+                  recoveryMode: _recoveryMode,
+                  error: _error,
+                  onTogglePassword: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                  onModeChange: (recovery) {
+                    setState(() {
+                      _recoveryMode = recovery;
+                      _error = null;
+                    });
+                  },
+                  onSubmit: _recoveryMode ? _sendResetEmail : _signIn,
                 ),
-              ),
+              ],
             ),
           ),
         );
@@ -295,40 +214,455 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen> {
   }
 }
 
-class _CenteredStatus extends StatelessWidget {
-  const _CenteredStatus({required this.title, required this.subtitle});
+class _AuthScaffold extends StatelessWidget {
+  const _AuthScaffold({required this.child});
 
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: <Color>[
+              Color(0xFF03060B),
+              Color(0xFF09111F),
+              Color(0xFF05070B),
+            ],
+          ),
+        ),
+        child: Stack(
+          children: <Widget>[
+            const Positioned(
+              top: -90,
+              left: -50,
+              child: _AuraBlob(size: 220, color: Color(0x222563EB)),
+            ),
+            const Positioned(
+              top: 120,
+              right: -44,
+              child: _AuraBlob(size: 180, color: Color(0x2206B6D4)),
+            ),
+            const Positioned(
+              bottom: -60,
+              left: 18,
+              child: _AuraBlob(size: 200, color: Color(0x1E38BDF8)),
+            ),
+            SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(22),
+                  child: child,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AuthHero extends StatelessWidget {
+  const _AuthHero();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return MobilePanel(
+      title: 'Command the shop from your pocket',
+      action: const MobileTag(
+        label: 'LIVE LINK ACTIVE',
+        icon: Icons.wifi_tethering_rounded,
+        accent: Color(0xFF22C55E),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Container(
+                width: 62,
+                height: 62,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  gradient: const LinearGradient(
+                    colors: <Color>[Color(0xFF60A5FA), Color(0xFF2563EB)],
+                  ),
+                ),
+                child: const Icon(
+                  Icons.storefront_rounded,
+                  color: Colors.white,
+                  size: 30,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Business Hub Pro',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        height: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'ZARRA ECOSYSTEM',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.52),
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'Local vault speed. Live cloud continuity. Premium operations in your hand.',
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: Colors.white.withValues(alpha: 0.76),
+              height: 1.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: const <Widget>[
+              MobileTag(
+                label: 'LOCAL-FIRST OPENING',
+                icon: Icons.offline_bolt_rounded,
+              ),
+              MobileTag(
+                label: 'FIREBASE SECURED',
+                icon: Icons.shield_rounded,
+                accent: Color(0xFF22C55E),
+              ),
+              MobileTag(
+                label: 'PREMIUM CHECKOUT FLOW',
+                icon: Icons.point_of_sale_rounded,
+                accent: Color(0xFFA78BFA),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AuthCard extends StatelessWidget {
+  const _AuthCard({
+    required this.emailController,
+    required this.passwordController,
+    required this.formKey,
+    required this.submitting,
+    required this.obscurePassword,
+    required this.recoveryMode,
+    required this.error,
+    required this.onTogglePassword,
+    required this.onModeChange,
+    required this.onSubmit,
+  });
+
+  final TextEditingController emailController;
+  final TextEditingController passwordController;
+  final GlobalKey<FormState> formKey;
+  final bool submitting;
+  final bool obscurePassword;
+  final bool recoveryMode;
+  final String? error;
+  final VoidCallback onTogglePassword;
+  final ValueChanged<bool> onModeChange;
+  final Future<void> Function() onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return MobilePanel(
+      title: recoveryMode ? 'Recover account access' : 'Operator sign in',
+      action: MobileTag(
+        label: recoveryMode ? 'RECOVERY MODE' : 'SECURE LOGIN',
+        icon: recoveryMode ? Icons.key_rounded : Icons.lock_rounded,
+        accent: recoveryMode
+            ? const Color(0xFFA78BFA)
+            : const Color(0xFF38BDF8),
+      ),
+      child: Form(
+        key: formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: const Color(0xFF0A1220),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: _AuthModeButton(
+                        active: !recoveryMode,
+                        label: 'Sign in',
+                        icon: Icons.login_rounded,
+                        onTap: () => onModeChange(false),
+                      ),
+                    ),
+                    Expanded(
+                      child: _AuthModeButton(
+                        active: recoveryMode,
+                        label: 'Recover',
+                        icon: Icons.restart_alt_rounded,
+                        onTap: () => onModeChange(true),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              recoveryMode
+                  ? 'We will send a reset link to the operator email you enter below.'
+                  : 'Use the same Business Hub account that already owns or belongs to your shop workspace.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Colors.white.withValues(alpha: 0.68),
+                fontWeight: FontWeight.w600,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 18),
+            TextFormField(
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              decoration: const InputDecoration(
+                labelText: 'Operator email',
+                prefixIcon: Icon(Icons.mail_outline_rounded),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Email is required';
+                }
+                return null;
+              },
+            ),
+            if (!recoveryMode) ...<Widget>[
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: passwordController,
+                obscureText: obscurePassword,
+                decoration: InputDecoration(
+                  labelText: 'Secure password',
+                  prefixIcon: const Icon(Icons.lock_outline_rounded),
+                  suffixIcon: IconButton(
+                    onPressed: onTogglePassword,
+                    icon: Icon(
+                      obscurePassword
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded,
+                    ),
+                  ),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Password is required';
+                  }
+                  return null;
+                },
+              ),
+            ],
+            if (error != null) ...<Widget>[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2A1016),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: const Color(0xFFFB7185).withValues(alpha: 0.25),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Color(0xFFFB7185),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        error!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: const Color(0xFFFFD1DB),
+                          fontWeight: FontWeight.w700,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: submitting ? null : onSubmit,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(58),
+              ),
+              child: submitting
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2.2),
+                    )
+                  : Text(
+                      recoveryMode
+                          ? 'Send recovery email'
+                          : 'Enter command center',
+                    ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'The mobile app mounts local SQLite first, then syncs your live workspace after sign-in.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.5),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AuthModeButton extends StatelessWidget {
+  const _AuthModeButton({
+    required this.active,
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final bool active;
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: active ? const Color(0xFF2563EB) : Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Icon(
+                icon,
+                size: 18,
+                color: active ? Colors.white : Colors.white70,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: active ? Colors.white : Colors.white70,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BrandedStatus extends StatelessWidget {
+  const _BrandedStatus({
+    required this.icon,
+    required this.eyebrow,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String eyebrow;
   final String title;
   final String subtitle;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 24),
-              Text(
-                title,
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                subtitle,
-                style: theme.textTheme.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-            ],
+    return MobilePanel(
+      title: title,
+      action: MobileTag(label: eyebrow.toUpperCase(), icon: icon),
+      child: Column(
+        children: <Widget>[
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: const Color(0xFF10192A),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Icon(icon, color: Colors.white, size: 34),
           ),
-        ),
+          const SizedBox(height: 20),
+          Text(
+            subtitle,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: Colors.white.withValues(alpha: 0.72),
+              fontWeight: FontWeight.w600,
+              height: 1.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 18),
+          const SizedBox(
+            width: 26,
+            height: 26,
+            child: CircularProgressIndicator(strokeWidth: 2.2),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AuraBlob extends StatelessWidget {
+  const _AuraBlob({required this.size, required this.color});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
       ),
     );
   }
