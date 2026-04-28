@@ -20,13 +20,15 @@ final class FirebaseBootstrap {
 
   static Future<void> _configureTelemetry() async {
     try {
-      await FirebaseCrashlytics.instance
-          .setCrashlyticsCollectionEnabled(kReleaseMode);
+      await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(
+        kReleaseMode,
+      );
     } catch (_) {}
 
     try {
-      await FirebasePerformance.instance
-          .setPerformanceCollectionEnabled(kReleaseMode);
+      await FirebasePerformance.instance.setPerformanceCollectionEnabled(
+        kReleaseMode,
+      );
     } catch (_) {}
   }
 

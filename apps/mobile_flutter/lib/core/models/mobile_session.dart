@@ -26,18 +26,22 @@ class MobileSession {
 
   static MobileSession fromClaims(
     User user,
-    Map<String, dynamic>? claims,
-  ) {
+    Map<String, dynamic>? claims, {
+    String? fallbackRole,
+    Map<String, dynamic>? fallbackPermissions,
+    String? fallbackShopId,
+    bool fallbackIsElevatedAdmin = false,
+  }) {
     return MobileSession(
       user: user,
       email: user.email ?? '',
       uid: user.uid,
-      role: claims?['role']?.toString(),
+      role: claims?['role']?.toString() ?? fallbackRole,
       permissions: claims?['perms'] is Map<String, dynamic>
-          ? claims!['perms'] as Map<String, dynamic>
-          : null,
-      shopId: claims?['shopId']?.toString(),
-      isElevatedAdmin: claims?['shopAdmin'] == true,
+          ? Map<String, dynamic>.from(claims!['perms'] as Map)
+          : fallbackPermissions,
+      shopId: claims?['shopId']?.toString() ?? fallbackShopId,
+      isElevatedAdmin: claims?['shopAdmin'] == true || fallbackIsElevatedAdmin,
     );
   }
 }
