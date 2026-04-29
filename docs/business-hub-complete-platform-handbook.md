@@ -2,66 +2,75 @@
 
 ## Purpose
 
-This is the single-file, A-to-Z architecture and migration handbook for Business Hub.
+This is the single, final, A-to-Z platform handbook for Business Hub.
 
-It is designed to be the one document that answers:
+It is the top-level document that answers:
 
-- what Business Hub is today
-- what Business Hub should become
-- what stack to build now
-- how the data model should look
+- what Business Hub should build now
+- what technology stack is best
+- how mobile, web, desktop, backend, and database should fit together
+- how data should be modeled
 - how Firebase should migrate to PostgreSQL
-- how offline/mobile conflicts should be handled
-- how scale, observability, queues, and control plane should work
-- how the system behaves in real operational scenarios
+- how offline and sync conflicts should be handled
+- how the platform should scale
+- how operations, observability, recovery, and rollout should work
 
-This file is the top-level handbook for:
+If one person opens only one architecture document, it should be this one.
 
-- founder decisions
-- product planning
-- backend design
-- mobile/web design
-- migration execution
-- DevOps and control plane planning
-- release and cutover planning
+If any older architecture note conflicts with this handbook on final stack choice, this handbook is the authoritative version.
 
 ## Executive decision
 
-### Final architecture decision
+### Final recommended stack
+
+For Business Hub, the best practical architecture is:
+
+- **Flutter** for mobile
+- **Next.js** for admin web
+- **Next.js** for public web
+- **Tauri** only when a packaged desktop shell is needed
+- **Python + Django** for the core backend
+- **Django REST Framework** for business APIs
+- **PostgreSQL** as the source of truth
+- **Redis** for cache, hot reads, coordination, and queue support
+- **Celery** for background jobs
+- **pgBouncer** or **Supavisor** for connection pooling
+- **S3-compatible object storage** for files, backups, exports, and receipts
+- **OpenTelemetry** for tracing, metrics, and logs
+- **Terraform** or **Pulumi** for infrastructure as code
+- **k6** for load testing
+
+### Final platform decision
 
 Business Hub should be built in **three tiers**:
 
 ### Tier A: Build now
 
-- Flutter mobile
-- Next.js admin web
-- Next.js public web
-- Tauri desktop shell where needed
-- NestJS modular-monolith backend
-- PostgreSQL as source of truth
-- Redis for hot cache and coordination
-- durable queue
-- workers
-- selective realtime
-- OpenTelemetry + IaC from day one
+- Flutter
+- Next.js
+- Django + DRF
+- PostgreSQL
+- Redis
+- Celery
+- object storage
+- OpenTelemetry
+- Terraform/Pulumi
 
 ### Tier B: Grow into
 
-- multi-region deployment
 - read replicas
-- richer caching
-- more projection tables
+- multi-region rollout
+- richer projections and caches
 - stronger queue topology
-- stronger chaos/load discipline
-- Temporal for complex multi-step workflows where justified
+- stronger operational control plane
+- selective use of Temporal if multi-step workflow durability becomes complex
 
 ### Tier C: Keep as future-only
 
 - distributed SQL ledger like Spanner or CockroachDB
-- Go/Rust ultra-fast ingestion API
-- Kafka/PubSub first-hop transaction stream
-- ledger commit pipeline
-- extreme global ACID write architecture
+- Kafka/PubSub first-hop ledger ingestion
+- Go/Rust ultra-high-write ingestion services
+- payment-rail-class transaction architecture
 
 ### Bottom line
 
@@ -69,30 +78,78 @@ For Business Hub today:
 
 - build **Tier A**
 - prepare for **Tier B**
-- document **Tier C** but do not build it unless the business truly reaches that class of scale
+- document **Tier C** as future reference only
 
-## Current reality
+## Why this stack is the best fit
 
-Business Hub currently has:
+Business Hub is much closer to:
 
-- a web/admin app that is the most feature-complete surface
-- a new Flutter mobile app that is the performance-focused path forward
-- Firebase as the shared cloud backend today
-- local SQLite as the speed layer on clients
+- ERP
+- POS
+- inventory management
+- customer and credit tracking
+- attendance and team operations
+- financial reporting
+- ledgers and audit trails
 
-Current repo shape:
+than to:
 
-- `src/` = current web/admin app
-- `apps/mobile_flutter/` = new Flutter mobile app
-- `apps/desktop/` = desktop shell path
-- `functions/` = Firebase Cloud Functions
+- social apps
+- simple chat apps
+- document-only SaaS
 
-Current truth:
+That means the best foundation is:
 
-- the old web/admin app is still richer
-- the Flutter app is the future mobile path
-- Firebase is still the shared operational cloud backbone today
-- PostgreSQL is the recommended next source of truth
+- a strong relational database
+- transactional business logic
+- typed domain models
+- modular backend services
+- offline-first mobile behavior
+
+That is why the final recommendation is:
+
+- **Django**
+- **PostgreSQL**
+- **Flutter**
+
+## Why not stay Firebase-first
+
+Firebase is useful for fast product starts, auth, and selective realtime patterns.
+
+It is not the best long-term source of truth for Business Hub’s heaviest domains because this product needs:
+
+- strongly relational data
+- transactional consistency
+- ledger-style history
+- domain constraints
+- predictable reporting
+- controlled migration and reconciliation
+
+So Firebase should be treated as:
+
+- the current legacy production backbone
+- a bridge source during migration
+- not the long-term core transactional database
+
+## Why not build directly on Odoo
+
+Odoo proves that:
+
+- Python is valid for ERP/business systems
+- PostgreSQL is valid for ERP/business systems
+
+But Business Hub should not be built *inside* Odoo because Business Hub needs:
+
+- a custom premium UI
+- offline-first Flutter POS
+- custom mobile behavior
+- custom migration path
+- custom sync and reconciliation logic
+
+So the best move is:
+
+- follow the **Python + PostgreSQL** direction
+- build a **custom Business Hub platform**
 
 ## Final platform architecture
 
@@ -111,18 +168,18 @@ flowchart TD
   end
 
   subgraph App["Application Platform"]
-    API["Stateless Backend API\nNestJS modular monolith first"]
-    Realtime["Selective Realtime Gateway"]
-    Queue["Durable Queue"]
-    Workers["Background Workers"]
+    API["Django + DRF API"]
+    Realtime["Selective Realtime Layer"]
+    Queue["Redis / Durable Queue"]
+    Workers["Celery Workers"]
   end
 
   subgraph Data["Core Data Platform"]
     Redis["Redis"]
-    Pooler["Supavisor / PgBouncer"]
+    Pooler["pgBouncer / Supavisor"]
     Postgres["PostgreSQL"]
     Storage["Object Storage + CDN"]
-    Analytics["Warehouse later"]
+    Analytics["Analytics / Warehouse later"]
   end
 
   subgraph Control["Control Plane"]
@@ -173,12 +230,12 @@ flowchart TD
 
 ### Flutter mobile
 
-Flutter becomes the primary mobile app because:
+Flutter is the primary mobile platform because:
 
 - it avoids WebView lag
-- it gives better list scrolling and interaction performance
-- it supports local SQLite well
-- it is the right fit for offline-first POS behavior
+- it handles large lists and rich interaction better
+- it works well with local SQLite
+- it is the right fit for offline-first POS
 
 Mobile rules:
 
@@ -186,90 +243,110 @@ Mobile rules:
 - optimistic UI
 - background sync
 - offline outbox
-- stale reconnect handled as command replay, not document overwrite
-- offline POS sessions should honor a defined auth grace period, for example up to 12 hours after token expiry, so operators are not locked out during temporary internet outages
+- stale reconnects handled as command replay, not record overwrite
+- offline POS sessions should honor a defined auth grace period, for example up to 12 hours after token expiry, to avoid locking operators out during short outages
 
 ### Next.js admin web
 
-Next.js should become the main admin/operator surface because:
+Next.js should be the main admin/operator surface for:
 
-- strong code splitting and caching model
-- clean route structure
-- better long-term split between admin and public web
-- easier reuse in Tauri shell
+- inventory management
+- customer management
+- reports
+- settings
+- reconciliation dashboard
+- migration review tooling
+- team and attendance admin
+
+Why:
+
+- strong route structure
+- good code splitting
+- clean caching model
+- easy reuse in Tauri shell
 
 ### Next.js public web
 
-Keep public web separate from heavy admin runtime.
-
-Use it for:
+Use a separate public site for:
 
 - landing pages
 - onboarding
 - pricing
 - marketing
 
+It should not share the heavy admin runtime.
+
 ### Tauri desktop shell
 
-Use Tauri only where packaged desktop matters:
+Use Tauri only where packaged desktop adds value:
 
-- native-feeling desktop distribution
-- lower memory than heavier wrappers
-- reuse of the admin web UI
+- native-feeling desktop delivery
+- printing and device integration
+- lower memory than heavier desktop wrappers
 
 ## Backend strategy
 
-### Primary recommendation
+### Final backend choice
 
-Use a **NestJS modular monolith first**.
+Use:
 
-Why:
+- **Django** for domain models, business logic, admin support, and transactions
+- **Django REST Framework** for APIs
+- **Celery** for background processing
 
-- simpler than microservices
-- faster to ship
-- clear module boundaries
-- still allows later extraction of hot paths
+Why Django:
 
-Recommended backend modules:
+- strong ORM
+- mature admin and business-app patterns
+- excellent fit for relational ERP-style systems
+- strong modularity for domain-oriented backend design
+
+### Core backend modules
 
 - auth
 - users
 - shops
 - memberships
+- permissions
 - inventory
 - sales
+- sale items
+- sale payments
 - customers
+- customer ledger
 - expenses
 - attendance
 - jobs
 - imports
 - exports
 - notifications
+- audit
 - reports
-- admin/security
+- reconciliation
 
-### Queue and worker strategy
+### Background job strategy
 
-Heavy work must leave the request path:
+Use Celery for:
 
 - imports
 - exports
 - PDF generation
 - dashboard rebuilds
-- velocity recompute
+- inventory velocity recompute
 - customer balance projection refresh
 - nightly summaries
 - reconciliation jobs
+- anomaly detection later if needed
 
 ### Realtime strategy
 
 Use realtime only for:
 
-- stock changes relevant to active sessions
-- job progress
 - sale completion state
+- stock changes relevant to active sessions
 - notifications
-- presence if required
+- job progress
+- presence if needed
 
 Do not make every screen permanently live.
 
@@ -279,7 +356,9 @@ Do not make every screen permanently live.
 
 Use PostgreSQL for:
 
-- identity and shop membership
+- users
+- shops
+- memberships
 - inventory
 - financial facts
 - customer ledger
@@ -292,37 +371,57 @@ Use PostgreSQL for:
 
 Use Redis for:
 
-- dashboard hot reads
+- hot dashboard reads
 - low-stock counts
-- short-lived config cache
-- rate limit state
-- idempotency support
-- fanout helpers
+- rate limiting
+- short-lived shop config cache
+- idempotency helpers
+- websocket/realtime helpers
+- queue broker support where appropriate
 
 ### Object storage
 
 Use object storage for:
 
-- backups
 - receipts
 - import files
 - export files
+- reports
+- backups
 - documents and media
 
-### Disaster recovery targets
+### Connection pooling
 
-Tier A should define explicit disaster recovery targets from the start.
+Use:
+
+- `pgBouncer`
+- or `Supavisor`
+
+between Django/Celery and PostgreSQL.
+
+## Disaster recovery
+
+Tier A should define explicit recovery targets from day one.
 
 Recommended initial targets:
 
 - `RPO` (Recovery Point Objective): maximum 15 minutes of data loss
 - `RTO` (Recovery Time Objective): maximum 4 hours to full system restoration
 
-These targets should be reviewed again when the platform moves deeper into Tier B.
+These targets should be revisited as the system moves into Tier B.
+
+## Regional deployment recommendation
+
+For the current operating base:
+
+- primary PostgreSQL and backend API in **Mumbai**
+- global CDN/WAF at the edge
+
+This keeps latency low for current operator traffic while still allowing future regional growth.
 
 ## Final target data model
 
-### Identity and tenancy tables
+### Identity and tenancy
 
 - `users`
 - `shops`
@@ -331,7 +430,7 @@ These targets should be reviewed again when the platform moves deeper into Tier 
 - `membership_private`
 - `devices`
 
-### Inventory tables
+### Inventory
 
 - `inventory_items`
 - `inventory_item_private`
@@ -339,7 +438,7 @@ These targets should be reviewed again when the platform moves deeper into Tier 
 - `inventory_adjustments`
 - `inventory_snapshots`
 
-### Sales tables
+### Sales and checkout
 
 - `sales`
 - `sale_items`
@@ -347,21 +446,25 @@ These targets should be reviewed again when the platform moves deeper into Tier 
 - `sale_discounts`
 - `sale_returns`
 
-### Customer tables
+### Customers and credit
 
 - `customers`
 - `customer_ledger_entries`
 - `customer_payments`
 - `customer_balance_snapshots`
 
-### Finance and team tables
+### Team and attendance
 
-- `expenses`
 - `attendance_sessions`
 - `attendance_adjustments`
 - `payroll_summary_monthly`
 
-### Operational tables
+### Expenses and finance
+
+- `expenses`
+- `expense_categories`
+
+### Operations
 
 - `jobs`
 - `job_events`
@@ -372,7 +475,7 @@ These targets should be reviewed again when the platform moves deeper into Tier 
 - `audit_events`
 - `backup_archives`
 
-### Projection tables
+### Aggregates and projections
 
 - `dashboard_snapshot_current`
 - `shop_daily_metrics`
@@ -380,8 +483,9 @@ These targets should be reviewed again when the platform moves deeper into Tier 
 - `inventory_low_stock_snapshot`
 - `inventory_velocity_snapshot`
 - `sales_payment_mix_daily`
+- `customer_balance_snapshots`
 
-### Migration support tables
+### Migration support
 
 - `migration_domain_ownership`
 - `migration_bridge_events`
@@ -402,13 +506,13 @@ Migrated rows should preserve:
 
 ### Rule 2: facts over snapshots
 
-Append-only business facts must remain facts:
+Append-only facts remain facts:
 
-- sale
-- payment
-- stock movement
-- customer ledger entry
-- audit event
+- sales
+- payments
+- stock movements
+- customer ledger entries
+- audit events
 
 ### Rule 3: projections are not canonical
 
@@ -419,24 +523,22 @@ Derived values are not the truth:
 - customer balance
 - payment mix
 
-These should be rebuilt from committed facts.
+These should be rebuilt from fact tables.
 
-### Rule 4: identity is separate from membership
+### Rule 4: separate identity from membership
 
-Do not store shop role data only in `users`.
+Do not keep all role/tenant logic inside `users`.
 
-Keep:
+Use:
 
-- user identity in `users`
-- tenancy and role in `shop_memberships`
+- `users` for identity
+- `shop_memberships` for tenancy and role
 
 ## Firebase to PostgreSQL migration strategy
 
-### Do not do a hard cutover
+### Do not hard cut over
 
-Business Hub should migrate using a **parallel, domain-by-domain strangler pattern**.
-
-The safe sequence is:
+Business Hub should migrate using a **parallel strangler pattern**:
 
 1. schema design
 2. snapshot backfill
@@ -449,8 +551,8 @@ The safe sequence is:
 
 For each domain:
 
-- one master write system
-- one replica/shadow system
+- exactly one write master
+- the other side is replica/shadow only
 
 Never allow true bidirectional write ownership for the same domain.
 
@@ -472,7 +574,7 @@ Never allow true bidirectional write ownership for the same domain.
 7. reports / analytics
 8. legacy import utilities
 
-### Why sales and payments go late
+### Why sales/payments go late
 
 Because they are:
 
@@ -493,9 +595,9 @@ After cutover:
 
 - Postgres writes
 - Firebase becomes read-only shadow if needed
-- old client writes must be rejected or turned into reconciliation events
+- legacy writes are rejected or converted to reconciliation events
 
-### Preventing sync loops
+### Preventing loops
 
 Every bridged event must carry:
 
@@ -504,25 +606,23 @@ Every bridged event must carry:
 - `bridge_applied_at`
 - `bridge_direction`
 
-Bridge rule:
+If an event came from the bridge already, the reverse bridge must ignore it.
 
-- if event came from the bridge already, do not bridge it back
-
-## Offline reconnect and conflict policy
+## Offline and sync conflict policy
 
 ### Core principle
 
 Offline reconnect payloads are **commands**, not **authoritative records**.
 
-The server should interpret reconnects as:
+The server must interpret reconnects as:
 
-- "client attempted action X against base version Y"
+- client attempted action X against base version Y
 
 not:
 
-- "overwrite server truth with this old document"
+- overwrite server truth with this old document
 
-### Required client outbox fields
+### Client outbox fields
 
 - `client_tx_id`
 - `device_id`
@@ -537,13 +637,13 @@ not:
 
 ### Required server checks
 
-1. is device/session valid
+1. is the device/session valid
 2. is the domain still writable by this client generation
-3. is the event already applied
+3. was this event already applied
 4. is the domain epoch stale
 5. does the command still make sense against current truth
 
-### Conflict classes
+### Conflict types
 
 #### Type A: mutable reference/config data
 
@@ -557,15 +657,15 @@ Examples:
 Policy:
 
 - **server wins**
-- stale overwrites are rejected
+- stale overwrites rejected
 - client must rehydrate and retry
 
-#### Type B: append-only facts
+#### Type B: append-only business facts
 
 Examples:
 
-- sales
-- payments
+- sale
+- payment
 - stock movement
 - attendance event
 
@@ -585,22 +685,22 @@ Examples:
 
 Policy:
 
-- clients never write these directly
+- clients never write these
 - recompute from committed facts only
 
 ### Domain epoch rule
 
 Each cutover increases a domain epoch.
 
-If offline client event epoch is older than current server epoch:
+If a reconnecting client carries an older epoch:
 
 - reject mutable overwrites
-- re-evaluate append-only facts under current policy
-- send ambiguous items to reconciliation queue
+- re-evaluate append-only facts under current rules
+- send ambiguous cases to reconciliation
 
 ### Price drift policy
 
-Price drift must be explicit business policy, for example:
+Price drift must be explicit business policy, such as:
 
 - `strict_current_price`
 - `allow_offline_captured_price_with_audit`
@@ -608,7 +708,7 @@ Price drift must be explicit business policy, for example:
 
 ## Reconciliation model
 
-### When manual review is needed
+### When to use manual review
 
 Use manual review for:
 
@@ -616,11 +716,9 @@ Use manual review for:
 - extreme price drift
 - duplicate-but-not-identical sales
 - stale command against heavily changed entity
-- permission mismatch with non-trivial business impact
+- permission mismatches with business impact
 
-### Reconciliation queue
-
-Use `migration_reconciliation_events` with:
+### Reconciliation queue fields
 
 - `domain`
 - `shop_id`
@@ -637,20 +735,18 @@ Use `migration_reconciliation_events` with:
 
 ### Product implication
 
-You need a secure admin review UI in the new admin web for:
+You need a secure admin review UI for:
 
 - approve
 - reject
 - annotate
 - replay if safe
 
-## Shadow verification
+## Shadow verification rules
 
 Never cut over a sensitive domain without green shadow verification.
 
-### Required checks
-
-#### Inventory
+### Inventory verification
 
 - item count
 - active item count
@@ -658,20 +754,20 @@ Never cut over a sensitive domain without green shadow verification.
 - price parity
 - cost parity
 
-#### Customers
+### Customer verification
 
 - customer count
 - open-balance total
 - sample balance parity
 
-#### Sales and payments
+### Sales/payment verification
 
 - sales count by day
 - gross sales by day
 - payment totals by method
-- refund/void count
+- refund/void counts
 
-#### Attendance
+### Attendance verification
 
 - session count
 - total hours
@@ -681,7 +777,7 @@ Never cut over a sensitive domain without green shadow verification.
 
 1. stop cutover
 2. inspect mismatch dashboard
-3. find missing or duplicated IDs
+3. identify missing or duplicated IDs
 4. determine whether issue is:
    - backfill miss
    - bridge lag
@@ -692,10 +788,10 @@ Never cut over a sensitive domain without green shadow verification.
 
 ### Scenario 1: owner signs in during migration
 
-- auth provider signs in the user
+- auth signs in the user
 - backend resolves membership from Postgres
-- if membership missing, recover from Firebase-era data
-- user proceeds without auth/data migration coupling
+- if missing, recover from Firebase-era membership data
+- auth and data migration remain decoupled
 
 ### Scenario 2: inventory before cutover
 
@@ -713,27 +809,27 @@ Never cut over a sensitive domain without green shadow verification.
 
 - mobile replays sale command
 - server validates
-- if valid, commits sale/items/payments/stock ledger
-- if ambiguous, sends to reconciliation queue
+- if valid, commits sale, items, payments, stock ledger
+- if ambiguous, creates reconciliation event
 
 ### Scenario 5: stale mutable inventory write
 
-- old product row snapshot returns from offline device
+- old snapshot returns from offline device
 - server rejects overwrite
-- server returns authoritative current row
-- client must refresh
+- server returns authoritative current item
+- client refreshes
 
 ### Scenario 6: mismatch dashboard turns red
 
 - cutover pauses
 - team investigates
-- no financially sensitive domain shifts while verification is red
+- no financially sensitive cutover proceeds while red
 
 ### Scenario 7: rollback
 
-- feature flag moves shop/domain back to prior owner
+- feature flag routes shop/domain back to prior owner
 - bridge direction freezes
-- captured events are preserved
+- events remain preserved
 - diagnosis happens without losing audit trail
 
 ### Scenario 8: final Firebase retirement
@@ -741,83 +837,70 @@ Never cut over a sensitive domain without green shadow verification.
 - all major domains are Postgres-primary
 - legacy writes disabled
 - bridge retired gradually
-- Firebase becomes archive/read-only if still needed temporarily
+- Firebase becomes archive/read-only temporarily if needed
 
 ## Scale strategy
 
 ### Tier A scale
 
-For current Business Hub:
+Build now with:
 
 - PostgreSQL primary
 - Redis
-- queue
-- workers
+- Celery
+- Django
+- Flutter
+- Next.js
 - CDN/WAF
-- local SQLite on mobile
+- OpenTelemetry
 
-Recommended first deployment geography:
-
-- primary PostgreSQL and backend API in the Mumbai cloud region
-- edge delivery through global CDN/WAF
-
-This keeps latency low for the current operating base while still allowing global edge delivery for web assets and future regional expansion.
-
-This is the correct architecture to build now.
+This is enough for real production and strong growth.
 
 ### Tier B scale
 
-When growth justifies it:
+Add when justified:
 
 - read replicas
-- stronger region strategy
 - richer projections
-- stronger cache invalidation
-- more observability and chaos engineering
+- stronger caching
+- stronger queues
+- regional scaling
+- stronger chaos/load testing
 
 ### Tier C scale
 
-Only if Business Hub becomes globally write-heavy at payment-rail class:
+Only if Business Hub becomes globally write-heavy at financial-network class:
 
 - distributed SQL ledger
 - Kafka/PubSub first-hop
 - Go/Rust ingestion plane
 - commit pipeline
-- heavy orchestration
-
-This is future reference, not current implementation target.
+- heavy workflow orchestration
 
 ## Production control plane
 
-### Must-have from day one
+### Must-have now
 
-- OpenTelemetry traces and metrics
-- structured JSON logs
-- Terraform or Pulumi
-- load testing
+- OpenTelemetry traces, metrics, logs
+- structured JSON logging
+- Terraform/Pulumi
+- k6 load testing
 - client event batching and virtualization
 
-### Add as complexity grows
+### Add later if complexity demands
 
-- Temporal for durable multi-step workflows
-- stronger chaos testing
-- cost-aware controls
+- Temporal
 - richer anomaly detection
-
-### Why this matters
-
-Without the control plane:
-
-- you cannot trace dropped or delayed transactions
-- you cannot reproduce secure infra consistently
-- you cannot safely operate a queue/worker-heavy platform
+- stronger FinOps controls
+- advanced chaos engineering
 
 ## Build phases
 
 ### Phase 1
 
 - PostgreSQL schema
-- NestJS backend modules
+- Django app/module structure
+- DRF API foundations
 - Flutter local SQLite foundations
 - Next.js admin shell
 - Redis foundation
@@ -844,16 +927,16 @@ Without the control plane:
 - broader cutovers
 - stronger queue/workers
 - read replicas if needed
-- region expansion if needed
+- regional scaling if needed
 
 ### Phase 5
 
 - retire Firebase dependencies
-- clean up legacy compatibility paths
+- remove legacy compatibility paths
 
 ## What not to do
 
-- do not keep expanding heavy new core domains deeper into Firebase-first direct-client flows
+- do not keep expanding heavy core domains deeper into Firebase-first direct-client flows
 - do not use last-write-wins for financial or inventory migration conflicts
 - do not let clients write derived totals as truth
 - do not make every screen permanently realtime
@@ -862,23 +945,23 @@ Without the control plane:
 
 ## Final verdict
 
-The complete Business Hub architecture from A to Z is:
+The final recommended Business Hub platform is:
 
 - **Flutter + Next.js + Tauri on the frontend**
-- **NestJS + PostgreSQL + Redis + workers in the core platform**
+- **Django + DRF + PostgreSQL + Redis + Celery in the core platform**
 - **OpenTelemetry + IaC + load testing in the control plane**
-- **Firebase-to-Postgres migration using domain-by-domain strangler pattern**
+- **Firebase-to-Postgres migration using a domain-by-domain strangler pattern**
 - **command-based offline reconciliation**
 - **one write master per domain**
 - **append-only financial facts**
 - **manual review for ambiguous conflicts**
 - **Tier A now, Tier B later, Tier C only if the business truly reaches that scale**
 
-This is the final recommended architecture and migration handbook for Business Hub.
+This is the final, single-file platform plan for Business Hub.
 
 ## Detailed companion docs
 
-For deeper breakdowns, see:
+For deeper detail, see:
 
 - [Final Architecture Blueprint](./final-architecture-blueprint.md)
 - [Firebase to PostgreSQL Migration Plan](./firebase-to-postgres-migration-plan.md)

@@ -51,12 +51,13 @@ It is designed to support:
 
 ## Current truth
 
-As of April 28, 2026:
+As of April 29, 2026:
 - the web/admin app is still the most complete Business Hub surface
 - the Flutter mobile app is the new performance-focused mobile path
 - Flutter mobile is not yet at full feature parity with the old app
 - Firestore is the shared cloud backbone
 - local SQLite remains the speed layer on clients
+- PostgreSQL + Django is the recommended final backend direction
 
 ## Suggested use by audience
 
