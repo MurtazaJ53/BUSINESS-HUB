@@ -1,0 +1,21 @@
+```mermaid
+flowchart LR
+  Client["Flutter / Web / Desktop Client"]
+  Edge["Global Edge / Regional Routing"]
+  Ingest["Ultra-fast Ingestion API"]
+  Stream["Durable Event Stream\nKafka or Pub/Sub"]
+  Validate["Validation Workers"]
+  Ledger["Distributed SQL Ledger\nSpanner or CockroachDB"]
+  Fanout["Realtime Fanout Layer"]
+  ReadModel["Read Models / Cache / Projections"]
+
+  Client --> Edge
+  Edge --> Ingest
+  Ingest --> Stream
+  Stream --> Validate
+  Validate --> Ledger
+  Ledger --> Fanout
+  Ledger --> ReadModel
+  Fanout --> Client
+  ReadModel --> Client
+```

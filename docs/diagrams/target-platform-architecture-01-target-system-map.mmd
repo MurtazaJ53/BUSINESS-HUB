@@ -1,0 +1,51 @@
+```mermaid
+flowchart LR
+  subgraph Clients["Client Layer"]
+    Mobile["Flutter Mobile App"]
+    AdminWeb["Next.js Admin Web"]
+    PublicWeb["Next.js Public Web"]
+    Desktop["Tauri 2 Desktop Shell"]
+  end
+
+  subgraph Edge["Edge and Delivery"]
+    CDN["CDN / Edge Cache"]
+    LB["Load Balancer / API Gateway"]
+  end
+
+  subgraph App["Application Layer"]
+    API["Stateless Backend API\nNestJS or Fastify"]
+    Realtime["Realtime Gateway\nSupabase Realtime / WS / SSE"]
+    Workers["Background Workers"]
+  end
+
+  subgraph Data["Data Layer"]
+    Redis["Redis Cache"]
+    Postgres["PostgreSQL"]
+    Pooler["Connection Pooler\nSupavisor / PgBouncer"]
+    Storage["Object Storage + CDN"]
+  end
+
+  Mobile --> CDN
+  AdminWeb --> CDN
+  PublicWeb --> CDN
+  Desktop --> CDN
+
+  Mobile --> LB
+  AdminWeb --> LB
+  PublicWeb --> LB
+  Desktop --> LB
+
+  LB --> API
+  API --> Redis
+  API --> Pooler
+  Pooler --> Postgres
+  API --> Storage
+  API --> Workers
+  Workers --> Pooler
+  Workers --> Redis
+  Workers --> Storage
+  Postgres --> Realtime
+  Realtime --> Mobile
+  Realtime --> AdminWeb
+  Realtime --> Desktop
+```

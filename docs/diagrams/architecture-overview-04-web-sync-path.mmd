@@ -1,0 +1,16 @@
+```mermaid
+sequenceDiagram
+  participant UI as Web UI
+  participant Local as Web SQLite
+  participant Outbox as sync_queue
+  participant Sync as SyncWorker
+  participant Cloud as Firestore
+
+  UI->>Local: Write entity
+  UI->>Outbox: Enqueue mutation
+  Sync->>Outbox: Drain pending operations
+  Sync->>Cloud: Batch push
+  Cloud-->>Sync: Snapshot updates
+  Sync->>Local: Merge remote changes
+  Local-->>UI: Live local query updates
+```

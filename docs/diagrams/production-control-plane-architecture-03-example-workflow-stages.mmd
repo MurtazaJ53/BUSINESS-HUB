@@ -1,0 +1,20 @@
+```mermaid
+stateDiagram-v2
+  [*] --> Accepted
+  Accepted --> SchemaValidated
+  SchemaValidated --> AuthValidated
+  AuthValidated --> IdempotencyChecked
+  IdempotencyChecked --> BusinessRuleValidated
+  BusinessRuleValidated --> StockValidated
+  StockValidated --> LedgerCommitted
+  LedgerCommitted --> ProjectionsUpdated
+  ProjectionsUpdated --> FanoutDelivered
+  FanoutDelivered --> [*]
+
+  SchemaValidated --> Rejected
+  AuthValidated --> Rejected
+  IdempotencyChecked --> Rejected
+  BusinessRuleValidated --> Rejected
+  StockValidated --> Rejected
+  Rejected --> [*]
+```

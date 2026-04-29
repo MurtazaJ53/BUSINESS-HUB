@@ -1,0 +1,25 @@
+```mermaid
+flowchart LR
+  User["Owner / Admin / Staff"] --> Web["Web Admin App\nReact + Vite"]
+  User --> Mobile["Flutter Mobile App\nRiverpod + Drift"]
+
+  Web --> WebLocal["Web Local DB\nSQLite via SQL.js / Capacitor SQLite"]
+  Mobile --> MobileLocal["Mobile Local DB\nDrift + SQLite"]
+
+  Web --> Auth["Firebase Auth"]
+  Mobile --> Auth
+
+  Web --> Firestore["Cloud Firestore"]
+  Mobile --> Firestore
+
+  Web --> Functions["Cloud Functions"]
+  Mobile --> Functions
+
+  Web --> Storage["Firebase Storage"]
+  Mobile --> Storage
+
+  Hosting["Firebase Hosting"] --> Web
+
+  Firestore --> Functions
+  Functions --> Firestore
+```

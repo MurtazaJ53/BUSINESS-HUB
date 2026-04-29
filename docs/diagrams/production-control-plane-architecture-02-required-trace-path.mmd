@@ -1,0 +1,26 @@
+```mermaid
+sequenceDiagram
+  participant Client as Client
+  participant Edge as Edge
+  participant API as API
+  participant Stream as Queue
+  participant Worker as Worker
+  participant DB as Ledger DB
+  participant RT as Realtime
+  participant Obs as OTel Collector / Backend
+
+  Client->>Edge: Request with trace context
+  Edge->>API: Forward context
+  API->>Stream: Publish event + metadata
+  Stream->>Worker: Deliver event
+  Worker->>DB: Commit transaction
+  DB->>RT: Change event
+  RT-->>Client: Notify completion
+
+  Client-->>Obs: client perf data
+  Edge-->>Obs: spans / metrics
+  API-->>Obs: spans / metrics / logs
+  Worker-->>Obs: spans / metrics / logs
+  DB-->>Obs: db metrics
+  RT-->>Obs: fanout metrics
+```

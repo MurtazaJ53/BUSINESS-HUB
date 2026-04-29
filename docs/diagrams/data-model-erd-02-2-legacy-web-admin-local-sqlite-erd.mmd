@@ -1,0 +1,181 @@
+```mermaid
+erDiagram
+  INVENTORY {
+    string id PK
+    string name
+    number price
+    string sku
+    string category
+    string subcategory
+    string size
+    string description
+    number stock
+    string sourceMeta
+    number createdAt
+    number updatedAt
+    number tombstone
+    number dirty
+  }
+
+  INVENTORY_PRIVATE {
+    string id PK
+    number costPrice
+    string supplierId
+    string lastPurchaseDate
+    number updatedAt
+    number dirty
+  }
+
+  SALES {
+    string id PK
+    number total
+    number discount
+    string discountValue
+    string discountType
+    string paymentMode
+    string customerName
+    string customerPhone
+    string customerId
+    string footerNote
+    string sourceMeta
+    string date
+    number createdAt
+    number updatedAt
+    number tombstone
+    number dirty
+  }
+
+  SALE_ITEMS {
+    string id PK
+    string saleId FK
+    string itemId
+    string name
+    number quantity
+    number price
+    number costPrice
+    string size
+    number isReturn
+  }
+
+  SALE_PAYMENTS {
+    string id PK
+    string saleId FK
+    string mode
+    number amount
+  }
+
+  CUSTOMERS {
+    string id PK
+    string name
+    string phone
+    string email
+    number totalSpent
+    number balance
+    string sourceMeta
+    number createdAt
+    number updatedAt
+    number tombstone
+    number dirty
+  }
+
+  CUSTOMER_PAYMENTS {
+    string id PK
+    string customerId FK
+    number amount
+    string date
+    number createdAt
+    number updatedAt
+    number tombstone
+    number dirty
+  }
+
+  EXPENSES {
+    string id PK
+    string category
+    number amount
+    string description
+    string paymentMethod
+    string paymentReference
+    string date
+    number createdAt
+    number updatedAt
+    number tombstone
+    number dirty
+  }
+
+  STAFF {
+    string id PK
+    string name
+    string phone
+    string email
+    string role
+    string joinedAt
+    string status
+    string permissions
+    number updatedAt
+    number tombstone
+    number dirty
+  }
+
+  STAFF_PRIVATE {
+    string id PK
+    number salary
+    string pin
+    number updatedAt
+    number dirty
+  }
+
+  ATTENDANCE {
+    string id PK
+    string staffId FK
+    string date
+    string clockIn
+    string clockOut
+    string status
+    number totalHours
+    number overtime
+    number bonus
+    string note
+    number updatedAt
+    number tombstone
+    number dirty
+  }
+
+  SHOP_METADATA {
+    string key PK
+    string value
+    number updatedAt
+    number dirty
+  }
+
+  LOCAL_BACKUPS {
+    string id PK
+    string label
+    string trigger
+    number createdAt
+    number sizeBytes
+    string payload
+  }
+
+  SYNC_QUEUE {
+    string opId PK
+    string entityType
+    string entityId
+    string operation
+    string payload
+    number createdAt
+    number retries
+  }
+
+  SYNC_STATE {
+    string entityType PK
+    number lastSyncedAt
+  }
+
+  SALES ||--o{ SALE_ITEMS : has
+  SALES ||--o{ SALE_PAYMENTS : has
+  CUSTOMERS ||--o{ CUSTOMER_PAYMENTS : has
+  STAFF ||--o{ ATTENDANCE : has
+  INVENTORY ||--|| INVENTORY_PRIVATE : "cost extension"
+  STAFF ||--|| STAFF_PRIVATE : "private extension"
+```

@@ -1,0 +1,39 @@
+```mermaid
+flowchart TD
+  subgraph Runtime["Runtime System"]
+    Clients["Clients"]
+    Edge["Edge + WAF"]
+    APIs["APIs"]
+    Stream["Queue / Stream"]
+    Workflows["Temporal Workflows"]
+    Workers["Workers"]
+    DB["Ledger DB"]
+    Fanout["Realtime"]
+  end
+
+  subgraph Control["Control Plane"]
+    OTel["OpenTelemetry + Collector"]
+    Dash["Grafana / Sentry / Alerting"]
+    IaC["Terraform / Pulumi"]
+    CI["CI/CD + Policy Gates"]
+    Test["k6 / Artillery / Chaos Tests"]
+    Sec["Secrets + Identity"]
+  end
+
+  Clients --> Edge --> APIs --> Stream --> Workflows --> Workers --> DB --> Fanout
+
+  Clients -. telemetry .-> OTel
+  Edge -. telemetry .-> OTel
+  APIs -. telemetry .-> OTel
+  Stream -. telemetry .-> OTel
+  Workflows -. telemetry .-> OTel
+  Workers -. telemetry .-> OTel
+  DB -. telemetry .-> OTel
+  Fanout -. telemetry .-> OTel
+
+  OTel --> Dash
+  IaC --> CI
+  CI --> Runtime
+  Test --> Runtime
+  Sec --> Runtime
+```

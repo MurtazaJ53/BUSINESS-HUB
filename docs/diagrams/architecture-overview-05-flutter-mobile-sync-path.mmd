@@ -1,0 +1,20 @@
+```mermaid
+sequenceDiagram
+  participant User as Signed-in user
+  participant Session as mobileSessionProvider
+  participant Sync as MobileSyncCoordinator
+  participant Cloud as Firestore
+  participant Local as Drift SQLite
+  participant UI as Flutter UI
+
+  User->>Session: Authenticate
+  Session->>Cloud: Recover shop context
+  Session-->>Sync: shopId + role
+  Sync->>Local: Clear stale workspace cache if shop changed
+  Sync->>Cloud: Prime initial workspace snapshot
+  Sync->>Local: Seed shop / inventory / sales
+  Sync->>Cloud: Attach live listeners
+  Cloud-->>Sync: Incremental changes
+  Sync->>Local: Merge updates
+  Local-->>UI: Stream fresh mobile views
+```

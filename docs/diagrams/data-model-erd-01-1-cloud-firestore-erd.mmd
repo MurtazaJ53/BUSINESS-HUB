@@ -1,0 +1,175 @@
+```mermaid
+erDiagram
+  USERS {
+    string userId PK
+    string email
+    string shopId
+    string role
+    string updatedAt
+  }
+
+  SHOPS {
+    string shopId PK
+    string ownerId
+    string name
+    map settings
+    string inviteCode
+    string createdAt
+  }
+
+  STAFF {
+    string id PK
+    string role
+    string status
+    string email
+    string phone
+    map permissions
+    number updatedAt
+  }
+
+  STAFF_PRIVATE {
+    string id PK
+    number salary
+    string pin
+    number updatedAt
+  }
+
+  INVENTORY {
+    string id PK
+    string name
+    number price
+    string sku
+    string category
+    string subcategory
+    string size
+    number stock
+    any sourceMeta
+    any createdAt
+    any updatedAt
+    boolean tombstone
+  }
+
+  INVENTORY_PRIVATE {
+    string id PK
+    number costPrice
+    string supplierId
+    string lastPurchaseDate
+    any updatedAt
+    boolean tombstone
+  }
+
+  SALES {
+    string id PK
+    number total
+    number discount
+    string discountType
+    string paymentMode
+    string customerName
+    string customerPhone
+    string customerId
+    string footerNote
+    string date
+    any createdAt
+    any updatedAt
+    string staffId
+    boolean tombstone
+  }
+
+  CUSTOMERS {
+    string id PK
+    string name
+    string phone
+    string email
+    number totalSpent
+    number balance
+    any createdAt
+    any updatedAt
+    boolean tombstone
+  }
+
+  EXPENSES {
+    string id PK
+    string category
+    number amount
+    string description
+    string paymentMethod
+    string paymentReference
+    string date
+    any createdAt
+    any updatedAt
+    boolean tombstone
+  }
+
+  ATTENDANCE {
+    string id PK
+    string staffId
+    string date
+    string clockIn
+    string clockOut
+    string status
+    number totalHours
+    number overtime
+    number bonus
+    string note
+    any updatedAt
+    boolean tombstone
+  }
+
+  INVITATIONS {
+    string id PK
+    string createdAt
+  }
+
+  JOBS {
+    string id PK
+    string type
+    string status
+    number createdAt
+  }
+
+  IMPORTS {
+    string id PK
+    string type
+    string status
+    number createdAt
+  }
+
+  BACKUP_ARCHIVES {
+    string id PK
+    string createdAt
+  }
+
+  DASHBOARD_SNAPSHOT {
+    string id PK
+  }
+
+  AGGREGATES_DAILY {
+    string id PK
+  }
+
+  CUSTOMER_CREDIT_SUMMARY {
+    string id PK
+  }
+
+  STAFF_PAYROLL_SUMMARY {
+    string id PK
+  }
+
+  USERS ||--o{ SHOPS : "owner via ownerId"
+  SHOPS ||--o{ STAFF : contains
+  SHOPS ||--o{ STAFF_PRIVATE : contains
+  SHOPS ||--o{ INVENTORY : contains
+  SHOPS ||--o{ INVENTORY_PRIVATE : contains
+  SHOPS ||--o{ SALES : contains
+  SHOPS ||--o{ CUSTOMERS : contains
+  SHOPS ||--o{ EXPENSES : contains
+  SHOPS ||--o{ ATTENDANCE : contains
+  SHOPS ||--o{ INVITATIONS : contains
+  SHOPS ||--o{ JOBS : contains
+  SHOPS ||--o{ IMPORTS : contains
+  SHOPS ||--o{ BACKUP_ARCHIVES : contains
+  SHOPS ||--o{ DASHBOARD_SNAPSHOT : contains
+  SHOPS ||--o{ AGGREGATES_DAILY : contains
+  SHOPS ||--o{ CUSTOMER_CREDIT_SUMMARY : contains
+  SHOPS ||--o{ STAFF_PAYROLL_SUMMARY : contains
+```

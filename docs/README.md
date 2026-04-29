@@ -28,26 +28,27 @@ It is designed to support:
 7. [Firebase to PostgreSQL Migration Plan](./firebase-to-postgres-migration-plan.md)
 8. [Firebase to PostgreSQL Schema Map](./firebase-to-postgres-schema-map.md)
 9. [Platform Scenarios and Operational Flows](./platform-scenarios-and-operational-flows.md)
-10. [Target Platform Architecture](./target-platform-architecture.md)
-11. [High-Scale Global Architecture](./high-scale-global-architecture.md)
-12. [Ultra-High-Write Transaction Architecture](./ultra-high-write-transaction-architecture.md)
-13. [Production Control Plane Architecture](./production-control-plane-architecture.md)
-14. [Data Model and ERD](./data-model-erd.md)
-15. [Backend Services and Functions](./backend-services-and-functions.md)
-16. [Sync Parity Matrix](./sync-parity-matrix.md)
+10. [Diagram Pack](./diagrams/README.md)
+11. [Target Platform Architecture](./target-platform-architecture.md)
+12. [High-Scale Global Architecture](./high-scale-global-architecture.md)
+13. [Ultra-High-Write Transaction Architecture](./ultra-high-write-transaction-architecture.md)
+14. [Production Control Plane Architecture](./production-control-plane-architecture.md)
+15. [Data Model and ERD](./data-model-erd.md)
+16. [Backend Services and Functions](./backend-services-and-functions.md)
+17. [Sync Parity Matrix](./sync-parity-matrix.md)
 
 ### Release and operations
 
-17. [Deployment and Release Runbook](./deployment-release-runbook.md)
-18. [Testing and QA Plan](./testing-qa-plan.md)
-19. [Mobile Cutover Checklist](./mobile-cutover-checklist.md)
-20. [Operations Runbook](./operations-runbook.md)
+18. [Deployment and Release Runbook](./deployment-release-runbook.md)
+19. [Testing and QA Plan](./testing-qa-plan.md)
+20. [Mobile Cutover Checklist](./mobile-cutover-checklist.md)
+21. [Operations Runbook](./operations-runbook.md)
 
 ### Existing strategy docs
 
-21. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
-22. [Global Scale Blueprint](./global-scale-blueprint.md)
-23. [Scale Certification Checklist](./scale-certification-checklist.md)
+22. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
+23. [Global Scale Blueprint](./global-scale-blueprint.md)
+24. [Scale Certification Checklist](./scale-certification-checklist.md)
 
 ## Current truth
 
@@ -70,6 +71,7 @@ As of April 29, 2026:
 ### Developer
 - start with Business Hub Complete Platform Handbook
 - then Architecture Overview
+- then Diagram Pack
 - then Target Platform Architecture
 - then High-Scale Global Architecture
 - then Ultra-High-Write Transaction Architecture

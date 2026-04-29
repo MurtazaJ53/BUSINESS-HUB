@@ -1,0 +1,8 @@
+```mermaid
+flowchart TD
+  Repo["GitHub repository"] --> Actions["GitHub Actions"]
+  Actions --> Hosting["Firebase Hosting deploy"]
+  Actions --> APK["Android APK artifact"]
+  Hosting --> WebProd["Live web/admin app"]
+  APK --> Testers["Android beta testers"]
+```

@@ -1,0 +1,19 @@
+```mermaid
+sequenceDiagram
+  participant Mobile as Offline Mobile
+  participant API as Backend API
+  participant Rules as Validation Layer
+  participant PG as PostgreSQL
+  participant Queue as Reconciliation Queue
+
+  Mobile->>API: Replay sale command with client_tx_id, base_version, domain_epoch
+  API->>Rules: Validate command
+  alt Valid and policy-allowed
+    Rules->>PG: Commit sale + sale_items + sale_payments + stock ledger
+    PG-->>API: Commit success
+    API-->>Mobile: Accepted
+  else Ambiguous or invalid
+    Rules->>Queue: Create reconciliation event
+    API-->>Mobile: Pending review / rejected with reason
+  end
+```
