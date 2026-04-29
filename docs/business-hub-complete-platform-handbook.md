@@ -187,6 +187,7 @@ Mobile rules:
 - background sync
 - offline outbox
 - stale reconnect handled as command replay, not document overwrite
+- offline POS sessions should honor a defined auth grace period, for example up to 12 hours after token expiry, so operators are not locked out during temporary internet outages
 
 ### Next.js admin web
 
@@ -307,6 +308,17 @@ Use object storage for:
 - import files
 - export files
 - documents and media
+
+### Disaster recovery targets
+
+Tier A should define explicit disaster recovery targets from the start.
+
+Recommended initial targets:
+
+- `RPO` (Recovery Point Objective): maximum 15 minutes of data loss
+- `RTO` (Recovery Time Objective): maximum 4 hours to full system restoration
+
+These targets should be reviewed again when the platform moves deeper into Tier B.
 
 ## Final target data model
 
@@ -743,6 +755,13 @@ For current Business Hub:
 - workers
 - CDN/WAF
 - local SQLite on mobile
+
+Recommended first deployment geography:
+
+- primary PostgreSQL and backend API in the Mumbai cloud region
+- edge delivery through global CDN/WAF
+
+This keeps latency low for the current operating base while still allowing global edge delivery for web assets and future regional expansion.
 
 This is the correct architecture to build now.
 
