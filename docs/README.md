@@ -16,37 +16,38 @@ It is designed to support:
 
 ### Product and business
 
-1. [Product Overview](./product-overview.md)
-2. [Product Requirements](./product-requirements-prd.md)
-3. [User Roles and Permissions](./user-roles-and-permissions.md)
+1. [Business Hub Complete Platform Handbook](./business-hub-complete-platform-handbook.md)
+2. [Product Overview](./product-overview.md)
+3. [Product Requirements](./product-requirements-prd.md)
+4. [User Roles and Permissions](./user-roles-and-permissions.md)
 
 ### System and engineering
 
-4. [Architecture Overview](./architecture-overview.md)
-5. [Final Architecture Blueprint](./final-architecture-blueprint.md)
-6. [Firebase to PostgreSQL Migration Plan](./firebase-to-postgres-migration-plan.md)
-7. [Firebase to PostgreSQL Schema Map](./firebase-to-postgres-schema-map.md)
-8. [Platform Scenarios and Operational Flows](./platform-scenarios-and-operational-flows.md)
-9. [Target Platform Architecture](./target-platform-architecture.md)
-10. [High-Scale Global Architecture](./high-scale-global-architecture.md)
-11. [Ultra-High-Write Transaction Architecture](./ultra-high-write-transaction-architecture.md)
-12. [Production Control Plane Architecture](./production-control-plane-architecture.md)
-13. [Data Model and ERD](./data-model-erd.md)
-14. [Backend Services and Functions](./backend-services-and-functions.md)
-15. [Sync Parity Matrix](./sync-parity-matrix.md)
+5. [Architecture Overview](./architecture-overview.md)
+6. [Final Architecture Blueprint](./final-architecture-blueprint.md)
+7. [Firebase to PostgreSQL Migration Plan](./firebase-to-postgres-migration-plan.md)
+8. [Firebase to PostgreSQL Schema Map](./firebase-to-postgres-schema-map.md)
+9. [Platform Scenarios and Operational Flows](./platform-scenarios-and-operational-flows.md)
+10. [Target Platform Architecture](./target-platform-architecture.md)
+11. [High-Scale Global Architecture](./high-scale-global-architecture.md)
+12. [Ultra-High-Write Transaction Architecture](./ultra-high-write-transaction-architecture.md)
+13. [Production Control Plane Architecture](./production-control-plane-architecture.md)
+14. [Data Model and ERD](./data-model-erd.md)
+15. [Backend Services and Functions](./backend-services-and-functions.md)
+16. [Sync Parity Matrix](./sync-parity-matrix.md)
 
 ### Release and operations
 
-16. [Deployment and Release Runbook](./deployment-release-runbook.md)
-17. [Testing and QA Plan](./testing-qa-plan.md)
-18. [Mobile Cutover Checklist](./mobile-cutover-checklist.md)
-19. [Operations Runbook](./operations-runbook.md)
+17. [Deployment and Release Runbook](./deployment-release-runbook.md)
+18. [Testing and QA Plan](./testing-qa-plan.md)
+19. [Mobile Cutover Checklist](./mobile-cutover-checklist.md)
+20. [Operations Runbook](./operations-runbook.md)
 
 ### Existing strategy docs
 
-20. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
-21. [Global Scale Blueprint](./global-scale-blueprint.md)
-22. [Scale Certification Checklist](./scale-certification-checklist.md)
+21. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
+22. [Global Scale Blueprint](./global-scale-blueprint.md)
+23. [Scale Certification Checklist](./scale-certification-checklist.md)
 
 ## Current truth
 
@@ -60,17 +61,14 @@ As of April 28, 2026:
 ## Suggested use by audience
 
 ### Founder / product owner
-- start with Product Overview
+- start with Business Hub Complete Platform Handbook
+- then Product Overview
 - then Product Requirements
-- then Final Architecture Blueprint
 - then Mobile Cutover Checklist
 
 ### Developer
-- start with Architecture Overview
-- then Final Architecture Blueprint
-- then Firebase to PostgreSQL Migration Plan
-- then Firebase to PostgreSQL Schema Map
-- then Platform Scenarios and Operational Flows
+- start with Business Hub Complete Platform Handbook
+- then Architecture Overview
 - then Target Platform Architecture
 - then High-Scale Global Architecture
 - then Ultra-High-Write Transaction Architecture
