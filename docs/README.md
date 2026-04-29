@@ -25,26 +25,28 @@ It is designed to support:
 4. [Architecture Overview](./architecture-overview.md)
 5. [Final Architecture Blueprint](./final-architecture-blueprint.md)
 6. [Firebase to PostgreSQL Migration Plan](./firebase-to-postgres-migration-plan.md)
-7. [Target Platform Architecture](./target-platform-architecture.md)
-8. [High-Scale Global Architecture](./high-scale-global-architecture.md)
-9. [Ultra-High-Write Transaction Architecture](./ultra-high-write-transaction-architecture.md)
-10. [Production Control Plane Architecture](./production-control-plane-architecture.md)
-11. [Data Model and ERD](./data-model-erd.md)
-12. [Backend Services and Functions](./backend-services-and-functions.md)
-13. [Sync Parity Matrix](./sync-parity-matrix.md)
+7. [Firebase to PostgreSQL Schema Map](./firebase-to-postgres-schema-map.md)
+8. [Platform Scenarios and Operational Flows](./platform-scenarios-and-operational-flows.md)
+9. [Target Platform Architecture](./target-platform-architecture.md)
+10. [High-Scale Global Architecture](./high-scale-global-architecture.md)
+11. [Ultra-High-Write Transaction Architecture](./ultra-high-write-transaction-architecture.md)
+12. [Production Control Plane Architecture](./production-control-plane-architecture.md)
+13. [Data Model and ERD](./data-model-erd.md)
+14. [Backend Services and Functions](./backend-services-and-functions.md)
+15. [Sync Parity Matrix](./sync-parity-matrix.md)
 
 ### Release and operations
 
-14. [Deployment and Release Runbook](./deployment-release-runbook.md)
-15. [Testing and QA Plan](./testing-qa-plan.md)
-16. [Mobile Cutover Checklist](./mobile-cutover-checklist.md)
-17. [Operations Runbook](./operations-runbook.md)
+16. [Deployment and Release Runbook](./deployment-release-runbook.md)
+17. [Testing and QA Plan](./testing-qa-plan.md)
+18. [Mobile Cutover Checklist](./mobile-cutover-checklist.md)
+19. [Operations Runbook](./operations-runbook.md)
 
 ### Existing strategy docs
 
-18. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
-19. [Global Scale Blueprint](./global-scale-blueprint.md)
-20. [Scale Certification Checklist](./scale-certification-checklist.md)
+20. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
+21. [Global Scale Blueprint](./global-scale-blueprint.md)
+22. [Scale Certification Checklist](./scale-certification-checklist.md)
 
 ## Current truth
 
@@ -67,6 +69,8 @@ As of April 28, 2026:
 - start with Architecture Overview
 - then Final Architecture Blueprint
 - then Firebase to PostgreSQL Migration Plan
+- then Firebase to PostgreSQL Schema Map
+- then Platform Scenarios and Operational Flows
 - then Target Platform Architecture
 - then High-Scale Global Architecture
 - then Ultra-High-Write Transaction Architecture
