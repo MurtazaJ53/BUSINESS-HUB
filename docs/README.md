@@ -23,22 +23,23 @@ It is designed to support:
 ### System and engineering
 
 4. [Architecture Overview](./architecture-overview.md)
-5. [Data Model and ERD](./data-model-erd.md)
-6. [Backend Services and Functions](./backend-services-and-functions.md)
-7. [Sync Parity Matrix](./sync-parity-matrix.md)
+5. [Target Platform Architecture](./target-platform-architecture.md)
+6. [Data Model and ERD](./data-model-erd.md)
+7. [Backend Services and Functions](./backend-services-and-functions.md)
+8. [Sync Parity Matrix](./sync-parity-matrix.md)
 
 ### Release and operations
 
-8. [Deployment and Release Runbook](./deployment-release-runbook.md)
-9. [Testing and QA Plan](./testing-qa-plan.md)
-10. [Mobile Cutover Checklist](./mobile-cutover-checklist.md)
-11. [Operations Runbook](./operations-runbook.md)
+9. [Deployment and Release Runbook](./deployment-release-runbook.md)
+10. [Testing and QA Plan](./testing-qa-plan.md)
+11. [Mobile Cutover Checklist](./mobile-cutover-checklist.md)
+12. [Operations Runbook](./operations-runbook.md)
 
 ### Existing strategy docs
 
-12. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
-13. [Global Scale Blueprint](./global-scale-blueprint.md)
-14. [Scale Certification Checklist](./scale-certification-checklist.md)
+13. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
+14. [Global Scale Blueprint](./global-scale-blueprint.md)
+15. [Scale Certification Checklist](./scale-certification-checklist.md)
 
 ## Current truth
 
@@ -58,6 +59,7 @@ As of April 28, 2026:
 
 ### Developer
 - start with Architecture Overview
+- then Target Platform Architecture
 - then Data Model and ERD
 - then Backend Services and Functions
 - then Sync Parity Matrix
