@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from platform_apps.jobs.models import MigrationDomainControl, MigrationJobRun
+from platform_apps.jobs.models import MigrationBridgeReceipt, MigrationDomainControl, MigrationJobRun
 
 
 class MigrationDomainControlSerializer(serializers.ModelSerializer):
@@ -68,3 +68,58 @@ class MigrationJobRunSerializer(serializers.ModelSerializer):
         if obj.actor_user_id:
             return obj.actor_user.email
         return None
+
+
+class MigrationBridgeReceiptSerializer(serializers.ModelSerializer):
+    shop_name = serializers.CharField(source="shop.name", read_only=True)
+
+    class Meta:
+        model = MigrationBridgeReceipt
+        fields = (
+            "id",
+            "shop",
+            "shop_name",
+            "domain",
+            "origin_system",
+            "origin_event_id",
+            "command_type",
+            "entity_type",
+            "entity_id",
+            "base_domain_epoch",
+            "payload_json",
+            "applied_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "shop_name",
+            "origin_system",
+            "origin_event_id",
+            "command_type",
+            "entity_type",
+            "entity_id",
+            "base_domain_epoch",
+            "payload_json",
+            "applied_at",
+            "created_at",
+            "updated_at",
+        )
+
+
+class MigrationShadowSummarySerializer(serializers.Serializer):
+    shop = serializers.UUIDField()
+    shop_name = serializers.CharField()
+    shop_slug = serializers.CharField()
+    domain = serializers.CharField()
+    write_master = serializers.CharField()
+    bridge_mode = serializers.CharField()
+    current_epoch = serializers.IntegerField()
+    last_shadow_verified_at = serializers.DateTimeField(allow_null=True)
+    latest_compare_status = serializers.CharField(allow_null=True)
+    latest_compare_at = serializers.DateTimeField(allow_null=True)
+    latest_compare_mismatches = serializers.IntegerField()
+    latest_compare_trace_id = serializers.CharField(allow_blank=True, allow_null=True)
+    open_events = serializers.IntegerField()
+    open_critical_events = serializers.IntegerField()
+    open_stale_epoch_events = serializers.IntegerField()

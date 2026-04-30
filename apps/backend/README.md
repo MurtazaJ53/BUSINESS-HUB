@@ -35,6 +35,8 @@ Phase 1 backend foundation for the Business Hub target platform.
 - `/api/v1/shops/<shop_id>/projections/dashboard/`
 - `/api/v1/migration/domains/`
 - `/api/v1/migration/jobs/`
+- `/api/v1/migration/bridge-receipts/`
+- `/api/v1/migration/shadow-summaries/`
 - `/api/v1/migration/reconciliation/`
 - `/api/v1/health/`
 - `/api/v1/health/ready/`
@@ -68,3 +70,4 @@ The current executable pilot slice supports:
 
 Pass a Firebase-like payload snapshot in `payload_json.source_snapshot` to exercise the pipeline locally.
 Use `payload_json.bridge_event` to exercise the unidirectional Firebase-to-PostgreSQL replay path.
+Use `/api/v1/migration/bridge-receipts/` and `/api/v1/migration/shadow-summaries/` to inspect replay health and compare posture from the admin control plane.

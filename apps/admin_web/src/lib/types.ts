@@ -275,6 +275,41 @@ export type MigrationJobRun = {
   updated_at: string;
 };
 
+export type MigrationBridgeReceipt = {
+  id: string;
+  shop: string;
+  shop_name: string;
+  domain: string;
+  origin_system: string;
+  origin_event_id: string;
+  command_type: string;
+  entity_type: string;
+  entity_id: string;
+  base_domain_epoch: number;
+  payload_json: Record<string, unknown>;
+  applied_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MigrationShadowSummary = {
+  shop: string;
+  shop_name: string;
+  shop_slug: string;
+  domain: string;
+  write_master: "firebase" | "postgres";
+  bridge_mode: "disabled" | "compare_only" | "firebase_to_postgres" | "postgres_to_firebase";
+  current_epoch: number;
+  last_shadow_verified_at: string | null;
+  latest_compare_status: "queued" | "running" | "succeeded" | "failed" | null;
+  latest_compare_at: string | null;
+  latest_compare_mismatches: number;
+  latest_compare_trace_id: string | null;
+  open_events: number;
+  open_critical_events: number;
+  open_stale_epoch_events: number;
+};
+
 export type MigrationReconciliationEvent = {
   id: string;
   shop: string;
@@ -303,6 +338,8 @@ export type MigrationStats = {
   totalControls: number;
   postgresPrimaryDomains: number;
   activeBridgeDomains: number;
+  bridgeReceipts: number;
   openCriticalEvents: number;
+  openStaleEpochEvents: number;
   runningJobs: number;
 };

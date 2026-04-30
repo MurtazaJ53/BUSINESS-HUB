@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from platform_apps.audit.models import MigrationReconciliationEvent
@@ -82,6 +83,66 @@ class MigrationControlApiTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(MigrationJobRun.objects.count(), 1)
+
+    def test_list_bridge_receipts(self):
+        MigrationBridgeReceipt.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            origin_system="firebase",
+            origin_event_id="evt_list_001",
+            command_type="upsert",
+            entity_type="inventory_item",
+            entity_id="inv_list_001",
+            base_domain_epoch=1,
+            payload_json={"name": "Bridge Tee"},
+            applied_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/bridge-receipts/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["origin_event_id"], "evt_list_001")
+
+    def test_list_shadow_summaries(self):
+        MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            current_epoch=4,
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=2,
+            trace_id="trace-shadow-001",
+        )
+        MigrationReconciliationEvent.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            severity="critical",
+            status="open",
+            issue_code="field_drift",
+            entity_type="inventory_item",
+            entity_id="inv_001",
+            expected_master="firebase",
+            observed_source="postgres",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/shadow-summaries/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["domain"], MigrationDomain.INVENTORY)
+        self.assertEqual(response.data[0]["current_epoch"], 4)
+        self.assertEqual(response.data[0]["latest_compare_mismatches"], 2)
+        self.assertEqual(response.data[0]["open_critical_events"], 1)
 
     def test_non_platform_admin_is_blocked(self):
         non_admin = PlatformUser.objects.create_user(email="staff@example.com", password="secret", full_name="Staff")

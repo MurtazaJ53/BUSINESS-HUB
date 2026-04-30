@@ -1,11 +1,19 @@
 from __future__ import annotations
 
 from rest_framework import generics
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
+from platform_apps.audit.models import MigrationReconciliationEvent
 from platform_apps.common.migration import MigrationJobStatus
 from platform_apps.common.permissions import IsPlatformAdminUser
-from platform_apps.jobs.models import MigrationDomainControl, MigrationJobRun
-from platform_apps.jobs.serializers import MigrationDomainControlSerializer, MigrationJobRunSerializer
+from platform_apps.jobs.models import MigrationBridgeReceipt, MigrationDomainControl, MigrationJobRun
+from platform_apps.jobs.serializers import (
+    MigrationBridgeReceiptSerializer,
+    MigrationDomainControlSerializer,
+    MigrationJobRunSerializer,
+    MigrationShadowSummarySerializer,
+)
 from platform_apps.jobs.services import execute_migration_job
 
 
@@ -76,3 +84,79 @@ class MigrationJobRunDetailView(generics.RetrieveUpdateAPIView):
 
     def get_queryset(self):
         return MigrationJobRun.objects.select_related("shop", "actor_user")
+
+
+class MigrationBridgeReceiptListView(generics.ListAPIView):
+    serializer_class = MigrationBridgeReceiptSerializer
+    permission_classes = [IsPlatformAdminUser]
+    pagination_class = None
+
+    def get_queryset(self):
+        queryset = MigrationBridgeReceipt.objects.select_related("shop")
+        domain = self.request.query_params.get("domain", "").strip()
+        shop_id = self.request.query_params.get("shop_id", "").strip()
+        origin_system = self.request.query_params.get("origin_system", "").strip()
+        entity_type = self.request.query_params.get("entity_type", "").strip()
+
+        if domain:
+            queryset = queryset.filter(domain=domain)
+        if shop_id:
+            queryset = queryset.filter(shop_id=shop_id)
+        if origin_system:
+            queryset = queryset.filter(origin_system=origin_system)
+        if entity_type:
+            queryset = queryset.filter(entity_type=entity_type)
+        return queryset
+
+
+class MigrationShadowSummaryListView(APIView):
+    permission_classes = [IsPlatformAdminUser]
+
+    def get(self, request):
+        controls = MigrationDomainControl.objects.select_related("shop").order_by("shop__name", "domain")
+        domain = request.query_params.get("domain", "").strip()
+        shop_id = request.query_params.get("shop_id", "").strip()
+
+        if domain:
+            controls = controls.filter(domain=domain)
+        if shop_id:
+            controls = controls.filter(shop_id=shop_id)
+
+        summaries = []
+        for control in controls:
+            latest_compare = (
+                MigrationJobRun.objects.filter(
+                    shop=control.shop,
+                    domain=control.domain,
+                    job_type="shadow_compare",
+                )
+                .order_by("-created_at")
+                .first()
+            )
+            open_events = MigrationReconciliationEvent.objects.filter(
+                shop=control.shop,
+                domain=control.domain,
+                status__in=["open", "acknowledged"],
+            )
+            summaries.append(
+                {
+                    "shop": control.shop_id,
+                    "shop_name": control.shop.name,
+                    "shop_slug": control.shop.slug,
+                    "domain": control.domain,
+                    "write_master": control.write_master,
+                    "bridge_mode": control.bridge_mode,
+                    "current_epoch": control.current_epoch,
+                    "last_shadow_verified_at": control.last_shadow_verified_at,
+                    "latest_compare_status": latest_compare.status if latest_compare else None,
+                    "latest_compare_at": latest_compare.finished_at if latest_compare else None,
+                    "latest_compare_mismatches": latest_compare.mismatch_count if latest_compare else 0,
+                    "latest_compare_trace_id": latest_compare.trace_id if latest_compare else "",
+                    "open_events": open_events.count(),
+                    "open_critical_events": open_events.filter(severity="critical").count(),
+                    "open_stale_epoch_events": open_events.filter(issue_code="stale_bridge_epoch").count(),
+                }
+            )
+
+        serializer = MigrationShadowSummarySerializer(summaries, many=True)
+        return Response(serializer.data)

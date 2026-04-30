@@ -1,10 +1,12 @@
 from django.urls import path
 
 from platform_apps.jobs.views import (
+    MigrationBridgeReceiptListView,
     MigrationDomainControlDetailView,
     MigrationDomainControlListCreateView,
     MigrationJobRunDetailView,
     MigrationJobRunListCreateView,
+    MigrationShadowSummaryListView,
 )
 
 urlpatterns = [
@@ -12,4 +14,6 @@ urlpatterns = [
     path("domains/<uuid:control_id>/", MigrationDomainControlDetailView.as_view(), name="migration-domain-detail"),
     path("jobs/", MigrationJobRunListCreateView.as_view(), name="migration-job-list"),
     path("jobs/<uuid:job_id>/", MigrationJobRunDetailView.as_view(), name="migration-job-detail"),
+    path("bridge-receipts/", MigrationBridgeReceiptListView.as_view(), name="migration-bridge-receipt-list"),
+    path("shadow-summaries/", MigrationShadowSummaryListView.as_view(), name="migration-shadow-summary-list"),
 ]

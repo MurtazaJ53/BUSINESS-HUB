@@ -1,14 +1,18 @@
 import { AdminShell } from "@/components/admin-shell";
 import { EmptyState } from "@/components/empty-state";
+import { MigrationBridgeReceiptsTable } from "@/components/migration-bridge-receipts-table";
 import { MetricCard } from "@/components/metric-card";
 import { MigrationControlsTable } from "@/components/migration-controls-table";
 import { MigrationJobsTable } from "@/components/migration-jobs-table";
 import { ReconciliationEventsTable } from "@/components/reconciliation-events-table";
+import { MigrationShadowSummariesTable } from "@/components/migration-shadow-summaries-table";
 import {
   buildMigrationStats,
+  getMigrationBridgeReceipts,
   getMigrationControls,
   getMigrationJobRuns,
   getMigrationReconciliationEvents,
+  getMigrationShadowSummaries,
   getSession,
   resolveActiveShop,
 } from "@/lib/admin-api";
@@ -34,12 +38,14 @@ export default async function MigrationPage() {
     );
   }
 
-  const [controls, jobs, events] = await Promise.all([
+  const [controls, jobs, receipts, shadowSummaries, events] = await Promise.all([
     getMigrationControls(),
     getMigrationJobRuns(),
+    getMigrationBridgeReceipts(),
+    getMigrationShadowSummaries(),
     getMigrationReconciliationEvents(),
   ]);
-  const stats = buildMigrationStats(controls, jobs, events);
+  const stats = buildMigrationStats(controls, jobs, receipts, events);
 
   return (
     <AdminShell
@@ -50,7 +56,7 @@ export default async function MigrationPage() {
       subtitle="Phase 2 control plane for domain ownership, bridge posture, job visibility, and reconciliation triage."
     >
       <div className="space-y-8">
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
           <MetricCard
             label="Domain controls"
             value={stats.totalControls.toString()}
@@ -72,11 +78,25 @@ export default async function MigrationPage() {
             icon="BRG"
           />
           <MetricCard
+            label="Replay receipts"
+            value={stats.bridgeReceipts.toString()}
+            detail="Applied bridge events recorded for idempotent replay safety"
+            accent="blue"
+            icon="RCT"
+          />
+          <MetricCard
             label="Critical mismatches"
             value={stats.openCriticalEvents.toString()}
             detail="Open reconciliation events needing immediate review"
             accent="rose"
             icon="MIS"
+          />
+          <MetricCard
+            label="Stale epochs"
+            value={stats.openStaleEpochEvents.toString()}
+            detail="Rejected replay attempts from outdated domain generations"
+            accent="rose"
+            icon="EPH"
           />
           <MetricCard
             label="Running jobs"
@@ -110,11 +130,37 @@ export default async function MigrationPage() {
           </div>
 
           <div className="panel-soft rounded-[28px] px-6 py-6">
+            <p className="eyebrow">Bridge health</p>
+            <h2 className="mt-3 text-2xl font-bold">Replay receipts</h2>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">
+              Every accepted Firebase replay should leave a durable receipt here. This is the fastest way to spot whether Phase 2 replication is flowing or silently stalled.
+            </p>
+            <div className="mt-6">
+              <MigrationBridgeReceiptsTable receipts={receipts} />
+            </div>
+          </div>
+        </section>
+
+        <section className="panel-soft rounded-[28px] px-6 py-6">
+          <div>
+            <p className="eyebrow">Shadow verification</p>
+            <h2 className="mt-3 text-2xl font-bold">Compare posture by shop and domain</h2>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">
+              This is the phase-gate view for Phase 2. It compresses the latest compare job, open drift, and stale epoch pressure into one surface so we can tell which domains are actually safe to pilot.
+            </p>
+          </div>
+          <div className="mt-6">
+            <MigrationShadowSummariesTable summaries={shadowSummaries} />
+          </div>
+        </section>
+
+        <section className="panel-soft rounded-[28px] px-6 py-6">
+          <div>
             <p className="eyebrow">Reconciliation queue</p>
             <h2 className="mt-3 text-2xl font-bold">Mismatch triage</h2>
-            <div className="mt-6">
-              <ReconciliationEventsTable events={events} />
-            </div>
+          </div>
+          <div className="mt-6">
+            <ReconciliationEventsTable events={events} />
           </div>
         </section>
       </div>

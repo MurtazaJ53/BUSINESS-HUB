@@ -13,8 +13,10 @@ import type {
   InventoryItem,
   InventoryStats,
   MigrationDomainControl,
+  MigrationBridgeReceipt,
   MigrationJobRun,
   MigrationReconciliationEvent,
+  MigrationShadowSummary,
   MigrationStats,
   PaymentStats,
   Sale,
@@ -163,6 +165,14 @@ export const getMigrationJobRuns = cache(async (): Promise<MigrationJobRun[]> =>
   return apiFetch<MigrationJobRun[]>("/migration/jobs/");
 });
 
+export const getMigrationBridgeReceipts = cache(async (): Promise<MigrationBridgeReceipt[]> => {
+  return apiFetch<MigrationBridgeReceipt[]>("/migration/bridge-receipts/");
+});
+
+export const getMigrationShadowSummaries = cache(async (): Promise<MigrationShadowSummary[]> => {
+  return apiFetch<MigrationShadowSummary[]>("/migration/shadow-summaries/");
+});
+
 export const getMigrationReconciliationEvents = cache(
   async (): Promise<MigrationReconciliationEvent[]> => {
     return apiFetch<MigrationReconciliationEvent[]>("/migration/reconciliation/");
@@ -279,14 +289,19 @@ export function buildPaymentStats(payments: SalePaymentRecord[]): PaymentStats {
 export function buildMigrationStats(
   controls: MigrationDomainControl[],
   jobs: MigrationJobRun[],
+  receipts: MigrationBridgeReceipt[],
   events: MigrationReconciliationEvent[],
 ): MigrationStats {
   return {
     totalControls: controls.length,
     postgresPrimaryDomains: controls.filter((control) => control.write_master === "postgres").length,
     activeBridgeDomains: controls.filter((control) => control.bridge_mode !== "disabled").length,
+    bridgeReceipts: receipts.length,
     openCriticalEvents: events.filter(
       (event) => event.severity === "critical" && ["open", "acknowledged"].includes(event.status),
+    ).length,
+    openStaleEpochEvents: events.filter(
+      (event) => event.issue_code === "stale_bridge_epoch" && ["open", "acknowledged"].includes(event.status),
     ).length,
     runningJobs: jobs.filter((job) => job.status === "running").length,
   };
