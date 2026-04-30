@@ -274,6 +274,101 @@ class MigrationControlApiTests(TestCase):
         self.assertEqual(control.current_epoch, 6)
         self.assertEqual(response.data["recommended_next_status"], MigrationCutoverStatus.POSTGRES_PRIMARY)
 
+    def test_verify_pilot_reports_healthy_postgres_primary_domain(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=8,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        InventoryItem.objects.create(
+            shop=self.shop,
+            source_system="firebase",
+            source_id="inv_verify_001",
+            source_shop_id="shop_001",
+            source_path="shops/shop_001/inventory/inv_verify_001",
+            name="Verify Tee",
+            sku="VERIFY-TEE",
+            sell_price="299.00",
+        )
+
+        response = self.client.post(
+            f"/api/v1/migration/domains/{control.id}/verify-pilot/?run_inline=1",
+            {
+                "payloads": {
+                    "shadow_compare": {
+                        "source_snapshot": [
+                            {
+                                "id": "inv_verify_001",
+                                "name": "Verify Tee",
+                                "sku": "VERIFY-TEE",
+                                "sell_price": "299.00",
+                            }
+                        ]
+                    }
+                }
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["healthy"])
+        self.assertFalse(response.data["requires_rollback"])
+        self.assertEqual(response.data["verification_job"]["status"], MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(response.data["latest_compare_mismatches"], 0)
+
+    def test_verify_pilot_flags_rollback_when_primary_domain_drifts(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=9,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        InventoryItem.objects.create(
+            shop=self.shop,
+            source_system="firebase",
+            source_id="inv_verify_002",
+            source_shop_id="shop_001",
+            source_path="shops/shop_001/inventory/inv_verify_002",
+            name="Verify Jeans",
+            sku="VERIFY-JEANS",
+            sell_price="699.00",
+        )
+
+        response = self.client.post(
+            f"/api/v1/migration/domains/{control.id}/verify-pilot/?run_inline=1",
+            {
+                "payloads": {
+                    "shadow_compare": {
+                        "source_snapshot": [
+                            {
+                                "id": "inv_verify_002",
+                                "name": "Verify Jeans",
+                                "sku": "VERIFY-JEANS",
+                                "sell_price": "749.00",
+                            }
+                        ]
+                    }
+                }
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["healthy"])
+        self.assertTrue(response.data["requires_rollback"])
+        self.assertGreater(response.data["latest_compare_mismatches"], 0)
+
     def test_rollback_returns_domain_to_firebase_pilot_and_bumps_epoch(self):
         control = MigrationDomainControl.objects.create(
             shop=self.shop,

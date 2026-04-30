@@ -4,6 +4,7 @@ import {
   rollbackPilotAction,
   runBackfillAction,
   runPilotPreparationAction,
+  runPilotVerificationAction,
   runShadowCompareAction,
 } from "@/app/migration/actions";
 import type { MigrationPilotReadiness } from "@/lib/types";
@@ -132,6 +133,19 @@ export function MigrationPilotReadinessTable({
                             className="w-full rounded-[14px] border border-[rgba(52,211,153,0.2)] bg-[rgba(7,33,25,0.82)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--success)]"
                           >
                             Promote primary
+                          </button>
+                        </form>
+                      ) : null}
+                      {row.cutover_status === "ready" || row.cutover_status === "postgres_primary" ? (
+                        <form action={runPilotVerificationAction}>
+                          <input type="hidden" name="controlId" value={row.control_id} />
+                          <input type="hidden" name="domain" value={row.domain} />
+                          <input type="hidden" name="shop" value={row.shop_name} />
+                          <button
+                            type="submit"
+                            className="w-full rounded-[14px] border border-[rgba(52,211,153,0.14)] bg-[rgba(8,27,23,0.82)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--success)]"
+                          >
+                            Verify pilot
                           </button>
                         </form>
                       ) : null}

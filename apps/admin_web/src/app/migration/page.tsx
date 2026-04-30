@@ -44,6 +44,9 @@ function buildActionBanner(searchParams: SearchParams) {
   const readyForPilot = getSearchParamValue(searchParams, "readyForPilot");
   const blockingCount = getSearchParamValue(searchParams, "blockingCount");
   const jobsCreated = getSearchParamValue(searchParams, "jobsCreated");
+  const healthy = getSearchParamValue(searchParams, "healthy");
+  const requiresRollback = getSearchParamValue(searchParams, "requiresRollback");
+  const criticalCount = getSearchParamValue(searchParams, "criticalCount");
 
   if (!status || !action) {
     return null;
@@ -53,6 +56,8 @@ function buildActionBanner(searchParams: SearchParams) {
     const extra =
       action === "prepare-pilot"
         ? ` Jobs created: ${jobsCreated || "0"}. ready_for_pilot=${readyForPilot || "false"}. remaining blockers=${blockingCount || "0"}.`
+        : action === "verify-pilot"
+        ? ` healthy=${healthy || "false"}. requires_rollback=${requiresRollback || "false"}. mismatch_count=${mismatchCount || "0"}. critical_events=${criticalCount || "0"}.`
         : action.startsWith("run-") && jobStatus
         ? ` Latest job status: ${jobStatus}. rows_scanned=${rowsScanned || "0"}, rows_written=${rowsWritten || "0"}, mismatch_count=${mismatchCount || "0"}.`
         : "";

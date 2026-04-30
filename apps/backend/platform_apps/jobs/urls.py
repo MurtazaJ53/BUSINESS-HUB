@@ -11,6 +11,7 @@ from platform_apps.jobs.views import (
     MigrationPilotPromoteReadyView,
     MigrationPilotRollbackView,
     MigrationPilotReadinessListView,
+    MigrationPilotVerifyView,
     MigrationShadowSummaryListView,
 )
 
@@ -25,5 +26,6 @@ urlpatterns = [
     path("domains/<uuid:control_id>/prepare-pilot/", MigrationPilotPrepareView.as_view(), name="migration-prepare-pilot"),
     path("domains/<uuid:control_id>/promote-ready/", MigrationPilotPromoteReadyView.as_view(), name="migration-promote-ready"),
     path("domains/<uuid:control_id>/promote-primary/", MigrationPilotPromotePrimaryView.as_view(), name="migration-promote-primary"),
+    path("domains/<uuid:control_id>/verify-pilot/", MigrationPilotVerifyView.as_view(), name="migration-verify-pilot"),
     path("domains/<uuid:control_id>/rollback/", MigrationPilotRollbackView.as_view(), name="migration-rollback"),
 ]

@@ -158,3 +158,20 @@ class MigrationPilotPreparationResultSerializer(serializers.Serializer):
     domain = serializers.CharField()
     jobs = MigrationJobRunSerializer(many=True)
     readiness = MigrationPilotReadinessSerializer()
+
+
+class MigrationPilotVerificationResultSerializer(serializers.Serializer):
+    control_id = serializers.UUIDField()
+    shop = serializers.UUIDField()
+    shop_name = serializers.CharField()
+    domain = serializers.CharField()
+    verification_job = MigrationJobRunSerializer()
+    cutover_status = serializers.CharField()
+    write_master = serializers.CharField()
+    latest_compare_status = serializers.CharField(allow_null=True)
+    latest_compare_mismatches = serializers.IntegerField()
+    open_critical_events = serializers.IntegerField()
+    open_stale_epoch_events = serializers.IntegerField()
+    healthy = serializers.BooleanField()
+    requires_rollback = serializers.BooleanField()
+    summary = serializers.CharField()

@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { apiMutation } from "@/lib/admin-api";
-import type { MigrationJobRun, MigrationPilotPreparationResult } from "@/lib/types";
+import type {
+  MigrationJobRun,
+  MigrationPilotPreparationResult,
+  MigrationPilotVerificationResult,
+} from "@/lib/types";
 
 
 function getRequiredControlId(formData: FormData): string {
@@ -201,6 +205,52 @@ export async function runPilotPreparationAction(formData: FormData) {
       buildRedirectUrl({
         status: "error",
         action: "prepare-pilot",
+        domain,
+        shop,
+        message,
+      }),
+    );
+  }
+}
+
+
+export async function runPilotVerificationAction(formData: FormData) {
+  const controlId = getRequiredControlId(formData);
+  const domain = getOptionalField(formData, "domain");
+  const shop = getOptionalField(formData, "shop");
+
+  try {
+    const result = await apiMutation<MigrationPilotVerificationResult>(
+      `/migration/domains/${controlId}/verify-pilot/?run_inline=1`,
+      {
+        method: "POST",
+        body: {
+          payloads: {},
+        },
+      },
+    );
+    revalidatePath("/migration");
+    redirect(
+      buildRedirectUrl({
+        status: "success",
+        action: "verify-pilot",
+        domain,
+        shop,
+        healthy: String(result.healthy),
+        requiresRollback: String(result.requires_rollback),
+        mismatchCount: String(result.latest_compare_mismatches),
+        criticalCount: String(result.open_critical_events),
+      }),
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message.replace(/\s+/g, " ").slice(0, 220)
+        : "Unknown pilot verification failure.";
+    redirect(
+      buildRedirectUrl({
+        status: "error",
+        action: "verify-pilot",
         domain,
         shop,
         message,

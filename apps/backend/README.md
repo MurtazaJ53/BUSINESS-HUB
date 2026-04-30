@@ -73,7 +73,8 @@ The current executable pilot slice supports:
 Pass a Firebase-like payload snapshot in `payload_json.source_snapshot` to exercise the pipeline locally.
 Use `payload_json.bridge_event` to exercise the unidirectional Firebase-to-PostgreSQL replay path.
 Use `/api/v1/migration/bridge-receipts/` and `/api/v1/migration/shadow-summaries/` to inspect replay health and compare posture from the admin control plane.
-Use `/api/v1/migration/pilot-readiness/`, `/api/v1/migration/domains/<control_id>/prepare-pilot/`, `/api/v1/migration/domains/<control_id>/promote-ready/`, `/api/v1/migration/domains/<control_id>/promote-primary/`, and `/api/v1/migration/domains/<control_id>/rollback/` to assess and control Phase 3 inventory/customer pilots.
+Use `/api/v1/migration/pilot-readiness/`, `/api/v1/migration/domains/<control_id>/prepare-pilot/`, `/api/v1/migration/domains/<control_id>/promote-ready/`, `/api/v1/migration/domains/<control_id>/promote-primary/`, `/api/v1/migration/domains/<control_id>/verify-pilot/`, and `/api/v1/migration/domains/<control_id>/rollback/` to assess and control Phase 3 inventory/customer pilots.
 `prepare-pilot` can run the backfill + shadow-compare sequence in one step, and `?run_inline=1` makes that sequence executable immediately for local/admin-driven pilot preparation.
+`verify-pilot` runs a fresh compare against the promoted or ready domain and reports whether the pilot is healthy or whether rollback should be considered.
 When a migration control exists for `inventory`, Django inventory mutations are allowed only after that domain is `postgres_primary`; otherwise the API returns a `409` so the legacy write owner is not bypassed accidentally.
 Use `/api/v1/shops/<shop_id>/domain-state/inventory/` from shop-scoped surfaces to show whether the current shop is still in legacy/shadow mode or has actually been promoted to PostgreSQL-primary.

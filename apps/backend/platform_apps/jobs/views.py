@@ -21,6 +21,7 @@ from platform_apps.jobs.serializers import (
     MigrationJobRunSerializer,
     MigrationPilotPreparationResultSerializer,
     MigrationPilotReadinessSerializer,
+    MigrationPilotVerificationResultSerializer,
     MigrationShadowSummarySerializer,
 )
 from platform_apps.jobs.services import execute_migration_job
@@ -286,6 +287,82 @@ class MigrationPilotPromotePrimaryView(APIView):
 
         payload = build_pilot_readiness(control)
         serializer = MigrationPilotReadinessSerializer(payload)
+        return Response(serializer.data, status=200)
+
+
+class MigrationPilotVerifyView(APIView):
+    permission_classes = [IsPlatformAdminUser]
+
+    def post(self, request, control_id):
+        control = MigrationDomainControl.objects.select_related("shop").filter(pk=control_id).first()
+        if control is None:
+            return Response({"detail": "Migration control not found."}, status=404)
+
+        if control.domain not in {"inventory", "customers"}:
+            return Response(
+                {"detail": "Pilot verification is only implemented for inventory and customers right now."},
+                status=409,
+            )
+
+        payloads = request.data.get("payloads") if isinstance(request.data, dict) else None
+        if not isinstance(payloads, dict):
+            payloads = {}
+
+        run_inline = request.query_params.get("run_inline", "").strip().lower() in {"1", "true", "yes"}
+        job_run = MigrationJobRun.objects.create(
+            shop=control.shop,
+            domain=control.domain,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            actor_user=request.user,
+            status=MigrationJobStatus.QUEUED,
+            payload_json=payloads.get(MigrationJobType.SHADOW_COMPARE, {})
+            if isinstance(payloads.get(MigrationJobType.SHADOW_COMPARE), dict)
+            else {},
+        )
+        if run_inline:
+            job_run = execute_migration_job(str(job_run.id))
+
+        control.refresh_from_db()
+        readiness = build_pilot_readiness(control)
+        latest_compare_status = job_run.status
+        latest_compare_mismatches = job_run.mismatch_count
+        open_critical_events = readiness["open_critical_events"]
+        open_stale_epoch_events = readiness["open_stale_epoch_events"]
+        healthy = (
+            latest_compare_status == MigrationJobStatus.SUCCEEDED
+            and latest_compare_mismatches == 0
+            and open_critical_events == 0
+            and open_stale_epoch_events == 0
+        )
+        requires_rollback = (
+            control.cutover_status == MigrationCutoverStatus.POSTGRES_PRIMARY
+            and not healthy
+        )
+
+        if healthy:
+            summary = "Latest pilot verification is clean. No mismatches or critical drift detected."
+        elif requires_rollback:
+            summary = "Pilot verification found drift after PostgreSQL promotion. Rollback should be considered immediately."
+        else:
+            summary = "Pilot verification still shows blockers. Keep the domain in pilot posture until compare health is clean."
+
+        payload = {
+            "control_id": str(control.id),
+            "shop": str(control.shop_id),
+            "shop_name": control.shop.name,
+            "domain": control.domain,
+            "verification_job": job_run,
+            "cutover_status": control.cutover_status,
+            "write_master": control.write_master,
+            "latest_compare_status": latest_compare_status,
+            "latest_compare_mismatches": latest_compare_mismatches,
+            "open_critical_events": open_critical_events,
+            "open_stale_epoch_events": open_stale_epoch_events,
+            "healthy": healthy,
+            "requires_rollback": requires_rollback,
+            "summary": summary,
+        }
+        serializer = MigrationPilotVerificationResultSerializer(payload)
         return Response(serializer.data, status=200)
 
 

@@ -358,6 +358,23 @@ export type MigrationPilotPreparationResult = {
   readiness: MigrationPilotReadiness;
 };
 
+export type MigrationPilotVerificationResult = {
+  control_id: string;
+  shop: string;
+  shop_name: string;
+  domain: string;
+  verification_job: MigrationJobRun;
+  cutover_status: "legacy" | "pilot" | "ready" | "postgres_primary";
+  write_master: "firebase" | "postgres";
+  latest_compare_status: "queued" | "running" | "succeeded" | "failed" | null;
+  latest_compare_mismatches: number;
+  open_critical_events: number;
+  open_stale_epoch_events: number;
+  healthy: boolean;
+  requires_rollback: boolean;
+  summary: string;
+};
+
 export type MigrationReconciliationEvent = {
   id: string;
   shop: string;
