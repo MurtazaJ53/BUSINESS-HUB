@@ -32,6 +32,9 @@ Phase 1 backend foundation for the Business Hub target platform.
 - `/api/v1/shops/<shop_id>/customers/<customer_id>/ledger/`
 - `/api/v1/shops/<shop_id>/expenses/`
 - `/api/v1/shops/<shop_id>/attendance/`
+- `/api/v1/migration/domains/`
+- `/api/v1/migration/jobs/`
+- `/api/v1/migration/reconciliation/`
 - `/api/v1/health/`
 - `/api/v1/health/ready/`
 - `/admin/`
@@ -45,3 +48,16 @@ Phase 1 backend foundation for the Business Hub target platform.
 ## Local infrastructure
 
 Use `docker-compose.yml` to run PostgreSQL and Redis for the Tier A local stack.
+
+## Phase 2 migration execution
+
+For local Phase 2 testing, migration jobs can be created and executed inline without a running worker by posting to:
+
+- `/api/v1/migration/jobs/?run_inline=1`
+
+The current executable pilot slice supports:
+
+- `inventory` `backfill`
+- `inventory` `shadow_compare`
+
+Pass a Firebase-like payload snapshot in `payload_json.source_snapshot` to exercise the pipeline locally.

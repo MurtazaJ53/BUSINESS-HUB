@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.test import TestCase
 from rest_framework.test import APIClient
 
+from platform_apps.audit.models import MigrationReconciliationEvent
 from platform_apps.common.migration import (
     MigrationBridgeMode,
     MigrationCutoverStatus,
@@ -11,7 +12,9 @@ from platform_apps.common.migration import (
     MigrationJobType,
     MigrationWriteMaster,
 )
+from platform_apps.inventory.models import InventoryItem
 from platform_apps.jobs.models import MigrationDomainControl, MigrationJobRun
+from platform_apps.jobs.services import execute_migration_job
 from platform_apps.shops.models import Shop
 from platform_apps.users.models import PlatformUser
 
@@ -85,3 +88,215 @@ class MigrationControlApiTests(TestCase):
         response = self.client.get("/api/v1/migration/domains/")
 
         self.assertEqual(response.status_code, 403)
+
+
+class MigrationExecutionTests(TestCase):
+    def setUp(self):
+        self.user = PlatformUser.objects.create_user(
+            email="platform@example.com",
+            password="secret",
+            full_name="Platform Admin",
+            is_platform_admin=True,
+        )
+        self.shop = Shop.objects.create(
+            name="Demo Shop",
+            slug="demo-shop",
+            source_system="firebase",
+            source_id="shop_001",
+            source_shop_id="shop_001",
+            source_path="shops/shop_001",
+        )
+        self.control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.COMPARE_ONLY,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            shadow_reads_enabled=True,
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_inventory_backfill_creates_and_updates_source_tracked_items(self):
+        job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.BACKFILL,
+            actor_user=self.user,
+            payload_json={
+                "source_snapshot": [
+                    {
+                        "id": "inv_001",
+                        "name": "Blue Shirt",
+                        "sku": "SKU-001",
+                        "price": "499.50",
+                        "category": "Clothing",
+                    },
+                    {
+                        "id": "inv_002",
+                        "name": "Black Jeans",
+                        "sell_price": "899.00",
+                        "status": "active",
+                    },
+                ]
+            },
+        )
+
+        execute_migration_job(str(job.id))
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(job.rows_scanned, 2)
+        self.assertEqual(job.rows_written, 2)
+        self.assertEqual(job.rows_skipped, 0)
+
+        item = InventoryItem.objects.get(shop=self.shop, source_system="firebase", source_id="inv_001")
+        self.assertEqual(item.name, "Blue Shirt")
+        self.assertEqual(str(item.sell_price), "499.50")
+        self.assertEqual(item.source_shop_id, "shop_001")
+        self.assertEqual(item.source_path, "shops/shop_001/inventory/inv_001")
+        self.assertIsNotNone(item.migrated_at)
+
+        update_job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.BACKFILL,
+            actor_user=self.user,
+            payload_json={
+                "source_snapshot": [
+                    {
+                        "id": "inv_001",
+                        "name": "Blue Shirt Premium",
+                        "sell_price": "549.00",
+                        "sku": "SKU-001",
+                    }
+                ]
+            },
+        )
+
+        execute_migration_job(str(update_job.id))
+
+        update_job.refresh_from_db()
+        item.refresh_from_db()
+        self.assertEqual(update_job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(update_job.rows_written, 1)
+        self.assertEqual(item.name, "Blue Shirt Premium")
+        self.assertEqual(str(item.sell_price), "549.00")
+
+    def test_inventory_shadow_compare_records_and_auto_resolves_reconciliation_events(self):
+        InventoryItem.objects.create(
+            shop=self.shop,
+            source_system="firebase",
+            source_id="inv_001",
+            source_shop_id="shop_001",
+            source_path="shops/shop_001/inventory/inv_001",
+            name="Blue Shirt",
+            sku="SKU-001",
+            sell_price="100.00",
+        )
+        InventoryItem.objects.create(
+            shop=self.shop,
+            source_system="firebase",
+            source_id="inv_extra",
+            source_shop_id="shop_001",
+            source_path="shops/shop_001/inventory/inv_extra",
+            name="Ghost Item",
+            sku="GHOST",
+            sell_price="50.00",
+        )
+
+        job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            actor_user=self.user,
+            payload_json={
+                "source_snapshot": [
+                    {
+                        "id": "inv_001",
+                        "name": "Blue Shirt",
+                        "sku": "SKU-001",
+                        "sell_price": "125.00",
+                    },
+                    {
+                        "id": "inv_002",
+                        "name": "Black Jeans",
+                        "sell_price": "899.00",
+                    },
+                ]
+            },
+        )
+
+        execute_migration_job(str(job.id))
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(job.rows_scanned, 2)
+        self.assertEqual(job.mismatch_count, 3)
+        self.assertEqual(MigrationReconciliationEvent.objects.filter(shop=self.shop).count(), 3)
+
+        drift_event = MigrationReconciliationEvent.objects.get(shop=self.shop, issue_code="field_drift")
+        self.assertEqual(drift_event.status, "open")
+
+        second_job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            actor_user=self.user,
+            payload_json={
+                "source_snapshot": [
+                    {
+                        "id": "inv_001",
+                        "name": "Blue Shirt",
+                        "sku": "SKU-001",
+                        "sell_price": "100.00",
+                    },
+                    {
+                        "id": "inv_extra",
+                        "name": "Ghost Item",
+                        "sku": "GHOST",
+                        "sell_price": "50.00",
+                    },
+                ]
+            },
+        )
+
+        execute_migration_job(str(second_job.id))
+
+        second_job.refresh_from_db()
+        drift_event.refresh_from_db()
+        self.assertEqual(second_job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(second_job.mismatch_count, 0)
+        self.assertEqual(drift_event.status, "resolved")
+        self.assertIsNotNone(drift_event.resolved_at)
+
+    def test_run_inline_query_executes_job_immediately(self):
+        response = self.client.post(
+            "/api/v1/migration/jobs/?run_inline=1",
+            {
+                "shop": str(self.shop.id),
+                "domain": MigrationDomain.INVENTORY,
+                "job_type": MigrationJobType.BACKFILL,
+                "payload_json": {
+                    "source_snapshot": [
+                        {
+                            "id": "inv_003",
+                            "name": "Inline Trigger Tee",
+                            "sell_price": "299.00",
+                        }
+                    ]
+                },
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["status"], MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(response.data["rows_written"], 1)
+        self.assertTrue(
+            InventoryItem.objects.filter(
+                shop=self.shop,
+                source_system="firebase",
+                source_id="inv_003",
+            ).exists()
+        )

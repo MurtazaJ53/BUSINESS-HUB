@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from rest_framework import generics
 
+from platform_apps.common.migration import MigrationJobStatus
 from platform_apps.common.permissions import IsPlatformAdminUser
 from platform_apps.jobs.models import MigrationDomainControl, MigrationJobRun
 from platform_apps.jobs.serializers import MigrationDomainControlSerializer, MigrationJobRunSerializer
+from platform_apps.jobs.services import execute_migration_job
 
 
 class MigrationDomainControlListCreateView(generics.ListCreateAPIView):
@@ -62,7 +64,9 @@ class MigrationJobRunListCreateView(generics.ListCreateAPIView):
         return queryset
 
     def perform_create(self, serializer):
-        serializer.save(actor_user=self.request.user)
+        job_run = serializer.save(actor_user=self.request.user, status=MigrationJobStatus.QUEUED)
+        if self.request.query_params.get("run_inline", "").strip().lower() in {"1", "true", "yes"}:
+            serializer.instance = execute_migration_job(str(job_run.id))
 
 
 class MigrationJobRunDetailView(generics.RetrieveUpdateAPIView):
