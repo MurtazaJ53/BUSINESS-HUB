@@ -76,6 +76,8 @@ export function MigrationPilotReadinessTable({
                       {row.ready_for_pilot && row.recommended_next_status === "ready" ? (
                         <form action={promoteReadyAction}>
                           <input type="hidden" name="controlId" value={row.control_id} />
+                          <input type="hidden" name="domain" value={row.domain} />
+                          <input type="hidden" name="shop" value={row.shop_name} />
                           <button
                             type="submit"
                             className="w-full rounded-[14px] border border-[rgba(92,174,254,0.18)] bg-[rgba(9,18,34,0.82)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent)]"
@@ -87,6 +89,8 @@ export function MigrationPilotReadinessTable({
                       {row.ready_for_pilot && row.recommended_next_status === "postgres_primary" ? (
                         <form action={promotePrimaryAction}>
                           <input type="hidden" name="controlId" value={row.control_id} />
+                          <input type="hidden" name="domain" value={row.domain} />
+                          <input type="hidden" name="shop" value={row.shop_name} />
                           <button
                             type="submit"
                             className="w-full rounded-[14px] border border-[rgba(52,211,153,0.2)] bg-[rgba(7,33,25,0.82)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--success)]"
@@ -98,6 +102,8 @@ export function MigrationPilotReadinessTable({
                       {row.cutover_status === "ready" || row.cutover_status === "postgres_primary" ? (
                         <form action={rollbackPilotAction}>
                           <input type="hidden" name="controlId" value={row.control_id} />
+                          <input type="hidden" name="domain" value={row.domain} />
+                          <input type="hidden" name="shop" value={row.shop_name} />
                           <button
                             type="submit"
                             className="w-full rounded-[14px] border border-[rgba(251,113,133,0.18)] bg-[rgba(40,12,19,0.82)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--warning)]"

@@ -5,6 +5,7 @@ import { MetricCard } from "@/components/metric-card";
 import { MigrationControlsTable } from "@/components/migration-controls-table";
 import { MigrationJobsTable } from "@/components/migration-jobs-table";
 import { MigrationPilotReadinessTable } from "@/components/migration-pilot-readiness-table";
+import { MigrationRunbookPanel } from "@/components/migration-runbook-panel";
 import { ReconciliationEventsTable } from "@/components/reconciliation-events-table";
 import { MigrationShadowSummariesTable } from "@/components/migration-shadow-summaries-table";
 import {
@@ -19,7 +20,47 @@ import {
   resolveActiveShop,
 } from "@/lib/admin-api";
 
-export default async function MigrationPage() {
+type SearchParams = Record<string, string | string[] | undefined>;
+
+type MigrationPageProps = {
+  searchParams?: Promise<SearchParams>;
+};
+
+function getSearchParamValue(searchParams: SearchParams, key: string) {
+  const raw = searchParams[key];
+  return Array.isArray(raw) ? raw[0] : raw;
+}
+
+function buildActionBanner(searchParams: SearchParams) {
+  const status = getSearchParamValue(searchParams, "status");
+  const action = getSearchParamValue(searchParams, "action");
+  const domain = getSearchParamValue(searchParams, "domain");
+  const shop = getSearchParamValue(searchParams, "shop");
+  const message = getSearchParamValue(searchParams, "message");
+
+  if (!status || !action) {
+    return null;
+  }
+
+  if (status === "success") {
+    return {
+      accent:
+        "border-[rgba(52,211,153,0.18)] bg-[rgba(7,33,25,0.76)] text-[var(--success)]" as const,
+      title: `Migration action succeeded: ${action}`,
+      body: `${shop || "Selected shop"} / ${domain || "domain"} completed the requested pilot action successfully. Review bridge receipts, shadow summaries, and reconciliation before taking the next step.`,
+    };
+  }
+
+  return {
+    accent:
+      "border-[rgba(251,113,133,0.18)] bg-[rgba(40,12,19,0.76)] text-[var(--warning)]" as const,
+    title: `Migration action failed: ${action}`,
+    body: `${shop || "Selected shop"} / ${domain || "domain"} could not complete the requested action.${message ? ` ${message}` : ""}`,
+  };
+}
+
+export default async function MigrationPage({ searchParams }: MigrationPageProps) {
+  const resolvedSearchParams = (await searchParams) ?? {};
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
 
@@ -49,6 +90,7 @@ export default async function MigrationPage() {
     getMigrationReconciliationEvents(),
   ]);
   const stats = buildMigrationStats(controls, jobs, receipts, pilotReadiness, events);
+  const actionBanner = buildActionBanner(resolvedSearchParams);
 
   return (
     <AdminShell
@@ -59,6 +101,14 @@ export default async function MigrationPage() {
       subtitle="Phase 3 control plane for pilot cutovers, bridge posture, job visibility, and reconciliation triage."
     >
       <div className="space-y-8">
+        {actionBanner ? (
+          <section className={`panel-soft rounded-[28px] border px-6 py-5 ${actionBanner.accent}`}>
+            <p className="eyebrow text-current/70">Operator feedback</p>
+            <h2 className="mt-3 text-2xl font-bold text-[var(--text-primary)]">{actionBanner.title}</h2>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">{actionBanner.body}</p>
+          </section>
+        ) : null}
+
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-8">
           <MetricCard
             label="Domain controls"
@@ -116,6 +166,8 @@ export default async function MigrationPage() {
             icon="RUN"
           />
         </section>
+
+        <MigrationRunbookPanel readiness={pilotReadiness} />
 
         <section className="panel-soft rounded-[28px] px-6 py-6">
           <div>
