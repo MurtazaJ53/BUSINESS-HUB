@@ -3,6 +3,8 @@ from __future__ import annotations
 from django.db.models import Q
 from rest_framework import exceptions, generics, permissions
 
+from platform_apps.common.migration import MigrationDomain
+from platform_apps.common.migration_guards import assert_postgres_primary_write_enabled
 from platform_apps.customers.models import Customer, CustomerLedgerEntry
 from platform_apps.customers.serializers import CustomerLedgerEntrySerializer, CustomerSerializer
 from platform_apps.shops.models import ShopMembership
@@ -54,6 +56,10 @@ class CustomerListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.STAFF)
+        assert_postgres_primary_write_enabled(
+            shop_id=str(self.kwargs["shop_id"]),
+            domain=MigrationDomain.CUSTOMERS,
+        )
         serializer.save()
 
 
@@ -78,10 +84,18 @@ class CustomerDetailView(ShopScopedMixin, generics.RetrieveUpdateDestroyAPIView)
 
     def perform_update(self, serializer):
         get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.STAFF)
+        assert_postgres_primary_write_enabled(
+            shop_id=str(self.kwargs["shop_id"]),
+            domain=MigrationDomain.CUSTOMERS,
+        )
         serializer.save()
 
     def perform_destroy(self, instance):
         get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.ADMIN)
+        assert_postgres_primary_write_enabled(
+            shop_id=str(self.kwargs["shop_id"]),
+            domain=MigrationDomain.CUSTOMERS,
+        )
         instance.tombstone = True
         instance.status = Customer.Status.ARCHIVED
         instance.save(update_fields=["tombstone", "status", "updated_at"])
@@ -122,4 +136,8 @@ class CustomerLedgerListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.STAFF)
+        assert_postgres_primary_write_enabled(
+            shop_id=str(self.kwargs["shop_id"]),
+            domain=MigrationDomain.CUSTOMER_LEDGER,
+        )
         serializer.save()
