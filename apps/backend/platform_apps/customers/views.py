@@ -25,6 +25,7 @@ class ShopScopedMixin:
 class CustomerListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
     serializer_class = CustomerSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
 
     def get_queryset(self):
         membership = self.get_membership()
@@ -90,6 +91,7 @@ class CustomerLedgerListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
     serializer_class = CustomerLedgerEntrySerializer
     permission_classes = [permissions.IsAuthenticated]
     minimum_role = ShopMembership.Role.VIEWER
+    pagination_class = None
 
     def get_customer(self):
         if not hasattr(self, "_customer_cache"):

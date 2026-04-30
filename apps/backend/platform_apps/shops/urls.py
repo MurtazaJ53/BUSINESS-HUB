@@ -5,6 +5,7 @@ from platform_apps.customers.views import (
     CustomerLedgerListCreateView,
     CustomerListCreateView,
 )
+from platform_apps.expenses.views import ExpenseDetailView, ExpenseListCreateView
 from platform_apps.inventory.views import (
     InventoryItemAdjustmentView,
     InventoryItemDetailView,
@@ -21,6 +22,8 @@ urlpatterns = [
         CustomerLedgerListCreateView.as_view(),
         name="customer-ledger",
     ),
+    path("<uuid:shop_id>/expenses/", ExpenseListCreateView.as_view(), name="expense-list"),
+    path("<uuid:shop_id>/expenses/<uuid:expense_id>/", ExpenseDetailView.as_view(), name="expense-detail"),
     path("<uuid:shop_id>/inventory/", InventoryItemListCreateView.as_view(), name="inventory-list"),
     path("<uuid:shop_id>/inventory/<uuid:item_id>/", InventoryItemDetailView.as_view(), name="inventory-detail"),
     path(

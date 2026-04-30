@@ -10,6 +10,7 @@ from platform_apps.shops.serializers import ShopMembershipListSerializer
 class ShopMembershipListView(ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = ShopMembershipListSerializer
+    pagination_class = None
 
     def get_queryset(self):
         return (

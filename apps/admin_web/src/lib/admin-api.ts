@@ -5,6 +5,8 @@ import { cache } from "react";
 import type {
   Customer,
   CustomerStats,
+  Expense,
+  ExpenseStats,
   InventoryItem,
   InventoryStats,
   SessionPayload,
@@ -88,6 +90,14 @@ export const getCustomers = cache(async (shopId: string, query?: string): Promis
   });
 });
 
+export const getExpenses = cache(async (shopId: string, query?: string): Promise<Expense[]> => {
+  return apiFetch<Expense[]>(`/shops/${shopId}/expenses/`, {
+    query: {
+      q: query,
+    },
+  });
+});
+
 export function resolveActiveShop(session: SessionPayload): ShopMembership | null {
   if (!session.active_shop_id) {
     return session.memberships[0] ?? null;
@@ -128,5 +138,30 @@ export function buildCustomerStats(customers: Customer[]): CustomerStats {
     activeCredits: customers.filter((customer) => Number(customer.balance) > 0).length,
     totalOutstanding: customers.reduce((total, customer) => total + Number(customer.balance || 0), 0),
     totalLifetimeSpend: customers.reduce((total, customer) => total + Number(customer.total_spent || 0), 0),
+  };
+}
+
+export function buildExpenseStats(expenses: Expense[]): ExpenseStats {
+  const totalsByCategory = new Map<string, number>();
+
+  for (const expense of expenses) {
+    const amount = Number(expense.amount || 0);
+    totalsByCategory.set(expense.category, (totalsByCategory.get(expense.category) ?? 0) + amount);
+  }
+
+  let biggestCategory: string | null = null;
+  let biggestAmount = -1;
+  for (const [category, total] of totalsByCategory.entries()) {
+    if (total > biggestAmount) {
+      biggestAmount = total;
+      biggestCategory = category;
+    }
+  }
+
+  return {
+    totalEntries: expenses.length,
+    totalAmount: expenses.reduce((total, expense) => total + Number(expense.amount || 0), 0),
+    uniqueCategories: totalsByCategory.size,
+    biggestCategory,
   };
 }

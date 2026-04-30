@@ -7,7 +7,7 @@ import type { SessionPayload, ShopMembership } from "@/lib/types";
 type AdminShellProps = {
   session: SessionPayload;
   activeShop: ShopMembership | null;
-  activeRoute: "overview" | "inventory" | "customers";
+  activeRoute: "overview" | "inventory" | "customers" | "expenses";
   title: string;
   subtitle: string;
   children: ReactNode;
@@ -31,6 +31,12 @@ const navItems = [
     label: "Customers",
     href: "/customers",
     glyph: "◎",
+  },
+  {
+    key: "expenses",
+    label: "Expenses",
+    href: "/expenses",
+    glyph: "↗",
   },
 ] as const;
 

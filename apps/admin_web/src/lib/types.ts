@@ -76,3 +76,22 @@ export type CustomerStats = {
   totalOutstanding: number;
   totalLifetimeSpend: number;
 };
+
+export type Expense = {
+  id: string;
+  category: string;
+  amount: string;
+  description: string;
+  payment_method: "CASH" | "UPI" | "BANK" | "CARD" | "OTHER";
+  payment_reference: string;
+  expense_date: string;
+  tombstone: boolean;
+  actor_name: string | null;
+};
+
+export type ExpenseStats = {
+  totalEntries: number;
+  totalAmount: number;
+  uniqueCategories: number;
+  biggestCategory: string | null;
+};
