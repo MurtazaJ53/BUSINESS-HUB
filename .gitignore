@@ -50,3 +50,11 @@ firebase-debug.log*
 *.apk
 release-artifacts/
 
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.sqlite3
+apps/backend/media/
+apps/backend/staticfiles/
+
