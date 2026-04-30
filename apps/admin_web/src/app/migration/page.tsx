@@ -56,7 +56,7 @@ export default async function MigrationPage() {
       activeShop={activeShop}
       activeRoute="migration"
       title="Migration Control"
-      subtitle="Phase 2 control plane for domain ownership, bridge posture, job visibility, and reconciliation triage."
+      subtitle="Phase 3 control plane for pilot cutovers, bridge posture, job visibility, and reconciliation triage."
     >
       <div className="space-y-8">
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-8">

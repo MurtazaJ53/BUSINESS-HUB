@@ -1,3 +1,8 @@
+import {
+  promotePrimaryAction,
+  promoteReadyAction,
+  rollbackPilotAction,
+} from "@/app/migration/actions";
 import type { MigrationPilotReadiness } from "@/lib/types";
 
 type MigrationPilotReadinessTableProps = {
@@ -19,6 +24,7 @@ export function MigrationPilotReadinessTable({
               <th className="px-5 py-4 font-medium">Open issues</th>
               <th className="px-5 py-4 font-medium">Next state</th>
               <th className="px-5 py-4 font-medium">Blockers</th>
+              <th className="px-5 py-4 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -65,11 +71,51 @@ export function MigrationPilotReadinessTable({
                       <span className="text-[var(--success)]">No blockers</span>
                     )}
                   </td>
+                  <td className="px-5 py-4">
+                    <div className="flex flex-col gap-2">
+                      {row.ready_for_pilot && row.recommended_next_status === "ready" ? (
+                        <form action={promoteReadyAction}>
+                          <input type="hidden" name="controlId" value={row.control_id} />
+                          <button
+                            type="submit"
+                            className="w-full rounded-[14px] border border-[rgba(92,174,254,0.18)] bg-[rgba(9,18,34,0.82)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent)]"
+                          >
+                            Promote ready
+                          </button>
+                        </form>
+                      ) : null}
+                      {row.ready_for_pilot && row.recommended_next_status === "postgres_primary" ? (
+                        <form action={promotePrimaryAction}>
+                          <input type="hidden" name="controlId" value={row.control_id} />
+                          <button
+                            type="submit"
+                            className="w-full rounded-[14px] border border-[rgba(52,211,153,0.2)] bg-[rgba(7,33,25,0.82)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--success)]"
+                          >
+                            Promote primary
+                          </button>
+                        </form>
+                      ) : null}
+                      {row.cutover_status === "ready" || row.cutover_status === "postgres_primary" ? (
+                        <form action={rollbackPilotAction}>
+                          <input type="hidden" name="controlId" value={row.control_id} />
+                          <button
+                            type="submit"
+                            className="w-full rounded-[14px] border border-[rgba(251,113,133,0.18)] bg-[rgba(40,12,19,0.82)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--warning)]"
+                          >
+                            Rollback
+                          </button>
+                        </form>
+                      ) : null}
+                      {!row.ready_for_pilot && row.cutover_status !== "ready" && row.cutover_status !== "postgres_primary" ? (
+                        <span className="text-xs text-[var(--text-muted)]">Clear blockers to unlock actions</span>
+                      ) : null}
+                    </div>
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-sm text-[var(--text-secondary)]">
+                <td colSpan={7} className="px-5 py-10 text-center text-sm text-[var(--text-secondary)]">
                   No pilot readiness records returned from the Phase 3 API yet.
                 </td>
               </tr>

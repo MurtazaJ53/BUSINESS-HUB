@@ -31,6 +31,11 @@ type FetchOptions = {
   query?: Record<string, string | undefined>;
 };
 
+type MutationOptions = {
+  method?: "POST" | "PATCH" | "PUT" | "DELETE";
+  body?: unknown;
+};
+
 const API_BASE_URL =
   process.env.BUSINESS_HUB_API_BASE_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:8000/api/v1";
 
@@ -78,6 +83,34 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T>
   }
 
   return response.json() as Promise<T>;
+}
+
+export async function apiMutation<T>(path: string, options: MutationOptions = {}): Promise<T> {
+  const url = new URL(`${API_BASE_URL}${path}`);
+  const headers = buildHeaders();
+  const init: RequestInit = {
+    method: options.method ?? "POST",
+    headers,
+    cache: "no-store",
+  };
+
+  if (options.body !== undefined) {
+    headers.set("Content-Type", "application/json");
+    init.body = JSON.stringify(options.body);
+  }
+
+  const response = await fetch(url, init);
+  const bodyText = await response.text();
+
+  if (!response.ok) {
+    throw new Error(`Business Hub API mutation failed (${response.status}) for ${path}: ${bodyText}`);
+  }
+
+  if (!bodyText) {
+    return undefined as T;
+  }
+
+  return JSON.parse(bodyText) as T;
 }
 
 export const getSession = cache(async (): Promise<SessionPayload> => {
