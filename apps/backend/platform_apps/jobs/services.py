@@ -20,6 +20,7 @@ from platform_apps.common.migration import (
 from platform_apps.customers.models import Customer
 from platform_apps.inventory.models import InventoryItem
 from platform_apps.jobs.models import MigrationDomainControl, MigrationJobRun
+from platform_apps.projections.services import refresh_shop_dashboard_projection
 from platform_apps.users.authentication import get_firebase_app
 
 
@@ -697,6 +698,39 @@ def run_customer_shadow_compare(job_run: MigrationJobRun) -> MigrationJobRun:
     return job_run
 
 
+def run_reporting_projection_refresh(job_run: MigrationJobRun) -> MigrationJobRun:
+    control = _get_required_control(job_run)
+    _mark_job_running(job_run)
+
+    try:
+        snapshot = refresh_shop_dashboard_projection(control.shop)
+        job_run.rows_scanned = (
+            snapshot.inventory_items_count
+            + snapshot.customer_count
+            + snapshot.sales_count
+            + snapshot.payment_count
+        )
+        job_run.rows_written = 1 + snapshot.low_stock_preview.count()
+        job_run.rows_skipped = 0
+        job_run.mismatch_count = 0
+        job_run.save(
+            update_fields=[
+                "rows_scanned",
+                "rows_written",
+                "rows_skipped",
+                "mismatch_count",
+                "updated_at",
+            ]
+        )
+    except Exception as exc:  # pragma: no cover
+        _mark_job_finished(job_run, status=MigrationJobStatus.FAILED, error_message=str(exc))
+        raise
+
+    _mark_job_finished(job_run, status=MigrationJobStatus.SUCCEEDED)
+    job_run.refresh_from_db()
+    return job_run
+
+
 def execute_migration_job(job_run_id: str) -> MigrationJobRun:
     job_run = MigrationJobRun.objects.select_related("shop").get(pk=job_run_id)
 
@@ -710,6 +744,9 @@ def execute_migration_job(job_run_id: str) -> MigrationJobRun:
             return run_customer_backfill(job_run)
         if job_run.job_type == MigrationJobType.SHADOW_COMPARE:
             return run_customer_shadow_compare(job_run)
+    elif job_run.domain == MigrationDomain.REPORTING:
+        if job_run.job_type == MigrationJobType.PROJECTION_REFRESH:
+            return run_reporting_projection_refresh(job_run)
     else:
         raise MigrationExecutionError(f"Domain {job_run.domain} is not implemented for phase-2 execution yet.")
 

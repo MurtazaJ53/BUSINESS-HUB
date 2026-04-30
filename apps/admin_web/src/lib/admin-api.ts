@@ -7,6 +7,7 @@ import type {
   AttendanceStats,
   Customer,
   CustomerStats,
+  DashboardSnapshot,
   Expense,
   ExpenseStats,
   InventoryItem,
@@ -90,6 +91,10 @@ export const getInventory = cache(async (shopId: string, query?: string): Promis
       q: query,
     },
   });
+});
+
+export const getDashboardSnapshot = cache(async (shopId: string): Promise<DashboardSnapshot> => {
+  return apiFetch<DashboardSnapshot>(`/shops/${shopId}/projections/dashboard/`);
 });
 
 export const getCustomers = cache(async (shopId: string, query?: string): Promise<Customer[]> => {

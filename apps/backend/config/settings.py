@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "platform_apps.payments.apps.PaymentsConfig",
     "platform_apps.expenses.apps.ExpensesConfig",
     "platform_apps.attendance.apps.AttendanceConfig",
+    "platform_apps.projections.apps.ProjectionsConfig",
     "platform_apps.jobs.apps.JobsConfig",
     "platform_apps.audit.apps.AuditConfig",
 ]

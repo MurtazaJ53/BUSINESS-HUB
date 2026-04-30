@@ -32,6 +32,7 @@ Phase 1 backend foundation for the Business Hub target platform.
 - `/api/v1/shops/<shop_id>/customers/<customer_id>/ledger/`
 - `/api/v1/shops/<shop_id>/expenses/`
 - `/api/v1/shops/<shop_id>/attendance/`
+- `/api/v1/shops/<shop_id>/projections/dashboard/`
 - `/api/v1/migration/domains/`
 - `/api/v1/migration/jobs/`
 - `/api/v1/migration/reconciliation/`
@@ -61,5 +62,6 @@ The current executable pilot slice supports:
 - `inventory` `shadow_compare`
 - `customers` `backfill`
 - `customers` `shadow_compare`
+- `reporting` `projection_refresh`
 
 Pass a Firebase-like payload snapshot in `payload_json.source_snapshot` to exercise the pipeline locally.

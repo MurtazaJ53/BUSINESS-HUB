@@ -16,6 +16,7 @@ from platform_apps.customers.models import Customer
 from platform_apps.inventory.models import InventoryItem
 from platform_apps.jobs.models import MigrationDomainControl, MigrationJobRun
 from platform_apps.jobs.services import execute_migration_job
+from platform_apps.projections.models import ShopDashboardSnapshot
 from platform_apps.shops.models import Shop
 from platform_apps.users.models import PlatformUser
 
@@ -126,6 +127,16 @@ class MigrationExecutionTests(TestCase):
             bridge_mode=MigrationBridgeMode.COMPARE_ONLY,
             cutover_status=MigrationCutoverStatus.PILOT,
             shadow_reads_enabled=True,
+        )
+
+    def _create_reporting_control(self) -> MigrationDomainControl:
+        return MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.REPORTING,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.DISABLED,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            shadow_reads_enabled=False,
         )
 
     def test_inventory_backfill_creates_and_updates_source_tracked_items(self):
@@ -480,3 +491,76 @@ class MigrationExecutionTests(TestCase):
         self.assertEqual(second_job.mismatch_count, 0)
         self.assertEqual(drift_event.status, "resolved")
         self.assertIsNotNone(drift_event.resolved_at)
+
+    def test_reporting_projection_refresh_job_builds_dashboard_snapshot(self):
+        self._create_reporting_control()
+        item = InventoryItem.objects.create(
+            shop=self.shop,
+            name="Projection Tee",
+            sku="PROJ-TEE",
+            category="Tees",
+            sell_price="399.00",
+        )
+        customer = Customer.objects.create(
+            shop=self.shop,
+            name="Projection Customer",
+            phone="9000000000",
+            total_spent="550.00",
+            balance="60.00",
+        )
+        # Reuse the existing stock-adjust path assumptions by seeding a backfill row into the ledger model indirectly
+        from platform_apps.inventory.models import InventoryStockLedger
+        from platform_apps.payments.models import SalePayment
+        from platform_apps.sales.models import Sale
+
+        InventoryStockLedger.objects.create(
+            shop=self.shop,
+            item=item,
+            event_type=InventoryStockLedger.EventType.OPENING_BALANCE,
+            quantity_delta=2,
+            unit_price=item.sell_price,
+            occurred_at="2026-04-30T09:00:00+05:30",
+        )
+        sale = Sale.objects.create(
+            shop=self.shop,
+            actor_user=self.user,
+            customer=customer,
+            receipt_number="S-PROJ-001",
+            subtotal_amount="550.00",
+            total_amount="550.00",
+            amount_received="500.00",
+            amount_due="50.00",
+            payment_mode=Sale.PaymentMode.UPI,
+            customer_name_snapshot="Projection Customer",
+            customer_phone_snapshot="9000000000",
+            sale_date="2026-04-30",
+            occurred_at="2026-04-30T10:00:00+05:30",
+            status=Sale.Status.COMPLETED,
+        )
+        SalePayment.objects.create(
+            sale=sale,
+            shop=self.shop,
+            actor_user=self.user,
+            payment_method=SalePayment.PaymentMethod.UPI,
+            amount="500.00",
+            occurred_at="2026-04-30T10:00:00+05:30",
+        )
+
+        job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.REPORTING,
+            job_type=MigrationJobType.PROJECTION_REFRESH,
+            actor_user=self.user,
+            payload_json={"phase": 2},
+        )
+
+        execute_migration_job(str(job.id))
+
+        job.refresh_from_db()
+        snapshot = ShopDashboardSnapshot.objects.get(shop=self.shop)
+        self.assertEqual(job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertGreaterEqual(job.rows_scanned, 4)
+        self.assertEqual(snapshot.inventory_items_count, 1)
+        self.assertEqual(snapshot.customer_count, 1)
+        self.assertEqual(snapshot.sales_count, 1)
+        self.assertEqual(snapshot.payment_count, 1)

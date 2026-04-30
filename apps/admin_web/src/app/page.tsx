@@ -2,17 +2,22 @@ import { AdminShell } from "@/components/admin-shell";
 import { EmptyState } from "@/components/empty-state";
 import { InventoryTable } from "@/components/inventory-table";
 import { MetricCard } from "@/components/metric-card";
-import { buildInventoryStats, getInventory, getSession, resolveActiveShop } from "@/lib/admin-api";
+import {
+  buildInventoryStats,
+  getDashboardSnapshot,
+  getInventory,
+  getSession,
+  resolveActiveShop,
+} from "@/lib/admin-api";
 import { formatCurrency } from "@/lib/formatters";
 
 export default async function HomePage() {
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
   const items = activeShop ? await getInventory(activeShop.shop.id) : [];
+  const dashboardSnapshot = activeShop ? await getDashboardSnapshot(activeShop.shop.id) : null;
   const stats = buildInventoryStats(items);
-  const lowStockPreview = items
-    .filter((item) => item.stock_on_hand > 0 && item.stock_on_hand <= 5)
-    .slice(0, 6);
+  const lowStockPreview = dashboardSnapshot?.low_stock_preview ?? [];
 
   return (
     <AdminShell
@@ -20,7 +25,7 @@ export default async function HomePage() {
       activeShop={activeShop}
       activeRoute="overview"
       title="Shop Command Center"
-      subtitle="Phase 1 command surface backed by Django session, membership, and inventory APIs. This shell is ready to evolve into the new Next.js admin workspace."
+      subtitle="Phase 2 command surface now reads KPI projections from PostgreSQL snapshots while the catalog table still validates the live inventory contract."
     >
       {!activeShop ? (
         <EmptyState
@@ -32,27 +37,34 @@ export default async function HomePage() {
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label="Inventory items"
-              value={stats.totalItems.toString()}
-              detail={`${stats.activeItems} active products in ${stats.categories} categories`}
+              value={(dashboardSnapshot?.inventory_items_count ?? stats.totalItems).toString()}
+              detail={`${
+                dashboardSnapshot?.active_inventory_items_count ?? stats.activeItems
+              } active products in ${
+                dashboardSnapshot?.category_count ?? stats.categories
+              } categories`}
               icon="INV"
             />
             <MetricCard
               label="Projected retail value"
-              value={formatCurrency(stats.projectedSellValue, activeShop.shop.currency_code)}
-              detail="Computed from live stock_on_hand and sell price"
+              value={formatCurrency(
+                Number(dashboardSnapshot?.projected_sell_value ?? stats.projectedSellValue),
+                activeShop.shop.currency_code,
+              )}
+              detail="Served from the PostgreSQL projection refresh layer"
               accent="green"
               icon="VAL"
             />
             <MetricCard
               label="Low stock pressure"
-              value={stats.lowStockItems.toString()}
+              value={(dashboardSnapshot?.low_stock_items_count ?? stats.lowStockItems).toString()}
               detail="Items at five units or lower need restock review"
               accent="blue"
               icon="LST"
             />
             <MetricCard
               label="Out of stock"
-              value={stats.outOfStockItems.toString()}
+              value={(dashboardSnapshot?.out_of_stock_items_count ?? stats.outOfStockItems).toString()}
               detail="Completely unavailable SKUs in the current shop scope"
               accent="rose"
               icon="OOS"
@@ -74,10 +86,7 @@ export default async function HomePage() {
                 </div>
               </div>
               <div className="mt-6">
-                <InventoryTable
-                  items={items.slice(0, 8)}
-                  currencyCode={activeShop.shop.currency_code}
-                />
+                <InventoryTable items={items.slice(0, 8)} currencyCode={activeShop.shop.currency_code} />
               </div>
             </div>
 
@@ -127,7 +136,7 @@ export default async function HomePage() {
                         className="flex items-center justify-between rounded-[20px] border border-[rgba(251,113,133,0.12)] bg-[rgba(34,10,18,0.68)] px-4 py-4"
                       >
                         <div>
-                          <p className="font-semibold">{item.name}</p>
+                          <p className="font-semibold">{item.item_name}</p>
                           <p className="mt-1 text-sm text-[var(--text-secondary)]">
                             {item.category || "Uncategorized"} · {item.sku || "No SKU"}
                           </p>
@@ -139,7 +148,7 @@ export default async function HomePage() {
                     ))
                   ) : (
                     <p className="text-sm text-[var(--text-secondary)]">
-                      No urgent low-stock items in the current preview window.
+                      No urgent low-stock items in the current projection preview.
                     </p>
                   )}
                 </div>

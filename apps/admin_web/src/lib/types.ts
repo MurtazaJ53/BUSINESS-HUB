@@ -57,6 +57,44 @@ export type InventoryStats = {
   projectedSellValue: number;
 };
 
+export type DashboardLowStockItem = {
+  id: string;
+  inventory_item_id: string | null;
+  item_name: string;
+  sku: string;
+  category: string;
+  stock_on_hand: number;
+  sell_price: string;
+  severity_rank: number;
+  refreshed_at: string;
+};
+
+export type DashboardSnapshot = {
+  id: string;
+  shop: string;
+  inventory_items_count: number;
+  active_inventory_items_count: number;
+  category_count: number;
+  low_stock_items_count: number;
+  out_of_stock_items_count: number;
+  projected_sell_value: string;
+  customer_count: number;
+  active_credit_customers_count: number;
+  total_outstanding_balance: string;
+  total_lifetime_spend: string;
+  sales_count: number;
+  gross_revenue: string;
+  outstanding_revenue: string;
+  payment_count: number;
+  total_collected: string;
+  credit_payment_count: number;
+  digital_payment_count: number;
+  last_sale_at: string | null;
+  refreshed_at: string;
+  metadata_json: Record<string, unknown>;
+  low_stock_preview: DashboardLowStockItem[];
+};
+
 export type Customer = {
   id: string;
   name: string;
