@@ -24,6 +24,7 @@ import type {
   SalePaymentRecord,
   SalesStats,
   SessionPayload,
+  ShopDomainState,
   ShopMembership,
 } from "@/lib/types";
 
@@ -128,6 +129,12 @@ export const getInventory = cache(async (shopId: string, query?: string): Promis
     },
   });
 });
+
+export const getShopDomainState = cache(
+  async (shopId: string, domain: string): Promise<ShopDomainState> => {
+    return apiFetch<ShopDomainState>(`/shops/${shopId}/domain-state/${domain}/`);
+  },
+);
 
 export const getDashboardSnapshot = cache(async (shopId: string): Promise<DashboardSnapshot> => {
   return apiFetch<DashboardSnapshot>(`/shops/${shopId}/projections/dashboard/`);

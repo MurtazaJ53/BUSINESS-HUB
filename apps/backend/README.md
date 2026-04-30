@@ -27,6 +27,7 @@ Phase 1 backend foundation for the Business Hub target platform.
 - `/api/v1/`
 - `/api/v1/session/`
 - `/api/v1/shops/`
+- `/api/v1/shops/<shop_id>/domain-state/<domain>/`
 - `/api/v1/shops/<shop_id>/inventory/`
 - `/api/v1/shops/<shop_id>/customers/`
 - `/api/v1/shops/<shop_id>/customers/<customer_id>/ledger/`
@@ -74,3 +75,4 @@ Use `payload_json.bridge_event` to exercise the unidirectional Firebase-to-Postg
 Use `/api/v1/migration/bridge-receipts/` and `/api/v1/migration/shadow-summaries/` to inspect replay health and compare posture from the admin control plane.
 Use `/api/v1/migration/pilot-readiness/`, `/api/v1/migration/domains/<control_id>/promote-ready/`, `/api/v1/migration/domains/<control_id>/promote-primary/`, and `/api/v1/migration/domains/<control_id>/rollback/` to assess and control Phase 3 inventory/customer pilots.
 When a migration control exists for `inventory`, Django inventory mutations are allowed only after that domain is `postgres_primary`; otherwise the API returns a `409` so the legacy write owner is not bypassed accidentally.
+Use `/api/v1/shops/<shop_id>/domain-state/inventory/` from shop-scoped surfaces to show whether the current shop is still in legacy/shadow mode or has actually been promoted to PostgreSQL-primary.

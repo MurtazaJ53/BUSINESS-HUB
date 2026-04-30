@@ -26,3 +26,16 @@ class ShopMembershipListSerializer(serializers.ModelSerializer):
             "shop_currency_code",
             "shop_timezone",
         )
+
+
+class ShopDomainStateSerializer(serializers.Serializer):
+    shop_id = serializers.UUIDField()
+    domain = serializers.CharField()
+    control_present = serializers.BooleanField()
+    write_master = serializers.CharField()
+    bridge_mode = serializers.CharField()
+    cutover_status = serializers.CharField()
+    current_epoch = serializers.IntegerField()
+    shadow_reads_enabled = serializers.BooleanField()
+    is_enabled = serializers.BooleanField()
+    can_write_on_postgres_surface = serializers.BooleanField()

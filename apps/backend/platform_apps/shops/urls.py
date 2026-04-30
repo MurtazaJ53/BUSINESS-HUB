@@ -15,10 +15,11 @@ from platform_apps.inventory.views import (
 from platform_apps.payments.views import SalePaymentListView
 from platform_apps.projections.views import ShopDashboardSnapshotView
 from platform_apps.sales.views import SaleDetailView, SaleListCreateView
-from platform_apps.shops.views import ShopMembershipListView
+from platform_apps.shops.views import ShopDomainStateView, ShopMembershipListView
 
 urlpatterns = [
     path("", ShopMembershipListView.as_view(), name="shop-memberships"),
+    path("<uuid:shop_id>/domain-state/<slug:domain>/", ShopDomainStateView.as_view(), name="shop-domain-state"),
     path("<uuid:shop_id>/customers/", CustomerListCreateView.as_view(), name="customer-list"),
     path("<uuid:shop_id>/customers/<uuid:customer_id>/", CustomerDetailView.as_view(), name="customer-detail"),
     path(

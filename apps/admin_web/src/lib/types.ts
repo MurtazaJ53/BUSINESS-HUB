@@ -57,6 +57,19 @@ export type InventoryStats = {
   projectedSellValue: number;
 };
 
+export type ShopDomainState = {
+  shop_id: string;
+  domain: string;
+  control_present: boolean;
+  write_master: "firebase" | "postgres";
+  bridge_mode: "disabled" | "compare_only" | "firebase_to_postgres" | "postgres_to_firebase";
+  cutover_status: "legacy" | "pilot" | "ready" | "postgres_primary";
+  current_epoch: number;
+  shadow_reads_enabled: boolean;
+  is_enabled: boolean;
+  can_write_on_postgres_surface: boolean;
+};
+
 export type DashboardLowStockItem = {
   id: string;
   inventory_item_id: string | null;
