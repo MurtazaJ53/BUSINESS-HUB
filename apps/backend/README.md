@@ -59,5 +59,7 @@ The current executable pilot slice supports:
 
 - `inventory` `backfill`
 - `inventory` `shadow_compare`
+- `customers` `backfill`
+- `customers` `shadow_compare`
 
 Pass a Firebase-like payload snapshot in `payload_json.source_snapshot` to exercise the pipeline locally.

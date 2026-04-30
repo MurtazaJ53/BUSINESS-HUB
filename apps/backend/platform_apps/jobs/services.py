@@ -17,6 +17,7 @@ from platform_apps.common.migration import (
     ReconciliationSeverity,
     ReconciliationStatus,
 )
+from platform_apps.customers.models import Customer
 from platform_apps.inventory.models import InventoryItem
 from platform_apps.jobs.models import MigrationDomainControl, MigrationJobRun
 from platform_apps.users.authentication import get_firebase_app
@@ -33,6 +34,20 @@ class InventorySnapshotRow:
     size: str
     description: str
     sell_price: Decimal
+    status: str
+    tombstone: bool
+    source_meta_json: dict[str, Any]
+
+
+@dataclass
+class CustomerSnapshotRow:
+    source_id: str
+    name: str
+    phone: str
+    email: str
+    total_spent: Decimal
+    balance: Decimal
+    notes: str
     status: str
     tombstone: bool
     source_meta_json: dict[str, Any]
@@ -90,6 +105,30 @@ def _normalize_inventory_row(payload: dict[str, Any]) -> InventorySnapshotRow:
     )
 
 
+def _normalize_customer_row(payload: dict[str, Any]) -> CustomerSnapshotRow:
+    source_id = str(payload.get("id") or payload.get("source_id") or "").strip()
+    if not source_id:
+        raise MigrationExecutionError("Customer snapshot row is missing an id/source_id.")
+
+    status = str(payload.get("status") or Customer.Status.ACTIVE).lower()
+    if status not in Customer.Status.values:
+        status = Customer.Status.ACTIVE
+
+    raw_phone = str(payload.get("phone") or payload.get("mobile") or "").strip()
+    return CustomerSnapshotRow(
+        source_id=source_id,
+        name=str(payload.get("name") or "").strip(),
+        phone=raw_phone or "-",
+        email=str(payload.get("email") or "").strip(),
+        total_spent=_normalize_decimal(payload.get("total_spent") or payload.get("totalSpent")),
+        balance=_normalize_decimal(payload.get("balance") or payload.get("dueBalance")),
+        notes=str(payload.get("notes") or "").strip(),
+        status=status,
+        tombstone=bool(payload.get("tombstone", False)),
+        source_meta_json=payload.get("source_meta_json") if isinstance(payload.get("source_meta_json"), dict) else {},
+    )
+
+
 def _load_inventory_snapshot(job_run: MigrationJobRun) -> list[InventorySnapshotRow]:
     source_snapshot = job_run.payload_json.get("source_snapshot")
     if isinstance(source_snapshot, list):
@@ -111,6 +150,30 @@ def _load_inventory_snapshot(job_run: MigrationJobRun) -> list[InventorySnapshot
         payload = doc.to_dict() or {}
         payload.setdefault("id", doc.id)
         rows.append(_normalize_inventory_row(payload))
+    return rows
+
+
+def _load_customer_snapshot(job_run: MigrationJobRun) -> list[CustomerSnapshotRow]:
+    source_snapshot = job_run.payload_json.get("source_snapshot")
+    if isinstance(source_snapshot, list):
+        return [_normalize_customer_row(row) for row in source_snapshot if isinstance(row, dict)]
+
+    control = _get_required_control(job_run)
+    shop = control.shop
+    if not shop.source_id:
+        raise MigrationExecutionError("Shop is missing Firebase source_id for customer snapshot fetch.")
+
+    app = get_firebase_app()
+    if app is None:
+        raise MigrationExecutionError("Firebase app is not configured for snapshot fetch.")
+
+    db = firestore.client(app=app)
+    rows = []
+    customer_docs = db.collection("shops").document(shop.source_id).collection("customers").stream()
+    for doc in customer_docs:
+        payload = doc.to_dict() or {}
+        payload.setdefault("id", doc.id)
+        rows.append(_normalize_customer_row(payload))
     return rows
 
 
@@ -246,6 +309,7 @@ def _record_reconciliation_event(
     *,
     control: MigrationDomainControl,
     issue_code: str,
+    entity_type: str,
     entity_id: str,
     note: str,
     mismatch_payload_json: dict[str, Any],
@@ -257,7 +321,7 @@ def _record_reconciliation_event(
         domain=control.domain,
         status=ReconciliationStatus.OPEN,
         issue_code=issue_code,
-        entity_type="inventory_item",
+        entity_type=entity_type,
         entity_id=entity_id,
         defaults={
             "severity": severity,
@@ -282,13 +346,14 @@ def _record_reconciliation_event(
 def _auto_resolve_stale_compare_events(
     *,
     control: MigrationDomainControl,
+    entity_type: str,
     active_issue_keys: set[tuple[str, str]],
 ) -> None:
     stale_events = MigrationReconciliationEvent.objects.filter(
         shop=control.shop,
         domain=control.domain,
         observed_source="compare_snapshot",
-        entity_type="inventory_item",
+        entity_type=entity_type,
         issue_code__in=COMPARE_MANAGED_ISSUE_CODES,
         status__in=[ReconciliationStatus.OPEN, ReconciliationStatus.ACKNOWLEDGED],
     )
@@ -332,6 +397,7 @@ def run_inventory_shadow_compare(job_run: MigrationJobRun) -> MigrationJobRun:
                         _record_reconciliation_event(
                             control=control,
                             issue_code="missing_in_postgres",
+                            entity_type="inventory_item",
                             entity_id=source_id,
                             note="Item exists in Firebase snapshot but not in PostgreSQL.",
                             mismatch_payload_json=_to_json_safe({"firebase": row.__dict__, "postgres": None}),
@@ -363,6 +429,7 @@ def run_inventory_shadow_compare(job_run: MigrationJobRun) -> MigrationJobRun:
                         _record_reconciliation_event(
                             control=control,
                             issue_code="field_drift",
+                            entity_type="inventory_item",
                             entity_id=source_id,
                             note="Inventory item fields drifted between Firebase and PostgreSQL.",
                             mismatch_payload_json=_to_json_safe(mismatches),
@@ -378,6 +445,7 @@ def run_inventory_shadow_compare(job_run: MigrationJobRun) -> MigrationJobRun:
                         _record_reconciliation_event(
                             control=control,
                             issue_code="missing_in_firebase",
+                            entity_type="inventory_item",
                             entity_id=source_id,
                             note="Item exists in PostgreSQL but not in Firebase snapshot.",
                             mismatch_payload_json={"postgres_id": str(item.id)},
@@ -386,7 +454,223 @@ def run_inventory_shadow_compare(job_run: MigrationJobRun) -> MigrationJobRun:
                         )
                     )
 
-            _auto_resolve_stale_compare_events(control=control, active_issue_keys=active_issue_keys)
+            _auto_resolve_stale_compare_events(
+                control=control,
+                entity_type="inventory_item",
+                active_issue_keys=active_issue_keys,
+            )
+
+            control.last_shadow_verified_at = timezone.now()
+            control.save(update_fields=["last_shadow_verified_at", "updated_at"])
+
+            job_run.rows_scanned = rows_scanned
+            job_run.rows_written = 0
+            job_run.rows_skipped = 0
+            job_run.mismatch_count = mismatch_count
+            job_run.save(
+                update_fields=[
+                    "rows_scanned",
+                    "rows_written",
+                    "rows_skipped",
+                    "mismatch_count",
+                    "updated_at",
+                ]
+            )
+    except Exception as exc:  # pragma: no cover
+        _mark_job_finished(job_run, status=MigrationJobStatus.FAILED, error_message=str(exc))
+        raise
+
+    _mark_job_finished(job_run, status=MigrationJobStatus.SUCCEEDED)
+    job_run.refresh_from_db()
+    return job_run
+
+
+def run_customer_backfill(job_run: MigrationJobRun) -> MigrationJobRun:
+    control = _get_required_control(job_run)
+    snapshot_rows = _load_customer_snapshot(job_run)
+    _mark_job_running(job_run)
+    run_started_at = timezone.now()
+
+    rows_scanned = 0
+    rows_written = 0
+    rows_skipped = 0
+
+    try:
+        with transaction.atomic():
+            for row in snapshot_rows:
+                rows_scanned += 1
+                customer, created = Customer.objects.get_or_create(
+                    shop=control.shop,
+                    source_system="firebase",
+                    source_id=row.source_id,
+                    defaults={
+                        "name": row.name or f"Imported {row.source_id}",
+                        "phone": row.phone,
+                        "email": row.email,
+                        "total_spent": row.total_spent,
+                        "balance": row.balance,
+                        "notes": row.notes,
+                        "status": row.status,
+                        "tombstone": row.tombstone,
+                        "source_meta_json": row.source_meta_json,
+                        "source_shop_id": control.shop.source_id,
+                        "source_path": f"shops/{control.shop.source_id}/customers/{row.source_id}",
+                        "domain_epoch": control.current_epoch,
+                        "migrated_at": run_started_at,
+                    },
+                )
+
+                changed = created
+                fields_to_update: list[str] = []
+                candidate_fields = {
+                    "name": row.name or customer.name,
+                    "phone": row.phone,
+                    "email": row.email,
+                    "total_spent": row.total_spent,
+                    "balance": row.balance,
+                    "notes": row.notes,
+                    "status": row.status,
+                    "tombstone": row.tombstone,
+                    "source_meta_json": row.source_meta_json,
+                    "source_shop_id": control.shop.source_id,
+                    "source_path": f"shops/{control.shop.source_id}/customers/{row.source_id}",
+                    "domain_epoch": control.current_epoch,
+                    "migrated_at": run_started_at,
+                }
+
+                for field, value in candidate_fields.items():
+                    if getattr(customer, field) != value:
+                        setattr(customer, field, value)
+                        fields_to_update.append(field)
+                        changed = True
+
+                if changed and not created:
+                    fields_to_update.append("updated_at")
+                    customer.save(update_fields=fields_to_update)
+                    rows_written += 1
+                elif created:
+                    rows_written += 1
+                else:
+                    rows_skipped += 1
+
+            control.last_backfill_at = timezone.now()
+            control.save(update_fields=["last_backfill_at", "updated_at"])
+
+            job_run.rows_scanned = rows_scanned
+            job_run.rows_written = rows_written
+            job_run.rows_skipped = rows_skipped
+            job_run.mismatch_count = 0
+            job_run.save(
+                update_fields=[
+                    "rows_scanned",
+                    "rows_written",
+                    "rows_skipped",
+                    "mismatch_count",
+                    "updated_at",
+                ]
+            )
+    except Exception as exc:  # pragma: no cover
+        _mark_job_finished(job_run, status=MigrationJobStatus.FAILED, error_message=str(exc))
+        raise
+
+    _mark_job_finished(job_run, status=MigrationJobStatus.SUCCEEDED)
+    job_run.refresh_from_db()
+    return job_run
+
+
+def run_customer_shadow_compare(job_run: MigrationJobRun) -> MigrationJobRun:
+    control = _get_required_control(job_run)
+    snapshot_rows = _load_customer_snapshot(job_run)
+    _mark_job_running(job_run)
+
+    rows_scanned = 0
+    mismatch_count = 0
+    active_issue_keys: set[tuple[str, str]] = set()
+
+    try:
+        with transaction.atomic():
+            snapshot_by_source_id = {row.source_id: row for row in snapshot_rows}
+            postgres_customers = {
+                customer.source_id: customer
+                for customer in Customer.objects.filter(
+                    shop=control.shop,
+                    source_system="firebase",
+                )
+            }
+
+            for source_id, row in snapshot_by_source_id.items():
+                rows_scanned += 1
+                customer = postgres_customers.get(source_id)
+                if customer is None:
+                    mismatch_count += 1
+                    active_issue_keys.add(
+                        _record_reconciliation_event(
+                            control=control,
+                            issue_code="missing_in_postgres",
+                            entity_type="customer",
+                            entity_id=source_id,
+                            note="Customer exists in Firebase snapshot but not in PostgreSQL.",
+                            mismatch_payload_json=_to_json_safe({"firebase": row.__dict__, "postgres": None}),
+                            severity=ReconciliationSeverity.CRITICAL,
+                            source_reference=f"shops/{control.shop.source_id}/customers/{source_id}",
+                        )
+                    )
+                    continue
+
+                mismatches = {}
+                comparisons = {
+                    "name": row.name,
+                    "phone": row.phone,
+                    "email": row.email,
+                    "total_spent": row.total_spent,
+                    "balance": row.balance,
+                    "status": row.status,
+                    "tombstone": row.tombstone,
+                }
+                for field, firebase_value in comparisons.items():
+                    postgres_value = getattr(customer, field)
+                    if postgres_value != firebase_value:
+                        mismatches[field] = {
+                            "firebase": firebase_value,
+                            "postgres": postgres_value,
+                        }
+
+                if mismatches:
+                    mismatch_count += 1
+                    active_issue_keys.add(
+                        _record_reconciliation_event(
+                            control=control,
+                            issue_code="field_drift",
+                            entity_type="customer",
+                            entity_id=source_id,
+                            note="Customer fields drifted between Firebase and PostgreSQL.",
+                            mismatch_payload_json=_to_json_safe(mismatches),
+                            severity=ReconciliationSeverity.WARNING,
+                            source_reference=f"shops/{control.shop.source_id}/customers/{source_id}",
+                        )
+                    )
+
+            for source_id, customer in postgres_customers.items():
+                if source_id and source_id not in snapshot_by_source_id:
+                    mismatch_count += 1
+                    active_issue_keys.add(
+                        _record_reconciliation_event(
+                            control=control,
+                            issue_code="missing_in_firebase",
+                            entity_type="customer",
+                            entity_id=source_id,
+                            note="Customer exists in PostgreSQL but not in Firebase snapshot.",
+                            mismatch_payload_json={"postgres_id": str(customer.id)},
+                            severity=ReconciliationSeverity.WARNING,
+                            source_reference=customer.source_path,
+                        )
+                    )
+
+            _auto_resolve_stale_compare_events(
+                control=control,
+                entity_type="customer",
+                active_issue_keys=active_issue_keys,
+            )
 
             control.last_shadow_verified_at = timezone.now()
             control.save(update_fields=["last_shadow_verified_at", "updated_at"])
@@ -416,12 +700,17 @@ def run_inventory_shadow_compare(job_run: MigrationJobRun) -> MigrationJobRun:
 def execute_migration_job(job_run_id: str) -> MigrationJobRun:
     job_run = MigrationJobRun.objects.select_related("shop").get(pk=job_run_id)
 
-    if job_run.domain != MigrationDomain.INVENTORY:
+    if job_run.domain == MigrationDomain.INVENTORY:
+        if job_run.job_type == MigrationJobType.BACKFILL:
+            return run_inventory_backfill(job_run)
+        if job_run.job_type == MigrationJobType.SHADOW_COMPARE:
+            return run_inventory_shadow_compare(job_run)
+    elif job_run.domain == MigrationDomain.CUSTOMERS:
+        if job_run.job_type == MigrationJobType.BACKFILL:
+            return run_customer_backfill(job_run)
+        if job_run.job_type == MigrationJobType.SHADOW_COMPARE:
+            return run_customer_shadow_compare(job_run)
+    else:
         raise MigrationExecutionError(f"Domain {job_run.domain} is not implemented for phase-2 execution yet.")
-
-    if job_run.job_type == MigrationJobType.BACKFILL:
-        return run_inventory_backfill(job_run)
-    if job_run.job_type == MigrationJobType.SHADOW_COMPARE:
-        return run_inventory_shadow_compare(job_run)
 
     raise MigrationExecutionError(f"Job type {job_run.job_type} is not implemented for phase-2 execution yet.")

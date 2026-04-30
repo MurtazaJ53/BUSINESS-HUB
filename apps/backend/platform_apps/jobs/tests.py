@@ -12,6 +12,7 @@ from platform_apps.common.migration import (
     MigrationJobType,
     MigrationWriteMaster,
 )
+from platform_apps.customers.models import Customer
 from platform_apps.inventory.models import InventoryItem
 from platform_apps.jobs.models import MigrationDomainControl, MigrationJobRun
 from platform_apps.jobs.services import execute_migration_job
@@ -116,6 +117,16 @@ class MigrationExecutionTests(TestCase):
         )
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
+
+    def _create_customer_control(self) -> MigrationDomainControl:
+        return MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.COMPARE_ONLY,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            shadow_reads_enabled=True,
+        )
 
     def test_inventory_backfill_creates_and_updates_source_tracked_items(self):
         job = MigrationJobRun.objects.create(
@@ -300,3 +311,172 @@ class MigrationExecutionTests(TestCase):
                 source_id="inv_003",
             ).exists()
         )
+
+    def test_customer_backfill_creates_and_updates_source_tracked_customers(self):
+        self._create_customer_control()
+        job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            job_type=MigrationJobType.BACKFILL,
+            actor_user=self.user,
+            payload_json={
+                "source_snapshot": [
+                    {
+                        "id": "cust_001",
+                        "name": "Amina Patel",
+                        "phone": "9999999999",
+                        "email": "amina@example.com",
+                        "totalSpent": "1225.50",
+                        "dueBalance": "150.00",
+                    },
+                    {
+                        "id": "cust_002",
+                        "name": "Bharat Shah",
+                        "mobile": "8888888888",
+                        "balance": "0.00",
+                    },
+                ]
+            },
+        )
+
+        execute_migration_job(str(job.id))
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(job.rows_scanned, 2)
+        self.assertEqual(job.rows_written, 2)
+
+        customer = Customer.objects.get(shop=self.shop, source_system="firebase", source_id="cust_001")
+        self.assertEqual(customer.name, "Amina Patel")
+        self.assertEqual(customer.phone, "9999999999")
+        self.assertEqual(str(customer.total_spent), "1225.50")
+        self.assertEqual(str(customer.balance), "150.00")
+        self.assertEqual(customer.source_path, "shops/shop_001/customers/cust_001")
+        self.assertIsNotNone(customer.migrated_at)
+
+        update_job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            job_type=MigrationJobType.BACKFILL,
+            actor_user=self.user,
+            payload_json={
+                "source_snapshot": [
+                    {
+                        "id": "cust_001",
+                        "name": "Amina Patel VIP",
+                        "phone": "9999999999",
+                        "balance": "90.00",
+                    }
+                ]
+            },
+        )
+
+        execute_migration_job(str(update_job.id))
+
+        update_job.refresh_from_db()
+        customer.refresh_from_db()
+        self.assertEqual(update_job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(update_job.rows_written, 1)
+        self.assertEqual(customer.name, "Amina Patel VIP")
+        self.assertEqual(str(customer.balance), "90.00")
+
+    def test_customer_shadow_compare_records_and_auto_resolves_reconciliation_events(self):
+        self._create_customer_control()
+        Customer.objects.create(
+            shop=self.shop,
+            source_system="firebase",
+            source_id="cust_001",
+            source_shop_id="shop_001",
+            source_path="shops/shop_001/customers/cust_001",
+            name="Amina Patel",
+            phone="9999999999",
+            balance="120.00",
+            total_spent="500.00",
+        )
+        Customer.objects.create(
+            shop=self.shop,
+            source_system="firebase",
+            source_id="cust_extra",
+            source_shop_id="shop_001",
+            source_path="shops/shop_001/customers/cust_extra",
+            name="Ghost Customer",
+            phone="7777777777",
+            balance="0.00",
+            total_spent="0.00",
+        )
+
+        job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            actor_user=self.user,
+            payload_json={
+                "source_snapshot": [
+                    {
+                        "id": "cust_001",
+                        "name": "Amina Patel",
+                        "phone": "9999999999",
+                        "balance": "150.00",
+                        "totalSpent": "500.00",
+                    },
+                    {
+                        "id": "cust_002",
+                        "name": "Bharat Shah",
+                        "mobile": "8888888888",
+                    },
+                ]
+            },
+        )
+
+        execute_migration_job(str(job.id))
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(job.rows_scanned, 2)
+        self.assertEqual(job.mismatch_count, 3)
+        self.assertEqual(
+            MigrationReconciliationEvent.objects.filter(shop=self.shop, domain=MigrationDomain.CUSTOMERS).count(),
+            3,
+        )
+
+        drift_event = MigrationReconciliationEvent.objects.get(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            issue_code="field_drift",
+            entity_type="customer",
+        )
+        self.assertEqual(drift_event.status, "open")
+
+        second_job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            actor_user=self.user,
+            payload_json={
+                "source_snapshot": [
+                    {
+                        "id": "cust_001",
+                        "name": "Amina Patel",
+                        "phone": "9999999999",
+                        "balance": "120.00",
+                        "totalSpent": "500.00",
+                    },
+                    {
+                        "id": "cust_extra",
+                        "name": "Ghost Customer",
+                        "mobile": "7777777777",
+                        "balance": "0.00",
+                        "totalSpent": "0.00",
+                    },
+                ]
+            },
+        )
+
+        execute_migration_job(str(second_job.id))
+
+        second_job.refresh_from_db()
+        drift_event.refresh_from_db()
+        self.assertEqual(second_job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(second_job.mismatch_count, 0)
+        self.assertEqual(drift_event.status, "resolved")
+        self.assertIsNotNone(drift_event.resolved_at)
