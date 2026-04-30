@@ -5,7 +5,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from platform_apps.audit.models import MigrationReconciliationEvent
-from platform_apps.common.migration import MigrationCutoverStatus, MigrationJobStatus
+from platform_apps.common.migration import (
+    MigrationBridgeMode,
+    MigrationCutoverStatus,
+    MigrationJobStatus,
+    MigrationWriteMaster,
+)
 from platform_apps.common.permissions import IsPlatformAdminUser
 from platform_apps.jobs.models import MigrationBridgeReceipt, MigrationDomainControl, MigrationJobRun
 from platform_apps.jobs.readiness import build_pilot_readiness
@@ -197,6 +202,67 @@ class MigrationPilotPromoteReadyView(APIView):
 
         control.cutover_status = MigrationCutoverStatus.READY
         control.save(update_fields=["cutover_status", "updated_at"])
+
+        payload = build_pilot_readiness(control)
+        serializer = MigrationPilotReadinessSerializer(payload)
+        return Response(serializer.data, status=200)
+
+
+class MigrationPilotPromotePrimaryView(APIView):
+    permission_classes = [IsPlatformAdminUser]
+
+    def post(self, request, control_id):
+        control = MigrationDomainControl.objects.select_related("shop").filter(pk=control_id).first()
+        if control is None:
+            return Response({"detail": "Migration control not found."}, status=404)
+
+        readiness = build_pilot_readiness(control)
+        if not readiness["ready_for_pilot"]:
+            serializer = MigrationPilotReadinessSerializer(readiness)
+            return Response(serializer.data, status=409)
+
+        control.write_master = MigrationWriteMaster.POSTGRES
+        control.cutover_status = MigrationCutoverStatus.POSTGRES_PRIMARY
+        control.current_epoch += 1
+        control.shadow_reads_enabled = True
+        control.save(
+            update_fields=[
+                "write_master",
+                "cutover_status",
+                "current_epoch",
+                "shadow_reads_enabled",
+                "updated_at",
+            ]
+        )
+
+        payload = build_pilot_readiness(control)
+        serializer = MigrationPilotReadinessSerializer(payload)
+        return Response(serializer.data, status=200)
+
+
+class MigrationPilotRollbackView(APIView):
+    permission_classes = [IsPlatformAdminUser]
+
+    def post(self, request, control_id):
+        control = MigrationDomainControl.objects.select_related("shop").filter(pk=control_id).first()
+        if control is None:
+            return Response({"detail": "Migration control not found."}, status=404)
+
+        control.write_master = MigrationWriteMaster.FIREBASE
+        control.cutover_status = MigrationCutoverStatus.PILOT
+        control.bridge_mode = MigrationBridgeMode.COMPARE_ONLY
+        control.shadow_reads_enabled = True
+        control.current_epoch += 1
+        control.save(
+            update_fields=[
+                "write_master",
+                "cutover_status",
+                "bridge_mode",
+                "shadow_reads_enabled",
+                "current_epoch",
+                "updated_at",
+            ]
+        )
 
         payload = build_pilot_readiness(control)
         serializer = MigrationPilotReadinessSerializer(payload)

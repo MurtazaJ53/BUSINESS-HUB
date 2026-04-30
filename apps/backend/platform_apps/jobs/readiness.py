@@ -68,11 +68,12 @@ def build_pilot_readiness(control: MigrationDomainControl) -> dict[str, Any]:
         warnings.append("Domain is already marked as PostgreSQL primary.")
 
     ready_for_pilot = not blocking_reasons
-    recommended_next_status = (
-        MigrationCutoverStatus.READY
-        if ready_for_pilot and control.cutover_status in {MigrationCutoverStatus.LEGACY, MigrationCutoverStatus.PILOT}
-        else control.cutover_status
-    )
+    if ready_for_pilot and control.cutover_status in {MigrationCutoverStatus.LEGACY, MigrationCutoverStatus.PILOT}:
+        recommended_next_status = MigrationCutoverStatus.READY
+    elif ready_for_pilot and control.cutover_status == MigrationCutoverStatus.READY:
+        recommended_next_status = MigrationCutoverStatus.POSTGRES_PRIMARY
+    else:
+        recommended_next_status = control.cutover_status
 
     return {
         "control_id": str(control.id),

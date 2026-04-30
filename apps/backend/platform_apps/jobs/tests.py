@@ -191,7 +191,59 @@ class MigrationControlApiTests(TestCase):
         control.refresh_from_db()
         self.assertEqual(control.cutover_status, MigrationCutoverStatus.READY)
         self.assertTrue(response.data["ready_for_pilot"])
-        self.assertEqual(response.data["recommended_next_status"], MigrationCutoverStatus.READY)
+        self.assertEqual(response.data["recommended_next_status"], MigrationCutoverStatus.POSTGRES_PRIMARY)
+
+    def test_promote_primary_flips_write_master_and_bumps_epoch(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.READY,
+            current_epoch=5,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=0,
+            trace_id="trace-primary-001",
+            finished_at=timezone.now(),
+        )
+
+        response = self.client.post(f"/api/v1/migration/domains/{control.id}/promote-primary/")
+
+        self.assertEqual(response.status_code, 200)
+        control.refresh_from_db()
+        self.assertEqual(control.write_master, MigrationWriteMaster.POSTGRES)
+        self.assertEqual(control.cutover_status, MigrationCutoverStatus.POSTGRES_PRIMARY)
+        self.assertEqual(control.current_epoch, 6)
+        self.assertEqual(response.data["recommended_next_status"], MigrationCutoverStatus.POSTGRES_PRIMARY)
+
+    def test_rollback_returns_domain_to_firebase_pilot_and_bumps_epoch(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=9,
+            shadow_reads_enabled=True,
+        )
+
+        response = self.client.post(f"/api/v1/migration/domains/{control.id}/rollback/")
+
+        self.assertEqual(response.status_code, 200)
+        control.refresh_from_db()
+        self.assertEqual(control.write_master, MigrationWriteMaster.FIREBASE)
+        self.assertEqual(control.cutover_status, MigrationCutoverStatus.PILOT)
+        self.assertEqual(control.bridge_mode, MigrationBridgeMode.COMPARE_ONLY)
+        self.assertEqual(control.current_epoch, 10)
 
     def test_non_platform_admin_is_blocked(self):
         non_admin = PlatformUser.objects.create_user(email="staff@example.com", password="secret", full_name="Staff")
