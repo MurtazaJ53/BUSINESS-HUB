@@ -21,7 +21,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
             "tombstone",
             "actor_name",
         )
-        read_only_fields = ("id", "actor_name")
+        read_only_fields = ("id", "actor_name", "tombstone")
 
     def get_actor_name(self, obj):
         if not obj.actor_user_id:

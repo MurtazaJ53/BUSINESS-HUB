@@ -90,7 +90,10 @@ class AttendanceSessionDetailView(ShopScopedMixin, generics.RetrieveUpdateDestro
 
     def get_queryset(self):
         membership = self.get_membership()
-        return AttendanceSession.objects.filter(shop=membership.shop).select_related("membership", "membership__user")
+        return AttendanceSession.objects.filter(shop=membership.shop, tombstone=False).select_related(
+            "membership",
+            "membership__user",
+        )
 
     def get_serializer_context(self):
         context = super().get_serializer_context()

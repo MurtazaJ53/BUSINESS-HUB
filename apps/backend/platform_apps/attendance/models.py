@@ -30,7 +30,11 @@ class AttendanceSession(SourceTrackedModel):
     class Meta:
         ordering = ["-session_date", "-created_at"]
         constraints = [
-            models.UniqueConstraint(fields=["shop", "membership", "session_date"], name="uniq_attendance_per_day"),
+            models.UniqueConstraint(
+                fields=["shop", "membership", "session_date"],
+                condition=models.Q(tombstone=False),
+                name="uniq_attendance_per_day",
+            ),
         ]
         indexes = [
             models.Index(fields=["shop", "session_date"]),

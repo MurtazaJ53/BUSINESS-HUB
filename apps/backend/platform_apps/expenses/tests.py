@@ -56,3 +56,18 @@ class ExpenseApiTests(TestCase):
         response = self.client.get(f"/api/v1/shops/{self.shop.id}/expenses/")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 1)
+
+    def test_expense_detail_hides_archived_records(self):
+        expense = Expense.objects.create(
+            shop=self.shop,
+            actor_user=self.user,
+            category="Archived",
+            amount=Decimal("10.00"),
+            description="Should stay hidden",
+            expense_date="2026-04-30",
+            tombstone=True,
+        )
+
+        response = self.client.get(f"/api/v1/shops/{self.shop.id}/expenses/{expense.id}/")
+
+        self.assertEqual(response.status_code, 404)

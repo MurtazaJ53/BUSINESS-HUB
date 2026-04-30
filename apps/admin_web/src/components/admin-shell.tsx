@@ -7,7 +7,7 @@ import type { SessionPayload, ShopMembership } from "@/lib/types";
 type AdminShellProps = {
   session: SessionPayload;
   activeShop: ShopMembership | null;
-  activeRoute: "overview" | "inventory" | "customers" | "expenses" | "attendance";
+  activeRoute: "overview" | "inventory" | "customers" | "sales" | "payments" | "expenses" | "attendance";
   title: string;
   subtitle: string;
   children: ReactNode;
@@ -18,31 +18,43 @@ const navItems = [
     key: "overview",
     label: "Overview",
     href: "/",
-    glyph: "◇",
+    glyph: "OVR",
   },
   {
     key: "inventory",
     label: "Inventory",
     href: "/inventory",
-    glyph: "▣",
+    glyph: "INV",
   },
   {
     key: "customers",
     label: "Customers",
     href: "/customers",
-    glyph: "◎",
+    glyph: "CUS",
+  },
+  {
+    key: "sales",
+    label: "Sales",
+    href: "/sales",
+    glyph: "SAL",
+  },
+  {
+    key: "payments",
+    label: "Payments",
+    href: "/payments",
+    glyph: "PAY",
   },
   {
     key: "expenses",
     label: "Expenses",
     href: "/expenses",
-    glyph: "↗",
+    glyph: "EXP",
   },
   {
     key: "attendance",
     label: "Attendance",
     href: "/attendance",
-    glyph: "◔",
+    glyph: "ATT",
   },
 ] as const;
 
@@ -81,7 +93,9 @@ export function AdminShell({
                       active ? "nav-pill-active" : "nav-pill-idle"
                     }`}
                   >
-                    <span className="text-lg">{item.glyph}</span>
+                    <span className="text-xs font-bold tracking-[0.24em] text-[var(--text-muted)]">
+                      {item.glyph}
+                    </span>
                     <span className="text-base font-semibold">{item.label}</span>
                   </Link>
                 );
@@ -112,14 +126,14 @@ export function AdminShell({
                 </p>
                 <p className="mt-1 text-sm text-[var(--text-secondary)]">
                   {activeShop
-                    ? `${activeShop.shop.slug} · ${activeShop.shop.currency_code} · ${activeShop.shop.timezone}`
+                    ? `${activeShop.shop.slug} | ${activeShop.shop.currency_code} | ${activeShop.shop.timezone}`
                     : "Bootstrap a membership to continue phase 1 testing."}
                 </p>
               </div>
               <div className="rounded-[24px] border border-[rgba(52,211,153,0.14)] bg-[rgba(7,40,28,0.7)] px-4 py-4 text-sm text-[var(--success)]">
                 Backend linked
                 <p className="mt-1 text-[var(--text-secondary)]">
-                  Session, memberships, and inventory are being served by Django phase 1 APIs.
+                  Session, memberships, inventory, customers, expenses, attendance, sales, and payments are being served by Django phase 1 APIs.
                 </p>
               </div>
             </div>

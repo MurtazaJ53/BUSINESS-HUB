@@ -58,7 +58,7 @@ class AttendanceSessionWriteSerializer(serializers.ModelSerializer):
             "note",
             "tombstone",
         )
-        read_only_fields = ("id", "member_name", "member_role")
+        read_only_fields = ("id", "member_name", "member_role", "tombstone")
 
     def get_member_name(self, obj):
         return obj.membership.user.full_name or obj.membership.user.email

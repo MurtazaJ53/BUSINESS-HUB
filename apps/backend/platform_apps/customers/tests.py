@@ -66,4 +66,37 @@ class CustomerApiTests(TestCase):
         self.assertEqual(customer.balance, Decimal("300.00"))
         self.assertEqual(customer.total_spent, Decimal("1200.00"))
 
+    def test_customer_detail_hides_archived_records(self):
+        customer = Customer.objects.create(
+            shop=self.shop,
+            name="Archived Account",
+            tombstone=True,
+            status=Customer.Status.ARCHIVED,
+        )
+
+        response = self.client.get(f"/api/v1/shops/{self.shop.id}/customers/{customer.id}/")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_customer_ledger_rejects_sale_event_type(self):
+        customer = Customer.objects.create(
+            shop=self.shop,
+            name="Ayaan Retail",
+        )
+
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/customers/{customer.id}/ledger/",
+            {
+                "event_type": "sale",
+                "amount_delta": "200.00",
+                "total_spent_delta": "200.00",
+                "note": "Should only come from the sales domain",
+                "occurred_at": "2026-04-30T12:00:00+05:30",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("event_type", response.json())
+
 # Create your tests here.

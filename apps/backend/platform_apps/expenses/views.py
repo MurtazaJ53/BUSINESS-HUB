@@ -64,7 +64,7 @@ class ExpenseDetailView(ShopScopedMixin, generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         membership = self.get_membership()
-        return Expense.objects.filter(shop=membership.shop).select_related("actor_user")
+        return Expense.objects.filter(shop=membership.shop, tombstone=False).select_related("actor_user")
 
     def get_serializer_context(self):
         context = super().get_serializer_context()

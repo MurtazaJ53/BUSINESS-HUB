@@ -12,6 +12,8 @@ from platform_apps.inventory.views import (
     InventoryItemDetailView,
     InventoryItemListCreateView,
 )
+from platform_apps.payments.views import SalePaymentListView
+from platform_apps.sales.views import SaleDetailView, SaleListCreateView
 from platform_apps.shops.views import ShopMembershipListView
 
 urlpatterns = [
@@ -33,6 +35,9 @@ urlpatterns = [
     path("<uuid:shop_id>/expenses/<uuid:expense_id>/", ExpenseDetailView.as_view(), name="expense-detail"),
     path("<uuid:shop_id>/inventory/", InventoryItemListCreateView.as_view(), name="inventory-list"),
     path("<uuid:shop_id>/inventory/<uuid:item_id>/", InventoryItemDetailView.as_view(), name="inventory-detail"),
+    path("<uuid:shop_id>/payments/", SalePaymentListView.as_view(), name="payment-list"),
+    path("<uuid:shop_id>/sales/", SaleListCreateView.as_view(), name="sale-list"),
+    path("<uuid:shop_id>/sales/<uuid:sale_id>/", SaleDetailView.as_view(), name="sale-detail"),
     path(
         "<uuid:shop_id>/inventory/<uuid:item_id>/adjust-stock/",
         InventoryItemAdjustmentView.as_view(),

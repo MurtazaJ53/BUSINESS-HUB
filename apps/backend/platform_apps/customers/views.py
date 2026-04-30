@@ -64,7 +64,7 @@ class CustomerDetailView(ShopScopedMixin, generics.RetrieveUpdateDestroyAPIView)
 
     def get_queryset(self):
         membership = self.get_membership()
-        return Customer.objects.filter(shop=membership.shop)
+        return Customer.objects.filter(shop=membership.shop, tombstone=False)
 
     def get_serializer_context(self):
         context = super().get_serializer_context()

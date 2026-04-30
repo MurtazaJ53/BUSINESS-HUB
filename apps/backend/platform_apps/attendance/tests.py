@@ -57,3 +57,38 @@ class AttendanceApiTests(TestCase):
         response = self.client.get(f"/api/v1/shops/{self.shop.id}/attendance/")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 1)
+
+    def test_can_recreate_attendance_after_soft_delete(self):
+        session = AttendanceSession.objects.create(
+            shop=self.shop,
+            membership=self.staff_membership,
+            session_date="2026-04-30",
+            status=AttendanceSession.Status.PRESENT,
+            tombstone=True,
+        )
+        self.assertTrue(session.tombstone)
+
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/attendance/",
+            {
+                "membership_id": str(self.staff_membership.id),
+                "session_date": "2026-04-30",
+                "status": "PRESENT",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+
+    def test_attendance_detail_hides_archived_records(self):
+        session = AttendanceSession.objects.create(
+            shop=self.shop,
+            membership=self.staff_membership,
+            session_date="2026-04-30",
+            status=AttendanceSession.Status.PRESENT,
+            tombstone=True,
+        )
+
+        response = self.client.get(f"/api/v1/shops/{self.shop.id}/attendance/{session.id}/")
+
+        self.assertEqual(response.status_code, 404)

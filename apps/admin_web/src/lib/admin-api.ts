@@ -11,6 +11,10 @@ import type {
   ExpenseStats,
   InventoryItem,
   InventoryStats,
+  PaymentStats,
+  Sale,
+  SalePaymentRecord,
+  SalesStats,
   SessionPayload,
   ShopMembership,
 } from "@/lib/types";
@@ -111,6 +115,37 @@ export const getAttendanceSessions = cache(
   },
 );
 
+export const getSales = cache(
+  async (
+    shopId: string,
+    query?: { q?: string; dateFrom?: string; dateTo?: string; customerId?: string },
+  ): Promise<Sale[]> => {
+    return apiFetch<Sale[]>(`/shops/${shopId}/sales/`, {
+      query: {
+        q: query?.q,
+        date_from: query?.dateFrom,
+        date_to: query?.dateTo,
+        customer_id: query?.customerId,
+      },
+    });
+  },
+);
+
+export const getPayments = cache(
+  async (
+    shopId: string,
+    query?: { saleId?: string; dateFrom?: string; dateTo?: string },
+  ): Promise<SalePaymentRecord[]> => {
+    return apiFetch<SalePaymentRecord[]>(`/shops/${shopId}/payments/`, {
+      query: {
+        sale_id: query?.saleId,
+        date_from: query?.dateFrom,
+        date_to: query?.dateTo,
+      },
+    });
+  },
+);
+
 export function resolveActiveShop(session: SessionPayload): ShopMembership | null {
   if (!session.active_shop_id) {
     return session.memberships[0] ?? null;
@@ -191,6 +226,29 @@ export function buildAttendanceStats(
       (session) =>
         session.session_date === today &&
         (session.status === "PRESENT" || session.status === "HALF_DAY"),
+    ).length,
+  };
+}
+
+export function buildSalesStats(sales: Sale[]): SalesStats {
+  const grossRevenue = sales.reduce((total, sale) => total + Number(sale.total_amount || 0), 0);
+  const outstandingRevenue = sales.reduce((total, sale) => total + Number(sale.amount_due || 0), 0);
+
+  return {
+    totalSales: sales.length,
+    grossRevenue,
+    outstandingRevenue,
+    averageTicket: sales.length ? grossRevenue / sales.length : 0,
+  };
+}
+
+export function buildPaymentStats(payments: SalePaymentRecord[]): PaymentStats {
+  return {
+    paymentCount: payments.length,
+    totalCollected: payments.reduce((total, payment) => total + Number(payment.amount || 0), 0),
+    creditCount: payments.filter((payment) => payment.payment_method === "CREDIT").length,
+    digitalShareCount: payments.filter((payment) =>
+      ["UPI", "BANK", "CARD"].includes(payment.payment_method),
     ).length,
   };
 }

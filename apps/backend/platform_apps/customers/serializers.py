@@ -33,7 +33,7 @@ class CustomerSerializer(serializers.ModelSerializer):
             "source_meta_json",
             "opening_balance",
         )
-        read_only_fields = ("id", "total_spent", "balance")
+        read_only_fields = ("id", "total_spent", "balance", "tombstone")
 
     @transaction.atomic
     def create(self, validated_data):
@@ -71,6 +71,12 @@ class CustomerSerializer(serializers.ModelSerializer):
 
 class CustomerLedgerEntrySerializer(serializers.ModelSerializer):
     actor_name = serializers.SerializerMethodField()
+    event_type = serializers.ChoiceField(
+        choices=[
+            CustomerLedgerEntry.EventType.PAYMENT,
+            CustomerLedgerEntry.EventType.ADJUSTMENT,
+        ]
+    )
 
     class Meta:
         model = CustomerLedgerEntry
