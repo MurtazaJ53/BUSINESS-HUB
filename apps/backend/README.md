@@ -25,9 +25,18 @@ Phase 1 backend foundation for the Business Hub target platform.
 ## Useful endpoints
 
 - `/api/v1/`
+- `/api/v1/session/`
+- `/api/v1/shops/`
+- `/api/v1/shops/<shop_id>/inventory/`
 - `/api/v1/health/`
 - `/api/v1/health/ready/`
 - `/admin/`
+
+## Local auth options
+
+- Session/basic auth for Django admin and direct API use
+- Firebase bearer token auth when Firebase credentials are configured
+- `X-Dev-User-Email` header fallback in debug mode for local API development
 
 ## Local infrastructure
 

@@ -7,9 +7,18 @@ from platform_apps.common.models import SourceTrackedModel
 
 
 class Shop(SourceTrackedModel):
+    owner_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="owned_shops",
+        blank=True,
+        null=True,
+    )
     name = models.CharField(max_length=255)
     slug = models.SlugField(unique=True)
     legal_name = models.CharField(max_length=255, blank=True)
+    invite_code = models.CharField(max_length=64, blank=True)
+    settings_json = models.JSONField(default=dict, blank=True)
     timezone = models.CharField(max_length=64, default="Asia/Kolkata")
     currency_code = models.CharField(max_length=8, default="INR")
     is_active = models.BooleanField(default=True)
@@ -35,6 +44,9 @@ class ShopMembership(SourceTrackedModel):
     role = models.CharField(max_length=16, choices=Role.choices, default=Role.STAFF)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
     permissions_version = models.PositiveIntegerField(default=1)
+    email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=32, blank=True)
+    permissions_json = models.JSONField(default=dict, blank=True)
 
     class Meta:
         unique_together = ("user", "shop")

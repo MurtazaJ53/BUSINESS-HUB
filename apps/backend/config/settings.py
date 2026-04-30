@@ -124,6 +124,8 @@ AUTH_USER_MODEL = "users.PlatformUser"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        "platform_apps.users.authentication.FirebaseAuthentication",
+        "platform_apps.users.authentication.DevHeaderAuthentication",
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
     ],
