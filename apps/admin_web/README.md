@@ -7,6 +7,7 @@ This app is the new Next.js admin shell for Phase 1 of the Business Hub platform
 - session bootstrap against `/api/v1/session/`
 - shop membership scope against `/api/v1/shops/`
 - inventory overview against `/api/v1/shops/<shop_id>/inventory/`
+- customer overview against `/api/v1/shops/<shop_id>/customers/`
 - premium dark command-center UI aligned with Business Hub styling
 
 ## Local development
@@ -43,5 +44,5 @@ pnpm build
 
 - search and filter controls backed by query params
 - stock adjustment actions
-- customer and settings domains
+- customer ledger actions and settings domains
 - real auth handoff beyond local dev headers

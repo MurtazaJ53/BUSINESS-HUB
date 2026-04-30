@@ -1,5 +1,10 @@
 from django.urls import path
 
+from platform_apps.customers.views import (
+    CustomerDetailView,
+    CustomerLedgerListCreateView,
+    CustomerListCreateView,
+)
 from platform_apps.inventory.views import (
     InventoryItemAdjustmentView,
     InventoryItemDetailView,
@@ -9,6 +14,13 @@ from platform_apps.shops.views import ShopMembershipListView
 
 urlpatterns = [
     path("", ShopMembershipListView.as_view(), name="shop-memberships"),
+    path("<uuid:shop_id>/customers/", CustomerListCreateView.as_view(), name="customer-list"),
+    path("<uuid:shop_id>/customers/<uuid:customer_id>/", CustomerDetailView.as_view(), name="customer-detail"),
+    path(
+        "<uuid:shop_id>/customers/<uuid:customer_id>/ledger/",
+        CustomerLedgerListCreateView.as_view(),
+        name="customer-ledger",
+    ),
     path("<uuid:shop_id>/inventory/", InventoryItemListCreateView.as_view(), name="inventory-list"),
     path("<uuid:shop_id>/inventory/<uuid:item_id>/", InventoryItemDetailView.as_view(), name="inventory-detail"),
     path(

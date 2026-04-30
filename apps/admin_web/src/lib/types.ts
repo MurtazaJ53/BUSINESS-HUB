@@ -56,3 +56,23 @@ export type InventoryStats = {
   categories: number;
   projectedSellValue: number;
 };
+
+export type Customer = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  total_spent: string;
+  balance: string;
+  notes: string;
+  status: string;
+  tombstone: boolean;
+  source_meta_json: Record<string, unknown>;
+};
+
+export type CustomerStats = {
+  totalCustomers: number;
+  activeCredits: number;
+  totalOutstanding: number;
+  totalLifetimeSpend: number;
+};

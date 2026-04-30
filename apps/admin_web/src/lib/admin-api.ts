@@ -2,7 +2,14 @@ import "server-only";
 
 import { cache } from "react";
 
-import type { InventoryItem, InventoryStats, SessionPayload, ShopMembership } from "@/lib/types";
+import type {
+  Customer,
+  CustomerStats,
+  InventoryItem,
+  InventoryStats,
+  SessionPayload,
+  ShopMembership,
+} from "@/lib/types";
 
 type FetchOptions = {
   query?: Record<string, string | undefined>;
@@ -73,6 +80,14 @@ export const getInventory = cache(async (shopId: string, query?: string): Promis
   });
 });
 
+export const getCustomers = cache(async (shopId: string, query?: string): Promise<Customer[]> => {
+  return apiFetch<Customer[]>(`/shops/${shopId}/customers/`, {
+    query: {
+      q: query,
+    },
+  });
+});
+
 export function resolveActiveShop(session: SessionPayload): ShopMembership | null {
   if (!session.active_shop_id) {
     return session.memberships[0] ?? null;
@@ -104,5 +119,14 @@ export function buildInventoryStats(items: InventoryItem[]): InventoryStats {
     outOfStockItems: items.filter((item) => item.stock_on_hand <= 0).length,
     categories: categorySet.size,
     projectedSellValue,
+  };
+}
+
+export function buildCustomerStats(customers: Customer[]): CustomerStats {
+  return {
+    totalCustomers: customers.length,
+    activeCredits: customers.filter((customer) => Number(customer.balance) > 0).length,
+    totalOutstanding: customers.reduce((total, customer) => total + Number(customer.balance || 0), 0),
+    totalLifetimeSpend: customers.reduce((total, customer) => total + Number(customer.total_spent || 0), 0),
   };
 }

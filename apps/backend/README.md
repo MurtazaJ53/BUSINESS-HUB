@@ -28,6 +28,8 @@ Phase 1 backend foundation for the Business Hub target platform.
 - `/api/v1/session/`
 - `/api/v1/shops/`
 - `/api/v1/shops/<shop_id>/inventory/`
+- `/api/v1/shops/<shop_id>/customers/`
+- `/api/v1/shops/<shop_id>/customers/<customer_id>/ledger/`
 - `/api/v1/health/`
 - `/api/v1/health/ready/`
 - `/admin/`
