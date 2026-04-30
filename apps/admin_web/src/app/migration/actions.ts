@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { apiMutation } from "@/lib/admin-api";
-import type { MigrationJobRun } from "@/lib/types";
+import type { MigrationJobRun, MigrationPilotPreparationResult } from "@/lib/types";
 
 
 function getRequiredControlId(formData: FormData): string {
@@ -162,4 +162,49 @@ export async function runBackfillAction(formData: FormData) {
 
 export async function runShadowCompareAction(formData: FormData) {
   await runMigrationJobAction(formData, { jobType: "shadow_compare" });
+}
+
+
+export async function runPilotPreparationAction(formData: FormData) {
+  const controlId = getRequiredControlId(formData);
+  const domain = getOptionalField(formData, "domain");
+  const shop = getOptionalField(formData, "shop");
+
+  try {
+    const result = await apiMutation<MigrationPilotPreparationResult>(
+      `/migration/domains/${controlId}/prepare-pilot/?run_inline=1`,
+      {
+        method: "POST",
+        body: {
+          payloads: {},
+        },
+      },
+    );
+    revalidatePath("/migration");
+    redirect(
+      buildRedirectUrl({
+        status: "success",
+        action: "prepare-pilot",
+        domain,
+        shop,
+        readyForPilot: String(result.readiness.ready_for_pilot),
+        blockingCount: String(result.readiness.blocking_reasons.length),
+        jobsCreated: String(result.jobs.length),
+      }),
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message.replace(/\s+/g, " ").slice(0, 220)
+        : "Unknown pilot preparation failure.";
+    redirect(
+      buildRedirectUrl({
+        status: "error",
+        action: "prepare-pilot",
+        domain,
+        shop,
+        message,
+      }),
+    );
+  }
 }

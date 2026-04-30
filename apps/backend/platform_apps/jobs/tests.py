@@ -193,6 +193,55 @@ class MigrationControlApiTests(TestCase):
         self.assertTrue(response.data["ready_for_pilot"])
         self.assertEqual(response.data["recommended_next_status"], MigrationCutoverStatus.POSTGRES_PRIMARY)
 
+    def test_prepare_pilot_runs_backfill_and_compare_inline(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            current_epoch=3,
+            shadow_reads_enabled=True,
+        )
+
+        response = self.client.post(
+            f"/api/v1/migration/domains/{control.id}/prepare-pilot/?run_inline=1",
+            {
+                "payloads": {
+                    "backfill": {
+                        "source_snapshot": [
+                            {
+                                "id": "inv_prepare_001",
+                                "name": "Pilot Tee",
+                                "sku": "PILOT-TEE",
+                                "sell_price": "399.00",
+                            }
+                        ]
+                    },
+                    "shadow_compare": {
+                        "source_snapshot": [
+                            {
+                                "id": "inv_prepare_001",
+                                "name": "Pilot Tee",
+                                "sku": "PILOT-TEE",
+                                "sell_price": "399.00",
+                            }
+                        ]
+                    },
+                }
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["jobs"]), 2)
+        self.assertEqual(response.data["jobs"][0]["job_type"], MigrationJobType.BACKFILL)
+        self.assertEqual(response.data["jobs"][0]["status"], MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(response.data["jobs"][1]["job_type"], MigrationJobType.SHADOW_COMPARE)
+        self.assertEqual(response.data["jobs"][1]["status"], MigrationJobStatus.SUCCEEDED)
+        self.assertTrue(response.data["readiness"]["ready_for_pilot"])
+        self.assertEqual(response.data["readiness"]["recommended_next_status"], MigrationCutoverStatus.READY)
+
     def test_promote_primary_flips_write_master_and_bumps_epoch(self):
         control = MigrationDomainControl.objects.create(
             shop=self.shop,

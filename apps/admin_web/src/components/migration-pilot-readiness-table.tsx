@@ -3,6 +3,7 @@ import {
   promoteReadyAction,
   rollbackPilotAction,
   runBackfillAction,
+  runPilotPreparationAction,
   runShadowCompareAction,
 } from "@/app/migration/actions";
 import type { MigrationPilotReadiness } from "@/lib/types";
@@ -75,6 +76,17 @@ export function MigrationPilotReadinessTable({
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex flex-col gap-2">
+                      <form action={runPilotPreparationAction}>
+                        <input type="hidden" name="controlId" value={row.control_id} />
+                        <input type="hidden" name="domain" value={row.domain} />
+                        <input type="hidden" name="shop" value={row.shop_name} />
+                        <button
+                          type="submit"
+                          className="w-full rounded-[14px] border border-[rgba(92,174,254,0.16)] bg-[rgba(18,28,47,0.88)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent)]"
+                        >
+                          Run pilot prep
+                        </button>
+                      </form>
                       <form action={runBackfillAction}>
                         <input type="hidden" name="shopId" value={row.shop} />
                         <input type="hidden" name="domain" value={row.domain} />

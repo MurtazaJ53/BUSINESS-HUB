@@ -9,6 +9,7 @@ from platform_apps.common.migration import (
     MigrationBridgeMode,
     MigrationCutoverStatus,
     MigrationJobStatus,
+    MigrationJobType,
     MigrationWriteMaster,
 )
 from platform_apps.common.permissions import IsPlatformAdminUser
@@ -18,6 +19,7 @@ from platform_apps.jobs.serializers import (
     MigrationBridgeReceiptSerializer,
     MigrationDomainControlSerializer,
     MigrationJobRunSerializer,
+    MigrationPilotPreparationResultSerializer,
     MigrationPilotReadinessSerializer,
     MigrationShadowSummarySerializer,
 )
@@ -205,6 +207,53 @@ class MigrationPilotPromoteReadyView(APIView):
 
         payload = build_pilot_readiness(control)
         serializer = MigrationPilotReadinessSerializer(payload)
+        return Response(serializer.data, status=200)
+
+
+class MigrationPilotPrepareView(APIView):
+    permission_classes = [IsPlatformAdminUser]
+
+    def post(self, request, control_id):
+        control = MigrationDomainControl.objects.select_related("shop").filter(pk=control_id).first()
+        if control is None:
+            return Response({"detail": "Migration control not found."}, status=404)
+
+        if control.domain not in {"inventory", "customers"}:
+            return Response(
+                {"detail": "Pilot preparation is only implemented for inventory and customers right now."},
+                status=409,
+            )
+
+        payloads = request.data.get("payloads") if isinstance(request.data, dict) else None
+        if not isinstance(payloads, dict):
+            payloads = {}
+
+        run_inline = request.query_params.get("run_inline", "").strip().lower() in {"1", "true", "yes"}
+        created_jobs: list[MigrationJobRun] = []
+
+        for job_type in (MigrationJobType.BACKFILL, MigrationJobType.SHADOW_COMPARE):
+            job_run = MigrationJobRun.objects.create(
+                shop=control.shop,
+                domain=control.domain,
+                job_type=job_type,
+                actor_user=request.user,
+                status=MigrationJobStatus.QUEUED,
+                payload_json=payloads.get(job_type, {}) if isinstance(payloads.get(job_type), dict) else {},
+            )
+            if run_inline:
+                job_run = execute_migration_job(str(job_run.id))
+            created_jobs.append(job_run)
+
+        control.refresh_from_db()
+        payload = {
+            "control_id": str(control.id),
+            "shop": str(control.shop_id),
+            "shop_name": control.shop.name,
+            "domain": control.domain,
+            "jobs": created_jobs,
+            "readiness": build_pilot_readiness(control),
+        }
+        serializer = MigrationPilotPreparationResultSerializer(payload)
         return Response(serializer.data, status=200)
 
 

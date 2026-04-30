@@ -149,3 +149,12 @@ class MigrationPilotReadinessSerializer(serializers.Serializer):
     recommended_next_status = serializers.CharField()
     blocking_reasons = serializers.ListField(child=serializers.CharField())
     warnings = serializers.ListField(child=serializers.CharField())
+
+
+class MigrationPilotPreparationResultSerializer(serializers.Serializer):
+    control_id = serializers.UUIDField()
+    shop = serializers.UUIDField()
+    shop_name = serializers.CharField()
+    domain = serializers.CharField()
+    jobs = MigrationJobRunSerializer(many=True)
+    readiness = MigrationPilotReadinessSerializer()

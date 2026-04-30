@@ -349,6 +349,15 @@ export type MigrationPilotReadiness = {
   warnings: string[];
 };
 
+export type MigrationPilotPreparationResult = {
+  control_id: string;
+  shop: string;
+  shop_name: string;
+  domain: string;
+  jobs: MigrationJobRun[];
+  readiness: MigrationPilotReadiness;
+};
+
 export type MigrationReconciliationEvent = {
   id: string;
   shop: string;

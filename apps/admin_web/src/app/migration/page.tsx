@@ -41,6 +41,9 @@ function buildActionBanner(searchParams: SearchParams) {
   const rowsScanned = getSearchParamValue(searchParams, "rowsScanned");
   const rowsWritten = getSearchParamValue(searchParams, "rowsWritten");
   const mismatchCount = getSearchParamValue(searchParams, "mismatchCount");
+  const readyForPilot = getSearchParamValue(searchParams, "readyForPilot");
+  const blockingCount = getSearchParamValue(searchParams, "blockingCount");
+  const jobsCreated = getSearchParamValue(searchParams, "jobsCreated");
 
   if (!status || !action) {
     return null;
@@ -48,7 +51,9 @@ function buildActionBanner(searchParams: SearchParams) {
 
   if (status === "success") {
     const extra =
-      action.startsWith("run-") && jobStatus
+      action === "prepare-pilot"
+        ? ` Jobs created: ${jobsCreated || "0"}. ready_for_pilot=${readyForPilot || "false"}. remaining blockers=${blockingCount || "0"}.`
+        : action.startsWith("run-") && jobStatus
         ? ` Latest job status: ${jobStatus}. rows_scanned=${rowsScanned || "0"}, rows_written=${rowsWritten || "0"}, mismatch_count=${mismatchCount || "0"}.`
         : "";
     return {
