@@ -1,5 +1,6 @@
 from django.urls import path
 
+from platform_apps.attendance.views import AttendanceSessionDetailView, AttendanceSessionListCreateView
 from platform_apps.customers.views import (
     CustomerDetailView,
     CustomerLedgerListCreateView,
@@ -21,6 +22,12 @@ urlpatterns = [
         "<uuid:shop_id>/customers/<uuid:customer_id>/ledger/",
         CustomerLedgerListCreateView.as_view(),
         name="customer-ledger",
+    ),
+    path("<uuid:shop_id>/attendance/", AttendanceSessionListCreateView.as_view(), name="attendance-list"),
+    path(
+        "<uuid:shop_id>/attendance/<uuid:attendance_id>/",
+        AttendanceSessionDetailView.as_view(),
+        name="attendance-detail",
     ),
     path("<uuid:shop_id>/expenses/", ExpenseListCreateView.as_view(), name="expense-list"),
     path("<uuid:shop_id>/expenses/<uuid:expense_id>/", ExpenseDetailView.as_view(), name="expense-detail"),

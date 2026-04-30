@@ -95,3 +95,26 @@ export type ExpenseStats = {
   uniqueCategories: number;
   biggestCategory: string | null;
 };
+
+export type AttendanceSession = {
+  id: string;
+  membership_id: string;
+  member_name: string;
+  member_role: string;
+  session_date: string;
+  clock_in_at: string | null;
+  clock_out_at: string | null;
+  status: "PRESENT" | "ABSENT" | "HALF_DAY" | "LEAVE";
+  total_hours: string | null;
+  overtime_hours: string;
+  bonus_amount: string;
+  note: string;
+  tombstone: boolean;
+};
+
+export type AttendanceStats = {
+  totalSessions: number;
+  presentCount: number;
+  leaveCount: number;
+  activeWorkersToday: number;
+};

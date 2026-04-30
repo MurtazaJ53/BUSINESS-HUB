@@ -3,6 +3,8 @@ import "server-only";
 import { cache } from "react";
 
 import type {
+  AttendanceSession,
+  AttendanceStats,
   Customer,
   CustomerStats,
   Expense,
@@ -98,6 +100,17 @@ export const getExpenses = cache(async (shopId: string, query?: string): Promise
   });
 });
 
+export const getAttendanceSessions = cache(
+  async (shopId: string, query?: { dateFrom?: string; dateTo?: string }): Promise<AttendanceSession[]> => {
+    return apiFetch<AttendanceSession[]>(`/shops/${shopId}/attendance/`, {
+      query: {
+        date_from: query?.dateFrom,
+        date_to: query?.dateTo,
+      },
+    });
+  },
+);
+
 export function resolveActiveShop(session: SessionPayload): ShopMembership | null {
   if (!session.active_shop_id) {
     return session.memberships[0] ?? null;
@@ -163,5 +176,21 @@ export function buildExpenseStats(expenses: Expense[]): ExpenseStats {
     totalAmount: expenses.reduce((total, expense) => total + Number(expense.amount || 0), 0),
     uniqueCategories: totalsByCategory.size,
     biggestCategory,
+  };
+}
+
+export function buildAttendanceStats(
+  sessions: AttendanceSession[],
+  today: string,
+): AttendanceStats {
+  return {
+    totalSessions: sessions.length,
+    presentCount: sessions.filter((session) => session.status === "PRESENT").length,
+    leaveCount: sessions.filter((session) => session.status === "LEAVE").length,
+    activeWorkersToday: sessions.filter(
+      (session) =>
+        session.session_date === today &&
+        (session.status === "PRESENT" || session.status === "HALF_DAY"),
+    ).length,
   };
 }

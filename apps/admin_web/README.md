@@ -9,6 +9,7 @@ This app is the new Next.js admin shell for Phase 1 of the Business Hub platform
 - inventory overview against `/api/v1/shops/<shop_id>/inventory/`
 - customer overview against `/api/v1/shops/<shop_id>/customers/`
 - expense overview against `/api/v1/shops/<shop_id>/expenses/`
+- attendance overview against `/api/v1/shops/<shop_id>/attendance/`
 - premium dark command-center UI aligned with Business Hub styling
 
 ## Local development
@@ -45,5 +46,5 @@ pnpm build
 
 - search and filter controls backed by query params
 - stock adjustment actions
-- customer ledger actions, expense entry actions, and settings domains
+- customer ledger actions, expense entry actions, attendance actions, and settings domains
 - real auth handoff beyond local dev headers
