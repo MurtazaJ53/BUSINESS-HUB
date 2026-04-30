@@ -10,6 +10,9 @@ This app is the new Next.js admin shell for Phase 1 of the Business Hub platform
 - customer overview against `/api/v1/shops/<shop_id>/customers/`
 - expense overview against `/api/v1/shops/<shop_id>/expenses/`
 - attendance overview against `/api/v1/shops/<shop_id>/attendance/`
+- migration control registry against `/api/v1/migration/domains/`
+- migration job visibility against `/api/v1/migration/jobs/`
+- reconciliation queue visibility against `/api/v1/migration/reconciliation/`
 - premium dark command-center UI aligned with Business Hub styling
 
 ## Local development

@@ -194,3 +194,77 @@ export type PaymentStats = {
   creditCount: number;
   digitalShareCount: number;
 };
+
+export type MigrationDomainControl = {
+  id: string;
+  shop: string;
+  shop_name: string;
+  shop_slug: string;
+  domain: string;
+  write_master: "firebase" | "postgres";
+  bridge_mode: "disabled" | "compare_only" | "firebase_to_postgres" | "postgres_to_firebase";
+  cutover_status: "legacy" | "pilot" | "ready" | "postgres_primary";
+  current_epoch: number;
+  shadow_reads_enabled: boolean;
+  is_enabled: boolean;
+  last_backfill_at: string | null;
+  last_shadow_verified_at: string | null;
+  metadata_json: Record<string, unknown>;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MigrationJobRun = {
+  id: string;
+  shop: string | null;
+  shop_name: string | null;
+  domain: string;
+  job_type: "backfill" | "shadow_compare" | "bridge_replay" | "projection_refresh";
+  status: "queued" | "running" | "succeeded" | "failed";
+  actor_user: string | null;
+  actor_name: string | null;
+  trace_id: string;
+  rows_scanned: number;
+  rows_written: number;
+  rows_skipped: number;
+  mismatch_count: number;
+  error_message: string;
+  payload_json: Record<string, unknown>;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MigrationReconciliationEvent = {
+  id: string;
+  shop: string;
+  shop_name: string;
+  domain: string;
+  severity: "info" | "warning" | "critical";
+  status: "open" | "acknowledged" | "resolved" | "ignored";
+  issue_code: string;
+  entity_type: string;
+  entity_id: string;
+  source_reference: string;
+  expected_master: string;
+  observed_source: string;
+  occurred_at: string;
+  mismatch_payload_json: Record<string, unknown>;
+  note: string;
+  resolver_user: string | null;
+  resolver_name: string | null;
+  resolved_at: string | null;
+  resolution_note: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MigrationStats = {
+  totalControls: number;
+  postgresPrimaryDomains: number;
+  activeBridgeDomains: number;
+  openCriticalEvents: number;
+  runningJobs: number;
+};

@@ -11,6 +11,10 @@ import type {
   ExpenseStats,
   InventoryItem,
   InventoryStats,
+  MigrationDomainControl,
+  MigrationJobRun,
+  MigrationReconciliationEvent,
+  MigrationStats,
   PaymentStats,
   Sale,
   SalePaymentRecord,
@@ -146,6 +150,20 @@ export const getPayments = cache(
   },
 );
 
+export const getMigrationControls = cache(async (): Promise<MigrationDomainControl[]> => {
+  return apiFetch<MigrationDomainControl[]>("/migration/domains/");
+});
+
+export const getMigrationJobRuns = cache(async (): Promise<MigrationJobRun[]> => {
+  return apiFetch<MigrationJobRun[]>("/migration/jobs/");
+});
+
+export const getMigrationReconciliationEvents = cache(
+  async (): Promise<MigrationReconciliationEvent[]> => {
+    return apiFetch<MigrationReconciliationEvent[]>("/migration/reconciliation/");
+  },
+);
+
 export function resolveActiveShop(session: SessionPayload): ShopMembership | null {
   if (!session.active_shop_id) {
     return session.memberships[0] ?? null;
@@ -250,5 +268,21 @@ export function buildPaymentStats(payments: SalePaymentRecord[]): PaymentStats {
     digitalShareCount: payments.filter((payment) =>
       ["UPI", "BANK", "CARD"].includes(payment.payment_method),
     ).length,
+  };
+}
+
+export function buildMigrationStats(
+  controls: MigrationDomainControl[],
+  jobs: MigrationJobRun[],
+  events: MigrationReconciliationEvent[],
+): MigrationStats {
+  return {
+    totalControls: controls.length,
+    postgresPrimaryDomains: controls.filter((control) => control.write_master === "postgres").length,
+    activeBridgeDomains: controls.filter((control) => control.bridge_mode !== "disabled").length,
+    openCriticalEvents: events.filter(
+      (event) => event.severity === "critical" && ["open", "acknowledged"].includes(event.status),
+    ).length,
+    runningJobs: jobs.filter((job) => job.status === "running").length,
   };
 }

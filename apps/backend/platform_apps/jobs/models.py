@@ -1,3 +1,96 @@
+from __future__ import annotations
+
+from django.conf import settings
 from django.db import models
 
-# Create your models here.
+from platform_apps.common.migration import (
+    MigrationBridgeMode,
+    MigrationCutoverStatus,
+    MigrationDomain,
+    MigrationJobStatus,
+    MigrationJobType,
+    MigrationWriteMaster,
+)
+from platform_apps.common.models import UUIDStampedModel
+from platform_apps.shops.models import Shop
+
+
+class MigrationDomainControl(UUIDStampedModel):
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="migration_controls")
+    domain = models.CharField(max_length=64, choices=MigrationDomain.choices)
+    write_master = models.CharField(
+        max_length=16,
+        choices=MigrationWriteMaster.choices,
+        default=MigrationWriteMaster.FIREBASE,
+    )
+    bridge_mode = models.CharField(
+        max_length=24,
+        choices=MigrationBridgeMode.choices,
+        default=MigrationBridgeMode.DISABLED,
+    )
+    cutover_status = models.CharField(
+        max_length=24,
+        choices=MigrationCutoverStatus.choices,
+        default=MigrationCutoverStatus.LEGACY,
+    )
+    current_epoch = models.PositiveIntegerField(default=1)
+    shadow_reads_enabled = models.BooleanField(default=False)
+    is_enabled = models.BooleanField(default=True)
+    last_backfill_at = models.DateTimeField(blank=True, null=True)
+    last_shadow_verified_at = models.DateTimeField(blank=True, null=True)
+    metadata_json = models.JSONField(default=dict, blank=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["shop__name", "domain"]
+        constraints = [
+            models.UniqueConstraint(fields=["shop", "domain"], name="uniq_migration_control_per_domain"),
+        ]
+        indexes = [
+            models.Index(fields=["shop", "domain"]),
+            models.Index(fields=["domain", "write_master"]),
+            models.Index(fields=["domain", "bridge_mode"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.shop.name} / {self.domain}"
+
+
+class MigrationJobRun(UUIDStampedModel):
+    shop = models.ForeignKey(
+        Shop,
+        on_delete=models.CASCADE,
+        related_name="migration_job_runs",
+        blank=True,
+        null=True,
+    )
+    domain = models.CharField(max_length=64, choices=MigrationDomain.choices)
+    job_type = models.CharField(max_length=32, choices=MigrationJobType.choices)
+    status = models.CharField(max_length=16, choices=MigrationJobStatus.choices, default=MigrationJobStatus.QUEUED)
+    actor_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="migration_job_runs",
+        blank=True,
+        null=True,
+    )
+    trace_id = models.CharField(max_length=128, blank=True)
+    rows_scanned = models.PositiveIntegerField(default=0)
+    rows_written = models.PositiveIntegerField(default=0)
+    rows_skipped = models.PositiveIntegerField(default=0)
+    mismatch_count = models.PositiveIntegerField(default=0)
+    error_message = models.TextField(blank=True)
+    payload_json = models.JSONField(default=dict, blank=True)
+    started_at = models.DateTimeField(blank=True, null=True)
+    finished_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["domain", "job_type"]),
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["shop", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.job_type}:{self.domain}:{self.status}"
