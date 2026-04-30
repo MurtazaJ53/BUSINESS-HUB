@@ -15,6 +15,7 @@ import type {
   MigrationDomainControl,
   MigrationBridgeReceipt,
   MigrationJobRun,
+  MigrationPilotReadiness,
   MigrationReconciliationEvent,
   MigrationShadowSummary,
   MigrationStats,
@@ -173,6 +174,10 @@ export const getMigrationShadowSummaries = cache(async (): Promise<MigrationShad
   return apiFetch<MigrationShadowSummary[]>("/migration/shadow-summaries/");
 });
 
+export const getMigrationPilotReadiness = cache(async (): Promise<MigrationPilotReadiness[]> => {
+  return apiFetch<MigrationPilotReadiness[]>("/migration/pilot-readiness/");
+});
+
 export const getMigrationReconciliationEvents = cache(
   async (): Promise<MigrationReconciliationEvent[]> => {
     return apiFetch<MigrationReconciliationEvent[]>("/migration/reconciliation/");
@@ -290,6 +295,7 @@ export function buildMigrationStats(
   controls: MigrationDomainControl[],
   jobs: MigrationJobRun[],
   receipts: MigrationBridgeReceipt[],
+  readiness: MigrationPilotReadiness[],
   events: MigrationReconciliationEvent[],
 ): MigrationStats {
   return {
@@ -297,6 +303,7 @@ export function buildMigrationStats(
     postgresPrimaryDomains: controls.filter((control) => control.write_master === "postgres").length,
     activeBridgeDomains: controls.filter((control) => control.bridge_mode !== "disabled").length,
     bridgeReceipts: receipts.length,
+    pilotReadyDomains: readiness.filter((item) => item.ready_for_pilot).length,
     openCriticalEvents: events.filter(
       (event) => event.severity === "critical" && ["open", "acknowledged"].includes(event.status),
     ).length,

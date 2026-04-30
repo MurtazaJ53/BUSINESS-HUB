@@ -6,6 +6,8 @@ from platform_apps.jobs.views import (
     MigrationDomainControlListCreateView,
     MigrationJobRunDetailView,
     MigrationJobRunListCreateView,
+    MigrationPilotPromoteReadyView,
+    MigrationPilotReadinessListView,
     MigrationShadowSummaryListView,
 )
 
@@ -16,4 +18,6 @@ urlpatterns = [
     path("jobs/<uuid:job_id>/", MigrationJobRunDetailView.as_view(), name="migration-job-detail"),
     path("bridge-receipts/", MigrationBridgeReceiptListView.as_view(), name="migration-bridge-receipt-list"),
     path("shadow-summaries/", MigrationShadowSummaryListView.as_view(), name="migration-shadow-summary-list"),
+    path("pilot-readiness/", MigrationPilotReadinessListView.as_view(), name="migration-pilot-readiness-list"),
+    path("domains/<uuid:control_id>/promote-ready/", MigrationPilotPromoteReadyView.as_view(), name="migration-promote-ready"),
 ]

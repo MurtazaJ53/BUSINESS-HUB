@@ -310,6 +310,32 @@ export type MigrationShadowSummary = {
   open_stale_epoch_events: number;
 };
 
+export type MigrationPilotReadiness = {
+  control_id: string;
+  shop: string;
+  shop_name: string;
+  shop_slug: string;
+  domain: string;
+  cutover_status: "legacy" | "pilot" | "ready" | "postgres_primary";
+  write_master: "firebase" | "postgres";
+  bridge_mode: "disabled" | "compare_only" | "firebase_to_postgres" | "postgres_to_firebase";
+  current_epoch: number;
+  shadow_reads_enabled: boolean;
+  last_backfill_at: string | null;
+  last_shadow_verified_at: string | null;
+  latest_compare_status: "queued" | "running" | "succeeded" | "failed" | null;
+  latest_compare_at: string | null;
+  latest_compare_mismatches: number;
+  latest_compare_trace_id: string | null;
+  open_events: number;
+  open_critical_events: number;
+  open_stale_epoch_events: number;
+  ready_for_pilot: boolean;
+  recommended_next_status: "legacy" | "pilot" | "ready" | "postgres_primary";
+  blocking_reasons: string[];
+  warnings: string[];
+};
+
 export type MigrationReconciliationEvent = {
   id: string;
   shop: string;
@@ -339,6 +365,7 @@ export type MigrationStats = {
   postgresPrimaryDomains: number;
   activeBridgeDomains: number;
   bridgeReceipts: number;
+  pilotReadyDomains: number;
   openCriticalEvents: number;
   openStaleEpochEvents: number;
   runningJobs: number;

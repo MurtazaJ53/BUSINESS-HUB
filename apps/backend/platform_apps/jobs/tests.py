@@ -144,6 +144,55 @@ class MigrationControlApiTests(TestCase):
         self.assertEqual(response.data[0]["latest_compare_mismatches"], 2)
         self.assertEqual(response.data[0]["open_critical_events"], 1)
 
+    def test_pilot_readiness_reports_blockers(self):
+        MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.DISABLED,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            current_epoch=2,
+            shadow_reads_enabled=False,
+        )
+
+        response = self.client.get("/api/v1/migration/pilot-readiness/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertFalse(response.data[0]["ready_for_pilot"])
+        self.assertGreaterEqual(len(response.data[0]["blocking_reasons"]), 3)
+
+    def test_promote_ready_requires_clean_phase2_posture(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            current_epoch=3,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=0,
+            trace_id="trace-ready-001",
+            finished_at=timezone.now(),
+        )
+
+        response = self.client.post(f"/api/v1/migration/domains/{control.id}/promote-ready/")
+
+        self.assertEqual(response.status_code, 200)
+        control.refresh_from_db()
+        self.assertEqual(control.cutover_status, MigrationCutoverStatus.READY)
+        self.assertTrue(response.data["ready_for_pilot"])
+        self.assertEqual(response.data["recommended_next_status"], MigrationCutoverStatus.READY)
+
     def test_non_platform_admin_is_blocked(self):
         non_admin = PlatformUser.objects.create_user(email="staff@example.com", password="secret", full_name="Staff")
         self.client.force_authenticate(user=non_admin)

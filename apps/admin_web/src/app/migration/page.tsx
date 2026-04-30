@@ -4,6 +4,7 @@ import { MigrationBridgeReceiptsTable } from "@/components/migration-bridge-rece
 import { MetricCard } from "@/components/metric-card";
 import { MigrationControlsTable } from "@/components/migration-controls-table";
 import { MigrationJobsTable } from "@/components/migration-jobs-table";
+import { MigrationPilotReadinessTable } from "@/components/migration-pilot-readiness-table";
 import { ReconciliationEventsTable } from "@/components/reconciliation-events-table";
 import { MigrationShadowSummariesTable } from "@/components/migration-shadow-summaries-table";
 import {
@@ -11,6 +12,7 @@ import {
   getMigrationBridgeReceipts,
   getMigrationControls,
   getMigrationJobRuns,
+  getMigrationPilotReadiness,
   getMigrationReconciliationEvents,
   getMigrationShadowSummaries,
   getSession,
@@ -38,14 +40,15 @@ export default async function MigrationPage() {
     );
   }
 
-  const [controls, jobs, receipts, shadowSummaries, events] = await Promise.all([
+  const [controls, jobs, receipts, pilotReadiness, shadowSummaries, events] = await Promise.all([
     getMigrationControls(),
     getMigrationJobRuns(),
     getMigrationBridgeReceipts(),
+    getMigrationPilotReadiness(),
     getMigrationShadowSummaries(),
     getMigrationReconciliationEvents(),
   ]);
-  const stats = buildMigrationStats(controls, jobs, receipts, events);
+  const stats = buildMigrationStats(controls, jobs, receipts, pilotReadiness, events);
 
   return (
     <AdminShell
@@ -56,7 +59,7 @@ export default async function MigrationPage() {
       subtitle="Phase 2 control plane for domain ownership, bridge posture, job visibility, and reconciliation triage."
     >
       <div className="space-y-8">
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-8">
           <MetricCard
             label="Domain controls"
             value={stats.totalControls.toString()}
@@ -83,6 +86,13 @@ export default async function MigrationPage() {
             detail="Applied bridge events recorded for idempotent replay safety"
             accent="blue"
             icon="RCT"
+          />
+          <MetricCard
+            label="Pilot ready"
+            value={stats.pilotReadyDomains.toString()}
+            detail="Domains currently meeting the automated Phase 3 pilot gate"
+            accent="green"
+            icon="RDY"
           />
           <MetricCard
             label="Critical mismatches"
@@ -138,6 +148,19 @@ export default async function MigrationPage() {
             <div className="mt-6">
               <MigrationBridgeReceiptsTable receipts={receipts} />
             </div>
+          </div>
+        </section>
+
+        <section className="panel-soft rounded-[28px] px-6 py-6">
+          <div>
+            <p className="eyebrow">Pilot gate</p>
+            <h2 className="mt-3 text-2xl font-bold">Phase 3 readiness</h2>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">
+              Inventory and customer cutovers should only move forward when they clear this gate. It rolls Phase 2 compare health, bridge posture, and open reconciliation blockers into one go/no-go surface.
+            </p>
+          </div>
+          <div className="mt-6">
+            <MigrationPilotReadinessTable readiness={pilotReadiness} />
           </div>
         </section>
 

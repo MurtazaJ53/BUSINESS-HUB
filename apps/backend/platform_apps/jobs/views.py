@@ -5,13 +5,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from platform_apps.audit.models import MigrationReconciliationEvent
-from platform_apps.common.migration import MigrationJobStatus
+from platform_apps.common.migration import MigrationCutoverStatus, MigrationJobStatus
 from platform_apps.common.permissions import IsPlatformAdminUser
 from platform_apps.jobs.models import MigrationBridgeReceipt, MigrationDomainControl, MigrationJobRun
+from platform_apps.jobs.readiness import build_pilot_readiness
 from platform_apps.jobs.serializers import (
     MigrationBridgeReceiptSerializer,
     MigrationDomainControlSerializer,
     MigrationJobRunSerializer,
+    MigrationPilotReadinessSerializer,
     MigrationShadowSummarySerializer,
 )
 from platform_apps.jobs.services import execute_migration_job
@@ -160,3 +162,42 @@ class MigrationShadowSummaryListView(APIView):
 
         serializer = MigrationShadowSummarySerializer(summaries, many=True)
         return Response(serializer.data)
+
+
+class MigrationPilotReadinessListView(APIView):
+    permission_classes = [IsPlatformAdminUser]
+
+    def get(self, request):
+        controls = MigrationDomainControl.objects.select_related("shop").order_by("shop__name", "domain")
+        domain = request.query_params.get("domain", "").strip()
+        shop_id = request.query_params.get("shop_id", "").strip()
+
+        if domain:
+            controls = controls.filter(domain=domain)
+        if shop_id:
+            controls = controls.filter(shop_id=shop_id)
+
+        payload = [build_pilot_readiness(control) for control in controls]
+        serializer = MigrationPilotReadinessSerializer(payload, many=True)
+        return Response(serializer.data)
+
+
+class MigrationPilotPromoteReadyView(APIView):
+    permission_classes = [IsPlatformAdminUser]
+
+    def post(self, request, control_id):
+        control = MigrationDomainControl.objects.select_related("shop").filter(pk=control_id).first()
+        if control is None:
+            return Response({"detail": "Migration control not found."}, status=404)
+
+        readiness = build_pilot_readiness(control)
+        if not readiness["ready_for_pilot"]:
+            serializer = MigrationPilotReadinessSerializer(readiness)
+            return Response(serializer.data, status=409)
+
+        control.cutover_status = MigrationCutoverStatus.READY
+        control.save(update_fields=["cutover_status", "updated_at"])
+
+        payload = build_pilot_readiness(control)
+        serializer = MigrationPilotReadinessSerializer(payload)
+        return Response(serializer.data, status=200)
