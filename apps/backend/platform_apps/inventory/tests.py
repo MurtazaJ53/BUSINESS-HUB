@@ -6,7 +6,9 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from platform_apps.common.migration import MigrationBridgeMode, MigrationCutoverStatus, MigrationDomain, MigrationWriteMaster
 from platform_apps.inventory.models import InventoryItem, InventoryStockLedger
+from platform_apps.jobs.models import MigrationDomainControl
 from platform_apps.shops.models import Shop, ShopMembership
 from platform_apps.users.models import PlatformUser
 
@@ -45,6 +47,57 @@ class InventoryApiTests(TestCase):
         self.assertEqual(item.ledger_entries.count(), 1)
         self.assertEqual(item.ledger_entries.first().quantity_delta, 12)
 
+    def test_inventory_create_is_blocked_when_legacy_path_still_owns_domain(self):
+        MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.COMPARE_ONLY,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            current_epoch=3,
+            shadow_reads_enabled=True,
+        )
+
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/inventory/",
+            {
+                "name": "Blocked Socks",
+                "sku": "SOCK-BLOCKED",
+                "category": "Socks",
+                "sell_price": "199.00",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(InventoryItem.objects.count(), 0)
+
+    def test_inventory_create_succeeds_when_postgres_is_primary(self):
+        MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=4,
+            shadow_reads_enabled=True,
+        )
+
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/inventory/",
+            {
+                "name": "Pilot Socks",
+                "sku": "SOCK-PILOT",
+                "category": "Socks",
+                "sell_price": "199.00",
+                "opening_stock": 4,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(InventoryItem.objects.count(), 1)
+
     def test_adjust_inventory_stock(self):
         item = InventoryItem.objects.create(shop=self.shop, name="Classic Socks", sell_price=Decimal("199.00"))
         InventoryStockLedger.objects.create(
@@ -65,3 +118,23 @@ class InventoryApiTests(TestCase):
         item.refresh_from_db()
         total = sum(item.ledger_entries.values_list("quantity_delta", flat=True))
         self.assertEqual(total, 3)
+
+    def test_inventory_adjustment_is_blocked_when_legacy_path_still_owns_domain(self):
+        item = InventoryItem.objects.create(shop=self.shop, name="Classic Socks", sell_price=Decimal("199.00"))
+        MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.COMPARE_ONLY,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            current_epoch=7,
+            shadow_reads_enabled=True,
+        )
+
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/inventory/{item.id}/adjust-stock/",
+            {"quantity_delta": -2, "note": "Damage"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)

@@ -9,6 +9,8 @@ from rest_framework import exceptions, generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from platform_apps.common.migration import MigrationDomain
+from platform_apps.common.migration_guards import assert_postgres_primary_write_enabled
 from platform_apps.inventory.models import InventoryItem, InventoryStockLedger
 from platform_apps.inventory.serializers import InventoryAdjustmentSerializer, InventoryItemSerializer
 from platform_apps.shops.models import ShopMembership
@@ -29,6 +31,12 @@ class ShopScopedMixin:
 
     def can_view_costs(self) -> bool:
         return ROLE_ORDER[self.get_membership().role] >= ROLE_ORDER[ShopMembership.Role.ADMIN]
+
+    def assert_inventory_postgres_write_enabled(self) -> None:
+        assert_postgres_primary_write_enabled(
+            shop_id=self.kwargs["shop_id"],
+            domain=MigrationDomain.INVENTORY,
+        )
 
 
 class InventoryItemListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
@@ -71,6 +79,7 @@ class InventoryItemListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.STAFF)
+        self.assert_inventory_postgres_write_enabled()
         serializer.save()
 
 
@@ -100,11 +109,13 @@ class InventoryItemDetailView(ShopScopedMixin, generics.RetrieveUpdateDestroyAPI
 
     def perform_update(self, serializer):
         get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.STAFF)
+        self.assert_inventory_postgres_write_enabled()
         serializer.save()
 
     @transaction.atomic
     def perform_destroy(self, instance):
         get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.ADMIN)
+        self.assert_inventory_postgres_write_enabled()
         instance.tombstone = True
         instance.status = InventoryItem.Status.ARCHIVED
         instance.save(update_fields=["tombstone", "status", "updated_at"])
@@ -116,6 +127,7 @@ class InventoryItemAdjustmentView(ShopScopedMixin, APIView):
 
     def post(self, request, shop_id, item_id):
         membership = self.get_membership()
+        self.assert_inventory_postgres_write_enabled()
         item = InventoryItem.objects.filter(shop=membership.shop, pk=item_id, tombstone=False).first()
         if item is None:
             raise exceptions.NotFound("Inventory item not found.")
