@@ -94,3 +94,36 @@ class MigrationJobRun(UUIDStampedModel):
 
     def __str__(self) -> str:
         return f"{self.job_type}:{self.domain}:{self.status}"
+
+
+class MigrationBridgeReceipt(UUIDStampedModel):
+    shop = models.ForeignKey(
+        Shop,
+        on_delete=models.CASCADE,
+        related_name="migration_bridge_receipts",
+    )
+    domain = models.CharField(max_length=64, choices=MigrationDomain.choices)
+    origin_system = models.CharField(max_length=32)
+    origin_event_id = models.CharField(max_length=128)
+    command_type = models.CharField(max_length=32, blank=True)
+    entity_type = models.CharField(max_length=64, blank=True)
+    entity_id = models.CharField(max_length=128, blank=True)
+    base_domain_epoch = models.PositiveIntegerField(default=1)
+    payload_json = models.JSONField(default=dict, blank=True)
+    applied_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["-applied_at", "-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["shop", "domain", "origin_system", "origin_event_id"],
+                name="uniq_bridge_receipt_origin_event",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["shop", "domain", "applied_at"]),
+            models.Index(fields=["domain", "origin_system"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.domain}:{self.origin_system}:{self.origin_event_id}"

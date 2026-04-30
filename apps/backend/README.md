@@ -60,8 +60,11 @@ The current executable pilot slice supports:
 
 - `inventory` `backfill`
 - `inventory` `shadow_compare`
+- `inventory` `bridge_replay`
 - `customers` `backfill`
 - `customers` `shadow_compare`
+- `customers` `bridge_replay`
 - `reporting` `projection_refresh`
 
 Pass a Firebase-like payload snapshot in `payload_json.source_snapshot` to exercise the pipeline locally.
+Use `payload_json.bridge_event` to exercise the unidirectional Firebase-to-PostgreSQL replay path.

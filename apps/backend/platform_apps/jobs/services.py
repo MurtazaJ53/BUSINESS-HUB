@@ -4,12 +4,13 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from firebase_admin import firestore
 
 from platform_apps.audit.models import MigrationReconciliationEvent
 from platform_apps.common.migration import (
+    MigrationBridgeMode,
     MigrationDomain,
     MigrationJobStatus,
     MigrationJobType,
@@ -19,7 +20,7 @@ from platform_apps.common.migration import (
 )
 from platform_apps.customers.models import Customer
 from platform_apps.inventory.models import InventoryItem
-from platform_apps.jobs.models import MigrationDomainControl, MigrationJobRun
+from platform_apps.jobs.models import MigrationBridgeReceipt, MigrationDomainControl, MigrationJobRun
 from platform_apps.projections.services import refresh_shop_dashboard_projection
 from platform_apps.users.authentication import get_firebase_app
 
@@ -62,6 +63,7 @@ COMPARE_MANAGED_ISSUE_CODES = {
     "missing_in_postgres",
     "field_drift",
     "missing_in_firebase",
+    "stale_bridge_epoch",
 }
 
 
@@ -207,6 +209,100 @@ def _mark_job_finished(job_run: MigrationJobRun, *, status: str, error_message: 
     job_run.error_message = error_message
     job_run.finished_at = timezone.now()
     job_run.save(update_fields=["status", "error_message", "finished_at", "updated_at"])
+
+
+def _merge_source_meta(source_meta_json: dict[str, Any], bridge_event: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(source_meta_json)
+    merged.update(
+        {
+            "bridge_origin_system": str(bridge_event.get("origin_system") or "").strip(),
+            "bridge_origin_event_id": str(bridge_event.get("origin_event_id") or "").strip(),
+            "bridge_command_type": str(bridge_event.get("command_type") or "").strip(),
+        }
+    )
+    return merged
+
+
+def _normalize_bridge_event(job_run: MigrationJobRun) -> dict[str, Any]:
+    bridge_event = job_run.payload_json.get("bridge_event")
+    if not isinstance(bridge_event, dict):
+        raise MigrationExecutionError("Bridge replay job requires payload_json.bridge_event.")
+
+    origin_system = str(bridge_event.get("origin_system") or "").strip().lower()
+    if origin_system != MigrationWriteMaster.FIREBASE:
+        raise MigrationExecutionError("Only firebase-origin bridge replay is supported in phase 2.")
+
+    origin_event_id = str(bridge_event.get("origin_event_id") or "").strip()
+    if not origin_event_id:
+        raise MigrationExecutionError("Bridge replay event is missing origin_event_id.")
+
+    command_type = str(bridge_event.get("command_type") or "").strip().lower()
+    if command_type not in {"upsert", "delete"}:
+        raise MigrationExecutionError("Bridge replay command_type must be 'upsert' or 'delete'.")
+
+    return {
+        "origin_system": origin_system,
+        "origin_event_id": origin_event_id,
+        "command_type": command_type,
+        "entity_type": str(bridge_event.get("entity_type") or "").strip().lower(),
+        "entity_id": str(bridge_event.get("entity_id") or "").strip(),
+        "base_domain_epoch": int(bridge_event.get("base_domain_epoch") or 1),
+        "record": bridge_event.get("record") if isinstance(bridge_event.get("record"), dict) else {},
+    }
+
+
+def _assert_bridge_allowed(control: MigrationDomainControl) -> None:
+    if control.bridge_mode != MigrationBridgeMode.FIREBASE_TO_POSTGRES:
+        raise MigrationExecutionError(
+            f"Domain {control.domain} is not accepting firebase_to_postgres bridge replay in the current control state."
+        )
+
+
+def _record_bridge_receipt(
+    *,
+    control: MigrationDomainControl,
+    bridge_event: dict[str, Any],
+    payload_json: dict[str, Any],
+) -> bool:
+    try:
+        with transaction.atomic():
+            MigrationBridgeReceipt.objects.create(
+                shop=control.shop,
+                domain=control.domain,
+                origin_system=bridge_event["origin_system"],
+                origin_event_id=bridge_event["origin_event_id"],
+                command_type=bridge_event["command_type"],
+                entity_type=bridge_event["entity_type"],
+                entity_id=bridge_event["entity_id"],
+                base_domain_epoch=bridge_event["base_domain_epoch"],
+                payload_json=payload_json,
+                applied_at=timezone.now(),
+            )
+    except IntegrityError:
+        return False
+    return True
+
+
+def _record_stale_bridge_epoch(
+    *,
+    control: MigrationDomainControl,
+    bridge_event: dict[str, Any],
+    note: str,
+) -> None:
+    _record_reconciliation_event(
+        control=control,
+        issue_code="stale_bridge_epoch",
+        entity_type=bridge_event["entity_type"] or control.domain,
+        entity_id=bridge_event["entity_id"] or bridge_event["origin_event_id"],
+        note=note,
+        mismatch_payload_json={
+            "base_domain_epoch": bridge_event["base_domain_epoch"],
+            "current_epoch": control.current_epoch,
+            "origin_event_id": bridge_event["origin_event_id"],
+        },
+        severity=ReconciliationSeverity.WARNING,
+        source_reference=control.shop.source_path or "",
+    )
 
 
 def run_inventory_backfill(job_run: MigrationJobRun) -> MigrationJobRun:
@@ -698,6 +794,212 @@ def run_customer_shadow_compare(job_run: MigrationJobRun) -> MigrationJobRun:
     return job_run
 
 
+def run_inventory_bridge_replay(job_run: MigrationJobRun) -> MigrationJobRun:
+    control = _get_required_control(job_run)
+    _assert_bridge_allowed(control)
+    bridge_event = _normalize_bridge_event(job_run)
+    _mark_job_running(job_run)
+    run_started_at = timezone.now()
+
+    rows_scanned = 1
+    rows_written = 0
+    rows_skipped = 0
+    mismatch_count = 0
+
+    try:
+        with transaction.atomic():
+            if not _record_bridge_receipt(control=control, bridge_event=bridge_event, payload_json=job_run.payload_json):
+                rows_skipped = 1
+            elif bridge_event["base_domain_epoch"] != control.current_epoch:
+                rows_skipped = 1
+                mismatch_count = 1
+                _record_stale_bridge_epoch(
+                    control=control,
+                    bridge_event=bridge_event,
+                    note="Inventory bridge replay arrived with a stale domain epoch and was rejected.",
+                )
+            else:
+                row = _normalize_inventory_row(bridge_event["record"] | {"id": bridge_event["entity_id"]})
+                source_meta_json = _merge_source_meta(row.source_meta_json, bridge_event)
+                item, created = InventoryItem.objects.get_or_create(
+                    shop=control.shop,
+                    source_system="firebase",
+                    source_id=row.source_id,
+                    defaults={
+                        "name": row.name or f"Imported {row.source_id}",
+                        "sku": row.sku,
+                        "barcode": row.barcode,
+                        "category": row.category,
+                        "subcategory": row.subcategory,
+                        "size": row.size,
+                        "description": row.description,
+                        "sell_price": row.sell_price,
+                        "status": row.status,
+                        "tombstone": row.tombstone,
+                        "source_meta_json": source_meta_json,
+                        "source_shop_id": control.shop.source_id,
+                        "source_path": f"shops/{control.shop.source_id}/inventory/{row.source_id}",
+                        "domain_epoch": control.current_epoch,
+                        "migrated_at": run_started_at,
+                    },
+                )
+
+                if bridge_event["command_type"] == "delete":
+                    item.tombstone = True
+                    item.status = InventoryItem.Status.ARCHIVED
+                    item.source_meta_json = source_meta_json
+                    item.domain_epoch = control.current_epoch
+                    item.migrated_at = run_started_at
+                    item.save(update_fields=["tombstone", "status", "source_meta_json", "domain_epoch", "migrated_at", "updated_at"])
+                    rows_written = 1
+                elif created:
+                    rows_written = 1
+                else:
+                    changed = False
+                    fields_to_update: list[str] = []
+                    candidate_fields = {
+                        "name": row.name or item.name,
+                        "sku": row.sku,
+                        "barcode": row.barcode,
+                        "category": row.category,
+                        "subcategory": row.subcategory,
+                        "size": row.size,
+                        "description": row.description,
+                        "sell_price": row.sell_price,
+                        "status": row.status,
+                        "tombstone": row.tombstone,
+                        "source_meta_json": source_meta_json,
+                        "source_shop_id": control.shop.source_id,
+                        "source_path": f"shops/{control.shop.source_id}/inventory/{row.source_id}",
+                        "domain_epoch": control.current_epoch,
+                        "migrated_at": run_started_at,
+                    }
+                    for field, value in candidate_fields.items():
+                        if getattr(item, field) != value:
+                            setattr(item, field, value)
+                            fields_to_update.append(field)
+                            changed = True
+                    if changed:
+                        item.save(update_fields=fields_to_update + ["updated_at"])
+                        rows_written = 1
+                    else:
+                        rows_skipped = 1
+
+            job_run.rows_scanned = rows_scanned
+            job_run.rows_written = rows_written
+            job_run.rows_skipped = rows_skipped
+            job_run.mismatch_count = mismatch_count
+            job_run.save(update_fields=["rows_scanned", "rows_written", "rows_skipped", "mismatch_count", "updated_at"])
+    except Exception as exc:  # pragma: no cover
+        _mark_job_finished(job_run, status=MigrationJobStatus.FAILED, error_message=str(exc))
+        raise
+
+    _mark_job_finished(job_run, status=MigrationJobStatus.SUCCEEDED)
+    job_run.refresh_from_db()
+    return job_run
+
+
+def run_customer_bridge_replay(job_run: MigrationJobRun) -> MigrationJobRun:
+    control = _get_required_control(job_run)
+    _assert_bridge_allowed(control)
+    bridge_event = _normalize_bridge_event(job_run)
+    _mark_job_running(job_run)
+    run_started_at = timezone.now()
+
+    rows_scanned = 1
+    rows_written = 0
+    rows_skipped = 0
+    mismatch_count = 0
+
+    try:
+        with transaction.atomic():
+            if not _record_bridge_receipt(control=control, bridge_event=bridge_event, payload_json=job_run.payload_json):
+                rows_skipped = 1
+            elif bridge_event["base_domain_epoch"] != control.current_epoch:
+                rows_skipped = 1
+                mismatch_count = 1
+                _record_stale_bridge_epoch(
+                    control=control,
+                    bridge_event=bridge_event,
+                    note="Customer bridge replay arrived with a stale domain epoch and was rejected.",
+                )
+            else:
+                row = _normalize_customer_row(bridge_event["record"] | {"id": bridge_event["entity_id"]})
+                source_meta_json = _merge_source_meta(row.source_meta_json, bridge_event)
+                customer, created = Customer.objects.get_or_create(
+                    shop=control.shop,
+                    source_system="firebase",
+                    source_id=row.source_id,
+                    defaults={
+                        "name": row.name or f"Imported {row.source_id}",
+                        "phone": row.phone,
+                        "email": row.email,
+                        "total_spent": row.total_spent,
+                        "balance": row.balance,
+                        "notes": row.notes,
+                        "status": row.status,
+                        "tombstone": row.tombstone,
+                        "source_meta_json": source_meta_json,
+                        "source_shop_id": control.shop.source_id,
+                        "source_path": f"shops/{control.shop.source_id}/customers/{row.source_id}",
+                        "domain_epoch": control.current_epoch,
+                        "migrated_at": run_started_at,
+                    },
+                )
+
+                if bridge_event["command_type"] == "delete":
+                    customer.tombstone = True
+                    customer.status = Customer.Status.ARCHIVED
+                    customer.source_meta_json = source_meta_json
+                    customer.domain_epoch = control.current_epoch
+                    customer.migrated_at = run_started_at
+                    customer.save(update_fields=["tombstone", "status", "source_meta_json", "domain_epoch", "migrated_at", "updated_at"])
+                    rows_written = 1
+                elif created:
+                    rows_written = 1
+                else:
+                    changed = False
+                    fields_to_update: list[str] = []
+                    candidate_fields = {
+                        "name": row.name or customer.name,
+                        "phone": row.phone,
+                        "email": row.email,
+                        "total_spent": row.total_spent,
+                        "balance": row.balance,
+                        "notes": row.notes,
+                        "status": row.status,
+                        "tombstone": row.tombstone,
+                        "source_meta_json": source_meta_json,
+                        "source_shop_id": control.shop.source_id,
+                        "source_path": f"shops/{control.shop.source_id}/customers/{row.source_id}",
+                        "domain_epoch": control.current_epoch,
+                        "migrated_at": run_started_at,
+                    }
+                    for field, value in candidate_fields.items():
+                        if getattr(customer, field) != value:
+                            setattr(customer, field, value)
+                            fields_to_update.append(field)
+                            changed = True
+                    if changed:
+                        customer.save(update_fields=fields_to_update + ["updated_at"])
+                        rows_written = 1
+                    else:
+                        rows_skipped = 1
+
+            job_run.rows_scanned = rows_scanned
+            job_run.rows_written = rows_written
+            job_run.rows_skipped = rows_skipped
+            job_run.mismatch_count = mismatch_count
+            job_run.save(update_fields=["rows_scanned", "rows_written", "rows_skipped", "mismatch_count", "updated_at"])
+    except Exception as exc:  # pragma: no cover
+        _mark_job_finished(job_run, status=MigrationJobStatus.FAILED, error_message=str(exc))
+        raise
+
+    _mark_job_finished(job_run, status=MigrationJobStatus.SUCCEEDED)
+    job_run.refresh_from_db()
+    return job_run
+
+
 def run_reporting_projection_refresh(job_run: MigrationJobRun) -> MigrationJobRun:
     control = _get_required_control(job_run)
     _mark_job_running(job_run)
@@ -739,11 +1041,15 @@ def execute_migration_job(job_run_id: str) -> MigrationJobRun:
             return run_inventory_backfill(job_run)
         if job_run.job_type == MigrationJobType.SHADOW_COMPARE:
             return run_inventory_shadow_compare(job_run)
+        if job_run.job_type == MigrationJobType.BRIDGE_REPLAY:
+            return run_inventory_bridge_replay(job_run)
     elif job_run.domain == MigrationDomain.CUSTOMERS:
         if job_run.job_type == MigrationJobType.BACKFILL:
             return run_customer_backfill(job_run)
         if job_run.job_type == MigrationJobType.SHADOW_COMPARE:
             return run_customer_shadow_compare(job_run)
+        if job_run.job_type == MigrationJobType.BRIDGE_REPLAY:
+            return run_customer_bridge_replay(job_run)
     elif job_run.domain == MigrationDomain.REPORTING:
         if job_run.job_type == MigrationJobType.PROJECTION_REFRESH:
             return run_reporting_projection_refresh(job_run)

@@ -14,7 +14,7 @@ from platform_apps.common.migration import (
 )
 from platform_apps.customers.models import Customer
 from platform_apps.inventory.models import InventoryItem
-from platform_apps.jobs.models import MigrationDomainControl, MigrationJobRun
+from platform_apps.jobs.models import MigrationBridgeReceipt, MigrationDomainControl, MigrationJobRun
 from platform_apps.jobs.services import execute_migration_job
 from platform_apps.projections.models import ShopDashboardSnapshot
 from platform_apps.shops.models import Shop
@@ -564,3 +564,106 @@ class MigrationExecutionTests(TestCase):
         self.assertEqual(snapshot.customer_count, 1)
         self.assertEqual(snapshot.sales_count, 1)
         self.assertEqual(snapshot.payment_count, 1)
+
+    def test_inventory_bridge_replay_applies_once_and_skips_duplicates(self):
+        self.control.bridge_mode = MigrationBridgeMode.FIREBASE_TO_POSTGRES
+        self.control.save(update_fields=["bridge_mode", "updated_at"])
+
+        job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.BRIDGE_REPLAY,
+            actor_user=self.user,
+            payload_json={
+                "bridge_event": {
+                    "origin_system": "firebase",
+                    "origin_event_id": "evt_inventory_001",
+                    "command_type": "upsert",
+                    "entity_type": "inventory_item",
+                    "entity_id": "inv_bridge_001",
+                    "base_domain_epoch": self.control.current_epoch,
+                    "record": {
+                        "name": "Bridge Tee",
+                        "sku": "BRG-TEE",
+                        "sell_price": "345.00",
+                    },
+                }
+            },
+        )
+
+        execute_migration_job(str(job.id))
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(job.rows_written, 1)
+        self.assertTrue(
+            InventoryItem.objects.filter(
+                shop=self.shop,
+                source_system="firebase",
+                source_id="inv_bridge_001",
+                name="Bridge Tee",
+            ).exists()
+        )
+        self.assertEqual(MigrationBridgeReceipt.objects.filter(shop=self.shop, domain=MigrationDomain.INVENTORY).count(), 1)
+
+        duplicate_job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.BRIDGE_REPLAY,
+            actor_user=self.user,
+            payload_json=job.payload_json,
+        )
+
+        execute_migration_job(str(duplicate_job.id))
+
+        duplicate_job.refresh_from_db()
+        self.assertEqual(duplicate_job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(duplicate_job.rows_written, 0)
+        self.assertEqual(duplicate_job.rows_skipped, 1)
+        self.assertEqual(MigrationBridgeReceipt.objects.filter(shop=self.shop, domain=MigrationDomain.INVENTORY).count(), 1)
+
+    def test_customer_bridge_replay_rejects_stale_epoch_with_reconciliation_event(self):
+        customer_control = self._create_customer_control()
+        customer_control.bridge_mode = MigrationBridgeMode.FIREBASE_TO_POSTGRES
+        customer_control.current_epoch = 3
+        customer_control.save(update_fields=["bridge_mode", "current_epoch", "updated_at"])
+
+        job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            job_type=MigrationJobType.BRIDGE_REPLAY,
+            actor_user=self.user,
+            payload_json={
+                "bridge_event": {
+                    "origin_system": "firebase",
+                    "origin_event_id": "evt_customer_001",
+                    "command_type": "upsert",
+                    "entity_type": "customer",
+                    "entity_id": "cust_bridge_001",
+                    "base_domain_epoch": 2,
+                    "record": {
+                        "name": "Bridge Customer",
+                        "phone": "9090909090",
+                        "balance": "50.00",
+                    },
+                }
+            },
+        )
+
+        execute_migration_job(str(job.id))
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(job.rows_written, 0)
+        self.assertEqual(job.rows_skipped, 1)
+        self.assertEqual(job.mismatch_count, 1)
+        self.assertFalse(Customer.objects.filter(shop=self.shop, source_id="cust_bridge_001").exists())
+        self.assertTrue(
+            MigrationReconciliationEvent.objects.filter(
+                shop=self.shop,
+                domain=MigrationDomain.CUSTOMERS,
+                issue_code="stale_bridge_epoch",
+                entity_type="customer",
+                entity_id="cust_bridge_001",
+            ).exists()
+        )
