@@ -2,6 +2,8 @@ import {
   promotePrimaryAction,
   promoteReadyAction,
   rollbackPilotAction,
+  runBackfillAction,
+  runShadowCompareAction,
 } from "@/app/migration/actions";
 import type { MigrationPilotReadiness } from "@/lib/types";
 
@@ -73,6 +75,28 @@ export function MigrationPilotReadinessTable({
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex flex-col gap-2">
+                      <form action={runBackfillAction}>
+                        <input type="hidden" name="shopId" value={row.shop} />
+                        <input type="hidden" name="domain" value={row.domain} />
+                        <input type="hidden" name="shop" value={row.shop_name} />
+                        <button
+                          type="submit"
+                          className="w-full rounded-[14px] border border-[rgba(92,174,254,0.12)] bg-[rgba(11,16,26,0.82)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]"
+                        >
+                          Run backfill
+                        </button>
+                      </form>
+                      <form action={runShadowCompareAction}>
+                        <input type="hidden" name="shopId" value={row.shop} />
+                        <input type="hidden" name="domain" value={row.domain} />
+                        <input type="hidden" name="shop" value={row.shop_name} />
+                        <button
+                          type="submit"
+                          className="w-full rounded-[14px] border border-[rgba(92,174,254,0.12)] bg-[rgba(11,16,26,0.82)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]"
+                        >
+                          Run compare
+                        </button>
+                      </form>
                       {row.ready_for_pilot && row.recommended_next_status === "ready" ? (
                         <form action={promoteReadyAction}>
                           <input type="hidden" name="controlId" value={row.control_id} />

@@ -37,17 +37,25 @@ function buildActionBanner(searchParams: SearchParams) {
   const domain = getSearchParamValue(searchParams, "domain");
   const shop = getSearchParamValue(searchParams, "shop");
   const message = getSearchParamValue(searchParams, "message");
+  const jobStatus = getSearchParamValue(searchParams, "jobStatus");
+  const rowsScanned = getSearchParamValue(searchParams, "rowsScanned");
+  const rowsWritten = getSearchParamValue(searchParams, "rowsWritten");
+  const mismatchCount = getSearchParamValue(searchParams, "mismatchCount");
 
   if (!status || !action) {
     return null;
   }
 
   if (status === "success") {
+    const extra =
+      action.startsWith("run-") && jobStatus
+        ? ` Latest job status: ${jobStatus}. rows_scanned=${rowsScanned || "0"}, rows_written=${rowsWritten || "0"}, mismatch_count=${mismatchCount || "0"}.`
+        : "";
     return {
       accent:
         "border-[rgba(52,211,153,0.18)] bg-[rgba(7,33,25,0.76)] text-[var(--success)]" as const,
       title: `Migration action succeeded: ${action}`,
-      body: `${shop || "Selected shop"} / ${domain || "domain"} completed the requested pilot action successfully. Review bridge receipts, shadow summaries, and reconciliation before taking the next step.`,
+      body: `${shop || "Selected shop"} / ${domain || "domain"} completed the requested pilot action successfully.${extra} Review bridge receipts, shadow summaries, and reconciliation before taking the next step.`,
     };
   }
 

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { apiMutation } from "@/lib/admin-api";
+import type { MigrationJobRun } from "@/lib/types";
 
 
 function getRequiredControlId(formData: FormData): string {
@@ -65,6 +66,70 @@ async function runPilotAction(
   }
 }
 
+async function runMigrationJobAction(
+  formData: FormData,
+  {
+    jobType,
+  }: {
+    jobType: "backfill" | "shadow_compare";
+  },
+) {
+  const shopId = getOptionalField(formData, "shopId");
+  const domain = getOptionalField(formData, "domain");
+  const shop = getOptionalField(formData, "shop");
+
+  if (!shopId || !domain) {
+    redirect(
+      buildRedirectUrl({
+        status: "error",
+        action: `run-${jobType}`,
+        domain,
+        shop,
+        message: "Missing shop or domain for migration job trigger.",
+      }),
+    );
+  }
+
+  try {
+    const job = await apiMutation<MigrationJobRun>("/migration/jobs/?run_inline=1", {
+      method: "POST",
+      body: {
+        shop: shopId,
+        domain,
+        job_type: jobType,
+        payload_json: {},
+      },
+    });
+    revalidatePath("/migration");
+    redirect(
+      buildRedirectUrl({
+        status: "success",
+        action: `run-${jobType}`,
+        domain,
+        shop,
+        jobStatus: job.status,
+        rowsScanned: String(job.rows_scanned),
+        rowsWritten: String(job.rows_written),
+        mismatchCount: String(job.mismatch_count),
+      }),
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message.replace(/\s+/g, " ").slice(0, 220)
+        : "Unknown migration job failure.";
+    redirect(
+      buildRedirectUrl({
+        status: "error",
+        action: `run-${jobType}`,
+        domain,
+        shop,
+        message,
+      }),
+    );
+  }
+}
+
 
 export async function promoteReadyAction(formData: FormData) {
   await runPilotAction(formData, {
@@ -87,4 +152,14 @@ export async function rollbackPilotAction(formData: FormData) {
     pathBuilder: (controlId) => `/migration/domains/${controlId}/rollback/`,
     action: "rollback",
   });
+}
+
+
+export async function runBackfillAction(formData: FormData) {
+  await runMigrationJobAction(formData, { jobType: "backfill" });
+}
+
+
+export async function runShadowCompareAction(formData: FormData) {
+  await runMigrationJobAction(formData, { jobType: "shadow_compare" });
 }
