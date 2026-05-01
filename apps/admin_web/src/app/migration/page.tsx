@@ -4,6 +4,7 @@ import { MigrationActivityTable } from "@/components/migration-activity-table";
 import { MigrationBridgeReceiptsTable } from "@/components/migration-bridge-receipts-table";
 import { MigrationPilotCheckpointBoard } from "@/components/migration-pilot-checkpoint-board";
 import { MigrationPilotSignoffBoard } from "@/components/migration-pilot-signoff-board";
+import { MigrationPilotShopScorecardBoard } from "@/components/migration-pilot-shop-scorecard-board";
 import { MetricCard } from "@/components/metric-card";
 import { MigrationControlsTable } from "@/components/migration-controls-table";
 import { MigrationJobsTable } from "@/components/migration-jobs-table";
@@ -21,6 +22,7 @@ import {
   getMigrationJobRuns,
   getMigrationPilotReadiness,
   getMigrationPilotSignoff,
+  getMigrationPilotShopScorecards,
   getMigrationReconciliationEvents,
   getMigrationShadowSummaries,
   getSession,
@@ -145,7 +147,7 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
     );
   }
 
-  const [controls, jobs, activityEvents, receipts, pilotReadiness, pilotSignoff, shadowSummaries, events] =
+  const [controls, jobs, activityEvents, receipts, pilotReadiness, pilotSignoff, pilotShopScorecards, shadowSummaries, events] =
     await Promise.all([
       getMigrationControls(),
       getMigrationJobRuns(),
@@ -153,6 +155,7 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
       getMigrationBridgeReceipts(),
       getMigrationPilotReadiness(),
       getMigrationPilotSignoff(),
+      getMigrationPilotShopScorecards(),
       getMigrationShadowSummaries(),
       getMigrationReconciliationEvents(),
     ]);
@@ -242,6 +245,8 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
         <MigrationRunbookPanel readiness={pilotReadiness} />
 
         <MigrationPilotCheckpointBoard readiness={pilotReadiness} />
+
+        <MigrationPilotShopScorecardBoard scorecards={pilotShopScorecards} />
 
         <MigrationPilotSignoffBoard signoff={pilotSignoff} />
 

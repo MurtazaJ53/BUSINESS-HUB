@@ -21,7 +21,12 @@ from platform_apps.jobs.models import (
     MigrationDomainControl,
     MigrationJobRun,
 )
-from platform_apps.jobs.readiness import PHASE3_PILOT_DOMAINS, build_pilot_readiness, build_pilot_signoff
+from platform_apps.jobs.readiness import (
+    PHASE3_PILOT_DOMAINS,
+    build_pilot_readiness,
+    build_pilot_signoff,
+    build_shop_pilot_scorecards,
+)
 from platform_apps.jobs.serializers import (
     MigrationBridgeReceiptSerializer,
     MigrationControlEventSerializer,
@@ -30,6 +35,7 @@ from platform_apps.jobs.serializers import (
     MigrationPilotPreparationResultSerializer,
     MigrationPilotReadinessSerializer,
     MigrationPilotSignoffSerializer,
+    MigrationPilotShopScorecardSerializer,
     MigrationPilotVerificationResultSerializer,
     MigrationShadowSummarySerializer,
 )
@@ -273,6 +279,25 @@ class MigrationPilotSignoffListView(APIView):
 
         payload = [build_pilot_signoff(control) for control in controls]
         serializer = MigrationPilotSignoffSerializer(payload, many=True)
+        return Response(serializer.data)
+
+
+class MigrationPilotShopScorecardListView(APIView):
+    permission_classes = [IsPlatformAdminUser]
+
+    def get(self, request):
+        controls = (
+            MigrationDomainControl.objects.select_related("shop")
+            .filter(domain__in=tuple(PHASE3_PILOT_DOMAINS))
+            .order_by("shop__name", "domain")
+        )
+        shop_id = request.query_params.get("shop_id", "").strip()
+
+        if shop_id:
+            controls = controls.filter(shop_id=shop_id)
+
+        payload = build_shop_pilot_scorecards(list(controls))
+        serializer = MigrationPilotShopScorecardSerializer(payload, many=True)
         return Response(serializer.data)
 
 

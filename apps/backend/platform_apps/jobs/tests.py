@@ -614,6 +614,121 @@ class MigrationControlApiTests(TestCase):
             "Rollback the pilot and triage reconciliation before retrying.",
         )
 
+    def test_list_pilot_shop_scorecards_reports_ready_for_cutover(self):
+        inventory_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.READY,
+            current_epoch=4,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        customer_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=5,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=0,
+            trace_id="trace-shop-scorecard-inventory-001",
+            finished_at=timezone.now(),
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=0,
+            trace_id="trace-shop-scorecard-customers-001",
+            finished_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=inventory_control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="monitoring",
+            summary="Inventory is ready-stage clean.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=customer_control,
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="production_safe",
+            summary="Customers are clean on PostgreSQL primary.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/pilot-shop-scorecards/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["overall_status"], "ready_for_cutover")
+        self.assertEqual(response.data[0]["ready_for_cutover_domains"], 1)
+        self.assertEqual(response.data[0]["production_safe_domains"], 1)
+        self.assertEqual(response.data[0]["missing_domains"], [])
+
+    def test_list_pilot_shop_scorecards_reports_missing_domain_as_blocked(self):
+        inventory_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            current_epoch=2,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=0,
+            trace_id="trace-shop-scorecard-missing-001",
+            finished_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=inventory_control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="monitoring",
+            summary="Inventory is clean, but customers are not onboarded yet.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/pilot-shop-scorecards/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]["overall_status"], "blocked")
+        self.assertIn(MigrationDomain.CUSTOMERS, response.data[0]["missing_domains"])
+        self.assertEqual(response.data[0]["blocked_domains"], 0)
+
     def test_non_platform_admin_is_blocked(self):
         non_admin = PlatformUser.objects.create_user(email="staff@example.com", password="secret", full_name="Staff")
         self.client.force_authenticate(user=non_admin)

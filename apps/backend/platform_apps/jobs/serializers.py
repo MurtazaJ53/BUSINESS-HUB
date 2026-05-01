@@ -223,6 +223,30 @@ class MigrationPilotSignoffSerializer(serializers.Serializer):
     warnings = serializers.ListField(child=serializers.CharField())
 
 
+class MigrationPilotShopScorecardSerializer(serializers.Serializer):
+    shop = serializers.UUIDField()
+    shop_name = serializers.CharField()
+    shop_slug = serializers.CharField()
+    overall_status = serializers.ChoiceField(
+        choices=[
+            "blocked",
+            "ready_for_cutover",
+            "monitoring",
+            "production_safe",
+            "rollback_recommended",
+        ]
+    )
+    recommended_action = serializers.CharField()
+    summary = serializers.CharField()
+    missing_domains = serializers.ListField(child=serializers.CharField())
+    production_safe_domains = serializers.IntegerField()
+    ready_for_cutover_domains = serializers.IntegerField()
+    monitoring_domains = serializers.IntegerField()
+    blocked_domains = serializers.IntegerField()
+    rollback_recommended_domains = serializers.IntegerField()
+    domains = MigrationPilotSignoffSerializer(many=True)
+
+
 class MigrationPilotPreparationResultSerializer(serializers.Serializer):
     control_id = serializers.UUIDField()
     shop = serializers.UUIDField()

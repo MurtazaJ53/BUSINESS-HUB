@@ -408,6 +408,27 @@ export type MigrationPilotSignoff = {
   warnings: string[];
 };
 
+export type MigrationPilotShopScorecard = {
+  shop: string;
+  shop_name: string;
+  shop_slug: string;
+  overall_status:
+    | "blocked"
+    | "ready_for_cutover"
+    | "monitoring"
+    | "production_safe"
+    | "rollback_recommended";
+  recommended_action: string;
+  summary: string;
+  missing_domains: string[];
+  production_safe_domains: number;
+  ready_for_cutover_domains: number;
+  monitoring_domains: number;
+  blocked_domains: number;
+  rollback_recommended_domains: number;
+  domains: MigrationPilotSignoff[];
+};
+
 export type MigrationPilotPreparationResult = {
   control_id: string;
   shop: string;

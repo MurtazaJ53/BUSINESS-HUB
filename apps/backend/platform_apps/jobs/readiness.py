@@ -200,3 +200,103 @@ def build_pilot_signoff(control: MigrationDomainControl) -> dict[str, Any]:
         "blocking_reasons": readiness["blocking_reasons"],
         "warnings": readiness["warnings"],
     }
+
+
+def build_shop_pilot_scorecards(controls: list[MigrationDomainControl]) -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
+
+    for control in controls:
+        signoff = build_pilot_signoff(control)
+        shop_key = str(control.shop_id)
+        bucket = grouped.setdefault(
+            shop_key,
+            {
+                "shop": shop_key,
+                "shop_name": control.shop.name,
+                "shop_slug": control.shop.slug,
+                "domains": [],
+            },
+        )
+        bucket["domains"].append(signoff)
+
+    scorecards: list[dict[str, Any]] = []
+    for bucket in grouped.values():
+        domains = sorted(bucket["domains"], key=lambda row: row["domain"])
+        seen_domains = {row["domain"] for row in domains}
+        missing_domains = sorted(PHASE3_PILOT_DOMAINS - seen_domains)
+        statuses = [row["signoff_status"] for row in domains]
+
+        if missing_domains:
+            overall_status = "blocked"
+            summary = (
+                "This shop is missing one or more pilot domain controls, so it cannot receive a full Phase 3 signoff yet."
+            )
+            recommended_action = (
+                "Create the missing pilot domain controls and run pilot prep before considering promotion."
+            )
+        elif "rollback_recommended" in statuses:
+            overall_status = "rollback_recommended"
+            summary = (
+                "At least one pilot domain is showing rollback-level drift. The shop should not advance until that domain is stabilized."
+            )
+            recommended_action = (
+                "Rollback the affected domain, clear reconciliation issues, and rerun verification."
+            )
+        elif "blocked" in statuses:
+            overall_status = "blocked"
+            summary = (
+                "At least one pilot domain is still blocked by compare drift, open critical issues, or missing prep work."
+            )
+            recommended_action = (
+                "Clear blockers on all pilot domains before attempting shop-level cutover progress."
+            )
+        elif all(status == "production_safe" for status in statuses):
+            overall_status = "production_safe"
+            summary = (
+                "All pilot domains are PostgreSQL-primary and currently verifying cleanly. This shop has passed the Phase 3 pilot checkpoint."
+            )
+            recommended_action = (
+                "Keep monitoring this shop and prepare the next rollout set if the posture remains stable."
+            )
+        elif any(status == "monitoring" for status in statuses):
+            overall_status = "monitoring"
+            summary = (
+                "The shop has pilot domains in motion, but it still needs more verification time before a final go/no-go decision."
+            )
+            recommended_action = (
+                "Keep verifying pilot domains, watch reconciliation, and avoid broader rollout until the monitoring posture clears."
+            )
+        elif any(status == "ready_for_cutover" for status in statuses):
+            overall_status = "ready_for_cutover"
+            summary = (
+                "All required pilot domains are clean enough to proceed with the next planned PostgreSQL cutover action."
+            )
+            recommended_action = (
+                "Execute the staged promotion plan for the remaining ready pilot domains during the pilot window."
+            )
+        else:
+            overall_status = "blocked"
+            summary = "This shop does not yet have a stable pilot posture."
+            recommended_action = "Review each pilot domain and bring it back to a known-good checkpoint."
+
+        scorecards.append(
+            {
+                "shop": bucket["shop"],
+                "shop_name": bucket["shop_name"],
+                "shop_slug": bucket["shop_slug"],
+                "overall_status": overall_status,
+                "recommended_action": recommended_action,
+                "summary": summary,
+                "missing_domains": missing_domains,
+                "production_safe_domains": sum(1 for status in statuses if status == "production_safe"),
+                "ready_for_cutover_domains": sum(1 for status in statuses if status == "ready_for_cutover"),
+                "monitoring_domains": sum(1 for status in statuses if status == "monitoring"),
+                "blocked_domains": sum(1 for status in statuses if status == "blocked"),
+                "rollback_recommended_domains": sum(
+                    1 for status in statuses if status == "rollback_recommended"
+                ),
+                "domains": domains,
+            }
+        )
+
+    return sorted(scorecards, key=lambda row: row["shop_name"].lower())
