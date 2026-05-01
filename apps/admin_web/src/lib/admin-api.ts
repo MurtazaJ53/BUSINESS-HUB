@@ -16,6 +16,7 @@ import type {
   MigrationBridgeReceipt,
   MigrationControlEvent,
   MigrationJobRun,
+  MigrationPhaseCheckpointEvent,
   MigrationPilotReadiness,
   MigrationPhaseReadiness,
   MigrationPilotSignoff,
@@ -222,6 +223,12 @@ export const getMigrationControlEvents = cache(async (): Promise<MigrationContro
 export const getMigrationShopCheckpointEvents = cache(
   async (): Promise<MigrationShopCheckpointEvent[]> => {
     return apiFetch<MigrationShopCheckpointEvent[]>("/migration/pilot-shop-checkpoints/");
+  },
+);
+
+export const getMigrationPhaseCheckpointEvents = cache(
+  async (): Promise<MigrationPhaseCheckpointEvent[]> => {
+    return apiFetch<MigrationPhaseCheckpointEvent[]>("/migration/phase-checkpoints/");
   },
 );
 

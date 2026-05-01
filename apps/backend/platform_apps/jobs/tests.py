@@ -21,6 +21,7 @@ from platform_apps.jobs.models import (
     MigrationBridgeReceipt,
     MigrationControlEvent,
     MigrationDomainControl,
+    MigrationPhaseCheckpointEvent,
     MigrationJobRun,
     MigrationShopCheckpointEvent,
 )
@@ -976,6 +977,103 @@ class MigrationControlApiTests(TestCase):
         self.assertEqual(response.data["rollback_escalated_count"], 1)
         self.assertEqual(response.data["rollback_recommended_shop_count"], 1)
         self.assertEqual(response.data["shops"][0]["latest_checkpoint_decision"], "rollback_escalated")
+
+    def test_create_phase_checkpoint_event_records_current_phase_snapshot(self):
+        inventory_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.READY,
+            current_epoch=4,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        customer_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=5,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        for domain in (MigrationDomain.INVENTORY, MigrationDomain.CUSTOMERS):
+            MigrationJobRun.objects.create(
+                shop=self.shop,
+                domain=domain,
+                job_type=MigrationJobType.SHADOW_COMPARE,
+                status=MigrationJobStatus.SUCCEEDED,
+                actor_user=self.user,
+                mismatch_count=0,
+                trace_id=f"trace-phase-checkpoint-{domain}",
+                finished_at=timezone.now(),
+            )
+        MigrationControlEvent.objects.create(
+            control=inventory_control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="monitoring",
+            summary="Inventory is ready for the next cutover window.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=customer_control,
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="production_safe",
+            summary="Customers are stable on PostgreSQL.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+        MigrationShopCheckpointEvent.objects.create(
+            shop=self.shop,
+            actor_user=self.user,
+            decision=MigrationShopCheckpointDecision.APPROVED_FOR_CUTOVER,
+            overall_status_snapshot="ready_for_cutover",
+            summary="Shop approved for cutover.",
+            recommended_action_snapshot="Proceed to the next phase review.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.post(
+            "/api/v1/migration/phase-checkpoints/",
+            {
+                "phase": "phase_3",
+                "decision": "approved_for_next_phase",
+                "note": "Program signoff recorded after clean pilot review.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(MigrationPhaseCheckpointEvent.objects.count(), 1)
+        event = MigrationPhaseCheckpointEvent.objects.get()
+        self.assertEqual(event.phase, "phase_3")
+        self.assertEqual(event.decision, "approved_for_next_phase")
+        self.assertEqual(event.overall_status_snapshot, "ready_for_phase_exit")
+        self.assertEqual(response.data["decision"], "approved_for_next_phase")
+
+    def test_create_phase_checkpoint_event_requires_pilot_shops(self):
+        response = self.client.post(
+            "/api/v1/migration/phase-checkpoints/",
+            {
+                "phase": "phase_3",
+                "decision": "hold_for_monitoring",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(MigrationPhaseCheckpointEvent.objects.count(), 0)
 
     def test_non_platform_admin_is_blocked(self):
         non_admin = PlatformUser.objects.create_user(email="staff@example.com", password="secret", full_name="Staff")

@@ -10,6 +10,7 @@ from platform_apps.common.migration import (
     MigrationBridgeMode,
     MigrationControlEventType,
     MigrationCutoverStatus,
+    MigrationPhaseCheckpointDecision,
     MigrationJobStatus,
     MigrationJobType,
     MigrationShopCheckpointDecision,
@@ -20,6 +21,7 @@ from platform_apps.jobs.models import (
     MigrationBridgeReceipt,
     MigrationControlEvent,
     MigrationDomainControl,
+    MigrationPhaseCheckpointEvent,
     MigrationJobRun,
     MigrationShopCheckpointEvent,
 )
@@ -35,6 +37,7 @@ from platform_apps.jobs.serializers import (
     MigrationControlEventSerializer,
     MigrationDomainControlSerializer,
     MigrationJobRunSerializer,
+    MigrationPhaseCheckpointEventSerializer,
     MigrationPhaseReadinessSerializer,
     MigrationPilotPreparationResultSerializer,
     MigrationPilotReadinessSerializer,
@@ -257,6 +260,87 @@ class MigrationShopCheckpointEventListCreateView(generics.ListCreateAPIView):
                         "write_master": row["write_master"],
                     }
                     for row in scorecard["domains"]
+                ],
+            },
+            occurred_at=timezone.now(),
+        )
+        serializer = self.get_serializer(event)
+        return Response(serializer.data, status=201)
+
+
+class MigrationPhaseCheckpointEventListCreateView(generics.ListCreateAPIView):
+    serializer_class = MigrationPhaseCheckpointEventSerializer
+    permission_classes = [IsPlatformAdminUser]
+    pagination_class = None
+
+    def get_queryset(self):
+        queryset = MigrationPhaseCheckpointEvent.objects.select_related("actor_user")
+        phase = self.request.query_params.get("phase", "").strip()
+        decision = self.request.query_params.get("decision", "").strip()
+
+        if phase:
+            queryset = queryset.filter(phase=phase)
+        if decision:
+            queryset = queryset.filter(decision=decision)
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        phase = str(request.data.get("phase") or "phase_3").strip() or "phase_3"
+        decision = str(request.data.get("decision") or "").strip()
+        note = str(request.data.get("note") or "").strip()
+
+        if not decision:
+            return Response({"detail": "decision is required."}, status=400)
+
+        if decision not in MigrationPhaseCheckpointDecision.values:
+            return Response({"detail": "Unknown phase checkpoint decision."}, status=400)
+
+        controls = list(
+            MigrationDomainControl.objects.select_related("shop")
+            .filter(domain__in=tuple(PHASE3_PILOT_DOMAINS))
+            .order_by("shop__name", "domain")
+        )
+        checkpoint_events = list(
+            MigrationShopCheckpointEvent.objects.select_related("shop", "actor_user").order_by(
+                "shop_id", "-occurred_at", "-created_at"
+            )
+        )
+        phase_readiness = build_phase3_program_readiness(controls, checkpoint_events)
+        if phase_readiness["pilot_shop_count"] == 0:
+            return Response(
+                {"detail": "No pilot shops exist for this phase yet."},
+                status=409,
+            )
+
+        event = MigrationPhaseCheckpointEvent.objects.create(
+            phase=phase,
+            actor_user=request.user,
+            decision=decision,
+            overall_status_snapshot=phase_readiness["overall_status"],
+            summary=phase_readiness["summary"],
+            recommended_action_snapshot=phase_readiness["recommended_action"],
+            metadata_json={
+                "note": note,
+                "pilot_shop_count": phase_readiness["pilot_shop_count"],
+                "approved_for_cutover_count": phase_readiness["approved_for_cutover_count"],
+                "hold_for_monitoring_count": phase_readiness["hold_for_monitoring_count"],
+                "rollback_escalated_count": phase_readiness["rollback_escalated_count"],
+                "shops_without_checkpoint": phase_readiness["shops_without_checkpoint"],
+                "production_safe_shop_count": phase_readiness["production_safe_shop_count"],
+                "ready_for_cutover_shop_count": phase_readiness["ready_for_cutover_shop_count"],
+                "monitoring_shop_count": phase_readiness["monitoring_shop_count"],
+                "blocked_shop_count": phase_readiness["blocked_shop_count"],
+                "rollback_recommended_shop_count": phase_readiness["rollback_recommended_shop_count"],
+                "shops": [
+                    {
+                        **shop_snapshot,
+                        "latest_checkpoint_at": (
+                            shop_snapshot["latest_checkpoint_at"].isoformat()
+                            if shop_snapshot.get("latest_checkpoint_at")
+                            else None
+                        ),
+                    }
+                    for shop_snapshot in phase_readiness["shops"]
                 ],
             },
             occurred_at=timezone.now(),

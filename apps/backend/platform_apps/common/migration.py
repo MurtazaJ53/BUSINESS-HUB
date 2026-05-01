@@ -64,6 +64,12 @@ class MigrationShopCheckpointDecision(models.TextChoices):
     ROLLBACK_ESCALATED = "rollback_escalated", "Rollback escalated"
 
 
+class MigrationPhaseCheckpointDecision(models.TextChoices):
+    APPROVED_FOR_NEXT_PHASE = "approved_for_next_phase", "Approved for next phase"
+    HOLD_FOR_MONITORING = "hold_for_monitoring", "Hold for monitoring"
+    ROLLBACK_ESCALATED = "rollback_escalated", "Rollback escalated"
+
+
 class ReconciliationSeverity(models.TextChoices):
     INFO = "info", "Info"
     WARNING = "warning", "Warning"

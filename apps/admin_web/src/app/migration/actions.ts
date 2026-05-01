@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { apiMutation } from "@/lib/admin-api";
 import type {
   MigrationJobRun,
+  MigrationPhaseCheckpointEvent,
   MigrationPilotPreparationResult,
   MigrationPilotVerificationResult,
   MigrationShopCheckpointEvent,
@@ -372,6 +373,59 @@ export async function recordShopCheckpointAction(formData: FormData) {
         status: "error",
         action: "shop-checkpoint",
         shop,
+        decision,
+        message,
+      }),
+    );
+  }
+}
+
+
+export async function recordPhaseCheckpointAction(formData: FormData) {
+  const phase = getOptionalField(formData, "phase") || "phase_3";
+  const decision = getOptionalField(formData, "decision");
+
+  if (!decision) {
+    redirect(
+      buildRedirectUrl({
+        status: "error",
+        action: "phase-checkpoint",
+        message: "Missing phase checkpoint decision.",
+      }),
+    );
+  }
+
+  try {
+    const result = await apiMutation<MigrationPhaseCheckpointEvent>(
+      "/migration/phase-checkpoints/",
+      {
+        method: "POST",
+        body: {
+          phase,
+          decision,
+        },
+      },
+    );
+    revalidatePath("/migration");
+    redirect(
+      buildRedirectUrl({
+        status: "success",
+        action: "phase-checkpoint",
+        phase: result.phase,
+        decision: result.decision,
+        phaseCheckpointStatus: result.overall_status_snapshot,
+      }),
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message.replace(/\s+/g, " ").slice(0, 220)
+        : "Unknown phase checkpoint failure.";
+    redirect(
+      buildRedirectUrl({
+        status: "error",
+        action: "phase-checkpoint",
+        phase,
         decision,
         message,
       }),

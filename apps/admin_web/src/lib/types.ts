@@ -361,6 +361,28 @@ export type MigrationShopCheckpointEvent = {
   updated_at: string;
 };
 
+export type MigrationPhaseCheckpointEvent = {
+  id: string;
+  phase: string;
+  actor_user: string | null;
+  actor_name: string | null;
+  decision:
+    | "approved_for_next_phase"
+    | "hold_for_monitoring"
+    | "rollback_escalated";
+  overall_status_snapshot:
+    | "blocked"
+    | "monitoring"
+    | "ready_for_phase_exit"
+    | "rollback_recommended";
+  summary: string;
+  recommended_action_snapshot: string;
+  metadata_json: Record<string, unknown>;
+  occurred_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type MigrationShadowSummary = {
   shop: string;
   shop_name: string;

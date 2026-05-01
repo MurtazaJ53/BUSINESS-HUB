@@ -3,6 +3,7 @@ import { EmptyState } from "@/components/empty-state";
 import { MigrationActivityTable } from "@/components/migration-activity-table";
 import { MigrationBridgeReceiptsTable } from "@/components/migration-bridge-receipts-table";
 import { MigrationPilotCheckpointBoard } from "@/components/migration-pilot-checkpoint-board";
+import { MigrationPhaseCheckpointTable } from "@/components/migration-phase-checkpoint-table";
 import { MigrationPhaseReadinessPanel } from "@/components/migration-phase-readiness-panel";
 import { MigrationPilotSignoffBoard } from "@/components/migration-pilot-signoff-board";
 import { MigrationPilotShopScorecardBoard } from "@/components/migration-pilot-shop-scorecard-board";
@@ -20,6 +21,7 @@ import {
   buildMigrationStats,
   getMigrationControlEvents,
   getMigrationBridgeReceipts,
+  getMigrationPhaseCheckpointEvents,
   getMigrationControls,
   getMigrationPhaseReadiness,
   getMigrationJobRuns,
@@ -70,6 +72,11 @@ function buildActionBanner(searchParams: SearchParams) {
     searchParams,
     "shopCheckpointStatus",
   );
+  const phase = getSearchParamValue(searchParams, "phase");
+  const phaseCheckpointStatus = getSearchParamValue(
+    searchParams,
+    "phaseCheckpointStatus",
+  );
   const reconciliationStatus = getSearchParamValue(
     searchParams,
     "reconciliationStatus",
@@ -88,6 +95,8 @@ function buildActionBanner(searchParams: SearchParams) {
         ? ` verdict=${operationalVerdict || "monitoring"}. healthy=${healthy || "false"}. requires_rollback=${requiresRollback || "false"}. mismatch_count=${mismatchCount || "0"}. critical_events=${criticalCount || "0"}.${summary ? ` ${summary}` : ""}`
         : action === "shop-checkpoint"
         ? ` decision=${checkpointDecision || "unknown"}. scorecard=${shopCheckpointStatus || "unknown"}.`
+        : action === "phase-checkpoint"
+        ? ` phase=${phase || "phase_3"}. decision=${checkpointDecision || "unknown"}. readiness=${phaseCheckpointStatus || "unknown"}.`
         : action.startsWith("reconciliation-")
         ? ` Issue ${issue || "unknown"} is now ${reconciliationStatus || "updated"}.`
         : action.startsWith("run-") && jobStatus
@@ -158,12 +167,13 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
     );
   }
 
-  const [controls, jobs, activityEvents, shopCheckpointEvents, receipts, pilotReadiness, pilotSignoff, pilotShopScorecards, phaseReadiness, shadowSummaries, events] =
+  const [controls, jobs, activityEvents, shopCheckpointEvents, phaseCheckpointEvents, receipts, pilotReadiness, pilotSignoff, pilotShopScorecards, phaseReadiness, shadowSummaries, events] =
     await Promise.all([
       getMigrationControls(),
       getMigrationJobRuns(),
       getMigrationControlEvents(),
       getMigrationShopCheckpointEvents(),
+      getMigrationPhaseCheckpointEvents(),
       getMigrationBridgeReceipts(),
       getMigrationPilotReadiness(),
       getMigrationPilotSignoff(),
@@ -198,6 +208,17 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
         ) : null}
 
         <MigrationPhaseReadinessPanel readiness={phaseReadiness} />
+
+        <section className="panel-soft rounded-[28px] px-6 py-6">
+          <p className="eyebrow">Phase checkpoint journal</p>
+          <h2 className="mt-3 text-2xl font-bold">Recorded phase decisions</h2>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
+            This is the durable signoff trail for the entire phase. It captures when operators approved advancement, held the phase for more monitoring, or escalated rollback pressure.
+          </p>
+          <div className="mt-6">
+            <MigrationPhaseCheckpointTable events={phaseCheckpointEvents} />
+          </div>
+        </section>
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-8">
           <MetricCard

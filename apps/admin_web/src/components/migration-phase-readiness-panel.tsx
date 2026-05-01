@@ -1,3 +1,4 @@
+import { recordPhaseCheckpointAction } from "@/app/migration/actions";
 import type { MigrationPhaseReadiness } from "@/lib/types";
 
 type MigrationPhaseReadinessPanelProps = {
@@ -133,6 +134,51 @@ export function MigrationPhaseReadinessPanel({
             checkpoint / scorecard
           </p>
         </div>
+      </div>
+
+      <div className="mt-5 grid gap-2 md:grid-cols-3">
+        <form action={recordPhaseCheckpointAction}>
+          <input type="hidden" name="phase" value={readiness.phase} />
+          <input
+            type="hidden"
+            name="decision"
+            value="approved_for_next_phase"
+          />
+          <button
+            type="submit"
+            className="w-full rounded-[14px] border border-[rgba(52,211,153,0.2)] bg-[rgba(7,33,25,0.82)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--success)]"
+          >
+            Approve next phase
+          </button>
+        </form>
+        <form action={recordPhaseCheckpointAction}>
+          <input type="hidden" name="phase" value={readiness.phase} />
+          <input
+            type="hidden"
+            name="decision"
+            value="hold_for_monitoring"
+          />
+          <button
+            type="submit"
+            className="w-full rounded-[14px] border border-[rgba(250,204,21,0.18)] bg-[rgba(38,30,7,0.82)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#facc15]"
+          >
+            Hold monitoring
+          </button>
+        </form>
+        <form action={recordPhaseCheckpointAction}>
+          <input type="hidden" name="phase" value={readiness.phase} />
+          <input
+            type="hidden"
+            name="decision"
+            value="rollback_escalated"
+          />
+          <button
+            type="submit"
+            className="w-full rounded-[14px] border border-[rgba(251,113,133,0.18)] bg-[rgba(40,12,19,0.82)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--warning)]"
+          >
+            Escalate rollback
+          </button>
+        </form>
       </div>
 
       {readiness.shops.length ? (
