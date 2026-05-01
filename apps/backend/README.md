@@ -38,6 +38,8 @@ Phase 1 backend foundation for the Business Hub target platform.
 - `/api/v1/migration/jobs/`
 - `/api/v1/migration/bridge-receipts/`
 - `/api/v1/migration/pilot-readiness/`
+- `/api/v1/migration/phase-readiness/`
+- `/api/v1/migration/phase-checkpoints/`
 - `/api/v1/migration/shadow-summaries/`
 - `/api/v1/migration/reconciliation/`
 - `/api/v1/health/`
@@ -78,3 +80,4 @@ Use `/api/v1/migration/pilot-readiness/`, `/api/v1/migration/domains/<control_id
 `verify-pilot` runs a fresh compare against the promoted or ready domain and reports whether the pilot is healthy or whether rollback should be considered.
 When a migration control exists for `inventory`, Django inventory mutations are allowed only after that domain is `postgres_primary`; otherwise the API returns a `409` so the legacy write owner is not bypassed accidentally.
 Use `/api/v1/shops/<shop_id>/domain-state/inventory/` from shop-scoped surfaces to show whether the current shop is still in legacy/shadow mode or has actually been promoted to PostgreSQL-primary.
+Use `/api/v1/migration/phase-readiness/` and `/api/v1/migration/phase-checkpoints/` for the final Phase 3 program-level exit gate and durable phase signoff trail.

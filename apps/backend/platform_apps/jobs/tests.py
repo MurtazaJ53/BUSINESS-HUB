@@ -1075,6 +1075,41 @@ class MigrationControlApiTests(TestCase):
         self.assertEqual(response.status_code, 409)
         self.assertEqual(MigrationPhaseCheckpointEvent.objects.count(), 0)
 
+    def test_create_phase_checkpoint_event_blocks_premature_approval(self):
+        inventory_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            current_epoch=2,
+            shadow_reads_enabled=True,
+        )
+        customer_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            current_epoch=2,
+            shadow_reads_enabled=True,
+        )
+        self.assertIsNotNone(inventory_control)
+        self.assertIsNotNone(customer_control)
+
+        response = self.client.post(
+            "/api/v1/migration/phase-checkpoints/",
+            {
+                "phase": "phase_3",
+                "decision": "approved_for_next_phase",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data["overall_status"], "blocked")
+        self.assertEqual(MigrationPhaseCheckpointEvent.objects.count(), 0)
+
     def test_non_platform_admin_is_blocked(self):
         non_admin = PlatformUser.objects.create_user(email="staff@example.com", password="secret", full_name="Staff")
         self.client.force_authenticate(user=non_admin)

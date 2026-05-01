@@ -311,6 +311,18 @@ class MigrationPhaseCheckpointEventListCreateView(generics.ListCreateAPIView):
                 {"detail": "No pilot shops exist for this phase yet."},
                 status=409,
             )
+        if (
+            decision == MigrationPhaseCheckpointDecision.APPROVED_FOR_NEXT_PHASE
+            and phase_readiness["overall_status"] != "ready_for_phase_exit"
+        ):
+            return Response(
+                {
+                    "detail": "Phase 3 is not yet ready for next-phase approval.",
+                    "overall_status": phase_readiness["overall_status"],
+                    "recommended_action": phase_readiness["recommended_action"],
+                },
+                status=409,
+            )
 
         event = MigrationPhaseCheckpointEvent.objects.create(
             phase=phase,

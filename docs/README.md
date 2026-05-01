@@ -44,12 +44,14 @@ It is designed to support:
 20. [Testing and QA Plan](./testing-qa-plan.md)
 21. [Mobile Cutover Checklist](./mobile-cutover-checklist.md)
 22. [Operations Runbook](./operations-runbook.md)
+23. [Legacy Client Compatibility Policy](./legacy-client-compatibility-policy.md)
+24. [Phase 3 Pilot Cutover Runbook](./phase-3-pilot-cutover-runbook.md)
 
 ### Existing strategy docs
 
-23. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
-24. [Global Scale Blueprint](./global-scale-blueprint.md)
-25. [Scale Certification Checklist](./scale-certification-checklist.md)
+25. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
+26. [Global Scale Blueprint](./global-scale-blueprint.md)
+27. [Scale Certification Checklist](./scale-certification-checklist.md)
 
 ## Current truth
 
