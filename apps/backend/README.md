@@ -46,6 +46,8 @@ Phase 1 backend foundation for the Business Hub target platform.
 - `/api/v1/migration/phase-checkpoints/`
 - `/api/v1/migration/retirement-readiness/`
 - `/api/v1/migration/launch-checkpoints/`
+- `/api/v1/migration/go-live-readiness/`
+- `/api/v1/migration/go-live-checkpoints/`
 - `/api/v1/migration/shadow-summaries/`
 - `/api/v1/migration/reconciliation/`
 - `/api/v1/health/`
@@ -117,3 +119,25 @@ The launch checkpoint endpoint records durable final decisions:
 - `approved_for_launch`
 - `hold_for_hardening`
 - `rollback_to_phase4`
+
+## Phase 6 go-live and hypercare signoff
+
+Phase 6 adds the final execution control plane:
+
+- `/api/v1/migration/go-live-readiness/`
+- `/api/v1/migration/go-live-checkpoints/`
+
+The go-live readiness endpoint answers whether the platform is:
+
+- `blocked`
+- `ready_for_go_live`
+- `hypercare_active`
+- `steady_state`
+- `rollback_recommended`
+
+The go-live checkpoint endpoint records durable launch-window decisions:
+
+- `execute_go_live`
+- `remain_in_hypercare`
+- `handoff_to_steady_state`
+- `rollback_launch`

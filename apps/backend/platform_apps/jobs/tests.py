@@ -10,6 +10,7 @@ from platform_apps.common.migration import (
     MigrationControlEventType,
     MigrationCutoverStatus,
     MigrationDomain,
+    MigrationGoLiveCheckpointDecision,
     MigrationJobStatus,
     MigrationJobType,
     MigrationLaunchCheckpointDecision,
@@ -22,6 +23,7 @@ from platform_apps.jobs.models import (
     MigrationBridgeReceipt,
     MigrationControlEvent,
     MigrationDomainControl,
+    MigrationGoLiveCheckpointEvent,
     MigrationLaunchCheckpointEvent,
     MigrationPhaseCheckpointEvent,
     MigrationJobRun,
@@ -1206,6 +1208,129 @@ class MigrationControlApiTests(TestCase):
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.data["overall_status"], "blocked")
         self.assertEqual(MigrationLaunchCheckpointEvent.objects.count(), 0)
+
+    def test_go_live_readiness_reports_ready_for_go_live_after_launch_approval(self):
+        required_domains = [
+            MigrationDomain.INVENTORY,
+            MigrationDomain.CUSTOMERS,
+            MigrationDomain.CUSTOMER_LEDGER,
+            MigrationDomain.EXPENSES,
+            MigrationDomain.ATTENDANCE,
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+            MigrationDomain.REPORTING,
+        ]
+        for domain in required_domains:
+            MigrationDomainControl.objects.create(
+                shop=self.shop,
+                domain=domain,
+                write_master=MigrationWriteMaster.POSTGRES,
+                bridge_mode=MigrationBridgeMode.DISABLED,
+                cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+                current_epoch=8,
+                shadow_reads_enabled=True,
+            )
+        MigrationLaunchCheckpointEvent.objects.create(
+            phase="phase_5",
+            actor_user=self.user,
+            decision=MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH,
+            overall_status_snapshot="ready_for_launch",
+            summary="Launch is approved.",
+            recommended_action_snapshot="Execute go-live.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/go-live-readiness/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["overall_status"], "ready_for_go_live")
+        self.assertEqual(response.data["shop_count"], 1)
+        self.assertEqual(response.data["latest_launch_decision"], "approved_for_launch")
+
+    def test_create_go_live_checkpoint_records_hypercare_entry(self):
+        required_domains = [
+            MigrationDomain.INVENTORY,
+            MigrationDomain.CUSTOMERS,
+            MigrationDomain.CUSTOMER_LEDGER,
+            MigrationDomain.EXPENSES,
+            MigrationDomain.ATTENDANCE,
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+            MigrationDomain.REPORTING,
+        ]
+        for domain in required_domains:
+            MigrationDomainControl.objects.create(
+                shop=self.shop,
+                domain=domain,
+                write_master=MigrationWriteMaster.POSTGRES,
+                bridge_mode=MigrationBridgeMode.DISABLED,
+                cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+                current_epoch=8,
+                shadow_reads_enabled=True,
+            )
+        MigrationLaunchCheckpointEvent.objects.create(
+            phase="phase_5",
+            actor_user=self.user,
+            decision=MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH,
+            overall_status_snapshot="ready_for_launch",
+            summary="Launch is approved.",
+            recommended_action_snapshot="Execute go-live.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.post(
+            "/api/v1/migration/go-live-checkpoints/",
+            {
+                "phase": "phase_6",
+                "decision": MigrationGoLiveCheckpointDecision.EXECUTE_GO_LIVE,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(MigrationGoLiveCheckpointEvent.objects.count(), 1)
+        event = MigrationGoLiveCheckpointEvent.objects.get()
+        self.assertEqual(event.phase, "phase_6")
+        self.assertEqual(event.decision, MigrationGoLiveCheckpointDecision.EXECUTE_GO_LIVE)
+        self.assertEqual(event.overall_status_snapshot, "ready_for_go_live")
+
+    def test_create_go_live_checkpoint_blocks_premature_execution(self):
+        required_domains = [
+            MigrationDomain.INVENTORY,
+            MigrationDomain.CUSTOMERS,
+            MigrationDomain.CUSTOMER_LEDGER,
+            MigrationDomain.EXPENSES,
+            MigrationDomain.ATTENDANCE,
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+            MigrationDomain.REPORTING,
+        ]
+        for domain in required_domains:
+            MigrationDomainControl.objects.create(
+                shop=self.shop,
+                domain=domain,
+                write_master=MigrationWriteMaster.POSTGRES,
+                bridge_mode=MigrationBridgeMode.DISABLED,
+                cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+                current_epoch=8,
+                shadow_reads_enabled=True,
+            )
+
+        response = self.client.post(
+            "/api/v1/migration/go-live-checkpoints/",
+            {
+                "phase": "phase_6",
+                "decision": MigrationGoLiveCheckpointDecision.EXECUTE_GO_LIVE,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data["overall_status"], "blocked")
+        self.assertEqual(MigrationGoLiveCheckpointEvent.objects.count(), 0)
 
     def test_non_platform_admin_is_blocked(self):
         non_admin = PlatformUser.objects.create_user(email="staff@example.com", password="secret", full_name="Staff")

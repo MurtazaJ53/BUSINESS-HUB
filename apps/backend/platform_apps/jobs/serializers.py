@@ -6,6 +6,7 @@ from platform_apps.jobs.models import (
     MigrationBridgeReceipt,
     MigrationControlEvent,
     MigrationDomainControl,
+    MigrationGoLiveCheckpointEvent,
     MigrationLaunchCheckpointEvent,
     MigrationPhaseCheckpointEvent,
     MigrationJobRun,
@@ -242,6 +243,35 @@ class MigrationLaunchCheckpointEventSerializer(serializers.ModelSerializer):
         return None
 
 
+class MigrationGoLiveCheckpointEventSerializer(serializers.ModelSerializer):
+    actor_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MigrationGoLiveCheckpointEvent
+        fields = (
+            "id",
+            "phase",
+            "actor_user",
+            "actor_name",
+            "decision",
+            "overall_status_snapshot",
+            "summary",
+            "recommended_action_snapshot",
+            "metadata_json",
+            "occurred_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+    def get_actor_name(self, obj):
+        if obj.actor_user_id and obj.actor_user.full_name:
+            return obj.actor_user.full_name
+        if obj.actor_user_id:
+            return obj.actor_user.email
+        return None
+
+
 class MigrationShadowSummarySerializer(serializers.Serializer):
     shop = serializers.UUIDField()
     shop_name = serializers.CharField()
@@ -452,6 +482,48 @@ class MigrationRetirementReadinessSerializer(serializers.Serializer):
     )
     latest_launch_status_snapshot = serializers.CharField(allow_null=True)
     latest_launch_at = serializers.DateTimeField(allow_null=True)
+    recommended_action = serializers.CharField()
+    summary = serializers.CharField()
+    shops = MigrationRetirementShopScorecardSerializer(many=True)
+
+
+class MigrationGoLiveReadinessSerializer(serializers.Serializer):
+    phase = serializers.CharField()
+    overall_status = serializers.ChoiceField(
+        choices=[
+            "blocked",
+            "ready_for_go_live",
+            "hypercare_active",
+            "steady_state",
+            "rollback_recommended",
+        ]
+    )
+    shop_count = serializers.IntegerField()
+    ready_for_launch_shop_count = serializers.IntegerField()
+    monitoring_shop_count = serializers.IntegerField()
+    blocked_shop_count = serializers.IntegerField()
+    rollback_recommended_shop_count = serializers.IntegerField()
+    latest_launch_decision = serializers.ChoiceField(
+        choices=[
+            "approved_for_launch",
+            "hold_for_hardening",
+            "rollback_to_phase4",
+        ],
+        allow_null=True,
+    )
+    latest_launch_status_snapshot = serializers.CharField(allow_null=True)
+    latest_launch_at = serializers.DateTimeField(allow_null=True)
+    latest_go_live_decision = serializers.ChoiceField(
+        choices=[
+            "execute_go_live",
+            "remain_in_hypercare",
+            "handoff_to_steady_state",
+            "rollback_launch",
+        ],
+        allow_null=True,
+    )
+    latest_go_live_status_snapshot = serializers.CharField(allow_null=True)
+    latest_go_live_at = serializers.DateTimeField(allow_null=True)
     recommended_action = serializers.CharField()
     summary = serializers.CharField()
     shops = MigrationRetirementShopScorecardSerializer(many=True)

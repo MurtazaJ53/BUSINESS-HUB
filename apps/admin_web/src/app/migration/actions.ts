@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { apiMutation } from "@/lib/admin-api";
 import type {
+  MigrationGoLiveCheckpointEvent,
   MigrationJobRun,
   MigrationLaunchCheckpointEvent,
   MigrationPhaseCheckpointEvent,
@@ -479,6 +480,59 @@ export async function recordLaunchCheckpointAction(formData: FormData) {
       buildRedirectUrl({
         status: "error",
         action: "launch-checkpoint",
+        phase,
+        decision,
+        message,
+      }),
+    );
+  }
+}
+
+
+export async function recordGoLiveCheckpointAction(formData: FormData) {
+  const phase = getOptionalField(formData, "phase") || "phase_6";
+  const decision = getOptionalField(formData, "decision");
+
+  if (!decision) {
+    redirect(
+      buildRedirectUrl({
+        status: "error",
+        action: "go-live-checkpoint",
+        message: "Missing go-live checkpoint decision.",
+      }),
+    );
+  }
+
+  try {
+    const result = await apiMutation<MigrationGoLiveCheckpointEvent>(
+      "/migration/go-live-checkpoints/",
+      {
+        method: "POST",
+        body: {
+          phase,
+          decision,
+        },
+      },
+    );
+    revalidatePath("/migration");
+    redirect(
+      buildRedirectUrl({
+        status: "success",
+        action: "go-live-checkpoint",
+        phase: result.phase,
+        decision: result.decision,
+        goLiveCheckpointStatus: result.overall_status_snapshot,
+      }),
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message.replace(/\s+/g, " ").slice(0, 220)
+        : "Unknown go-live checkpoint failure.";
+    redirect(
+      buildRedirectUrl({
+        status: "error",
+        action: "go-live-checkpoint",
         phase,
         decision,
         message,

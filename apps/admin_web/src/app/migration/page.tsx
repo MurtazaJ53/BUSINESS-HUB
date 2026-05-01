@@ -2,6 +2,8 @@ import { AdminShell } from "@/components/admin-shell";
 import { EmptyState } from "@/components/empty-state";
 import { MigrationActivityTable } from "@/components/migration-activity-table";
 import { MigrationBridgeReceiptsTable } from "@/components/migration-bridge-receipts-table";
+import { MigrationGoLiveCheckpointTable } from "@/components/migration-go-live-checkpoint-table";
+import { MigrationGoLiveReadinessPanel } from "@/components/migration-go-live-readiness-panel";
 import { MigrationLaunchCheckpointTable } from "@/components/migration-launch-checkpoint-table";
 import { MigrationPilotCheckpointBoard } from "@/components/migration-pilot-checkpoint-board";
 import { MigrationPhaseCheckpointTable } from "@/components/migration-phase-checkpoint-table";
@@ -23,6 +25,8 @@ import {
   buildMigrationStats,
   getMigrationControlEvents,
   getMigrationBridgeReceipts,
+  getMigrationGoLiveCheckpointEvents,
+  getMigrationGoLiveReadiness,
   getMigrationLaunchCheckpointEvents,
   getMigrationPhaseCheckpointEvents,
   getMigrationControls,
@@ -85,6 +89,10 @@ function buildActionBanner(searchParams: SearchParams) {
     searchParams,
     "launchCheckpointStatus",
   );
+  const goLiveCheckpointStatus = getSearchParamValue(
+    searchParams,
+    "goLiveCheckpointStatus",
+  );
   const reconciliationStatus = getSearchParamValue(
     searchParams,
     "reconciliationStatus",
@@ -107,6 +115,8 @@ function buildActionBanner(searchParams: SearchParams) {
         ? ` phase=${phase || "phase_3"}. decision=${checkpointDecision || "unknown"}. readiness=${phaseCheckpointStatus || "unknown"}.`
         : action === "launch-checkpoint"
         ? ` phase=${phase || "phase_5"}. decision=${checkpointDecision || "unknown"}. retirement=${launchCheckpointStatus || "unknown"}.`
+        : action === "go-live-checkpoint"
+        ? ` phase=${phase || "phase_6"}. decision=${checkpointDecision || "unknown"}. go_live=${goLiveCheckpointStatus || "unknown"}.`
         : action.startsWith("reconciliation-")
         ? ` Issue ${issue || "unknown"} is now ${reconciliationStatus || "updated"}.`
         : action.startsWith("run-") && jobStatus
@@ -177,7 +187,7 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
     );
   }
 
-  const [controls, jobs, activityEvents, shopCheckpointEvents, phaseCheckpointEvents, launchCheckpointEvents, receipts, pilotReadiness, pilotSignoff, pilotShopScorecards, phaseReadiness, retirementReadiness, shadowSummaries, events] =
+  const [controls, jobs, activityEvents, shopCheckpointEvents, phaseCheckpointEvents, launchCheckpointEvents, goLiveCheckpointEvents, receipts, pilotReadiness, pilotSignoff, pilotShopScorecards, phaseReadiness, retirementReadiness, goLiveReadiness, shadowSummaries, events] =
     await Promise.all([
       getMigrationControls(),
       getMigrationJobRuns(),
@@ -185,12 +195,14 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
       getMigrationShopCheckpointEvents(),
       getMigrationPhaseCheckpointEvents(),
       getMigrationLaunchCheckpointEvents(),
+      getMigrationGoLiveCheckpointEvents(),
       getMigrationBridgeReceipts(),
       getMigrationPilotReadiness(),
       getMigrationPilotSignoff(),
       getMigrationPilotShopScorecards(),
       getMigrationPhaseReadiness(),
       getMigrationRetirementReadiness(),
+      getMigrationGoLiveReadiness(),
       getMigrationShadowSummaries(),
       getMigrationReconciliationEvents(),
     ]);
@@ -204,7 +216,7 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
       activeShop={activeShop}
       activeRoute="migration"
       title="Migration Control"
-      subtitle="Unified migration control plane for pilot cutovers, commerce hardening, retirement readiness, and final launch signoff."
+      subtitle="Unified migration control plane for pilot cutovers, commerce hardening, retirement readiness, go-live execution, and steady-state handoff."
     >
       <div className="space-y-8">
         {actionBanner ? (
@@ -221,6 +233,8 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
 
         <MigrationRetirementReadinessPanel readiness={retirementReadiness} />
 
+        <MigrationGoLiveReadinessPanel readiness={goLiveReadiness} />
+
         <section className="panel-soft rounded-[28px] px-6 py-6">
           <p className="eyebrow">Launch checkpoint journal</p>
           <h2 className="mt-3 text-2xl font-bold">Recorded retirement decisions</h2>
@@ -229,6 +243,19 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
           </p>
           <div className="mt-6">
             <MigrationLaunchCheckpointTable events={launchCheckpointEvents} />
+          </div>
+        </section>
+
+        <section className="panel-soft rounded-[28px] px-6 py-6">
+          <p className="eyebrow">Go-live checkpoint journal</p>
+          <h2 className="mt-3 text-2xl font-bold">Recorded launch-window decisions</h2>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
+            This is the durable Phase 6 execution trail for entering the go-live
+            window, remaining in hypercare, handing the platform off to steady-state
+            operations, or escalating a launch rollback.
+          </p>
+          <div className="mt-6">
+            <MigrationGoLiveCheckpointTable events={goLiveCheckpointEvents} />
           </div>
         </section>
 

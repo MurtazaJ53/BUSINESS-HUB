@@ -300,6 +300,40 @@ Finish the transition, remove legacy dependencies, and lock the new platform int
 - carrying hidden Firebase fallback paths into the final platform
 - assuming retirement is complete before audits and parity checks are closed
 
+## Phase 6: Go-Live and Hypercare
+
+### Goal
+
+Execute the real launch window, keep the platform under controlled hypercare, and hand it off into steady-state operations without losing rollback discipline.
+
+### Primary scope
+
+- final go-live execution
+- hypercare monitoring window
+- steady-state handoff
+- launch rollback governance
+
+### Deliverables
+
+- go-live readiness board
+- durable go-live checkpoint journal
+- hypercare operator checklist
+- steady-state handoff runbook
+- launch rollback triggers and ownership map
+
+### Exit criteria
+
+- final launch approval has been executed, not just recorded
+- hypercare window completes without unresolved critical drift
+- rollback criteria remain green throughout the monitoring window
+- steady-state ownership is explicitly handed off to normal operations
+
+### Key risks to control
+
+- treating Phase 5 approval as the same thing as real go-live execution
+- ending hypercare before the reconciliation surface is quiet
+- letting the launch window close without a durable handoff decision
+
 ## Cross-phase non-negotiables
 
 - every write path must be idempotent
@@ -330,6 +364,7 @@ Before moving to the next phase, the team should explicitly approve:
 - pilot cutover gate
 - financial reconciliation gate
 - legacy retirement gate
+- go-live handoff gate
 
 ## Recommended timeboxing
 
@@ -340,6 +375,7 @@ The exact timeline depends on team size, but a reasonable planning shape is:
 - Phase 3: 4 to 6 weeks
 - Phase 4: 4 to 8 weeks
 - Phase 5: 2 to 4 weeks
+- Phase 6: 1 to 2 weeks
 
 This should be treated as a sequencing estimate, not a promise.
 
@@ -364,6 +400,7 @@ This is the approved execution path for Business Hub:
 - cut over domain by domain
 - move the financial core only after pilot trust is earned
 - retire Firebase only after parity is proven
+- execute go-live under hypercare before declaring steady state
 
 The architecture is only as good as the migration discipline behind it.
 

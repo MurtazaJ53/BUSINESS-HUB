@@ -10,6 +10,7 @@ from platform_apps.common.migration import (
     MigrationBridgeMode,
     MigrationControlEventType,
     MigrationCutoverStatus,
+    MigrationGoLiveCheckpointDecision,
     MigrationLaunchCheckpointDecision,
     MigrationPhaseCheckpointDecision,
     MigrationJobStatus,
@@ -22,6 +23,7 @@ from platform_apps.jobs.models import (
     MigrationBridgeReceipt,
     MigrationControlEvent,
     MigrationDomainControl,
+    MigrationGoLiveCheckpointEvent,
     MigrationLaunchCheckpointEvent,
     MigrationPhaseCheckpointEvent,
     MigrationJobRun,
@@ -30,6 +32,7 @@ from platform_apps.jobs.models import (
 from platform_apps.jobs.readiness import (
     PHASE3_PILOT_DOMAINS,
     PHASE5_REQUIRED_DOMAINS,
+    build_phase6_go_live_readiness,
     build_phase5_retirement_readiness,
     build_phase3_program_readiness,
     build_pilot_readiness,
@@ -40,6 +43,8 @@ from platform_apps.jobs.serializers import (
     MigrationBridgeReceiptSerializer,
     MigrationControlEventSerializer,
     MigrationDomainControlSerializer,
+    MigrationGoLiveCheckpointEventSerializer,
+    MigrationGoLiveReadinessSerializer,
     MigrationJobRunSerializer,
     MigrationLaunchCheckpointEventSerializer,
     MigrationPhaseCheckpointEventSerializer,
@@ -452,6 +457,110 @@ class MigrationLaunchCheckpointEventListCreateView(generics.ListCreateAPIView):
         return Response(serializer.data, status=201)
 
 
+class MigrationGoLiveCheckpointEventListCreateView(generics.ListCreateAPIView):
+    serializer_class = MigrationGoLiveCheckpointEventSerializer
+    permission_classes = [IsPlatformAdminUser]
+    pagination_class = None
+
+    def get_queryset(self):
+        queryset = MigrationGoLiveCheckpointEvent.objects.select_related("actor_user")
+        phase = self.request.query_params.get("phase", "").strip()
+        decision = self.request.query_params.get("decision", "").strip()
+
+        if phase:
+            queryset = queryset.filter(phase=phase)
+        if decision:
+            queryset = queryset.filter(decision=decision)
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        phase = str(request.data.get("phase") or "phase_6").strip() or "phase_6"
+        decision = str(request.data.get("decision") or "").strip()
+        note = str(request.data.get("note") or "").strip()
+
+        if not decision:
+            return Response({"detail": "decision is required."}, status=400)
+
+        if decision not in MigrationGoLiveCheckpointDecision.values:
+            return Response({"detail": "Unknown go-live checkpoint decision."}, status=400)
+
+        controls = list(
+            MigrationDomainControl.objects.select_related("shop")
+            .filter(domain__in=tuple(PHASE5_REQUIRED_DOMAINS))
+            .order_by("shop__name", "domain")
+        )
+        launch_events = list(
+            MigrationLaunchCheckpointEvent.objects.select_related("actor_user").order_by(
+                "-occurred_at", "-created_at"
+            )
+        )
+        go_live_events = list(
+            MigrationGoLiveCheckpointEvent.objects.select_related("actor_user").order_by(
+                "-occurred_at", "-created_at"
+            )
+        )
+        go_live_readiness = build_phase6_go_live_readiness(controls, launch_events, go_live_events)
+
+        if (
+            decision == MigrationGoLiveCheckpointDecision.EXECUTE_GO_LIVE
+            and go_live_readiness["overall_status"] != "ready_for_go_live"
+        ):
+            return Response(
+                {
+                    "detail": "Phase 6 is not ready for go-live execution.",
+                    "overall_status": go_live_readiness["overall_status"],
+                    "recommended_action": go_live_readiness["recommended_action"],
+                },
+                status=409,
+            )
+
+        if (
+            decision == MigrationGoLiveCheckpointDecision.HANDOFF_TO_STEADY_STATE
+            and go_live_readiness["overall_status"] != "hypercare_active"
+        ):
+            return Response(
+                {
+                    "detail": "Steady-state handoff requires an active hypercare window first.",
+                    "overall_status": go_live_readiness["overall_status"],
+                    "recommended_action": go_live_readiness["recommended_action"],
+                },
+                status=409,
+            )
+
+        event = MigrationGoLiveCheckpointEvent.objects.create(
+            phase=phase,
+            actor_user=request.user,
+            decision=decision,
+            overall_status_snapshot=go_live_readiness["overall_status"],
+            summary=go_live_readiness["summary"],
+            recommended_action_snapshot=go_live_readiness["recommended_action"],
+            metadata_json={
+                "note": note,
+                "shop_count": go_live_readiness["shop_count"],
+                "ready_for_launch_shop_count": go_live_readiness["ready_for_launch_shop_count"],
+                "monitoring_shop_count": go_live_readiness["monitoring_shop_count"],
+                "blocked_shop_count": go_live_readiness["blocked_shop_count"],
+                "rollback_recommended_shop_count": go_live_readiness["rollback_recommended_shop_count"],
+                "latest_launch_decision": go_live_readiness["latest_launch_decision"],
+                "shops": [
+                    {
+                        "shop": shop_snapshot["shop"],
+                        "shop_name": shop_snapshot["shop_name"],
+                        "overall_status": shop_snapshot["overall_status"],
+                        "missing_domains": shop_snapshot["missing_domains"],
+                        "firebase_primary_domains": shop_snapshot["firebase_primary_domains"],
+                        "active_bridge_domains": shop_snapshot["active_bridge_domains"],
+                        "open_critical_events": shop_snapshot["open_critical_events"],
+                    }
+                    for shop_snapshot in go_live_readiness["shops"]
+                ],
+            },
+            occurred_at=timezone.now(),
+        )
+        serializer = self.get_serializer(event)
+        return Response(serializer.data, status=201)
+
+
 class MigrationShadowSummaryListView(APIView):
     permission_classes = [IsPlatformAdminUser]
 
@@ -609,6 +718,35 @@ class MigrationRetirementReadinessView(APIView):
 
         payload = build_phase5_retirement_readiness(controls, launch_events)
         serializer = MigrationRetirementReadinessSerializer(payload)
+        return Response(serializer.data)
+
+
+class MigrationGoLiveReadinessView(APIView):
+    permission_classes = [IsPlatformAdminUser]
+
+    def get(self, request):
+        controls = list(
+            MigrationDomainControl.objects.select_related("shop")
+            .filter(domain__in=tuple(PHASE5_REQUIRED_DOMAINS))
+            .order_by("shop__name", "domain")
+        )
+        shop_id = request.query_params.get("shop_id", "").strip()
+        if shop_id:
+            controls = [control for control in controls if str(control.shop_id) == shop_id]
+
+        launch_events = list(
+            MigrationLaunchCheckpointEvent.objects.select_related("actor_user").order_by(
+                "-occurred_at", "-created_at"
+            )
+        )
+        go_live_events = list(
+            MigrationGoLiveCheckpointEvent.objects.select_related("actor_user").order_by(
+                "-occurred_at", "-created_at"
+            )
+        )
+
+        payload = build_phase6_go_live_readiness(controls, launch_events, go_live_events)
+        serializer = MigrationGoLiveReadinessSerializer(payload)
         return Response(serializer.data)
 
 

@@ -76,6 +76,13 @@ class MigrationLaunchCheckpointDecision(models.TextChoices):
     ROLLBACK_TO_PHASE4 = "rollback_to_phase4", "Rollback to phase 4"
 
 
+class MigrationGoLiveCheckpointDecision(models.TextChoices):
+    EXECUTE_GO_LIVE = "execute_go_live", "Execute go-live"
+    REMAIN_IN_HYPERCARE = "remain_in_hypercare", "Remain in hypercare"
+    HANDOFF_TO_STEADY_STATE = "handoff_to_steady_state", "Handoff to steady state"
+    ROLLBACK_LAUNCH = "rollback_launch", "Rollback launch"
+
+
 class ReconciliationSeverity(models.TextChoices):
     INFO = "info", "Info"
     WARNING = "warning", "Warning"

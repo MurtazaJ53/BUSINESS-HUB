@@ -8,6 +8,7 @@ from platform_apps.common.migration import (
     MigrationControlEventType,
     MigrationCutoverStatus,
     MigrationDomain,
+    MigrationGoLiveCheckpointDecision,
     MigrationJobStatus,
     MigrationJobType,
     MigrationLaunchCheckpointDecision,
@@ -16,6 +17,7 @@ from platform_apps.common.migration import (
 from platform_apps.jobs.models import (
     MigrationControlEvent,
     MigrationDomainControl,
+    MigrationGoLiveCheckpointEvent,
     MigrationJobRun,
     MigrationLaunchCheckpointEvent,
     MigrationShopCheckpointEvent,
@@ -664,4 +666,111 @@ def build_phase5_retirement_readiness(
         "recommended_action": recommended_action,
         "summary": summary,
         "shops": scorecards,
+    }
+
+
+def build_phase6_go_live_readiness(
+    controls: list[MigrationDomainControl],
+    launch_events: list[MigrationLaunchCheckpointEvent],
+    go_live_events: list[MigrationGoLiveCheckpointEvent],
+) -> dict[str, Any]:
+    retirement_readiness = build_phase5_retirement_readiness(controls, launch_events)
+    latest_launch_event = launch_events[0] if launch_events else None
+    latest_go_live_event = go_live_events[0] if go_live_events else None
+
+    shop_count = retirement_readiness["shop_count"]
+    ready_for_launch_shop_count = retirement_readiness["ready_for_launch_shop_count"]
+    monitoring_shop_count = retirement_readiness["monitoring_shop_count"]
+    blocked_shop_count = retirement_readiness["blocked_shop_count"]
+    rollback_recommended_shop_count = retirement_readiness["rollback_recommended_shop_count"]
+
+    if shop_count == 0:
+        overall_status = "blocked"
+        recommended_action = (
+            "No retirement-ready shops exist yet. Finish Phase 5 retirement posture before entering go-live."
+        )
+        summary = "Phase 6 cannot start because no shops are participating in the launch program."
+    elif (
+        retirement_readiness["overall_status"] == "rollback_recommended"
+        or (latest_launch_event and latest_launch_event.decision == MigrationLaunchCheckpointDecision.ROLLBACK_TO_PHASE4)
+        or (latest_go_live_event and latest_go_live_event.decision == MigrationGoLiveCheckpointDecision.ROLLBACK_LAUNCH)
+    ):
+        overall_status = "rollback_recommended"
+        recommended_action = (
+            "Roll the platform back to the last safe posture and clear launch-risk drift before re-entering the go-live window."
+        )
+        summary = "Go-live is under rollback pressure from retirement posture, launch signoff, or hypercare execution."
+    elif retirement_readiness["overall_status"] == "blocked":
+        overall_status = "blocked"
+        recommended_action = (
+            "Finish the remaining Firebase retirement blockers and do not execute go-live while any required shop is blocked."
+        )
+        summary = retirement_readiness["summary"]
+    elif retirement_readiness["overall_status"] == "monitoring":
+        overall_status = "monitoring"
+        recommended_action = (
+            "Keep the platform in pre-launch hardening until the retirement board clears all monitoring pressure."
+        )
+        summary = retirement_readiness["summary"]
+    elif latest_go_live_event and latest_go_live_event.decision == MigrationGoLiveCheckpointDecision.HANDOFF_TO_STEADY_STATE:
+        overall_status = "steady_state"
+        recommended_action = (
+            "Go-live is complete. Maintain steady-state dashboards, SLOs, and on-call ownership under normal operations."
+        )
+        summary = (
+            "The launch window has been completed and the platform has been handed off from hypercare to steady-state operation."
+        )
+    elif latest_go_live_event and latest_go_live_event.decision in {
+        MigrationGoLiveCheckpointDecision.EXECUTE_GO_LIVE,
+        MigrationGoLiveCheckpointDecision.REMAIN_IN_HYPERCARE,
+    }:
+        overall_status = "hypercare_active"
+        recommended_action = (
+            "Keep hypercare active, monitor reconciliation and operator feedback closely, and only hand off after the stability window is complete."
+        )
+        summary = (
+            "The platform is live and currently in hypercare. Launch execution is complete, but steady-state handoff is still pending."
+        )
+    elif (
+        latest_launch_event
+        and latest_launch_event.decision == MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH
+        and retirement_readiness["overall_status"] in {"ready_for_launch", "retirement_complete"}
+    ):
+        overall_status = "ready_for_go_live"
+        recommended_action = (
+            "Execute the go-live window, confirm the smoke checklist, and enter hypercare with rollback monitoring active."
+        )
+        summary = (
+            "Phase 5 approved the platform for launch. The next step is the actual go-live execution window."
+        )
+    else:
+        overall_status = "blocked"
+        recommended_action = (
+            "Record the Phase 5 launch approval before attempting any Phase 6 go-live execution."
+        )
+        summary = (
+            "The platform is not yet approved for the go-live window because the final Phase 5 launch checkpoint is missing or insufficient."
+        )
+
+    return {
+        "phase": "phase_6",
+        "overall_status": overall_status,
+        "shop_count": shop_count,
+        "ready_for_launch_shop_count": ready_for_launch_shop_count,
+        "monitoring_shop_count": monitoring_shop_count,
+        "blocked_shop_count": blocked_shop_count,
+        "rollback_recommended_shop_count": rollback_recommended_shop_count,
+        "latest_launch_decision": latest_launch_event.decision if latest_launch_event else None,
+        "latest_launch_status_snapshot": (
+            latest_launch_event.overall_status_snapshot if latest_launch_event else None
+        ),
+        "latest_launch_at": latest_launch_event.occurred_at if latest_launch_event else None,
+        "latest_go_live_decision": latest_go_live_event.decision if latest_go_live_event else None,
+        "latest_go_live_status_snapshot": (
+            latest_go_live_event.overall_status_snapshot if latest_go_live_event else None
+        ),
+        "latest_go_live_at": latest_go_live_event.occurred_at if latest_go_live_event else None,
+        "recommended_action": recommended_action,
+        "summary": summary,
+        "shops": retirement_readiness["shops"],
     }

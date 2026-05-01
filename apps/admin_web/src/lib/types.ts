@@ -406,6 +406,30 @@ export type MigrationLaunchCheckpointEvent = {
   updated_at: string;
 };
 
+export type MigrationGoLiveCheckpointEvent = {
+  id: string;
+  phase: string;
+  actor_user: string | null;
+  actor_name: string | null;
+  decision:
+    | "execute_go_live"
+    | "remain_in_hypercare"
+    | "handoff_to_steady_state"
+    | "rollback_launch";
+  overall_status_snapshot:
+    | "blocked"
+    | "ready_for_go_live"
+    | "hypercare_active"
+    | "steady_state"
+    | "rollback_recommended";
+  summary: string;
+  recommended_action_snapshot: string;
+  metadata_json: Record<string, unknown>;
+  occurred_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type MigrationShadowSummary = {
   shop: string;
   shop_name: string;
@@ -602,6 +626,39 @@ export type MigrationRetirementReadiness = {
     | null;
   latest_launch_status_snapshot: string | null;
   latest_launch_at: string | null;
+  recommended_action: string;
+  summary: string;
+  shops: MigrationRetirementShopScorecard[];
+};
+
+export type MigrationGoLiveReadiness = {
+  phase: string;
+  overall_status:
+    | "blocked"
+    | "ready_for_go_live"
+    | "hypercare_active"
+    | "steady_state"
+    | "rollback_recommended";
+  shop_count: number;
+  ready_for_launch_shop_count: number;
+  monitoring_shop_count: number;
+  blocked_shop_count: number;
+  rollback_recommended_shop_count: number;
+  latest_launch_decision:
+    | "approved_for_launch"
+    | "hold_for_hardening"
+    | "rollback_to_phase4"
+    | null;
+  latest_launch_status_snapshot: string | null;
+  latest_launch_at: string | null;
+  latest_go_live_decision:
+    | "execute_go_live"
+    | "remain_in_hypercare"
+    | "handoff_to_steady_state"
+    | "rollback_launch"
+    | null;
+  latest_go_live_status_snapshot: string | null;
+  latest_go_live_at: string | null;
   recommended_action: string;
   summary: string;
   shops: MigrationRetirementShopScorecard[];
