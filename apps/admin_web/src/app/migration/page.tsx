@@ -12,6 +12,7 @@ import { MigrationPilotReadinessTable } from "@/components/migration-pilot-readi
 import { MigrationPilotStageStrip } from "@/components/migration-pilot-stage-strip";
 import { MigrationPilotVerificationSummary } from "@/components/migration-pilot-verification-summary";
 import { MigrationRunbookPanel } from "@/components/migration-runbook-panel";
+import { MigrationShopCheckpointTable } from "@/components/migration-shop-checkpoint-table";
 import { ReconciliationEventsTable } from "@/components/reconciliation-events-table";
 import { MigrationShadowSummariesTable } from "@/components/migration-shadow-summaries-table";
 import {
@@ -24,6 +25,7 @@ import {
   getMigrationPilotSignoff,
   getMigrationPilotShopScorecards,
   getMigrationReconciliationEvents,
+  getMigrationShopCheckpointEvents,
   getMigrationShadowSummaries,
   getSession,
   resolveActiveShop,
@@ -61,6 +63,11 @@ function buildActionBanner(searchParams: SearchParams) {
     searchParams,
     "operationalVerdict",
   );
+  const checkpointDecision = getSearchParamValue(searchParams, "decision");
+  const shopCheckpointStatus = getSearchParamValue(
+    searchParams,
+    "shopCheckpointStatus",
+  );
   const reconciliationStatus = getSearchParamValue(
     searchParams,
     "reconciliationStatus",
@@ -77,6 +84,8 @@ function buildActionBanner(searchParams: SearchParams) {
         ? ` Jobs created: ${jobsCreated || "0"}. ready_for_pilot=${readyForPilot || "false"}. remaining blockers=${blockingCount || "0"}.`
         : action === "verify-pilot"
         ? ` verdict=${operationalVerdict || "monitoring"}. healthy=${healthy || "false"}. requires_rollback=${requiresRollback || "false"}. mismatch_count=${mismatchCount || "0"}. critical_events=${criticalCount || "0"}.${summary ? ` ${summary}` : ""}`
+        : action === "shop-checkpoint"
+        ? ` decision=${checkpointDecision || "unknown"}. scorecard=${shopCheckpointStatus || "unknown"}.`
         : action.startsWith("reconciliation-")
         ? ` Issue ${issue || "unknown"} is now ${reconciliationStatus || "updated"}.`
         : action.startsWith("run-") && jobStatus
@@ -147,11 +156,12 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
     );
   }
 
-  const [controls, jobs, activityEvents, receipts, pilotReadiness, pilotSignoff, pilotShopScorecards, shadowSummaries, events] =
+  const [controls, jobs, activityEvents, shopCheckpointEvents, receipts, pilotReadiness, pilotSignoff, pilotShopScorecards, shadowSummaries, events] =
     await Promise.all([
       getMigrationControls(),
       getMigrationJobRuns(),
       getMigrationControlEvents(),
+      getMigrationShopCheckpointEvents(),
       getMigrationBridgeReceipts(),
       getMigrationPilotReadiness(),
       getMigrationPilotSignoff(),
@@ -285,6 +295,17 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
             <div className="mt-6">
               <MigrationActivityTable events={activityEvents} />
             </div>
+          </div>
+        </section>
+
+        <section className="panel-soft rounded-[28px] px-6 py-6">
+          <p className="eyebrow">Shop checkpoint journal</p>
+          <h2 className="mt-3 text-2xl font-bold">Recorded shop decisions</h2>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
+            This is the durable shop-level signoff trail for Phase 3. It captures whether operators approved a pilot shop for cutover, held it for monitoring, or escalated rollback pressure.
+          </p>
+          <div className="mt-6">
+            <MigrationShopCheckpointTable events={shopCheckpointEvents} />
           </div>
         </section>
 

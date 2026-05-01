@@ -12,6 +12,7 @@ from platform_apps.common.migration import (
     MigrationDomain,
     MigrationJobStatus,
     MigrationJobType,
+    MigrationShopCheckpointDecision,
     MigrationWriteMaster,
 )
 from platform_apps.customers.models import Customer
@@ -21,6 +22,7 @@ from platform_apps.jobs.models import (
     MigrationControlEvent,
     MigrationDomainControl,
     MigrationJobRun,
+    MigrationShopCheckpointEvent,
 )
 from platform_apps.jobs.services import execute_migration_job
 from platform_apps.projections.models import ShopDashboardSnapshot
@@ -728,6 +730,103 @@ class MigrationControlApiTests(TestCase):
         self.assertEqual(response.data[0]["overall_status"], "blocked")
         self.assertIn(MigrationDomain.CUSTOMERS, response.data[0]["missing_domains"])
         self.assertEqual(response.data[0]["blocked_domains"], 0)
+
+    def test_create_shop_checkpoint_event_records_current_scorecard_snapshot(self):
+        inventory_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.READY,
+            current_epoch=4,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        customer_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=5,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=0,
+            trace_id="trace-shop-checkpoint-inventory-001",
+            finished_at=timezone.now(),
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=0,
+            trace_id="trace-shop-checkpoint-customers-001",
+            finished_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=inventory_control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="monitoring",
+            summary="Inventory is clean and waiting for promotion.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=customer_control,
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="production_safe",
+            summary="Customers are already stable on PostgreSQL.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.post(
+            "/api/v1/migration/pilot-shop-checkpoints/",
+            {
+                "shop": str(self.shop.id),
+                "decision": MigrationShopCheckpointDecision.APPROVED_FOR_CUTOVER,
+                "note": "Operator approved this shop for the next cutover window.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(MigrationShopCheckpointEvent.objects.count(), 1)
+        event = MigrationShopCheckpointEvent.objects.get()
+        self.assertEqual(event.decision, MigrationShopCheckpointDecision.APPROVED_FOR_CUTOVER)
+        self.assertEqual(event.overall_status_snapshot, "ready_for_cutover")
+        self.assertEqual(response.data["shop_name"], self.shop.name)
+        self.assertEqual(response.data["decision"], MigrationShopCheckpointDecision.APPROVED_FOR_CUTOVER)
+
+    def test_create_shop_checkpoint_event_requires_existing_pilot_controls(self):
+        response = self.client.post(
+            "/api/v1/migration/pilot-shop-checkpoints/",
+            {
+                "shop": str(self.shop.id),
+                "decision": MigrationShopCheckpointDecision.HOLD_FOR_MONITORING,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(MigrationShopCheckpointEvent.objects.count(), 0)
 
     def test_non_platform_admin_is_blocked(self):
         non_admin = PlatformUser.objects.create_user(email="staff@example.com", password="secret", full_name="Staff")

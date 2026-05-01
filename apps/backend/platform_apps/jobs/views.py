@@ -12,6 +12,7 @@ from platform_apps.common.migration import (
     MigrationCutoverStatus,
     MigrationJobStatus,
     MigrationJobType,
+    MigrationShopCheckpointDecision,
     MigrationWriteMaster,
 )
 from platform_apps.common.permissions import IsPlatformAdminUser
@@ -20,6 +21,7 @@ from platform_apps.jobs.models import (
     MigrationControlEvent,
     MigrationDomainControl,
     MigrationJobRun,
+    MigrationShopCheckpointEvent,
 )
 from platform_apps.jobs.readiness import (
     PHASE3_PILOT_DOMAINS,
@@ -37,6 +39,7 @@ from platform_apps.jobs.serializers import (
     MigrationPilotSignoffSerializer,
     MigrationPilotShopScorecardSerializer,
     MigrationPilotVerificationResultSerializer,
+    MigrationShopCheckpointEventSerializer,
     MigrationShadowSummarySerializer,
 )
 from platform_apps.jobs.services import execute_migration_job
@@ -187,6 +190,77 @@ class MigrationControlEventListView(generics.ListAPIView):
         if result:
             queryset = queryset.filter(result=result)
         return queryset
+
+
+class MigrationShopCheckpointEventListCreateView(generics.ListCreateAPIView):
+    serializer_class = MigrationShopCheckpointEventSerializer
+    permission_classes = [IsPlatformAdminUser]
+    pagination_class = None
+
+    def get_queryset(self):
+        queryset = MigrationShopCheckpointEvent.objects.select_related("shop", "actor_user")
+        shop_id = self.request.query_params.get("shop_id", "").strip()
+        decision = self.request.query_params.get("decision", "").strip()
+
+        if shop_id:
+            queryset = queryset.filter(shop_id=shop_id)
+        if decision:
+            queryset = queryset.filter(decision=decision)
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        shop_id = str(request.data.get("shop") or "").strip()
+        decision = str(request.data.get("decision") or "").strip()
+        note = str(request.data.get("note") or "").strip()
+
+        if not shop_id or not decision:
+            return Response({"detail": "shop and decision are required."}, status=400)
+
+        if decision not in MigrationShopCheckpointDecision.values:
+            return Response({"detail": "Unknown checkpoint decision."}, status=400)
+
+        controls = list(
+            MigrationDomainControl.objects.select_related("shop")
+            .filter(shop_id=shop_id, domain__in=tuple(PHASE3_PILOT_DOMAINS))
+            .order_by("shop__name", "domain")
+        )
+        if not controls:
+            return Response({"detail": "No pilot domain controls exist for this shop."}, status=409)
+
+        scorecards = build_shop_pilot_scorecards(controls)
+        if not scorecards:
+            return Response({"detail": "Unable to build a pilot scorecard for this shop."}, status=409)
+
+        scorecard = scorecards[0]
+        event = MigrationShopCheckpointEvent.objects.create(
+            shop=controls[0].shop,
+            actor_user=request.user,
+            decision=decision,
+            overall_status_snapshot=scorecard["overall_status"],
+            summary=scorecard["summary"],
+            recommended_action_snapshot=scorecard["recommended_action"],
+            metadata_json={
+                "note": note,
+                "missing_domains": scorecard["missing_domains"],
+                "production_safe_domains": scorecard["production_safe_domains"],
+                "ready_for_cutover_domains": scorecard["ready_for_cutover_domains"],
+                "monitoring_domains": scorecard["monitoring_domains"],
+                "blocked_domains": scorecard["blocked_domains"],
+                "rollback_recommended_domains": scorecard["rollback_recommended_domains"],
+                "domains": [
+                    {
+                        "domain": row["domain"],
+                        "signoff_status": row["signoff_status"],
+                        "cutover_status": row["cutover_status"],
+                        "write_master": row["write_master"],
+                    }
+                    for row in scorecard["domains"]
+                ],
+            },
+            occurred_at=timezone.now(),
+        )
+        serializer = self.get_serializer(event)
+        return Response(serializer.data, status=201)
 
 
 class MigrationShadowSummaryListView(APIView):

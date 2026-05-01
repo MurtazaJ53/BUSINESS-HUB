@@ -10,6 +10,7 @@ from platform_apps.common.migration import (
     MigrationDomain,
     MigrationJobStatus,
     MigrationJobType,
+    MigrationShopCheckpointDecision,
     MigrationWriteMaster,
 )
 from platform_apps.common.models import UUIDStampedModel
@@ -169,3 +170,35 @@ class MigrationControlEvent(UUIDStampedModel):
 
     def __str__(self) -> str:
         return f"{self.domain}:{self.event_type}:{self.result or 'none'}"
+
+
+class MigrationShopCheckpointEvent(UUIDStampedModel):
+    shop = models.ForeignKey(
+        Shop,
+        on_delete=models.CASCADE,
+        related_name="migration_shop_checkpoint_events",
+    )
+    actor_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="migration_shop_checkpoint_events",
+        blank=True,
+        null=True,
+    )
+    decision = models.CharField(max_length=32, choices=MigrationShopCheckpointDecision.choices)
+    overall_status_snapshot = models.CharField(max_length=32, blank=True)
+    summary = models.TextField(blank=True)
+    recommended_action_snapshot = models.TextField(blank=True)
+    metadata_json = models.JSONField(default=dict, blank=True)
+    occurred_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["-occurred_at", "-created_at"]
+        indexes = [
+            models.Index(fields=["shop", "occurred_at"]),
+            models.Index(fields=["decision", "occurred_at"]),
+            models.Index(fields=["overall_status_snapshot", "occurred_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.shop.name}:{self.decision}"

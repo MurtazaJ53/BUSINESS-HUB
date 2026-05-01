@@ -8,6 +8,7 @@ import type {
   MigrationJobRun,
   MigrationPilotPreparationResult,
   MigrationPilotVerificationResult,
+  MigrationShopCheckpointEvent,
 } from "@/lib/types";
 
 
@@ -317,6 +318,61 @@ export async function runPilotVerificationAction(formData: FormData) {
         action: "verify-pilot",
         domain,
         shop,
+        message,
+      }),
+    );
+  }
+}
+
+
+export async function recordShopCheckpointAction(formData: FormData) {
+  const shopId = getOptionalField(formData, "shopId");
+  const shop = getOptionalField(formData, "shop");
+  const decision = getOptionalField(formData, "decision");
+
+  if (!shopId || !decision) {
+    redirect(
+      buildRedirectUrl({
+        status: "error",
+        action: "shop-checkpoint",
+        shop,
+        message: "Missing shop or checkpoint decision.",
+      }),
+    );
+  }
+
+  try {
+    const result = await apiMutation<MigrationShopCheckpointEvent>(
+      "/migration/pilot-shop-checkpoints/",
+      {
+        method: "POST",
+        body: {
+          shop: shopId,
+          decision,
+        },
+      },
+    );
+    revalidatePath("/migration");
+    redirect(
+      buildRedirectUrl({
+        status: "success",
+        action: "shop-checkpoint",
+        shop,
+        decision: result.decision,
+        shopCheckpointStatus: result.overall_status_snapshot,
+      }),
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message.replace(/\s+/g, " ").slice(0, 220)
+        : "Unknown shop checkpoint failure.";
+    redirect(
+      buildRedirectUrl({
+        status: "error",
+        action: "shop-checkpoint",
+        shop,
+        decision,
         message,
       }),
     );

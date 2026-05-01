@@ -336,6 +336,31 @@ export type MigrationControlEvent = {
   updated_at: string;
 };
 
+export type MigrationShopCheckpointEvent = {
+  id: string;
+  shop: string;
+  shop_name: string;
+  shop_slug: string;
+  actor_user: string | null;
+  actor_name: string | null;
+  decision:
+    | "approved_for_cutover"
+    | "hold_for_monitoring"
+    | "rollback_escalated";
+  overall_status_snapshot:
+    | "blocked"
+    | "ready_for_cutover"
+    | "monitoring"
+    | "production_safe"
+    | "rollback_recommended";
+  summary: string;
+  recommended_action_snapshot: string;
+  metadata_json: Record<string, unknown>;
+  occurred_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type MigrationShadowSummary = {
   shop: string;
   shop_name: string;

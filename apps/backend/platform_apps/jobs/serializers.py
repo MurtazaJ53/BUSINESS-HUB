@@ -7,6 +7,7 @@ from platform_apps.jobs.models import (
     MigrationControlEvent,
     MigrationDomainControl,
     MigrationJobRun,
+    MigrationShopCheckpointEvent,
 )
 
 
@@ -133,6 +134,39 @@ class MigrationControlEventSerializer(serializers.ModelSerializer):
             "from_write_master",
             "to_write_master",
             "summary",
+            "metadata_json",
+            "occurred_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+    def get_actor_name(self, obj):
+        if obj.actor_user_id and obj.actor_user.full_name:
+            return obj.actor_user.full_name
+        if obj.actor_user_id:
+            return obj.actor_user.email
+        return None
+
+
+class MigrationShopCheckpointEventSerializer(serializers.ModelSerializer):
+    shop_name = serializers.CharField(source="shop.name", read_only=True)
+    shop_slug = serializers.CharField(source="shop.slug", read_only=True)
+    actor_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MigrationShopCheckpointEvent
+        fields = (
+            "id",
+            "shop",
+            "shop_name",
+            "shop_slug",
+            "actor_user",
+            "actor_name",
+            "decision",
+            "overall_status_snapshot",
+            "summary",
+            "recommended_action_snapshot",
             "metadata_json",
             "occurred_at",
             "created_at",

@@ -20,6 +20,7 @@ import type {
   MigrationPilotSignoff,
   MigrationPilotShopScorecard,
   MigrationReconciliationEvent,
+  MigrationShopCheckpointEvent,
   MigrationShadowSummary,
   MigrationStats,
   PaymentStats,
@@ -216,6 +217,12 @@ export const getMigrationBridgeReceipts = cache(async (): Promise<MigrationBridg
 export const getMigrationControlEvents = cache(async (): Promise<MigrationControlEvent[]> => {
   return apiFetch<MigrationControlEvent[]>("/migration/activity/");
 });
+
+export const getMigrationShopCheckpointEvents = cache(
+  async (): Promise<MigrationShopCheckpointEvent[]> => {
+    return apiFetch<MigrationShopCheckpointEvent[]>("/migration/pilot-shop-checkpoints/");
+  },
+);
 
 export const getMigrationShadowSummaries = cache(async (): Promise<MigrationShadowSummary[]> => {
   return apiFetch<MigrationShadowSummary[]>("/migration/shadow-summaries/");

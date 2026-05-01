@@ -58,6 +58,12 @@ class MigrationControlEventType(models.TextChoices):
     ROLLBACK = "rollback", "Rollback"
 
 
+class MigrationShopCheckpointDecision(models.TextChoices):
+    APPROVED_FOR_CUTOVER = "approved_for_cutover", "Approved for cutover"
+    HOLD_FOR_MONITORING = "hold_for_monitoring", "Hold for monitoring"
+    ROLLBACK_ESCALATED = "rollback_escalated", "Rollback escalated"
+
+
 class ReconciliationSeverity(models.TextChoices):
     INFO = "info", "Info"
     WARNING = "warning", "Warning"

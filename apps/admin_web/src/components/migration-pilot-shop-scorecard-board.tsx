@@ -1,3 +1,4 @@
+import { recordShopCheckpointAction } from "@/app/migration/actions";
 import type { MigrationPilotShopScorecard } from "@/lib/types";
 
 type MigrationPilotShopScorecardBoardProps = {
@@ -168,6 +169,54 @@ export function MigrationPilotShopScorecardBoard({
                   </p>
                 </div>
               ) : null}
+
+              <div className="mt-5 grid gap-2 md:grid-cols-3">
+                <form action={recordShopCheckpointAction}>
+                  <input type="hidden" name="shopId" value={row.shop} />
+                  <input type="hidden" name="shop" value={row.shop_name} />
+                  <input
+                    type="hidden"
+                    name="decision"
+                    value="approved_for_cutover"
+                  />
+                  <button
+                    type="submit"
+                    className="w-full rounded-[14px] border border-[rgba(52,211,153,0.2)] bg-[rgba(7,33,25,0.82)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--success)]"
+                  >
+                    Approve cutover
+                  </button>
+                </form>
+                <form action={recordShopCheckpointAction}>
+                  <input type="hidden" name="shopId" value={row.shop} />
+                  <input type="hidden" name="shop" value={row.shop_name} />
+                  <input
+                    type="hidden"
+                    name="decision"
+                    value="hold_for_monitoring"
+                  />
+                  <button
+                    type="submit"
+                    className="w-full rounded-[14px] border border-[rgba(250,204,21,0.18)] bg-[rgba(38,30,7,0.82)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#facc15]"
+                  >
+                    Hold monitoring
+                  </button>
+                </form>
+                <form action={recordShopCheckpointAction}>
+                  <input type="hidden" name="shopId" value={row.shop} />
+                  <input type="hidden" name="shop" value={row.shop_name} />
+                  <input
+                    type="hidden"
+                    name="decision"
+                    value="rollback_escalated"
+                  />
+                  <button
+                    type="submit"
+                    className="w-full rounded-[14px] border border-[rgba(251,113,133,0.18)] bg-[rgba(40,12,19,0.82)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--warning)]"
+                  >
+                    Escalate rollback
+                  </button>
+                </form>
+              </div>
             </article>
           );
         })}
