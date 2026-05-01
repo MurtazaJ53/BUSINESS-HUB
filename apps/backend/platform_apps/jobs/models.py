@@ -5,6 +5,7 @@ from django.db import models
 
 from platform_apps.common.migration import (
     MigrationBridgeMode,
+    MigrationControlEventType,
     MigrationCutoverStatus,
     MigrationDomain,
     MigrationJobStatus,
@@ -127,3 +128,44 @@ class MigrationBridgeReceipt(UUIDStampedModel):
 
     def __str__(self) -> str:
         return f"{self.domain}:{self.origin_system}:{self.origin_event_id}"
+
+
+class MigrationControlEvent(UUIDStampedModel):
+    control = models.ForeignKey(
+        MigrationDomainControl,
+        on_delete=models.CASCADE,
+        related_name="activity_events",
+    )
+    shop = models.ForeignKey(
+        Shop,
+        on_delete=models.CASCADE,
+        related_name="migration_control_events",
+    )
+    domain = models.CharField(max_length=64, choices=MigrationDomain.choices)
+    event_type = models.CharField(max_length=32, choices=MigrationControlEventType.choices)
+    actor_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="migration_control_events",
+        blank=True,
+        null=True,
+    )
+    result = models.CharField(max_length=32, blank=True)
+    from_cutover_status = models.CharField(max_length=24, blank=True)
+    to_cutover_status = models.CharField(max_length=24, blank=True)
+    from_write_master = models.CharField(max_length=16, blank=True)
+    to_write_master = models.CharField(max_length=16, blank=True)
+    summary = models.TextField(blank=True)
+    metadata_json = models.JSONField(default=dict, blank=True)
+    occurred_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["-occurred_at", "-created_at"]
+        indexes = [
+            models.Index(fields=["shop", "domain", "occurred_at"]),
+            models.Index(fields=["event_type", "occurred_at"]),
+            models.Index(fields=["result", "occurred_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.domain}:{self.event_type}:{self.result or 'none'}"

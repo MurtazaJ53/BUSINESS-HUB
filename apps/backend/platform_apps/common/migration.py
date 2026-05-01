@@ -50,6 +50,14 @@ class MigrationJobStatus(models.TextChoices):
     FAILED = "failed", "Failed"
 
 
+class MigrationControlEventType(models.TextChoices):
+    PREPARE_PILOT = "prepare_pilot", "Prepare pilot"
+    PROMOTE_READY = "promote_ready", "Promote ready"
+    PROMOTE_PRIMARY = "promote_primary", "Promote primary"
+    VERIFY_PILOT = "verify_pilot", "Verify pilot"
+    ROLLBACK = "rollback", "Rollback"
+
+
 class ReconciliationSeverity(models.TextChoices):
     INFO = "info", "Info"
     WARNING = "warning", "Warning"

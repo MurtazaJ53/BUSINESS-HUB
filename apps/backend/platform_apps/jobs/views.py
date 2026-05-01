@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.utils import timezone
 from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -7,16 +8,23 @@ from rest_framework.views import APIView
 from platform_apps.audit.models import MigrationReconciliationEvent
 from platform_apps.common.migration import (
     MigrationBridgeMode,
+    MigrationControlEventType,
     MigrationCutoverStatus,
     MigrationJobStatus,
     MigrationJobType,
     MigrationWriteMaster,
 )
 from platform_apps.common.permissions import IsPlatformAdminUser
-from platform_apps.jobs.models import MigrationBridgeReceipt, MigrationDomainControl, MigrationJobRun
+from platform_apps.jobs.models import (
+    MigrationBridgeReceipt,
+    MigrationControlEvent,
+    MigrationDomainControl,
+    MigrationJobRun,
+)
 from platform_apps.jobs.readiness import build_pilot_readiness
 from platform_apps.jobs.serializers import (
     MigrationBridgeReceiptSerializer,
+    MigrationControlEventSerializer,
     MigrationDomainControlSerializer,
     MigrationJobRunSerializer,
     MigrationPilotPreparationResultSerializer,
@@ -25,6 +33,36 @@ from platform_apps.jobs.serializers import (
     MigrationShadowSummarySerializer,
 )
 from platform_apps.jobs.services import execute_migration_job
+
+
+def record_control_event(
+    *,
+    control: MigrationDomainControl,
+    event_type: str,
+    actor_user,
+    result: str,
+    summary: str,
+    from_cutover_status: str = "",
+    to_cutover_status: str = "",
+    from_write_master: str = "",
+    to_write_master: str = "",
+    metadata_json: dict | None = None,
+) -> MigrationControlEvent:
+    return MigrationControlEvent.objects.create(
+        control=control,
+        shop=control.shop,
+        domain=control.domain,
+        event_type=event_type,
+        actor_user=actor_user,
+        result=result,
+        from_cutover_status=from_cutover_status,
+        to_cutover_status=to_cutover_status,
+        from_write_master=from_write_master,
+        to_write_master=to_write_master,
+        summary=summary,
+        metadata_json=metadata_json or {},
+        occurred_at=timezone.now(),
+    )
 
 
 class MigrationDomainControlListCreateView(generics.ListCreateAPIView):
@@ -119,6 +157,31 @@ class MigrationBridgeReceiptListView(generics.ListAPIView):
         return queryset
 
 
+class MigrationControlEventListView(generics.ListAPIView):
+    serializer_class = MigrationControlEventSerializer
+    permission_classes = [IsPlatformAdminUser]
+    pagination_class = None
+
+    def get_queryset(self):
+        queryset = MigrationControlEvent.objects.select_related(
+            "shop", "control", "actor_user"
+        )
+        domain = self.request.query_params.get("domain", "").strip()
+        shop_id = self.request.query_params.get("shop_id", "").strip()
+        event_type = self.request.query_params.get("event_type", "").strip()
+        result = self.request.query_params.get("result", "").strip()
+
+        if domain:
+            queryset = queryset.filter(domain=domain)
+        if shop_id:
+            queryset = queryset.filter(shop_id=shop_id)
+        if event_type:
+            queryset = queryset.filter(event_type=event_type)
+        if result:
+            queryset = queryset.filter(result=result)
+        return queryset
+
+
 class MigrationShadowSummaryListView(APIView):
     permission_classes = [IsPlatformAdminUser]
 
@@ -200,11 +263,35 @@ class MigrationPilotPromoteReadyView(APIView):
 
         readiness = build_pilot_readiness(control)
         if not readiness["ready_for_pilot"]:
+            record_control_event(
+                control=control,
+                event_type=MigrationControlEventType.PROMOTE_READY,
+                actor_user=request.user,
+                result="blocked",
+                summary="Promote-ready attempt was blocked because the domain did not clear the pilot gate.",
+                from_cutover_status=control.cutover_status,
+                to_cutover_status=control.cutover_status,
+                from_write_master=control.write_master,
+                to_write_master=control.write_master,
+                metadata_json={"blocking_reasons": readiness["blocking_reasons"]},
+            )
             serializer = MigrationPilotReadinessSerializer(readiness)
             return Response(serializer.data, status=409)
 
+        from_cutover_status = control.cutover_status
         control.cutover_status = MigrationCutoverStatus.READY
         control.save(update_fields=["cutover_status", "updated_at"])
+        record_control_event(
+            control=control,
+            event_type=MigrationControlEventType.PROMOTE_READY,
+            actor_user=request.user,
+            result="succeeded",
+            summary="Domain was promoted to ready after clearing the pilot gate.",
+            from_cutover_status=from_cutover_status,
+            to_cutover_status=control.cutover_status,
+            from_write_master=control.write_master,
+            to_write_master=control.write_master,
+        )
 
         payload = build_pilot_readiness(control)
         serializer = MigrationPilotReadinessSerializer(payload)
@@ -246,13 +333,30 @@ class MigrationPilotPrepareView(APIView):
             created_jobs.append(job_run)
 
         control.refresh_from_db()
+        readiness = build_pilot_readiness(control)
+        record_control_event(
+            control=control,
+            event_type=MigrationControlEventType.PREPARE_PILOT,
+            actor_user=request.user,
+            result="succeeded" if readiness["ready_for_pilot"] else "monitoring",
+            summary="Pilot preparation ran backfill and compare jobs for the selected domain.",
+            from_cutover_status=control.cutover_status,
+            to_cutover_status=control.cutover_status,
+            from_write_master=control.write_master,
+            to_write_master=control.write_master,
+            metadata_json={
+                "jobs_created": len(created_jobs),
+                "ready_for_pilot": readiness["ready_for_pilot"],
+                "blocking_reasons": readiness["blocking_reasons"],
+            },
+        )
         payload = {
             "control_id": str(control.id),
             "shop": str(control.shop_id),
             "shop_name": control.shop.name,
             "domain": control.domain,
             "jobs": created_jobs,
-            "readiness": build_pilot_readiness(control),
+            "readiness": readiness,
         }
         serializer = MigrationPilotPreparationResultSerializer(payload)
         return Response(serializer.data, status=200)
@@ -268,9 +372,23 @@ class MigrationPilotPromotePrimaryView(APIView):
 
         readiness = build_pilot_readiness(control)
         if not readiness["ready_for_pilot"]:
+            record_control_event(
+                control=control,
+                event_type=MigrationControlEventType.PROMOTE_PRIMARY,
+                actor_user=request.user,
+                result="blocked",
+                summary="Promote-primary attempt was blocked because the domain did not clear the pilot gate.",
+                from_cutover_status=control.cutover_status,
+                to_cutover_status=control.cutover_status,
+                from_write_master=control.write_master,
+                to_write_master=control.write_master,
+                metadata_json={"blocking_reasons": readiness["blocking_reasons"]},
+            )
             serializer = MigrationPilotReadinessSerializer(readiness)
             return Response(serializer.data, status=409)
 
+        from_cutover_status = control.cutover_status
+        from_write_master = control.write_master
         control.write_master = MigrationWriteMaster.POSTGRES
         control.cutover_status = MigrationCutoverStatus.POSTGRES_PRIMARY
         control.current_epoch += 1
@@ -283,6 +401,18 @@ class MigrationPilotPromotePrimaryView(APIView):
                 "shadow_reads_enabled",
                 "updated_at",
             ]
+        )
+        record_control_event(
+            control=control,
+            event_type=MigrationControlEventType.PROMOTE_PRIMARY,
+            actor_user=request.user,
+            result="succeeded",
+            summary="Domain was promoted to PostgreSQL primary write ownership.",
+            from_cutover_status=from_cutover_status,
+            to_cutover_status=control.cutover_status,
+            from_write_master=from_write_master,
+            to_write_master=control.write_master,
+            metadata_json={"new_epoch": control.current_epoch},
         )
 
         payload = build_pilot_readiness(control)
@@ -353,6 +483,25 @@ class MigrationPilotVerifyView(APIView):
         else:
             operational_verdict = "monitoring"
 
+        record_control_event(
+            control=control,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=request.user,
+            result=operational_verdict,
+            summary=summary,
+            from_cutover_status=control.cutover_status,
+            to_cutover_status=control.cutover_status,
+            from_write_master=control.write_master,
+            to_write_master=control.write_master,
+            metadata_json={
+                "healthy": healthy,
+                "requires_rollback": requires_rollback,
+                "mismatch_count": latest_compare_mismatches,
+                "critical_events": open_critical_events,
+                "stale_epoch_events": open_stale_epoch_events,
+            },
+        )
+
         payload = {
             "control_id": str(control.id),
             "shop": str(control.shop_id),
@@ -382,6 +531,8 @@ class MigrationPilotRollbackView(APIView):
         if control is None:
             return Response({"detail": "Migration control not found."}, status=404)
 
+        from_cutover_status = control.cutover_status
+        from_write_master = control.write_master
         control.write_master = MigrationWriteMaster.FIREBASE
         control.cutover_status = MigrationCutoverStatus.PILOT
         control.bridge_mode = MigrationBridgeMode.COMPARE_ONLY
@@ -396,6 +547,18 @@ class MigrationPilotRollbackView(APIView):
                 "current_epoch",
                 "updated_at",
             ]
+        )
+        record_control_event(
+            control=control,
+            event_type=MigrationControlEventType.ROLLBACK,
+            actor_user=request.user,
+            result="succeeded",
+            summary="Domain was rolled back to Firebase ownership and compare-only bridge mode.",
+            from_cutover_status=from_cutover_status,
+            to_cutover_status=control.cutover_status,
+            from_write_master=from_write_master,
+            to_write_master=control.write_master,
+            metadata_json={"new_epoch": control.current_epoch},
         )
 
         payload = build_pilot_readiness(control)

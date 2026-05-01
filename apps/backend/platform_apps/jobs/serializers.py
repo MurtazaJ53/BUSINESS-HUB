@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from platform_apps.jobs.models import MigrationBridgeReceipt, MigrationDomainControl, MigrationJobRun
+from platform_apps.jobs.models import (
+    MigrationBridgeReceipt,
+    MigrationControlEvent,
+    MigrationDomainControl,
+    MigrationJobRun,
+)
 
 
 class MigrationDomainControlSerializer(serializers.ModelSerializer):
@@ -105,6 +110,42 @@ class MigrationBridgeReceiptSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
+
+
+class MigrationControlEventSerializer(serializers.ModelSerializer):
+    shop_name = serializers.CharField(source="shop.name", read_only=True)
+    actor_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MigrationControlEvent
+        fields = (
+            "id",
+            "control",
+            "shop",
+            "shop_name",
+            "domain",
+            "event_type",
+            "actor_user",
+            "actor_name",
+            "result",
+            "from_cutover_status",
+            "to_cutover_status",
+            "from_write_master",
+            "to_write_master",
+            "summary",
+            "metadata_json",
+            "occurred_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+    def get_actor_name(self, obj):
+        if obj.actor_user_id and obj.actor_user.full_name:
+            return obj.actor_user.full_name
+        if obj.actor_user_id:
+            return obj.actor_user.email
+        return None
 
 
 class MigrationShadowSummarySerializer(serializers.Serializer):

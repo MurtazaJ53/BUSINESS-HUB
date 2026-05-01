@@ -14,6 +14,7 @@ import type {
   InventoryStats,
   MigrationDomainControl,
   MigrationBridgeReceipt,
+  MigrationControlEvent,
   MigrationJobRun,
   MigrationPilotReadiness,
   MigrationReconciliationEvent,
@@ -208,6 +209,10 @@ export const getMigrationJobRuns = cache(async (): Promise<MigrationJobRun[]> =>
 
 export const getMigrationBridgeReceipts = cache(async (): Promise<MigrationBridgeReceipt[]> => {
   return apiFetch<MigrationBridgeReceipt[]>("/migration/bridge-receipts/");
+});
+
+export const getMigrationControlEvents = cache(async (): Promise<MigrationControlEvent[]> => {
+  return apiFetch<MigrationControlEvent[]>("/migration/activity/");
 });
 
 export const getMigrationShadowSummaries = cache(async (): Promise<MigrationShadowSummary[]> => {

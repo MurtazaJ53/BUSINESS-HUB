@@ -15,7 +15,12 @@ from platform_apps.common.migration import (
 )
 from platform_apps.customers.models import Customer
 from platform_apps.inventory.models import InventoryItem
-from platform_apps.jobs.models import MigrationBridgeReceipt, MigrationDomainControl, MigrationJobRun
+from platform_apps.jobs.models import (
+    MigrationBridgeReceipt,
+    MigrationControlEvent,
+    MigrationDomainControl,
+    MigrationJobRun,
+)
 from platform_apps.jobs.services import execute_migration_job
 from platform_apps.projections.models import ShopDashboardSnapshot
 from platform_apps.shops.models import Shop
@@ -103,6 +108,32 @@ class MigrationControlApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["origin_event_id"], "evt_list_001")
+
+    def test_list_control_activity_events(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.COMPARE_ONLY,
+            cutover_status=MigrationCutoverStatus.PILOT,
+        )
+        MigrationControlEvent.objects.create(
+            control=control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type="prepare_pilot",
+            actor_user=self.user,
+            result="monitoring",
+            summary="Pilot prep executed for inventory.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/activity/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["event_type"], "prepare_pilot")
+        self.assertEqual(response.data[0]["result"], "monitoring")
 
     def test_list_shadow_summaries(self):
         MigrationDomainControl.objects.create(
@@ -192,6 +223,13 @@ class MigrationControlApiTests(TestCase):
         self.assertEqual(control.cutover_status, MigrationCutoverStatus.READY)
         self.assertTrue(response.data["ready_for_pilot"])
         self.assertEqual(response.data["recommended_next_status"], MigrationCutoverStatus.POSTGRES_PRIMARY)
+        self.assertTrue(
+            MigrationControlEvent.objects.filter(
+                control=control,
+                event_type="promote_ready",
+                result="succeeded",
+            ).exists()
+        )
 
     def test_prepare_pilot_runs_backfill_and_compare_inline(self):
         control = MigrationDomainControl.objects.create(
@@ -322,6 +360,60 @@ class MigrationControlApiTests(TestCase):
         self.assertEqual(response.data["operational_verdict"], "production_safe")
         self.assertEqual(response.data["verification_job"]["status"], MigrationJobStatus.SUCCEEDED)
         self.assertEqual(response.data["latest_compare_mismatches"], 0)
+        self.assertTrue(
+            MigrationControlEvent.objects.filter(
+                control=control,
+                event_type="verify_pilot",
+                result="production_safe",
+            ).exists()
+        )
+
+    def test_verify_pilot_reports_monitoring_for_ready_domain(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.READY,
+            current_epoch=7,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        InventoryItem.objects.create(
+            shop=self.shop,
+            source_system="firebase",
+            source_id="inv_verify_003",
+            source_shop_id="shop_001",
+            source_path="shops/shop_001/inventory/inv_verify_003",
+            name="Monitor Tee",
+            sku="MONITOR-TEE",
+            sell_price="399.00",
+        )
+
+        response = self.client.post(
+            f"/api/v1/migration/domains/{control.id}/verify-pilot/?run_inline=1",
+            {
+                "payloads": {
+                    "shadow_compare": {
+                        "source_snapshot": [
+                            {
+                                "id": "inv_verify_003",
+                                "name": "Monitor Tee",
+                                "sku": "MONITOR-TEE",
+                                "sell_price": "399.00",
+                            }
+                        ]
+                    }
+                }
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["healthy"])
+        self.assertFalse(response.data["requires_rollback"])
+        self.assertEqual(response.data["operational_verdict"], "monitoring")
 
     def test_verify_pilot_flags_rollback_when_primary_domain_drifts(self):
         control = MigrationDomainControl.objects.create(

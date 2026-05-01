@@ -1,5 +1,6 @@
 import { AdminShell } from "@/components/admin-shell";
 import { EmptyState } from "@/components/empty-state";
+import { MigrationActivityTable } from "@/components/migration-activity-table";
 import { MigrationBridgeReceiptsTable } from "@/components/migration-bridge-receipts-table";
 import { MigrationPilotCheckpointBoard } from "@/components/migration-pilot-checkpoint-board";
 import { MetricCard } from "@/components/metric-card";
@@ -13,6 +14,7 @@ import { ReconciliationEventsTable } from "@/components/reconciliation-events-ta
 import { MigrationShadowSummariesTable } from "@/components/migration-shadow-summaries-table";
 import {
   buildMigrationStats,
+  getMigrationControlEvents,
   getMigrationBridgeReceipts,
   getMigrationControls,
   getMigrationJobRuns,
@@ -141,14 +143,16 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
     );
   }
 
-  const [controls, jobs, receipts, pilotReadiness, shadowSummaries, events] = await Promise.all([
-    getMigrationControls(),
-    getMigrationJobRuns(),
-    getMigrationBridgeReceipts(),
-    getMigrationPilotReadiness(),
-    getMigrationShadowSummaries(),
-    getMigrationReconciliationEvents(),
-  ]);
+  const [controls, jobs, activityEvents, receipts, pilotReadiness, shadowSummaries, events] =
+    await Promise.all([
+      getMigrationControls(),
+      getMigrationJobRuns(),
+      getMigrationControlEvents(),
+      getMigrationBridgeReceipts(),
+      getMigrationPilotReadiness(),
+      getMigrationShadowSummaries(),
+      getMigrationReconciliationEvents(),
+    ]);
   const stats = buildMigrationStats(controls, jobs, receipts, pilotReadiness, events);
   const actionBanner = buildActionBanner(resolvedSearchParams);
   const verificationSummary = buildVerificationSummary(resolvedSearchParams);
@@ -260,6 +264,21 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
             </div>
           </div>
 
+          <div className="panel-soft rounded-[28px] px-6 py-6">
+            <p className="eyebrow">Pilot activity</p>
+            <h2 className="mt-3 text-2xl font-bold">Decision journal</h2>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">
+              This shows the actual operator trail behind each pilot domain:
+              preparation, promotion, verification verdicts, and rollback
+              events.
+            </p>
+            <div className="mt-6">
+              <MigrationActivityTable events={activityEvents} />
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-2">
           <div className="panel-soft rounded-[28px] px-6 py-6">
             <p className="eyebrow">Bridge health</p>
             <h2 className="mt-3 text-2xl font-bold">Replay receipts</h2>

@@ -305,6 +305,27 @@ export type MigrationBridgeReceipt = {
   updated_at: string;
 };
 
+export type MigrationControlEvent = {
+  id: string;
+  control: string;
+  shop: string;
+  shop_name: string;
+  domain: string;
+  event_type: string;
+  actor_user: string | null;
+  actor_name: string | null;
+  result: string;
+  from_cutover_status: string;
+  to_cutover_status: string;
+  from_write_master: string;
+  to_write_master: string;
+  summary: string;
+  metadata_json: Record<string, unknown>;
+  occurred_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type MigrationShadowSummary = {
   shop: string;
   shop_name: string;
