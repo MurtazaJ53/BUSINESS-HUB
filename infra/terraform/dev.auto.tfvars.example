@@ -1,0 +1,3 @@
+project_name = "business-hub"
+environment  = "dev"
+aws_region   = "ap-south-1"

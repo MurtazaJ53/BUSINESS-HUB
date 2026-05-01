@@ -1,9 +1,11 @@
 import { AdminShell } from "@/components/admin-shell";
+import { DomainPilotSignoffCard } from "@/components/domain-pilot-signoff-card";
 import { EmptyState } from "@/components/empty-state";
 import { MetricCard } from "@/components/metric-card";
 import { PaymentsTable } from "@/components/payments-table";
 import {
   buildPaymentStats,
+  getShopDomainState,
   getPayments,
   getSession,
   resolveActiveShop,
@@ -13,7 +15,12 @@ import { formatCurrency } from "@/lib/formatters";
 export default async function PaymentsPage() {
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
-  const payments = activeShop ? await getPayments(activeShop.shop.id) : [];
+  const [payments, domainState] = activeShop
+    ? await Promise.all([
+        getPayments(activeShop.shop.id),
+        getShopDomainState(activeShop.shop.id, "payments"),
+      ])
+    : [[], null];
   const stats = buildPaymentStats(payments);
 
   return (
@@ -31,6 +38,10 @@ export default async function PaymentsPage() {
         />
       ) : (
         <div className="space-y-8">
+          {domainState ? (
+            <DomainPilotSignoffCard domainState={domainState} domainLabel="Payments" />
+          ) : null}
+
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label="Payments captured"

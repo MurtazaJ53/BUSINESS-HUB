@@ -1,9 +1,11 @@
 import { AdminShell } from "@/components/admin-shell";
+import { DomainPilotSignoffCard } from "@/components/domain-pilot-signoff-card";
 import { EmptyState } from "@/components/empty-state";
 import { MetricCard } from "@/components/metric-card";
 import { SalesTable } from "@/components/sales-table";
 import {
   buildSalesStats,
+  getShopDomainState,
   getSales,
   getSession,
   resolveActiveShop,
@@ -13,7 +15,12 @@ import { formatCurrency } from "@/lib/formatters";
 export default async function SalesPage() {
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
-  const sales = activeShop ? await getSales(activeShop.shop.id) : [];
+  const [sales, domainState] = activeShop
+    ? await Promise.all([
+        getSales(activeShop.shop.id),
+        getShopDomainState(activeShop.shop.id, "sales"),
+      ])
+    : [[], null];
   const stats = buildSalesStats(sales);
   const creditHeavy = sales
     .filter((sale) => Number(sale.amount_due) > 0)
@@ -93,6 +100,10 @@ export default async function SalesPage() {
             </div>
 
             <div className="space-y-6">
+              {domainState ? (
+                <DomainPilotSignoffCard domainState={domainState} domainLabel="Sales" />
+              ) : null}
+
               <div className="panel-soft rounded-[28px] px-6 py-6">
                 <p className="eyebrow">Credit watch</p>
                 <h2 className="mt-3 text-2xl font-bold">Highest unsettled tickets</h2>

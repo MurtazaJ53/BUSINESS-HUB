@@ -1,12 +1,22 @@
 from __future__ import annotations
 
+from django.db import transaction
 from django.db.models import Q
 from django.db.models import Prefetch
-from rest_framework import generics, permissions
+from django.utils import timezone
+from rest_framework import generics, permissions, status
+from rest_framework.response import Response
 
+from platform_apps.common.migration import MigrationDomain
+from platform_apps.common.migration_guards import (
+    assert_domain_epoch_current,
+    assert_postgres_primary_write_enabled_multi,
+)
 from platform_apps.payments.models import SalePayment
+from platform_apps.projections.services import refresh_shop_dashboard_projection
 from platform_apps.sales.models import Sale, SaleItem
-from platform_apps.sales.serializers import SaleSerializer
+from platform_apps.sales.models import SaleCommandReceipt
+from platform_apps.sales.serializers import SaleCommandCreateSerializer, SaleSerializer
 from platform_apps.shops.models import ShopMembership
 from platform_apps.shops.permissions import get_membership_or_403
 
@@ -77,6 +87,17 @@ class SaleListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.STAFF)
+        guarded_domains = [
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+        ]
+        if self.request.data.get("customer_id"):
+            guarded_domains.append(MigrationDomain.CUSTOMER_LEDGER)
+        assert_postgres_primary_write_enabled_multi(
+            shop_id=str(self.kwargs["shop_id"]),
+            domains=guarded_domains,
+        )
         serializer.save()
 
 
@@ -94,4 +115,151 @@ class SaleDetailView(ShopScopedMixin, generics.RetrieveAPIView):
                 Prefetch("items", queryset=SaleItem.objects.select_related("inventory_item").order_by("created_at")),
                 Prefetch("payments", queryset=SalePayment.objects.order_by("created_at")),
             )
+        )
+
+
+def _get_sale_queryset_for_shop(*, shop_id: str):
+    return (
+        Sale.objects.filter(shop_id=shop_id, tombstone=False)
+        .select_related("actor_user", "customer")
+        .prefetch_related(
+            Prefetch("items", queryset=SaleItem.objects.select_related("inventory_item").order_by("created_at")),
+            Prefetch("payments", queryset=SalePayment.objects.order_by("created_at")),
+        )
+    )
+
+
+class SaleCommandIngestionView(ShopScopedMixin, generics.GenericAPIView):
+    serializer_class = SaleCommandCreateSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    minimum_role = ShopMembership.Role.STAFF
+
+    def post(self, request, *args, **kwargs):
+        membership = self.get_membership()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        raw_sale_payload = request.data.get("sale", {}) if isinstance(request.data, dict) else {}
+
+        command_id = serializer.validated_data["command_id"]
+        base_domain_epoch = serializer.validated_data["base_domain_epoch"]
+        source_surface = serializer.validated_data["source_surface"] or "flutter_pos"
+        sale_payload = serializer.validated_data["sale"]
+
+        guarded_domains = [
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+        ]
+        if sale_payload.get("customer_id"):
+            guarded_domains.append(MigrationDomain.CUSTOMER_LEDGER)
+
+        controls = assert_postgres_primary_write_enabled_multi(
+            shop_id=str(membership.shop_id),
+            domains=guarded_domains,
+        )
+        sales_control = assert_domain_epoch_current(
+            shop_id=str(membership.shop_id),
+            domain=MigrationDomain.SALES,
+            base_domain_epoch=base_domain_epoch,
+        )
+
+        with transaction.atomic():
+            receipt, created = SaleCommandReceipt.objects.select_for_update().get_or_create(
+                shop=membership.shop,
+                command_id=command_id,
+                defaults={
+                    "actor_user": request.user,
+                    "source_surface": source_surface,
+                    "base_domain_epoch": base_domain_epoch,
+                    "payload_json": {"sale": raw_sale_payload, "source_surface": source_surface},
+                },
+            )
+
+            if not created:
+                if receipt.sale_id:
+                    sale = _get_sale_queryset_for_shop(shop_id=str(membership.shop_id)).get(pk=receipt.sale_id)
+                    return Response(
+                        {
+                            "command_id": command_id,
+                            "receipt_id": str(receipt.id),
+                            "duplicate": True,
+                            "result_status": receipt.result_status,
+                            "sale": SaleSerializer(sale).data,
+                        },
+                        status=status.HTTP_200_OK,
+                    )
+
+                return Response(
+                    {
+                        "detail": "This sale command is already being processed.",
+                        "command_id": command_id,
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            sale_serializer = SaleSerializer(
+                data=sale_payload,
+                context={
+                    "shop": membership.shop,
+                    "actor": request.user,
+                },
+            )
+            sale_serializer.is_valid(raise_exception=True)
+
+            source_meta_json = dict(sale_payload.get("source_meta_json") or {})
+            source_meta_json.update(
+                {
+                    "command_id": command_id,
+                    "source_surface": source_surface,
+                }
+            )
+
+            sale = sale_serializer.save(
+                source_system="postgres_command",
+                source_id=command_id,
+                source_shop_id=membership.shop.source_id,
+                source_path=f"shops/{membership.shop.source_id or membership.shop_id}/sales/commands/{command_id}",
+                domain_epoch=sales_control.current_epoch if sales_control is not None else base_domain_epoch,
+                source_meta_json=source_meta_json,
+            )
+
+            receipt.actor_user = request.user
+            receipt.sale = sale
+            receipt.source_surface = source_surface
+            receipt.base_domain_epoch = base_domain_epoch
+            receipt.result_status = SaleCommandReceipt.ResultStatus.ACCEPTED
+            receipt.payload_json = {
+                "sale": raw_sale_payload,
+                "source_surface": source_surface,
+                "guarded_domains": guarded_domains,
+                "resolved_epochs": {
+                    domain: control.current_epoch if control is not None else None
+                    for domain, control in controls.items()
+                },
+            }
+            receipt.applied_at = timezone.now()
+            receipt.save(
+                update_fields=[
+                    "actor_user",
+                    "sale",
+                    "source_surface",
+                    "base_domain_epoch",
+                    "result_status",
+                    "payload_json",
+                    "applied_at",
+                    "updated_at",
+                ]
+            )
+
+        refresh_shop_dashboard_projection(membership.shop)
+        sale = _get_sale_queryset_for_shop(shop_id=str(membership.shop_id)).get(pk=sale.id)
+        return Response(
+            {
+                "command_id": command_id,
+                "receipt_id": str(receipt.id),
+                "duplicate": False,
+                "result_status": receipt.result_status,
+                "sale": SaleSerializer(sale).data,
+            },
+            status=status.HTTP_201_CREATED,
         )

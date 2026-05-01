@@ -330,3 +330,10 @@ class SaleSerializer(serializers.ModelSerializer):
             customer.save(update_fields=["balance", "total_spent", "updated_at"])
 
         return sale
+
+
+class SaleCommandCreateSerializer(serializers.Serializer):
+    command_id = serializers.CharField(max_length=128)
+    base_domain_epoch = serializers.IntegerField(min_value=1)
+    source_surface = serializers.CharField(max_length=64, required=False, allow_blank=True, default="flutter_pos")
+    sale = SaleSerializer()

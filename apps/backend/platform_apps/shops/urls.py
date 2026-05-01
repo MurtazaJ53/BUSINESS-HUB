@@ -12,9 +12,9 @@ from platform_apps.inventory.views import (
     InventoryItemDetailView,
     InventoryItemListCreateView,
 )
-from platform_apps.payments.views import SalePaymentListView
+from platform_apps.payments.views import SalePaymentCommandIngestionView, SalePaymentListView
 from platform_apps.projections.views import ShopDashboardSnapshotView
-from platform_apps.sales.views import SaleDetailView, SaleListCreateView
+from platform_apps.sales.views import SaleCommandIngestionView, SaleDetailView, SaleListCreateView
 from platform_apps.shops.views import ShopDomainStateView, ShopMembershipListView
 
 urlpatterns = [
@@ -39,11 +39,17 @@ urlpatterns = [
     path("<uuid:shop_id>/inventory/<uuid:item_id>/", InventoryItemDetailView.as_view(), name="inventory-detail"),
     path("<uuid:shop_id>/payments/", SalePaymentListView.as_view(), name="payment-list"),
     path(
+        "<uuid:shop_id>/payments/commands/",
+        SalePaymentCommandIngestionView.as_view(),
+        name="payment-command-ingestion",
+    ),
+    path(
         "<uuid:shop_id>/projections/dashboard/",
         ShopDashboardSnapshotView.as_view(),
         name="projection-dashboard",
     ),
     path("<uuid:shop_id>/sales/", SaleListCreateView.as_view(), name="sale-list"),
+    path("<uuid:shop_id>/sales/commands/", SaleCommandIngestionView.as_view(), name="sale-command-ingestion"),
     path("<uuid:shop_id>/sales/<uuid:sale_id>/", SaleDetailView.as_view(), name="sale-detail"),
     path(
         "<uuid:shop_id>/inventory/<uuid:item_id>/adjust-stock/",

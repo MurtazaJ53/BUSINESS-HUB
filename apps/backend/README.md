@@ -33,6 +33,10 @@ Phase 1 backend foundation for the Business Hub target platform.
 - `/api/v1/shops/<shop_id>/customers/<customer_id>/ledger/`
 - `/api/v1/shops/<shop_id>/expenses/`
 - `/api/v1/shops/<shop_id>/attendance/`
+- `/api/v1/shops/<shop_id>/sales/`
+- `/api/v1/shops/<shop_id>/sales/commands/`
+- `/api/v1/shops/<shop_id>/payments/`
+- `/api/v1/shops/<shop_id>/payments/commands/`
 - `/api/v1/shops/<shop_id>/projections/dashboard/`
 - `/api/v1/migration/domains/`
 - `/api/v1/migration/jobs/`
@@ -81,3 +85,19 @@ Use `/api/v1/migration/pilot-readiness/`, `/api/v1/migration/domains/<control_id
 When a migration control exists for `inventory`, Django inventory mutations are allowed only after that domain is `postgres_primary`; otherwise the API returns a `409` so the legacy write owner is not bypassed accidentally.
 Use `/api/v1/shops/<shop_id>/domain-state/inventory/` from shop-scoped surfaces to show whether the current shop is still in legacy/shadow mode or has actually been promoted to PostgreSQL-primary.
 Use `/api/v1/migration/phase-readiness/` and `/api/v1/migration/phase-checkpoints/` for the final Phase 3 program-level exit gate and durable phase signoff trail.
+
+## Phase 4 commerce command flow
+
+Phase 4 introduces command-style commerce ingestion on the PostgreSQL path:
+
+- `/api/v1/shops/<shop_id>/sales/commands/`
+- `/api/v1/shops/<shop_id>/payments/commands/`
+
+These endpoints add:
+
+- idempotent command receipts per shop
+- base-domain-epoch checks for stale POS replay rejection
+- migration ownership guards for `sales`, `payments`, `stock_ledger`, and `customer_ledger` where applicable
+- projection refresh after accepted commerce writes so dashboards stay derived from committed facts
+
+If a sales or payments migration control exists and that domain is still legacy-owned, the command endpoint returns `409` instead of bypassing the active write owner.

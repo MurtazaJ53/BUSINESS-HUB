@@ -39,3 +39,15 @@ class SalePaymentSerializer(serializers.ModelSerializer):
         if obj.actor_user_id:
             return obj.actor_user.email
         return None
+
+
+class SalePaymentCommandCreateSerializer(serializers.Serializer):
+    command_id = serializers.CharField(max_length=128)
+    base_domain_epoch = serializers.IntegerField(min_value=1)
+    source_surface = serializers.CharField(max_length=64, required=False, allow_blank=True, default="flutter_pos")
+    sale_id = serializers.UUIDField()
+    payment_method = serializers.ChoiceField(choices=SalePayment.PaymentMethod.choices)
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    reference_code = serializers.CharField(max_length=128, required=False, allow_blank=True)
+    note = serializers.CharField(required=False, allow_blank=True, max_length=2000)
+    occurred_at = serializers.DateTimeField(required=False)

@@ -6,6 +6,7 @@ from django.conf import settings
 from django.db import models
 
 from platform_apps.common.models import SourceTrackedModel
+from platform_apps.common.models import UUIDStampedModel
 from platform_apps.customers.models import Customer
 from platform_apps.inventory.models import InventoryItem
 from platform_apps.shops.models import Shop
@@ -103,3 +104,55 @@ class SaleItem(SourceTrackedModel):
 
     def __str__(self) -> str:
         return f"{self.name_snapshot} x{self.quantity}"
+
+
+class SaleCommandReceipt(UUIDStampedModel):
+    class ResultStatus(models.TextChoices):
+        PENDING = "pending", "Pending"
+        ACCEPTED = "accepted", "Accepted"
+
+    shop = models.ForeignKey(
+        Shop,
+        on_delete=models.CASCADE,
+        related_name="sale_command_receipts",
+    )
+    actor_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="sale_command_receipts",
+        blank=True,
+        null=True,
+    )
+    sale = models.OneToOneField(
+        Sale,
+        on_delete=models.SET_NULL,
+        related_name="command_receipt",
+        blank=True,
+        null=True,
+    )
+    command_id = models.CharField(max_length=128)
+    source_surface = models.CharField(max_length=64, blank=True)
+    base_domain_epoch = models.PositiveIntegerField(default=1)
+    result_status = models.CharField(
+        max_length=16,
+        choices=ResultStatus.choices,
+        default=ResultStatus.PENDING,
+    )
+    payload_json = models.JSONField(default=dict, blank=True)
+    applied_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ["-applied_at", "-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["shop", "command_id"],
+                name="uniq_sale_command_receipt_per_shop",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["shop", "applied_at"]),
+            models.Index(fields=["shop", "result_status"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.shop.name}:{self.command_id}"

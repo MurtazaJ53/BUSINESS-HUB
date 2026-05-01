@@ -1,50 +1,66 @@
 # Business Hub Mobile (Flutter)
 
-This folder is the new Flutter mobile app track for Business Hub.
+This folder is the active Flutter mobile app track for Business Hub.
 
-Why it exists:
-- keep the current React/Vite app stable for web and admin
+## Why it exists
+
+- keep the current React/Vite stack stable for web and legacy surfaces
 - build a smoother Android-first mobile experience in parallel
-- move mobile performance-critical flows to Flutter + native SQLite
+- move performance-critical mobile flows to Flutter + local SQLite
 
-Current status:
-- Flutter app scaffold created
-- Firebase mobile bootstrap wired for the existing `business-hub-pro` project
-- architecture placeholders added for auth, dashboard, inventory, POS, local database, and sync
-- native Android and iOS folders are not generated yet because the Flutter SDK is not installed in this shell
+## Current state
 
-Recommended next commands after Flutter is installed:
+- Flutter app scaffold is generated and buildable
+- Android project is present under [D:/business-hub/apps/mobile_flutter/android](D:/business-hub/apps/mobile_flutter/android)
+- Firebase bootstrap is wired for the existing `business-hub-pro` project
+- local SQLite/Drift foundation exists under:
+  - [D:/business-hub/apps/mobile_flutter/lib/core/database/local_database.dart](D:/business-hub/apps/mobile_flutter/lib/core/database/local_database.dart)
+  - [D:/business-hub/apps/mobile_flutter/lib/core/database/mobile_repository.dart](D:/business-hub/apps/mobile_flutter/lib/core/database/mobile_repository.dart)
+- sync coordinator exists under [D:/business-hub/apps/mobile_flutter/lib/core/sync/mobile_sync_coordinator.dart](D:/business-hub/apps/mobile_flutter/lib/core/sync/mobile_sync_coordinator.dart)
+- feature slices already exist for:
+  - auth/session
+  - dashboard
+  - inventory
+  - POS
+
+## Recommended commands
 
 ```bash
 cd apps/mobile_flutter
-flutter create . --platforms=android --org com.businesshub.pro.dev
 flutter pub get
 dart run build_runner build --delete-conflicting-outputs
-flutterfire configure --project=business-hub-pro --android-package-name com.businesshub.pro.dev
-flutter run
+flutter analyze
+flutter test
+flutter build apk --release
 ```
 
-Development package strategy:
-- use `com.businesshub.pro.dev` while the Flutter app is in parallel beta
-- switch back to `com.businesshub.pro` only when the Flutter mobile app is ready to replace the current Capacitor app
+## Package strategy
 
-Target architecture:
+- keep the Flutter beta app on a side-by-side package while migration is in progress
+- switch back to the production package name only when Flutter is ready to replace the legacy mobile app
+
+## Target architecture
+
 - UI: Flutter
 - State: Riverpod
 - Local database: Drift + SQLite
-- Cloud: Firebase Auth + Firestore + Storage + Functions
+- Cloud during transition: Firebase Auth + Firestore + Storage + Functions
+- Long-term backend target: Django + PostgreSQL APIs
 - Stability: Crashlytics
 - Performance telemetry: Firebase Performance
 
-Migration order:
-1. Auth/session shell
-2. Local SQLite schema and repositories
-3. Sync queue between SQLite and Firestore
-4. POS
-5. Inventory
-6. Dashboard
-7. Customers / history / reports
+## Migration order
 
-Important:
-- keep the current web app as source of truth for business logic during migration
+1. auth/session shell
+2. local SQLite schema and repositories
+3. sync queue between SQLite and cloud/backend
+4. POS
+5. inventory
+6. dashboard
+7. customers / history / reports
+
+## Important
+
+- keep the current web/admin app stable during migration
 - port features in slices, not with a big-bang rewrite
+- treat offline replay as commands, not record overwrites

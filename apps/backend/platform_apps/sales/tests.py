@@ -6,11 +6,17 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from platform_apps.common.migration import MigrationBridgeMode
+from platform_apps.common.migration import MigrationCutoverStatus
+from platform_apps.common.migration import MigrationDomain
+from platform_apps.common.migration import MigrationWriteMaster
 from platform_apps.customers.models import Customer
 from platform_apps.customers.models import CustomerLedgerEntry
 from platform_apps.inventory.models import InventoryItem, InventoryStockLedger
+from platform_apps.jobs.models import MigrationDomainControl
 from platform_apps.payments.models import SalePayment
 from platform_apps.sales.models import Sale, SaleItem
+from platform_apps.sales.models import SaleCommandReceipt
 from platform_apps.shops.models import Shop, ShopMembership
 from platform_apps.users.models import PlatformUser
 
@@ -124,3 +130,168 @@ class SalesApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 1)
+
+    def _create_postgres_primary_control(self, domain: str, *, epoch: int = 4):
+        return MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=domain,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=epoch,
+            shadow_reads_enabled=True,
+        )
+
+    def test_sale_command_is_idempotent(self):
+        for domain in [
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+            MigrationDomain.CUSTOMER_LEDGER,
+        ]:
+            self._create_postgres_primary_control(domain)
+
+        payload = {
+            "command_id": "cmd-sale-001",
+            "base_domain_epoch": 4,
+            "source_surface": "flutter_pos",
+            "sale": {
+                "customer_id": str(self.customer.id),
+                "discount_amount": "50.00",
+                "items": [
+                    {
+                        "inventory_item_id": str(self.item.id),
+                        "quantity": 2,
+                        "unit_price": "500.00",
+                    }
+                ],
+                "payments": [
+                    {
+                        "payment_method": "CASH",
+                        "amount": "950.00",
+                    }
+                ],
+            },
+        }
+
+        first = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/commands/",
+            payload,
+            format="json",
+        )
+        second = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/commands/",
+            payload,
+            format="json",
+        )
+
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 200)
+        self.assertFalse(first.json()["duplicate"])
+        self.assertTrue(second.json()["duplicate"])
+        self.assertEqual(Sale.objects.count(), 1)
+        self.assertEqual(SaleCommandReceipt.objects.count(), 1)
+
+    def test_sale_command_rejects_legacy_write_owner(self):
+        MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.SALES,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.COMPARE_ONLY,
+            cutover_status=MigrationCutoverStatus.LEGACY,
+            current_epoch=1,
+            shadow_reads_enabled=True,
+        )
+
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/commands/",
+            {
+                "command_id": "cmd-sale-blocked",
+                "base_domain_epoch": 1,
+                "sale": {
+                    "items": [
+                        {
+                            "inventory_item_id": str(self.item.id),
+                            "quantity": 1,
+                            "unit_price": "500.00",
+                        }
+                    ],
+                    "payments": [
+                        {
+                            "payment_method": "CASH",
+                            "amount": "500.00",
+                        }
+                    ],
+                },
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+
+    def test_sale_command_rejects_stale_epoch(self):
+        for domain in [
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+        ]:
+            self._create_postgres_primary_control(domain, epoch=7)
+
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/commands/",
+            {
+                "command_id": "cmd-sale-stale",
+                "base_domain_epoch": 3,
+                "sale": {
+                    "items": [
+                        {
+                            "inventory_item_id": str(self.item.id),
+                            "quantity": 1,
+                            "unit_price": "500.00",
+                        }
+                    ],
+                    "payments": [
+                        {
+                            "payment_method": "CASH",
+                            "amount": "500.00",
+                        }
+                    ],
+                },
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+
+    def test_direct_sale_create_is_blocked_when_sales_control_is_legacy(self):
+        MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.SALES,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.COMPARE_ONLY,
+            cutover_status=MigrationCutoverStatus.LEGACY,
+            current_epoch=1,
+            shadow_reads_enabled=True,
+        )
+
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/",
+            {
+                "items": [
+                    {
+                        "inventory_item_id": str(self.item.id),
+                        "quantity": 1,
+                        "unit_price": "500.00",
+                    }
+                ],
+                "payments": [
+                    {
+                        "payment_method": "CASH",
+                        "amount": "500.00",
+                    }
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
