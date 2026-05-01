@@ -16,6 +16,7 @@ from platform_apps.jobs.models import (
     MigrationControlEvent,
     MigrationDomainControl,
     MigrationJobRun,
+    MigrationShopCheckpointEvent,
 )
 
 
@@ -300,3 +301,125 @@ def build_shop_pilot_scorecards(controls: list[MigrationDomainControl]) -> list[
         )
 
     return sorted(scorecards, key=lambda row: row["shop_name"].lower())
+
+
+def build_phase3_program_readiness(
+    controls: list[MigrationDomainControl],
+    checkpoint_events: list[MigrationShopCheckpointEvent],
+) -> dict[str, Any]:
+    scorecards = build_shop_pilot_scorecards(controls)
+    latest_checkpoint_by_shop: dict[str, MigrationShopCheckpointEvent] = {}
+    for event in checkpoint_events:
+        latest_checkpoint_by_shop.setdefault(str(event.shop_id), event)
+
+    shops: list[dict[str, Any]] = []
+    approved_for_cutover_count = 0
+    hold_for_monitoring_count = 0
+    rollback_escalated_count = 0
+    shops_without_checkpoint = 0
+
+    for scorecard in scorecards:
+        latest_checkpoint = latest_checkpoint_by_shop.get(scorecard["shop"])
+        latest_decision = latest_checkpoint.decision if latest_checkpoint else None
+        if latest_decision == "approved_for_cutover":
+            approved_for_cutover_count += 1
+        elif latest_decision == "hold_for_monitoring":
+            hold_for_monitoring_count += 1
+        elif latest_decision == "rollback_escalated":
+            rollback_escalated_count += 1
+        else:
+            shops_without_checkpoint += 1
+
+        shops.append(
+            {
+                "shop": scorecard["shop"],
+                "shop_name": scorecard["shop_name"],
+                "shop_slug": scorecard["shop_slug"],
+                "overall_status": scorecard["overall_status"],
+                "recommended_action": scorecard["recommended_action"],
+                "summary": scorecard["summary"],
+                "latest_checkpoint_decision": latest_decision,
+                "latest_checkpoint_overall_status": (
+                    latest_checkpoint.overall_status_snapshot if latest_checkpoint else None
+                ),
+                "latest_checkpoint_at": latest_checkpoint.occurred_at if latest_checkpoint else None,
+            }
+        )
+
+    pilot_shop_count = len(scorecards)
+    production_safe_shop_count = sum(1 for row in scorecards if row["overall_status"] == "production_safe")
+    ready_for_cutover_shop_count = sum(1 for row in scorecards if row["overall_status"] == "ready_for_cutover")
+    monitoring_shop_count = sum(1 for row in scorecards if row["overall_status"] == "monitoring")
+    blocked_shop_count = sum(1 for row in scorecards if row["overall_status"] == "blocked")
+    rollback_recommended_shop_count = sum(
+        1 for row in scorecards if row["overall_status"] == "rollback_recommended"
+    )
+
+    if pilot_shop_count == 0:
+        overall_status = "blocked"
+        recommended_action = (
+            "No pilot shops are registered yet. Create inventory and customer pilot controls before Phase 3 exit review."
+        )
+        summary = "Phase 3 cannot exit because no pilot shops are registered."
+    elif rollback_recommended_shop_count > 0 or rollback_escalated_count > 0:
+        overall_status = "rollback_recommended"
+        recommended_action = (
+            "Do not exit Phase 3. Roll back or stabilize the affected pilot shops before considering broader rollout."
+        )
+        summary = (
+            f"{rollback_recommended_shop_count} shop scorecards and {rollback_escalated_count} checkpoint decisions are signaling rollback pressure."
+        )
+    elif blocked_shop_count > 0:
+        overall_status = "blocked"
+        recommended_action = (
+            "Clear blocked pilot domains, rerun prep and compare, and avoid phase exit until every pilot shop reaches a stable checkpoint."
+        )
+        summary = (
+            f"{blocked_shop_count} of {pilot_shop_count} pilot shops are still blocked by missing prep work, drift, or unresolved checkpoint gaps."
+        )
+    elif monitoring_shop_count > 0 or hold_for_monitoring_count > 0 or shops_without_checkpoint > 0:
+        overall_status = "monitoring"
+        recommended_action = (
+            "Keep Phase 3 in monitoring. Continue verification and record explicit shop checkpoint decisions before signing off the phase."
+        )
+        summary = (
+            f"{monitoring_shop_count} pilot shops are still in monitoring, {hold_for_monitoring_count} are on explicit hold, and {shops_without_checkpoint} are missing a checkpoint decision."
+        )
+    elif (
+        pilot_shop_count > 0
+        and approved_for_cutover_count == pilot_shop_count
+        and ready_for_cutover_shop_count + production_safe_shop_count == pilot_shop_count
+    ):
+        overall_status = "ready_for_phase_exit"
+        recommended_action = (
+            "Phase 3 exit gate is clean. Record the final pilot signoff and prepare the next phase rollout plan."
+        )
+        summary = (
+            f"All {pilot_shop_count} pilot shops have approved checkpoints and are currently classified as ready_for_cutover or production_safe."
+        )
+    else:
+        overall_status = "monitoring"
+        recommended_action = (
+            "Keep observing pilot shops until their scorecards and checkpoint decisions converge on an unambiguous phase-exit posture."
+        )
+        summary = (
+            f"Pilot shops are active, but the checkpoint posture is not yet strong enough to declare a Phase 3 exit."
+        )
+
+    return {
+        "phase": "phase_3",
+        "overall_status": overall_status,
+        "pilot_shop_count": pilot_shop_count,
+        "approved_for_cutover_count": approved_for_cutover_count,
+        "hold_for_monitoring_count": hold_for_monitoring_count,
+        "rollback_escalated_count": rollback_escalated_count,
+        "shops_without_checkpoint": shops_without_checkpoint,
+        "production_safe_shop_count": production_safe_shop_count,
+        "ready_for_cutover_shop_count": ready_for_cutover_shop_count,
+        "monitoring_shop_count": monitoring_shop_count,
+        "blocked_shop_count": blocked_shop_count,
+        "rollback_recommended_shop_count": rollback_recommended_shop_count,
+        "recommended_action": recommended_action,
+        "summary": summary,
+        "shops": sorted(shops, key=lambda row: row["shop_name"].lower()),
+    }

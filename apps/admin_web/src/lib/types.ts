@@ -454,6 +454,49 @@ export type MigrationPilotShopScorecard = {
   domains: MigrationPilotSignoff[];
 };
 
+export type MigrationPhaseReadinessShop = {
+  shop: string;
+  shop_name: string;
+  shop_slug: string;
+  overall_status:
+    | "blocked"
+    | "ready_for_cutover"
+    | "monitoring"
+    | "production_safe"
+    | "rollback_recommended";
+  recommended_action: string;
+  summary: string;
+  latest_checkpoint_decision:
+    | "approved_for_cutover"
+    | "hold_for_monitoring"
+    | "rollback_escalated"
+    | null;
+  latest_checkpoint_overall_status: string | null;
+  latest_checkpoint_at: string | null;
+};
+
+export type MigrationPhaseReadiness = {
+  phase: string;
+  overall_status:
+    | "blocked"
+    | "monitoring"
+    | "ready_for_phase_exit"
+    | "rollback_recommended";
+  pilot_shop_count: number;
+  approved_for_cutover_count: number;
+  hold_for_monitoring_count: number;
+  rollback_escalated_count: number;
+  shops_without_checkpoint: number;
+  production_safe_shop_count: number;
+  ready_for_cutover_shop_count: number;
+  monitoring_shop_count: number;
+  blocked_shop_count: number;
+  rollback_recommended_shop_count: number;
+  recommended_action: string;
+  summary: string;
+  shops: MigrationPhaseReadinessShop[];
+};
+
 export type MigrationPilotPreparationResult = {
   control_id: string;
   shop: string;

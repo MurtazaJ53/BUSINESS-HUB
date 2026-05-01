@@ -281,6 +281,58 @@ class MigrationPilotShopScorecardSerializer(serializers.Serializer):
     domains = MigrationPilotSignoffSerializer(many=True)
 
 
+class MigrationPhaseReadinessShopSerializer(serializers.Serializer):
+    shop = serializers.UUIDField()
+    shop_name = serializers.CharField()
+    shop_slug = serializers.CharField()
+    overall_status = serializers.ChoiceField(
+        choices=[
+            "blocked",
+            "ready_for_cutover",
+            "monitoring",
+            "production_safe",
+            "rollback_recommended",
+        ]
+    )
+    recommended_action = serializers.CharField()
+    summary = serializers.CharField()
+    latest_checkpoint_decision = serializers.ChoiceField(
+        choices=[
+            "approved_for_cutover",
+            "hold_for_monitoring",
+            "rollback_escalated",
+        ],
+        allow_null=True,
+    )
+    latest_checkpoint_overall_status = serializers.CharField(allow_null=True)
+    latest_checkpoint_at = serializers.DateTimeField(allow_null=True)
+
+
+class MigrationPhaseReadinessSerializer(serializers.Serializer):
+    phase = serializers.CharField()
+    overall_status = serializers.ChoiceField(
+        choices=[
+            "blocked",
+            "monitoring",
+            "ready_for_phase_exit",
+            "rollback_recommended",
+        ]
+    )
+    pilot_shop_count = serializers.IntegerField()
+    approved_for_cutover_count = serializers.IntegerField()
+    hold_for_monitoring_count = serializers.IntegerField()
+    rollback_escalated_count = serializers.IntegerField()
+    shops_without_checkpoint = serializers.IntegerField()
+    production_safe_shop_count = serializers.IntegerField()
+    ready_for_cutover_shop_count = serializers.IntegerField()
+    monitoring_shop_count = serializers.IntegerField()
+    blocked_shop_count = serializers.IntegerField()
+    rollback_recommended_shop_count = serializers.IntegerField()
+    recommended_action = serializers.CharField()
+    summary = serializers.CharField()
+    shops = MigrationPhaseReadinessShopSerializer(many=True)
+
+
 class MigrationPilotPreparationResultSerializer(serializers.Serializer):
     control_id = serializers.UUIDField()
     shop = serializers.UUIDField()

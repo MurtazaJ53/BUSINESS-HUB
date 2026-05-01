@@ -17,6 +17,7 @@ import type {
   MigrationControlEvent,
   MigrationJobRun,
   MigrationPilotReadiness,
+  MigrationPhaseReadiness,
   MigrationPilotSignoff,
   MigrationPilotShopScorecard,
   MigrationReconciliationEvent,
@@ -241,6 +242,10 @@ export const getMigrationPilotShopScorecards = cache(
     return apiFetch<MigrationPilotShopScorecard[]>("/migration/pilot-shop-scorecards/");
   },
 );
+
+export const getMigrationPhaseReadiness = cache(async (): Promise<MigrationPhaseReadiness> => {
+  return apiFetch<MigrationPhaseReadiness>("/migration/phase-readiness/");
+});
 
 export const getMigrationReconciliationEvents = cache(
   async (): Promise<MigrationReconciliationEvent[]> => {

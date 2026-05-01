@@ -828,6 +828,155 @@ class MigrationControlApiTests(TestCase):
         self.assertEqual(response.status_code, 409)
         self.assertEqual(MigrationShopCheckpointEvent.objects.count(), 0)
 
+    def test_phase_readiness_reports_ready_for_phase_exit(self):
+        inventory_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.READY,
+            current_epoch=4,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        customer_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=5,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        for domain in (MigrationDomain.INVENTORY, MigrationDomain.CUSTOMERS):
+            MigrationJobRun.objects.create(
+                shop=self.shop,
+                domain=domain,
+                job_type=MigrationJobType.SHADOW_COMPARE,
+                status=MigrationJobStatus.SUCCEEDED,
+                actor_user=self.user,
+                mismatch_count=0,
+                trace_id=f"trace-phase-readiness-{domain}",
+                finished_at=timezone.now(),
+            )
+        MigrationControlEvent.objects.create(
+            control=inventory_control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="monitoring",
+            summary="Inventory is clean and ready for the next promotion window.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=customer_control,
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="production_safe",
+            summary="Customers are stable on PostgreSQL.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+        MigrationShopCheckpointEvent.objects.create(
+            shop=self.shop,
+            actor_user=self.user,
+            decision=MigrationShopCheckpointDecision.APPROVED_FOR_CUTOVER,
+            overall_status_snapshot="ready_for_cutover",
+            summary="Operator approved the shop for the next cutover window.",
+            recommended_action_snapshot="Prepare the next rollout step.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/phase-readiness/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["overall_status"], "ready_for_phase_exit")
+        self.assertEqual(response.data["pilot_shop_count"], 1)
+        self.assertEqual(response.data["approved_for_cutover_count"], 1)
+        self.assertEqual(response.data["shops_without_checkpoint"], 0)
+        self.assertEqual(response.data["shops"][0]["latest_checkpoint_decision"], "approved_for_cutover")
+
+    def test_phase_readiness_reports_rollback_recommended(self):
+        inventory_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=6,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        customer_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=6,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        for domain in (MigrationDomain.INVENTORY, MigrationDomain.CUSTOMERS):
+            MigrationJobRun.objects.create(
+                shop=self.shop,
+                domain=domain,
+                job_type=MigrationJobType.SHADOW_COMPARE,
+                status=MigrationJobStatus.SUCCEEDED,
+                actor_user=self.user,
+                mismatch_count=0,
+                trace_id=f"trace-phase-rollback-{domain}",
+                finished_at=timezone.now(),
+            )
+        MigrationControlEvent.objects.create(
+            control=inventory_control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="rollback_recommended",
+            summary="Inventory drift requires rollback.",
+            metadata_json={"healthy": False, "requires_rollback": True},
+            occurred_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=customer_control,
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="production_safe",
+            summary="Customers are stable on PostgreSQL.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+        MigrationShopCheckpointEvent.objects.create(
+            shop=self.shop,
+            actor_user=self.user,
+            decision=MigrationShopCheckpointDecision.ROLLBACK_ESCALATED,
+            overall_status_snapshot="rollback_recommended",
+            summary="Operator escalated rollback for this shop.",
+            recommended_action_snapshot="Rollback inventory before the next attempt.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/phase-readiness/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["overall_status"], "rollback_recommended")
+        self.assertEqual(response.data["rollback_escalated_count"], 1)
+        self.assertEqual(response.data["rollback_recommended_shop_count"], 1)
+        self.assertEqual(response.data["shops"][0]["latest_checkpoint_decision"], "rollback_escalated")
+
     def test_non_platform_admin_is_blocked(self):
         non_admin = PlatformUser.objects.create_user(email="staff@example.com", password="secret", full_name="Staff")
         self.client.force_authenticate(user=non_admin)

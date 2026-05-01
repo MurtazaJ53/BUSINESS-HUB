@@ -3,6 +3,7 @@ import { EmptyState } from "@/components/empty-state";
 import { MigrationActivityTable } from "@/components/migration-activity-table";
 import { MigrationBridgeReceiptsTable } from "@/components/migration-bridge-receipts-table";
 import { MigrationPilotCheckpointBoard } from "@/components/migration-pilot-checkpoint-board";
+import { MigrationPhaseReadinessPanel } from "@/components/migration-phase-readiness-panel";
 import { MigrationPilotSignoffBoard } from "@/components/migration-pilot-signoff-board";
 import { MigrationPilotShopScorecardBoard } from "@/components/migration-pilot-shop-scorecard-board";
 import { MetricCard } from "@/components/metric-card";
@@ -20,6 +21,7 @@ import {
   getMigrationControlEvents,
   getMigrationBridgeReceipts,
   getMigrationControls,
+  getMigrationPhaseReadiness,
   getMigrationJobRuns,
   getMigrationPilotReadiness,
   getMigrationPilotSignoff,
@@ -156,7 +158,7 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
     );
   }
 
-  const [controls, jobs, activityEvents, shopCheckpointEvents, receipts, pilotReadiness, pilotSignoff, pilotShopScorecards, shadowSummaries, events] =
+  const [controls, jobs, activityEvents, shopCheckpointEvents, receipts, pilotReadiness, pilotSignoff, pilotShopScorecards, phaseReadiness, shadowSummaries, events] =
     await Promise.all([
       getMigrationControls(),
       getMigrationJobRuns(),
@@ -166,6 +168,7 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
       getMigrationPilotReadiness(),
       getMigrationPilotSignoff(),
       getMigrationPilotShopScorecards(),
+      getMigrationPhaseReadiness(),
       getMigrationShadowSummaries(),
       getMigrationReconciliationEvents(),
     ]);
@@ -193,6 +196,8 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
         {verificationSummary ? (
           <MigrationPilotVerificationSummary {...verificationSummary} />
         ) : null}
+
+        <MigrationPhaseReadinessPanel readiness={phaseReadiness} />
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-8">
           <MetricCard
