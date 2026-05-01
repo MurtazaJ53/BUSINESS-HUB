@@ -6,6 +6,7 @@ from platform_apps.jobs.models import (
     MigrationBridgeReceipt,
     MigrationControlEvent,
     MigrationDomainControl,
+    MigrationLaunchCheckpointEvent,
     MigrationPhaseCheckpointEvent,
     MigrationJobRun,
     MigrationShopCheckpointEvent,
@@ -212,6 +213,35 @@ class MigrationPhaseCheckpointEventSerializer(serializers.ModelSerializer):
         return None
 
 
+class MigrationLaunchCheckpointEventSerializer(serializers.ModelSerializer):
+    actor_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MigrationLaunchCheckpointEvent
+        fields = (
+            "id",
+            "phase",
+            "actor_user",
+            "actor_name",
+            "decision",
+            "overall_status_snapshot",
+            "summary",
+            "recommended_action_snapshot",
+            "metadata_json",
+            "occurred_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+    def get_actor_name(self, obj):
+        if obj.actor_user_id and obj.actor_user.full_name:
+            return obj.actor_user.full_name
+        if obj.actor_user_id:
+            return obj.actor_user.email
+        return None
+
+
 class MigrationShadowSummarySerializer(serializers.Serializer):
     shop = serializers.UUIDField()
     shop_name = serializers.CharField()
@@ -361,6 +391,70 @@ class MigrationPhaseReadinessSerializer(serializers.Serializer):
     recommended_action = serializers.CharField()
     summary = serializers.CharField()
     shops = MigrationPhaseReadinessShopSerializer(many=True)
+
+
+class MigrationRetirementDomainSnapshotSerializer(serializers.Serializer):
+    domain = serializers.CharField()
+    present = serializers.BooleanField()
+    write_master = serializers.CharField(allow_null=True)
+    bridge_mode = serializers.CharField(allow_null=True)
+    cutover_status = serializers.CharField(allow_null=True)
+
+
+class MigrationRetirementShopScorecardSerializer(serializers.Serializer):
+    shop = serializers.UUIDField()
+    shop_name = serializers.CharField()
+    shop_slug = serializers.CharField()
+    overall_status = serializers.ChoiceField(
+        choices=[
+            "blocked",
+            "monitoring",
+            "ready_for_launch",
+            "rollback_recommended",
+        ]
+    )
+    recommended_action = serializers.CharField()
+    summary = serializers.CharField()
+    missing_domains = serializers.ListField(child=serializers.CharField())
+    postgres_primary_domains = serializers.IntegerField()
+    firebase_primary_domains = serializers.IntegerField()
+    active_bridge_domains = serializers.IntegerField()
+    compare_only_domains = serializers.IntegerField()
+    blocked_domains = serializers.IntegerField()
+    open_events = serializers.IntegerField()
+    open_critical_events = serializers.IntegerField()
+    domains = MigrationRetirementDomainSnapshotSerializer(many=True)
+
+
+class MigrationRetirementReadinessSerializer(serializers.Serializer):
+    phase = serializers.CharField()
+    overall_status = serializers.ChoiceField(
+        choices=[
+            "blocked",
+            "monitoring",
+            "ready_for_launch",
+            "retirement_complete",
+            "rollback_recommended",
+        ]
+    )
+    shop_count = serializers.IntegerField()
+    ready_for_launch_shop_count = serializers.IntegerField()
+    monitoring_shop_count = serializers.IntegerField()
+    blocked_shop_count = serializers.IntegerField()
+    rollback_recommended_shop_count = serializers.IntegerField()
+    latest_launch_decision = serializers.ChoiceField(
+        choices=[
+            "approved_for_launch",
+            "hold_for_hardening",
+            "rollback_to_phase4",
+        ],
+        allow_null=True,
+    )
+    latest_launch_status_snapshot = serializers.CharField(allow_null=True)
+    latest_launch_at = serializers.DateTimeField(allow_null=True)
+    recommended_action = serializers.CharField()
+    summary = serializers.CharField()
+    shops = MigrationRetirementShopScorecardSerializer(many=True)
 
 
 class MigrationPilotPreparationResultSerializer(serializers.Serializer):

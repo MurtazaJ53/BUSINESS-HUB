@@ -10,6 +10,7 @@ from platform_apps.common.migration import (
     MigrationBridgeMode,
     MigrationControlEventType,
     MigrationCutoverStatus,
+    MigrationLaunchCheckpointDecision,
     MigrationPhaseCheckpointDecision,
     MigrationJobStatus,
     MigrationJobType,
@@ -21,12 +22,15 @@ from platform_apps.jobs.models import (
     MigrationBridgeReceipt,
     MigrationControlEvent,
     MigrationDomainControl,
+    MigrationLaunchCheckpointEvent,
     MigrationPhaseCheckpointEvent,
     MigrationJobRun,
     MigrationShopCheckpointEvent,
 )
 from platform_apps.jobs.readiness import (
     PHASE3_PILOT_DOMAINS,
+    PHASE5_REQUIRED_DOMAINS,
+    build_phase5_retirement_readiness,
     build_phase3_program_readiness,
     build_pilot_readiness,
     build_pilot_signoff,
@@ -37,6 +41,7 @@ from platform_apps.jobs.serializers import (
     MigrationControlEventSerializer,
     MigrationDomainControlSerializer,
     MigrationJobRunSerializer,
+    MigrationLaunchCheckpointEventSerializer,
     MigrationPhaseCheckpointEventSerializer,
     MigrationPhaseReadinessSerializer,
     MigrationPilotPreparationResultSerializer,
@@ -44,6 +49,7 @@ from platform_apps.jobs.serializers import (
     MigrationPilotSignoffSerializer,
     MigrationPilotShopScorecardSerializer,
     MigrationPilotVerificationResultSerializer,
+    MigrationRetirementReadinessSerializer,
     MigrationShopCheckpointEventSerializer,
     MigrationShadowSummarySerializer,
 )
@@ -361,6 +367,91 @@ class MigrationPhaseCheckpointEventListCreateView(generics.ListCreateAPIView):
         return Response(serializer.data, status=201)
 
 
+class MigrationLaunchCheckpointEventListCreateView(generics.ListCreateAPIView):
+    serializer_class = MigrationLaunchCheckpointEventSerializer
+    permission_classes = [IsPlatformAdminUser]
+    pagination_class = None
+
+    def get_queryset(self):
+        queryset = MigrationLaunchCheckpointEvent.objects.select_related("actor_user")
+        phase = self.request.query_params.get("phase", "").strip()
+        decision = self.request.query_params.get("decision", "").strip()
+
+        if phase:
+            queryset = queryset.filter(phase=phase)
+        if decision:
+            queryset = queryset.filter(decision=decision)
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        phase = str(request.data.get("phase") or "phase_5").strip() or "phase_5"
+        decision = str(request.data.get("decision") or "").strip()
+        note = str(request.data.get("note") or "").strip()
+
+        if not decision:
+            return Response({"detail": "decision is required."}, status=400)
+
+        if decision not in MigrationLaunchCheckpointDecision.values:
+            return Response({"detail": "Unknown launch checkpoint decision."}, status=400)
+
+        controls = list(
+            MigrationDomainControl.objects.select_related("shop")
+            .filter(domain__in=tuple(PHASE5_REQUIRED_DOMAINS))
+            .order_by("shop__name", "domain")
+        )
+        launch_events = list(
+            MigrationLaunchCheckpointEvent.objects.select_related("actor_user").order_by(
+                "-occurred_at", "-created_at"
+            )
+        )
+        retirement_readiness = build_phase5_retirement_readiness(controls, launch_events)
+
+        if (
+            decision == MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH
+            and retirement_readiness["overall_status"] != "ready_for_launch"
+        ):
+            return Response(
+                {
+                    "detail": "Phase 5 is not yet ready for final launch approval.",
+                    "overall_status": retirement_readiness["overall_status"],
+                    "recommended_action": retirement_readiness["recommended_action"],
+                },
+                status=409,
+            )
+
+        event = MigrationLaunchCheckpointEvent.objects.create(
+            phase=phase,
+            actor_user=request.user,
+            decision=decision,
+            overall_status_snapshot=retirement_readiness["overall_status"],
+            summary=retirement_readiness["summary"],
+            recommended_action_snapshot=retirement_readiness["recommended_action"],
+            metadata_json={
+                "note": note,
+                "shop_count": retirement_readiness["shop_count"],
+                "ready_for_launch_shop_count": retirement_readiness["ready_for_launch_shop_count"],
+                "monitoring_shop_count": retirement_readiness["monitoring_shop_count"],
+                "blocked_shop_count": retirement_readiness["blocked_shop_count"],
+                "rollback_recommended_shop_count": retirement_readiness["rollback_recommended_shop_count"],
+                "shops": [
+                    {
+                        "shop": shop_snapshot["shop"],
+                        "shop_name": shop_snapshot["shop_name"],
+                        "overall_status": shop_snapshot["overall_status"],
+                        "missing_domains": shop_snapshot["missing_domains"],
+                        "firebase_primary_domains": shop_snapshot["firebase_primary_domains"],
+                        "active_bridge_domains": shop_snapshot["active_bridge_domains"],
+                        "open_critical_events": shop_snapshot["open_critical_events"],
+                    }
+                    for shop_snapshot in retirement_readiness["shops"]
+                ],
+            },
+            occurred_at=timezone.now(),
+        )
+        serializer = self.get_serializer(event)
+        return Response(serializer.data, status=201)
+
+
 class MigrationShadowSummaryListView(APIView):
     permission_classes = [IsPlatformAdminUser]
 
@@ -495,6 +586,29 @@ class MigrationPhaseReadinessView(APIView):
 
         payload = build_phase3_program_readiness(controls, checkpoint_events)
         serializer = MigrationPhaseReadinessSerializer(payload)
+        return Response(serializer.data)
+
+
+class MigrationRetirementReadinessView(APIView):
+    permission_classes = [IsPlatformAdminUser]
+
+    def get(self, request):
+        controls = list(
+            MigrationDomainControl.objects.select_related("shop")
+            .filter(domain__in=tuple(PHASE5_REQUIRED_DOMAINS))
+            .order_by("shop__name", "domain")
+        )
+        shop_id = request.query_params.get("shop_id", "").strip()
+        if shop_id:
+            controls = [control for control in controls if str(control.shop_id) == shop_id]
+
+        launch_events_queryset = MigrationLaunchCheckpointEvent.objects.select_related(
+            "actor_user"
+        ).order_by("-occurred_at", "-created_at")
+        launch_events = list(launch_events_queryset)
+
+        payload = build_phase5_retirement_readiness(controls, launch_events)
+        serializer = MigrationRetirementReadinessSerializer(payload)
         return Response(serializer.data)
 
 

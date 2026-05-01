@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { apiMutation } from "@/lib/admin-api";
 import type {
   MigrationJobRun,
+  MigrationLaunchCheckpointEvent,
   MigrationPhaseCheckpointEvent,
   MigrationPilotPreparationResult,
   MigrationPilotVerificationResult,
@@ -425,6 +426,59 @@ export async function recordPhaseCheckpointAction(formData: FormData) {
       buildRedirectUrl({
         status: "error",
         action: "phase-checkpoint",
+        phase,
+        decision,
+        message,
+      }),
+    );
+  }
+}
+
+
+export async function recordLaunchCheckpointAction(formData: FormData) {
+  const phase = getOptionalField(formData, "phase") || "phase_5";
+  const decision = getOptionalField(formData, "decision");
+
+  if (!decision) {
+    redirect(
+      buildRedirectUrl({
+        status: "error",
+        action: "launch-checkpoint",
+        message: "Missing launch checkpoint decision.",
+      }),
+    );
+  }
+
+  try {
+    const result = await apiMutation<MigrationLaunchCheckpointEvent>(
+      "/migration/launch-checkpoints/",
+      {
+        method: "POST",
+        body: {
+          phase,
+          decision,
+        },
+      },
+    );
+    revalidatePath("/migration");
+    redirect(
+      buildRedirectUrl({
+        status: "success",
+        action: "launch-checkpoint",
+        phase: result.phase,
+        decision: result.decision,
+        launchCheckpointStatus: result.overall_status_snapshot,
+      }),
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message.replace(/\s+/g, " ").slice(0, 220)
+        : "Unknown launch checkpoint failure.";
+    redirect(
+      buildRedirectUrl({
+        status: "error",
+        action: "launch-checkpoint",
         phase,
         decision,
         message,

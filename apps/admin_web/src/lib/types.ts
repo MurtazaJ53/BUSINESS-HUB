@@ -383,6 +383,29 @@ export type MigrationPhaseCheckpointEvent = {
   updated_at: string;
 };
 
+export type MigrationLaunchCheckpointEvent = {
+  id: string;
+  phase: string;
+  actor_user: string | null;
+  actor_name: string | null;
+  decision:
+    | "approved_for_launch"
+    | "hold_for_hardening"
+    | "rollback_to_phase4";
+  overall_status_snapshot:
+    | "blocked"
+    | "monitoring"
+    | "ready_for_launch"
+    | "retirement_complete"
+    | "rollback_recommended";
+  summary: string;
+  recommended_action_snapshot: string;
+  metadata_json: Record<string, unknown>;
+  occurred_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type MigrationShadowSummary = {
   shop: string;
   shop_name: string;
@@ -517,6 +540,71 @@ export type MigrationPhaseReadiness = {
   recommended_action: string;
   summary: string;
   shops: MigrationPhaseReadinessShop[];
+};
+
+export type MigrationRetirementDomainSnapshot = {
+  domain: string;
+  present: boolean;
+  write_master: "firebase" | "postgres" | null;
+  bridge_mode:
+    | "disabled"
+    | "compare_only"
+    | "firebase_to_postgres"
+    | "postgres_to_firebase"
+    | null;
+  cutover_status:
+    | "legacy"
+    | "pilot"
+    | "ready"
+    | "postgres_primary"
+    | null;
+};
+
+export type MigrationRetirementShopScorecard = {
+  shop: string;
+  shop_name: string;
+  shop_slug: string;
+  overall_status:
+    | "blocked"
+    | "monitoring"
+    | "ready_for_launch"
+    | "rollback_recommended";
+  recommended_action: string;
+  summary: string;
+  missing_domains: string[];
+  postgres_primary_domains: number;
+  firebase_primary_domains: number;
+  active_bridge_domains: number;
+  compare_only_domains: number;
+  blocked_domains: number;
+  open_events: number;
+  open_critical_events: number;
+  domains: MigrationRetirementDomainSnapshot[];
+};
+
+export type MigrationRetirementReadiness = {
+  phase: string;
+  overall_status:
+    | "blocked"
+    | "monitoring"
+    | "ready_for_launch"
+    | "retirement_complete"
+    | "rollback_recommended";
+  shop_count: number;
+  ready_for_launch_shop_count: number;
+  monitoring_shop_count: number;
+  blocked_shop_count: number;
+  rollback_recommended_shop_count: number;
+  latest_launch_decision:
+    | "approved_for_launch"
+    | "hold_for_hardening"
+    | "rollback_to_phase4"
+    | null;
+  latest_launch_status_snapshot: string | null;
+  latest_launch_at: string | null;
+  recommended_action: string;
+  summary: string;
+  shops: MigrationRetirementShopScorecard[];
 };
 
 export type MigrationPilotPreparationResult = {

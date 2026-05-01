@@ -16,12 +16,14 @@ import type {
   MigrationBridgeReceipt,
   MigrationControlEvent,
   MigrationJobRun,
+  MigrationLaunchCheckpointEvent,
   MigrationPhaseCheckpointEvent,
   MigrationPilotReadiness,
   MigrationPhaseReadiness,
   MigrationPilotSignoff,
   MigrationPilotShopScorecard,
   MigrationReconciliationEvent,
+  MigrationRetirementReadiness,
   MigrationShopCheckpointEvent,
   MigrationShadowSummary,
   MigrationStats,
@@ -232,6 +234,12 @@ export const getMigrationPhaseCheckpointEvents = cache(
   },
 );
 
+export const getMigrationLaunchCheckpointEvents = cache(
+  async (): Promise<MigrationLaunchCheckpointEvent[]> => {
+    return apiFetch<MigrationLaunchCheckpointEvent[]>("/migration/launch-checkpoints/");
+  },
+);
+
 export const getMigrationShadowSummaries = cache(async (): Promise<MigrationShadowSummary[]> => {
   return apiFetch<MigrationShadowSummary[]>("/migration/shadow-summaries/");
 });
@@ -253,6 +261,12 @@ export const getMigrationPilotShopScorecards = cache(
 export const getMigrationPhaseReadiness = cache(async (): Promise<MigrationPhaseReadiness> => {
   return apiFetch<MigrationPhaseReadiness>("/migration/phase-readiness/");
 });
+
+export const getMigrationRetirementReadiness = cache(
+  async (): Promise<MigrationRetirementReadiness> => {
+    return apiFetch<MigrationRetirementReadiness>("/migration/retirement-readiness/");
+  },
+);
 
 export const getMigrationReconciliationEvents = cache(
   async (): Promise<MigrationReconciliationEvent[]> => {

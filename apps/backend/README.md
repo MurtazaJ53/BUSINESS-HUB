@@ -44,6 +44,8 @@ Phase 1 backend foundation for the Business Hub target platform.
 - `/api/v1/migration/pilot-readiness/`
 - `/api/v1/migration/phase-readiness/`
 - `/api/v1/migration/phase-checkpoints/`
+- `/api/v1/migration/retirement-readiness/`
+- `/api/v1/migration/launch-checkpoints/`
 - `/api/v1/migration/shadow-summaries/`
 - `/api/v1/migration/reconciliation/`
 - `/api/v1/health/`
@@ -101,3 +103,17 @@ These endpoints add:
 - projection refresh after accepted commerce writes so dashboards stay derived from committed facts
 
 If a sales or payments migration control exists and that domain is still legacy-owned, the command endpoint returns `409` instead of bypassing the active write owner.
+
+## Phase 5 retirement and launch signoff
+
+Phase 5 adds the final retirement/hardening control plane:
+
+- `/api/v1/migration/retirement-readiness/`
+- `/api/v1/migration/launch-checkpoints/`
+
+The retirement readiness endpoint rolls up whether required domains are still Firebase-primary, still using bridge pressure, or are actually ready for final launch.
+The launch checkpoint endpoint records durable final decisions:
+
+- `approved_for_launch`
+- `hold_for_hardening`
+- `rollback_to_phase4`

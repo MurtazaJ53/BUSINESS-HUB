@@ -2,6 +2,7 @@ import { AdminShell } from "@/components/admin-shell";
 import { EmptyState } from "@/components/empty-state";
 import { MigrationActivityTable } from "@/components/migration-activity-table";
 import { MigrationBridgeReceiptsTable } from "@/components/migration-bridge-receipts-table";
+import { MigrationLaunchCheckpointTable } from "@/components/migration-launch-checkpoint-table";
 import { MigrationPilotCheckpointBoard } from "@/components/migration-pilot-checkpoint-board";
 import { MigrationPhaseCheckpointTable } from "@/components/migration-phase-checkpoint-table";
 import { MigrationPhaseReadinessPanel } from "@/components/migration-phase-readiness-panel";
@@ -13,6 +14,7 @@ import { MigrationJobsTable } from "@/components/migration-jobs-table";
 import { MigrationPilotReadinessTable } from "@/components/migration-pilot-readiness-table";
 import { MigrationPilotStageStrip } from "@/components/migration-pilot-stage-strip";
 import { MigrationPilotVerificationSummary } from "@/components/migration-pilot-verification-summary";
+import { MigrationRetirementReadinessPanel } from "@/components/migration-retirement-readiness-panel";
 import { MigrationRunbookPanel } from "@/components/migration-runbook-panel";
 import { MigrationShopCheckpointTable } from "@/components/migration-shop-checkpoint-table";
 import { ReconciliationEventsTable } from "@/components/reconciliation-events-table";
@@ -21,6 +23,7 @@ import {
   buildMigrationStats,
   getMigrationControlEvents,
   getMigrationBridgeReceipts,
+  getMigrationLaunchCheckpointEvents,
   getMigrationPhaseCheckpointEvents,
   getMigrationControls,
   getMigrationPhaseReadiness,
@@ -29,6 +32,7 @@ import {
   getMigrationPilotSignoff,
   getMigrationPilotShopScorecards,
   getMigrationReconciliationEvents,
+  getMigrationRetirementReadiness,
   getMigrationShopCheckpointEvents,
   getMigrationShadowSummaries,
   getSession,
@@ -77,6 +81,10 @@ function buildActionBanner(searchParams: SearchParams) {
     searchParams,
     "phaseCheckpointStatus",
   );
+  const launchCheckpointStatus = getSearchParamValue(
+    searchParams,
+    "launchCheckpointStatus",
+  );
   const reconciliationStatus = getSearchParamValue(
     searchParams,
     "reconciliationStatus",
@@ -97,6 +105,8 @@ function buildActionBanner(searchParams: SearchParams) {
         ? ` decision=${checkpointDecision || "unknown"}. scorecard=${shopCheckpointStatus || "unknown"}.`
         : action === "phase-checkpoint"
         ? ` phase=${phase || "phase_3"}. decision=${checkpointDecision || "unknown"}. readiness=${phaseCheckpointStatus || "unknown"}.`
+        : action === "launch-checkpoint"
+        ? ` phase=${phase || "phase_5"}. decision=${checkpointDecision || "unknown"}. retirement=${launchCheckpointStatus || "unknown"}.`
         : action.startsWith("reconciliation-")
         ? ` Issue ${issue || "unknown"} is now ${reconciliationStatus || "updated"}.`
         : action.startsWith("run-") && jobStatus
@@ -167,18 +177,20 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
     );
   }
 
-  const [controls, jobs, activityEvents, shopCheckpointEvents, phaseCheckpointEvents, receipts, pilotReadiness, pilotSignoff, pilotShopScorecards, phaseReadiness, shadowSummaries, events] =
+  const [controls, jobs, activityEvents, shopCheckpointEvents, phaseCheckpointEvents, launchCheckpointEvents, receipts, pilotReadiness, pilotSignoff, pilotShopScorecards, phaseReadiness, retirementReadiness, shadowSummaries, events] =
     await Promise.all([
       getMigrationControls(),
       getMigrationJobRuns(),
       getMigrationControlEvents(),
       getMigrationShopCheckpointEvents(),
       getMigrationPhaseCheckpointEvents(),
+      getMigrationLaunchCheckpointEvents(),
       getMigrationBridgeReceipts(),
       getMigrationPilotReadiness(),
       getMigrationPilotSignoff(),
       getMigrationPilotShopScorecards(),
       getMigrationPhaseReadiness(),
+      getMigrationRetirementReadiness(),
       getMigrationShadowSummaries(),
       getMigrationReconciliationEvents(),
     ]);
@@ -192,7 +204,7 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
       activeShop={activeShop}
       activeRoute="migration"
       title="Migration Control"
-      subtitle="Phase 3 control plane for pilot cutovers, bridge posture, job visibility, and reconciliation triage."
+      subtitle="Unified migration control plane for pilot cutovers, commerce hardening, retirement readiness, and final launch signoff."
     >
       <div className="space-y-8">
         {actionBanner ? (
@@ -206,6 +218,19 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
         {verificationSummary ? (
           <MigrationPilotVerificationSummary {...verificationSummary} />
         ) : null}
+
+        <MigrationRetirementReadinessPanel readiness={retirementReadiness} />
+
+        <section className="panel-soft rounded-[28px] px-6 py-6">
+          <p className="eyebrow">Launch checkpoint journal</p>
+          <h2 className="mt-3 text-2xl font-bold">Recorded retirement decisions</h2>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
+            This is the durable Phase 5 signoff trail for final launch, hardening holds, and any decision to push the platform back into Phase 4 posture.
+          </p>
+          <div className="mt-6">
+            <MigrationLaunchCheckpointTable events={launchCheckpointEvents} />
+          </div>
+        </section>
 
         <MigrationPhaseReadinessPanel readiness={phaseReadiness} />
 

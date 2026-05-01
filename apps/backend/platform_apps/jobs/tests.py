@@ -12,6 +12,7 @@ from platform_apps.common.migration import (
     MigrationDomain,
     MigrationJobStatus,
     MigrationJobType,
+    MigrationLaunchCheckpointDecision,
     MigrationShopCheckpointDecision,
     MigrationWriteMaster,
 )
@@ -21,6 +22,7 @@ from platform_apps.jobs.models import (
     MigrationBridgeReceipt,
     MigrationControlEvent,
     MigrationDomainControl,
+    MigrationLaunchCheckpointEvent,
     MigrationPhaseCheckpointEvent,
     MigrationJobRun,
     MigrationShopCheckpointEvent,
@@ -1109,6 +1111,101 @@ class MigrationControlApiTests(TestCase):
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.data["overall_status"], "blocked")
         self.assertEqual(MigrationPhaseCheckpointEvent.objects.count(), 0)
+
+    def test_retirement_readiness_reports_ready_for_launch(self):
+        required_domains = [
+            MigrationDomain.INVENTORY,
+            MigrationDomain.CUSTOMERS,
+            MigrationDomain.CUSTOMER_LEDGER,
+            MigrationDomain.EXPENSES,
+            MigrationDomain.ATTENDANCE,
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+            MigrationDomain.REPORTING,
+        ]
+        for domain in required_domains:
+            MigrationDomainControl.objects.create(
+                shop=self.shop,
+                domain=domain,
+                write_master=MigrationWriteMaster.POSTGRES,
+                bridge_mode=MigrationBridgeMode.DISABLED,
+                cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+                current_epoch=8,
+                shadow_reads_enabled=True,
+            )
+
+        response = self.client.get("/api/v1/migration/retirement-readiness/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["overall_status"], "ready_for_launch")
+        self.assertEqual(response.data["shop_count"], 1)
+        self.assertEqual(response.data["ready_for_launch_shop_count"], 1)
+        self.assertEqual(response.data["blocked_shop_count"], 0)
+
+    def test_create_launch_checkpoint_records_retirement_snapshot(self):
+        required_domains = [
+            MigrationDomain.INVENTORY,
+            MigrationDomain.CUSTOMERS,
+            MigrationDomain.CUSTOMER_LEDGER,
+            MigrationDomain.EXPENSES,
+            MigrationDomain.ATTENDANCE,
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+            MigrationDomain.REPORTING,
+        ]
+        for domain in required_domains:
+            MigrationDomainControl.objects.create(
+                shop=self.shop,
+                domain=domain,
+                write_master=MigrationWriteMaster.POSTGRES,
+                bridge_mode=MigrationBridgeMode.DISABLED,
+                cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+                current_epoch=8,
+                shadow_reads_enabled=True,
+            )
+
+        response = self.client.post(
+            "/api/v1/migration/launch-checkpoints/",
+            {
+                "phase": "phase_5",
+                "decision": MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH,
+                "note": "Legacy retirement is signed off for launch.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(MigrationLaunchCheckpointEvent.objects.count(), 1)
+        event = MigrationLaunchCheckpointEvent.objects.get()
+        self.assertEqual(event.phase, "phase_5")
+        self.assertEqual(event.decision, MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH)
+        self.assertEqual(event.overall_status_snapshot, "ready_for_launch")
+
+    def test_create_launch_checkpoint_blocks_premature_approval(self):
+        MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            current_epoch=3,
+            shadow_reads_enabled=True,
+        )
+
+        response = self.client.post(
+            "/api/v1/migration/launch-checkpoints/",
+            {
+                "phase": "phase_5",
+                "decision": MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data["overall_status"], "blocked")
+        self.assertEqual(MigrationLaunchCheckpointEvent.objects.count(), 0)
 
     def test_non_platform_admin_is_blocked(self):
         non_admin = PlatformUser.objects.create_user(email="staff@example.com", password="secret", full_name="Staff")

@@ -10,12 +10,14 @@ from platform_apps.common.migration import (
     MigrationDomain,
     MigrationJobStatus,
     MigrationJobType,
+    MigrationLaunchCheckpointDecision,
     ReconciliationStatus,
 )
 from platform_apps.jobs.models import (
     MigrationControlEvent,
     MigrationDomainControl,
     MigrationJobRun,
+    MigrationLaunchCheckpointEvent,
     MigrationShopCheckpointEvent,
 )
 
@@ -23,6 +25,18 @@ from platform_apps.jobs.models import (
 PHASE3_PILOT_DOMAINS = {
     MigrationDomain.INVENTORY,
     MigrationDomain.CUSTOMERS,
+}
+
+PHASE5_REQUIRED_DOMAINS = {
+    MigrationDomain.INVENTORY,
+    MigrationDomain.CUSTOMERS,
+    MigrationDomain.CUSTOMER_LEDGER,
+    MigrationDomain.EXPENSES,
+    MigrationDomain.ATTENDANCE,
+    MigrationDomain.SALES,
+    MigrationDomain.PAYMENTS,
+    MigrationDomain.STOCK_LEDGER,
+    MigrationDomain.REPORTING,
 }
 
 
@@ -422,4 +436,232 @@ def build_phase3_program_readiness(
         "recommended_action": recommended_action,
         "summary": summary,
         "shops": sorted(shops, key=lambda row: row["shop_name"].lower()),
+    }
+
+
+def build_phase5_shop_retirement_scorecards(
+    controls: list[MigrationDomainControl],
+) -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
+
+    for control in controls:
+        if control.domain not in PHASE5_REQUIRED_DOMAINS:
+            continue
+        shop_key = str(control.shop_id)
+        bucket = grouped.setdefault(
+            shop_key,
+            {
+                "shop": shop_key,
+                "shop_name": control.shop.name,
+                "shop_slug": control.shop.slug,
+                "controls": [],
+            },
+        )
+        bucket["controls"].append(control)
+
+    scorecards: list[dict[str, Any]] = []
+    for bucket in grouped.values():
+        controls_for_shop = sorted(bucket["controls"], key=lambda item: item.domain)
+        by_domain = {control.domain: control for control in controls_for_shop}
+        missing_domains = sorted(PHASE5_REQUIRED_DOMAINS - set(by_domain))
+        open_events = MigrationReconciliationEvent.objects.filter(
+            shop_id=bucket["shop"],
+            domain__in=tuple(PHASE5_REQUIRED_DOMAINS),
+            status__in=[ReconciliationStatus.OPEN, ReconciliationStatus.ACKNOWLEDGED],
+        )
+        open_critical_events = open_events.filter(severity="critical").count()
+        open_total_events = open_events.count()
+
+        postgres_primary_domains = 0
+        firebase_primary_domains = 0
+        active_bridge_domains = 0
+        compare_only_domains = 0
+        blocked_domains = 0
+        domain_snapshots: list[dict[str, Any]] = []
+
+        for domain in sorted(PHASE5_REQUIRED_DOMAINS):
+            control = by_domain.get(domain)
+            if control is None:
+                blocked_domains += 1
+                domain_snapshots.append(
+                    {
+                        "domain": domain,
+                        "present": False,
+                        "write_master": None,
+                        "bridge_mode": None,
+                        "cutover_status": None,
+                    }
+                )
+                continue
+
+            if (
+                control.write_master == "postgres"
+                and control.cutover_status == MigrationCutoverStatus.POSTGRES_PRIMARY
+            ):
+                postgres_primary_domains += 1
+            else:
+                blocked_domains += 1
+
+            if control.write_master == "firebase":
+                firebase_primary_domains += 1
+            if control.bridge_mode in {
+                MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+                MigrationBridgeMode.POSTGRES_TO_FIREBASE,
+            }:
+                active_bridge_domains += 1
+            elif control.bridge_mode == MigrationBridgeMode.COMPARE_ONLY:
+                compare_only_domains += 1
+
+            domain_snapshots.append(
+                {
+                    "domain": domain,
+                    "present": True,
+                    "write_master": control.write_master,
+                    "bridge_mode": control.bridge_mode,
+                    "cutover_status": control.cutover_status,
+                }
+            )
+
+        if open_critical_events > 0:
+            overall_status = "rollback_recommended"
+            summary = (
+                "Critical reconciliation pressure still exists on required Phase 5 domains."
+            )
+            recommended_action = (
+                "Do not retire legacy paths. Resolve critical reconciliation issues or fall back to the Phase 4 cutover posture."
+            )
+        elif missing_domains or firebase_primary_domains > 0 or blocked_domains > 0:
+            overall_status = "blocked"
+            summary = (
+                "One or more required domains are missing controls or have not fully reached PostgreSQL-primary ownership yet."
+            )
+            recommended_action = (
+                "Finish cutover for all required domains before considering Firebase retirement."
+            )
+        elif active_bridge_domains > 0 or compare_only_domains > 0 or open_total_events > 0:
+            overall_status = "monitoring"
+            summary = (
+                "Core domains are on PostgreSQL, but bridge traffic or reconciliation pressure still means retirement should stay under hardening watch."
+            )
+            recommended_action = (
+                "Keep bridge/watch posture active, clear open issues, and only approve launch once the legacy dependency surface is quiet."
+            )
+        else:
+            overall_status = "ready_for_launch"
+            summary = (
+                "All required domains are PostgreSQL-primary with no open reconciliation pressure or active bridge dependency."
+            )
+            recommended_action = (
+                "This shop is clean enough for final launch signoff and legacy retirement review."
+            )
+
+        scorecards.append(
+            {
+                "shop": bucket["shop"],
+                "shop_name": bucket["shop_name"],
+                "shop_slug": bucket["shop_slug"],
+                "overall_status": overall_status,
+                "recommended_action": recommended_action,
+                "summary": summary,
+                "missing_domains": missing_domains,
+                "postgres_primary_domains": postgres_primary_domains,
+                "firebase_primary_domains": firebase_primary_domains,
+                "active_bridge_domains": active_bridge_domains,
+                "compare_only_domains": compare_only_domains,
+                "blocked_domains": blocked_domains,
+                "open_events": open_total_events,
+                "open_critical_events": open_critical_events,
+                "domains": domain_snapshots,
+            }
+        )
+
+    return sorted(scorecards, key=lambda row: row["shop_name"].lower())
+
+
+def build_phase5_retirement_readiness(
+    controls: list[MigrationDomainControl],
+    launch_events: list[MigrationLaunchCheckpointEvent],
+) -> dict[str, Any]:
+    scorecards = build_phase5_shop_retirement_scorecards(controls)
+    latest_launch_event = launch_events[0] if launch_events else None
+
+    shop_count = len(scorecards)
+    ready_for_launch_shop_count = sum(
+        1 for row in scorecards if row["overall_status"] == "ready_for_launch"
+    )
+    monitoring_shop_count = sum(
+        1 for row in scorecards if row["overall_status"] == "monitoring"
+    )
+    blocked_shop_count = sum(1 for row in scorecards if row["overall_status"] == "blocked")
+    rollback_recommended_shop_count = sum(
+        1 for row in scorecards if row["overall_status"] == "rollback_recommended"
+    )
+
+    if shop_count == 0:
+        overall_status = "blocked"
+        recommended_action = (
+            "No Phase 5 retirement scorecards exist yet. Promote the required domains before evaluating launch readiness."
+        )
+        summary = "Phase 5 cannot start because no required-domain scorecards exist."
+    elif rollback_recommended_shop_count > 0:
+        overall_status = "rollback_recommended"
+        recommended_action = (
+            "Keep the platform in Phase 4 posture and resolve rollback-level drift before any retirement signoff."
+        )
+        summary = (
+            f"{rollback_recommended_shop_count} shops are signaling rollback-level reconciliation pressure."
+        )
+    elif blocked_shop_count > 0:
+        overall_status = "blocked"
+        recommended_action = (
+            "Finish cutover on all required domains and remove Firebase-primary ownership before launch signoff."
+        )
+        summary = (
+            f"{blocked_shop_count} of {shop_count} shops still have blocked retirement scorecards."
+        )
+    elif monitoring_shop_count > 0:
+        overall_status = "monitoring"
+        recommended_action = (
+            "Keep Phase 5 in hardening. Clear remaining bridge/watch pressure and reconcile open issues before launch approval."
+        )
+        summary = (
+            f"{monitoring_shop_count} of {shop_count} shops are still under retirement monitoring."
+        )
+    elif (
+        latest_launch_event
+        and latest_launch_event.decision == MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH
+        and ready_for_launch_shop_count == shop_count
+    ):
+        overall_status = "retirement_complete"
+        recommended_action = (
+            "Legacy retirement has been signed off. Keep archive/quarantine policy in place and operate on the new platform as steady state."
+        )
+        summary = (
+            "All required shops are launch-ready and the latest launch checkpoint approved the platform for steady-state operation."
+        )
+    else:
+        overall_status = "ready_for_launch"
+        recommended_action = (
+            "Record the final launch checkpoint, quarantine remaining legacy dependencies, and move the platform into steady-state operations."
+        )
+        summary = (
+            f"All {shop_count} shops are ready for launch from a code/config posture. Final business signoff is the last gate."
+        )
+
+    return {
+        "phase": "phase_5",
+        "overall_status": overall_status,
+        "shop_count": shop_count,
+        "ready_for_launch_shop_count": ready_for_launch_shop_count,
+        "monitoring_shop_count": monitoring_shop_count,
+        "blocked_shop_count": blocked_shop_count,
+        "rollback_recommended_shop_count": rollback_recommended_shop_count,
+        "latest_launch_decision": latest_launch_event.decision if latest_launch_event else None,
+        "latest_launch_status_snapshot": (
+            latest_launch_event.overall_status_snapshot if latest_launch_event else None
+        ),
+        "latest_launch_at": latest_launch_event.occurred_at if latest_launch_event else None,
+        "recommended_action": recommended_action,
+        "summary": summary,
+        "shops": scorecards,
     }
