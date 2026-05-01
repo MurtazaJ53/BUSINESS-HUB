@@ -346,6 +346,13 @@ class MigrationPilotVerifyView(APIView):
         else:
             summary = "Pilot verification still shows blockers. Keep the domain in pilot posture until compare health is clean."
 
+        if requires_rollback:
+            operational_verdict = "rollback_recommended"
+        elif control.cutover_status == MigrationCutoverStatus.POSTGRES_PRIMARY and healthy:
+            operational_verdict = "production_safe"
+        else:
+            operational_verdict = "monitoring"
+
         payload = {
             "control_id": str(control.id),
             "shop": str(control.shop_id),
@@ -360,6 +367,7 @@ class MigrationPilotVerifyView(APIView):
             "open_stale_epoch_events": open_stale_epoch_events,
             "healthy": healthy,
             "requires_rollback": requires_rollback,
+            "operational_verdict": operational_verdict,
             "summary": summary,
         }
         serializer = MigrationPilotVerificationResultSerializer(payload)

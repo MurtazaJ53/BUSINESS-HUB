@@ -7,6 +7,7 @@ import { MigrationControlsTable } from "@/components/migration-controls-table";
 import { MigrationJobsTable } from "@/components/migration-jobs-table";
 import { MigrationPilotReadinessTable } from "@/components/migration-pilot-readiness-table";
 import { MigrationPilotStageStrip } from "@/components/migration-pilot-stage-strip";
+import { MigrationPilotVerificationSummary } from "@/components/migration-pilot-verification-summary";
 import { MigrationRunbookPanel } from "@/components/migration-runbook-panel";
 import { ReconciliationEventsTable } from "@/components/reconciliation-events-table";
 import { MigrationShadowSummariesTable } from "@/components/migration-shadow-summaries-table";
@@ -50,10 +51,15 @@ function buildActionBanner(searchParams: SearchParams) {
   const healthy = getSearchParamValue(searchParams, "healthy");
   const requiresRollback = getSearchParamValue(searchParams, "requiresRollback");
   const criticalCount = getSearchParamValue(searchParams, "criticalCount");
+  const operationalVerdict = getSearchParamValue(
+    searchParams,
+    "operationalVerdict",
+  );
   const reconciliationStatus = getSearchParamValue(
     searchParams,
     "reconciliationStatus",
   );
+  const summary = getSearchParamValue(searchParams, "summary");
 
   if (!status || !action) {
     return null;
@@ -64,7 +70,7 @@ function buildActionBanner(searchParams: SearchParams) {
       action === "prepare-pilot"
         ? ` Jobs created: ${jobsCreated || "0"}. ready_for_pilot=${readyForPilot || "false"}. remaining blockers=${blockingCount || "0"}.`
         : action === "verify-pilot"
-        ? ` healthy=${healthy || "false"}. requires_rollback=${requiresRollback || "false"}. mismatch_count=${mismatchCount || "0"}. critical_events=${criticalCount || "0"}.`
+        ? ` verdict=${operationalVerdict || "monitoring"}. healthy=${healthy || "false"}. requires_rollback=${requiresRollback || "false"}. mismatch_count=${mismatchCount || "0"}. critical_events=${criticalCount || "0"}.${summary ? ` ${summary}` : ""}`
         : action.startsWith("reconciliation-")
         ? ` Issue ${issue || "unknown"} is now ${reconciliationStatus || "updated"}.`
         : action.startsWith("run-") && jobStatus
@@ -83,6 +89,33 @@ function buildActionBanner(searchParams: SearchParams) {
       "border-[rgba(251,113,133,0.18)] bg-[rgba(40,12,19,0.76)] text-[var(--warning)]" as const,
     title: `Migration action failed: ${action}`,
     body: `${shop || "Selected shop"} / ${domain || "domain"} could not complete the requested action.${message ? ` ${message}` : ""}`,
+  };
+}
+
+function buildVerificationSummary(searchParams: SearchParams) {
+  const status = getSearchParamValue(searchParams, "status");
+  const action = getSearchParamValue(searchParams, "action");
+
+  if (status !== "success" || action !== "verify-pilot") {
+    return null;
+  }
+
+  return {
+    domain: getSearchParamValue(searchParams, "domain") || "domain",
+    shop: getSearchParamValue(searchParams, "shop") || "Selected shop",
+    operationalVerdict:
+      (getSearchParamValue(searchParams, "operationalVerdict") as
+        | "production_safe"
+        | "monitoring"
+        | "rollback_recommended") || "monitoring",
+    summary:
+      getSearchParamValue(searchParams, "summary") ||
+      "Pilot verification completed.",
+    healthy: getSearchParamValue(searchParams, "healthy") === "true",
+    requiresRollback:
+      getSearchParamValue(searchParams, "requiresRollback") === "true",
+    mismatchCount: Number(getSearchParamValue(searchParams, "mismatchCount") || 0),
+    criticalCount: Number(getSearchParamValue(searchParams, "criticalCount") || 0),
   };
 }
 
@@ -118,6 +151,7 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
   ]);
   const stats = buildMigrationStats(controls, jobs, receipts, pilotReadiness, events);
   const actionBanner = buildActionBanner(resolvedSearchParams);
+  const verificationSummary = buildVerificationSummary(resolvedSearchParams);
 
   return (
     <AdminShell
@@ -134,6 +168,10 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
             <h2 className="mt-3 text-2xl font-bold text-[var(--text-primary)]">{actionBanner.title}</h2>
             <p className="mt-2 text-sm text-[var(--text-secondary)]">{actionBanner.body}</p>
           </section>
+        ) : null}
+
+        {verificationSummary ? (
+          <MigrationPilotVerificationSummary {...verificationSummary} />
         ) : null}
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-8">

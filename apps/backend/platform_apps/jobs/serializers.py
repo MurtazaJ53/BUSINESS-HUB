@@ -174,4 +174,7 @@ class MigrationPilotVerificationResultSerializer(serializers.Serializer):
     open_stale_epoch_events = serializers.IntegerField()
     healthy = serializers.BooleanField()
     requires_rollback = serializers.BooleanField()
+    operational_verdict = serializers.ChoiceField(
+        choices=["production_safe", "monitoring", "rollback_recommended"]
+    )
     summary = serializers.CharField()

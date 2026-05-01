@@ -319,6 +319,7 @@ class MigrationControlApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data["healthy"])
         self.assertFalse(response.data["requires_rollback"])
+        self.assertEqual(response.data["operational_verdict"], "production_safe")
         self.assertEqual(response.data["verification_job"]["status"], MigrationJobStatus.SUCCEEDED)
         self.assertEqual(response.data["latest_compare_mismatches"], 0)
 
@@ -367,6 +368,7 @@ class MigrationControlApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.data["healthy"])
         self.assertTrue(response.data["requires_rollback"])
+        self.assertEqual(response.data["operational_verdict"], "rollback_recommended")
         self.assertGreater(response.data["latest_compare_mismatches"], 0)
 
     def test_rollback_returns_domain_to_firebase_pilot_and_bumps_epoch(self):

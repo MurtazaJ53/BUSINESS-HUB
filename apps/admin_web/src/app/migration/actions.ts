@@ -300,8 +300,10 @@ export async function runPilotVerificationAction(formData: FormData) {
         shop,
         healthy: String(result.healthy),
         requiresRollback: String(result.requires_rollback),
+        operationalVerdict: result.operational_verdict,
         mismatchCount: String(result.latest_compare_mismatches),
         criticalCount: String(result.open_critical_events),
+        summary: result.summary,
       }),
     );
   } catch (error) {

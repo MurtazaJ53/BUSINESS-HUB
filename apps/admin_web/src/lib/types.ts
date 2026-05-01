@@ -372,6 +372,10 @@ export type MigrationPilotVerificationResult = {
   open_stale_epoch_events: number;
   healthy: boolean;
   requires_rollback: boolean;
+  operational_verdict:
+    | "production_safe"
+    | "monitoring"
+    | "rollback_recommended";
   summary: string;
 };
 
