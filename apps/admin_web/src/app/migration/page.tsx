@@ -5,6 +5,7 @@ import { MetricCard } from "@/components/metric-card";
 import { MigrationControlsTable } from "@/components/migration-controls-table";
 import { MigrationJobsTable } from "@/components/migration-jobs-table";
 import { MigrationPilotReadinessTable } from "@/components/migration-pilot-readiness-table";
+import { MigrationPilotStageStrip } from "@/components/migration-pilot-stage-strip";
 import { MigrationRunbookPanel } from "@/components/migration-runbook-panel";
 import { ReconciliationEventsTable } from "@/components/reconciliation-events-table";
 import { MigrationShadowSummariesTable } from "@/components/migration-shadow-summaries-table";
@@ -193,6 +194,8 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
         </section>
 
         <MigrationRunbookPanel readiness={pilotReadiness} />
+
+        <MigrationPilotStageStrip readiness={pilotReadiness} />
 
         <section className="panel-soft rounded-[28px] px-6 py-6">
           <div>
