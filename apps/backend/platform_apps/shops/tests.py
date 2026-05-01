@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from platform_apps.common.migration import (
     MigrationBridgeMode,
+    MigrationControlEventType,
     MigrationCutoverStatus,
     MigrationDomain,
+    MigrationJobStatus,
+    MigrationJobType,
     MigrationWriteMaster,
 )
-from platform_apps.jobs.models import MigrationDomainControl
+from platform_apps.jobs.models import MigrationControlEvent, MigrationDomainControl, MigrationJobRun
 from platform_apps.shops.models import Shop, ShopMembership
 from platform_apps.users.models import PlatformUser
 
@@ -60,9 +64,11 @@ class ShopDomainStateApiTests(TestCase):
         self.assertEqual(payload["current_epoch"], 1)
         self.assertFalse(payload["shadow_reads_enabled"])
         self.assertFalse(payload["can_write_on_postgres_surface"])
+        self.assertIsNone(payload["pilot_signoff_status"])
+        self.assertIsNone(payload["pilot_signoff_summary"])
 
     def test_domain_state_returns_controlled_postgres_primary_state(self):
-        MigrationDomainControl.objects.create(
+        control = MigrationDomainControl.objects.create(
             shop=self.shop,
             domain=MigrationDomain.INVENTORY,
             write_master=MigrationWriteMaster.POSTGRES,
@@ -71,6 +77,27 @@ class ShopDomainStateApiTests(TestCase):
             current_epoch=7,
             shadow_reads_enabled=True,
             is_enabled=True,
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=0,
+            trace_id="trace-shop-state-001",
+            finished_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="production_safe",
+            summary="Inventory pilot is clean and production-safe.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
         )
 
         response = self.client.get(
@@ -86,6 +113,12 @@ class ShopDomainStateApiTests(TestCase):
         self.assertEqual(payload["current_epoch"], 7)
         self.assertTrue(payload["shadow_reads_enabled"])
         self.assertTrue(payload["can_write_on_postgres_surface"])
+        self.assertEqual(payload["pilot_signoff_status"], "production_safe")
+        self.assertEqual(payload["pilot_latest_verify_result"], "production_safe")
+        self.assertEqual(
+            payload["pilot_recommended_action"],
+            "Keep monitoring drift, bridge receipts, and operator activity.",
+        )
 
     def test_domain_state_requires_shop_membership(self):
         response = self.client.get(

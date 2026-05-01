@@ -39,3 +39,7 @@ class ShopDomainStateSerializer(serializers.Serializer):
     shadow_reads_enabled = serializers.BooleanField()
     is_enabled = serializers.BooleanField()
     can_write_on_postgres_surface = serializers.BooleanField()
+    pilot_signoff_status = serializers.CharField(allow_null=True)
+    pilot_signoff_summary = serializers.CharField(allow_blank=True, allow_null=True)
+    pilot_recommended_action = serializers.CharField(allow_blank=True, allow_null=True)
+    pilot_latest_verify_result = serializers.CharField(allow_blank=True, allow_null=True)

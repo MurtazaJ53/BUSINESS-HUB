@@ -1,4 +1,5 @@
 import { AdminShell } from "@/components/admin-shell";
+import { DomainPilotSignoffCard } from "@/components/domain-pilot-signoff-card";
 import { CustomerTable } from "@/components/customer-table";
 import { EmptyState } from "@/components/empty-state";
 import { MetricCard } from "@/components/metric-card";
@@ -137,6 +138,10 @@ export default async function CustomersPage() {
                       <span className="font-mono text-[var(--text-primary)]">{domainState.current_epoch}</span>
                     </div>
                   </div>
+                  <DomainPilotSignoffCard
+                    domainState={domainState}
+                    domainLabel="Customer"
+                  />
                 </div>
               </div>
             </section>

@@ -12,6 +12,7 @@ from platform_apps.common.migration import (
     MigrationDomain,
     MigrationWriteMaster,
 )
+from platform_apps.jobs.readiness import build_pilot_signoff
 from platform_apps.jobs.models import MigrationDomainControl
 from platform_apps.shops.models import ShopMembership
 from platform_apps.shops.permissions import get_membership_or_403
@@ -62,8 +63,13 @@ class ShopDomainStateView(APIView):
                 "shadow_reads_enabled": False,
                 "is_enabled": True,
                 "can_write_on_postgres_surface": False,
+                "pilot_signoff_status": None,
+                "pilot_signoff_summary": None,
+                "pilot_recommended_action": None,
+                "pilot_latest_verify_result": None,
             }
         else:
+            signoff = build_pilot_signoff(control)
             payload = {
                 "shop_id": membership.shop_id,
                 "domain": control.domain,
@@ -78,6 +84,10 @@ class ShopDomainStateView(APIView):
                     control.write_master == MigrationWriteMaster.POSTGRES
                     and control.cutover_status == MigrationCutoverStatus.POSTGRES_PRIMARY
                 ),
+                "pilot_signoff_status": signoff["signoff_status"],
+                "pilot_signoff_summary": signoff["summary"],
+                "pilot_recommended_action": signoff["recommended_action"],
+                "pilot_latest_verify_result": signoff["latest_verify_result"],
             }
 
         serializer = ShopDomainStateSerializer(payload)

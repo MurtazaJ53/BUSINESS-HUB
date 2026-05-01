@@ -68,6 +68,16 @@ export type ShopDomainState = {
   shadow_reads_enabled: boolean;
   is_enabled: boolean;
   can_write_on_postgres_surface: boolean;
+  pilot_signoff_status:
+    | "blocked"
+    | "ready_for_cutover"
+    | "monitoring"
+    | "production_safe"
+    | "rollback_recommended"
+    | null;
+  pilot_signoff_summary: string | null;
+  pilot_recommended_action: string | null;
+  pilot_latest_verify_result: string | null;
 };
 
 export type DashboardLowStockItem = {
