@@ -17,6 +17,7 @@ import type {
   MigrationControlEvent,
   MigrationJobRun,
   MigrationPilotReadiness,
+  MigrationPilotSignoff,
   MigrationReconciliationEvent,
   MigrationShadowSummary,
   MigrationStats,
@@ -221,6 +222,10 @@ export const getMigrationShadowSummaries = cache(async (): Promise<MigrationShad
 
 export const getMigrationPilotReadiness = cache(async (): Promise<MigrationPilotReadiness[]> => {
   return apiFetch<MigrationPilotReadiness[]>("/migration/pilot-readiness/");
+});
+
+export const getMigrationPilotSignoff = cache(async (): Promise<MigrationPilotSignoff[]> => {
+  return apiFetch<MigrationPilotSignoff[]>("/migration/pilot-signoff/");
 });
 
 export const getMigrationReconciliationEvents = cache(

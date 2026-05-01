@@ -370,6 +370,34 @@ export type MigrationPilotReadiness = {
   warnings: string[];
 };
 
+export type MigrationPilotSignoff = {
+  control_id: string;
+  shop: string;
+  shop_name: string;
+  shop_slug: string;
+  domain: string;
+  cutover_status: "legacy" | "pilot" | "ready" | "postgres_primary";
+  write_master: "firebase" | "postgres";
+  current_epoch: number;
+  signoff_status:
+    | "blocked"
+    | "ready_for_cutover"
+    | "monitoring"
+    | "production_safe"
+    | "rollback_recommended";
+  latest_verify_result: string | null;
+  latest_verified_at: string | null;
+  latest_compare_status: "queued" | "running" | "succeeded" | "failed" | null;
+  latest_compare_mismatches: number;
+  open_critical_events: number;
+  open_stale_epoch_events: number;
+  ready_for_pilot: boolean;
+  summary: string;
+  recommended_action: string;
+  blocking_reasons: string[];
+  warnings: string[];
+};
+
 export type MigrationPilotPreparationResult = {
   control_id: string;
   shop: string;

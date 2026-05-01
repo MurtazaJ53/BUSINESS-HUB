@@ -3,6 +3,7 @@ import { EmptyState } from "@/components/empty-state";
 import { MigrationActivityTable } from "@/components/migration-activity-table";
 import { MigrationBridgeReceiptsTable } from "@/components/migration-bridge-receipts-table";
 import { MigrationPilotCheckpointBoard } from "@/components/migration-pilot-checkpoint-board";
+import { MigrationPilotSignoffBoard } from "@/components/migration-pilot-signoff-board";
 import { MetricCard } from "@/components/metric-card";
 import { MigrationControlsTable } from "@/components/migration-controls-table";
 import { MigrationJobsTable } from "@/components/migration-jobs-table";
@@ -19,6 +20,7 @@ import {
   getMigrationControls,
   getMigrationJobRuns,
   getMigrationPilotReadiness,
+  getMigrationPilotSignoff,
   getMigrationReconciliationEvents,
   getMigrationShadowSummaries,
   getSession,
@@ -143,13 +145,14 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
     );
   }
 
-  const [controls, jobs, activityEvents, receipts, pilotReadiness, shadowSummaries, events] =
+  const [controls, jobs, activityEvents, receipts, pilotReadiness, pilotSignoff, shadowSummaries, events] =
     await Promise.all([
       getMigrationControls(),
       getMigrationJobRuns(),
       getMigrationControlEvents(),
       getMigrationBridgeReceipts(),
       getMigrationPilotReadiness(),
+      getMigrationPilotSignoff(),
       getMigrationShadowSummaries(),
       getMigrationReconciliationEvents(),
     ]);
@@ -239,6 +242,8 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
         <MigrationRunbookPanel readiness={pilotReadiness} />
 
         <MigrationPilotCheckpointBoard readiness={pilotReadiness} />
+
+        <MigrationPilotSignoffBoard signoff={pilotSignoff} />
 
         <MigrationPilotStageStrip readiness={pilotReadiness} />
 

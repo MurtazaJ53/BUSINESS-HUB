@@ -7,6 +7,7 @@ from rest_framework.test import APIClient
 from platform_apps.audit.models import MigrationReconciliationEvent
 from platform_apps.common.migration import (
     MigrationBridgeMode,
+    MigrationControlEventType,
     MigrationCutoverStatus,
     MigrationDomain,
     MigrationJobStatus,
@@ -482,6 +483,136 @@ class MigrationControlApiTests(TestCase):
         self.assertEqual(control.cutover_status, MigrationCutoverStatus.PILOT)
         self.assertEqual(control.bridge_mode, MigrationBridgeMode.COMPARE_ONLY)
         self.assertEqual(control.current_epoch, 10)
+
+    def test_list_pilot_signoff_reports_ready_for_cutover(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.READY,
+            current_epoch=4,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=0,
+            trace_id="trace-signoff-ready-001",
+            finished_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="monitoring",
+            summary="Ready-stage verification is clean.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/pilot-signoff/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["signoff_status"], "ready_for_cutover")
+        self.assertEqual(
+            response.data[0]["recommended_action"],
+            "Promote PostgreSQL primary during the planned pilot window.",
+        )
+
+    def test_list_pilot_signoff_reports_production_safe(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=5,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=0,
+            trace_id="trace-signoff-safe-001",
+            finished_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="production_safe",
+            summary="Primary pilot is clean.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/pilot-signoff/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]["signoff_status"], "production_safe")
+        self.assertEqual(
+            response.data[0]["recommended_action"],
+            "Keep monitoring drift, bridge receipts, and operator activity.",
+        )
+
+    def test_list_pilot_signoff_reports_rollback_recommended(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=6,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=2,
+            trace_id="trace-signoff-rollback-001",
+            finished_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="rollback_recommended",
+            summary="Primary pilot drift detected.",
+            metadata_json={"healthy": False, "requires_rollback": True},
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/pilot-signoff/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]["signoff_status"], "rollback_recommended")
+        self.assertEqual(
+            response.data[0]["recommended_action"],
+            "Rollback the pilot and triage reconciliation before retrying.",
+        )
 
     def test_non_platform_admin_is_blocked(self):
         non_admin = PlatformUser.objects.create_user(email="staff@example.com", password="secret", full_name="Staff")
