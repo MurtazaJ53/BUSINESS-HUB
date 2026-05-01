@@ -1602,6 +1602,73 @@ class $SalesEntriesTable extends SalesEntries
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _commandIdMeta = const VerificationMeta(
+    'commandId',
+  );
+  @override
+  late final GeneratedColumn<String> commandId = GeneratedColumn<String>(
+    'command_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
+    'syncStatus',
+  );
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+    'sync_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('local_only'),
+  );
+  static const VerificationMeta _backendReceiptIdMeta = const VerificationMeta(
+    'backendReceiptId',
+  );
+  @override
+  late final GeneratedColumn<String> backendReceiptId = GeneratedColumn<String>(
+    'backend_receipt_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _backendSaleIdMeta = const VerificationMeta(
+    'backendSaleId',
+  );
+  @override
+  late final GeneratedColumn<String> backendSaleId = GeneratedColumn<String>(
+    'backend_sale_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastSyncErrorMeta = const VerificationMeta(
+    'lastSyncError',
+  );
+  @override
+  late final GeneratedColumn<String> lastSyncError = GeneratedColumn<String>(
+    'last_sync_error',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastSyncedAtMeta = const VerificationMeta(
+    'lastSyncedAt',
+  );
+  @override
+  late final GeneratedColumn<int> lastSyncedAt = GeneratedColumn<int>(
+    'last_synced_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _tombstoneMeta = const VerificationMeta(
     'tombstone',
   );
@@ -1633,6 +1700,12 @@ class $SalesEntriesTable extends SalesEntries
     footerNote,
     itemsJson,
     paymentsJson,
+    commandId,
+    syncStatus,
+    backendReceiptId,
+    backendSaleId,
+    lastSyncError,
+    lastSyncedAt,
     tombstone,
   ];
   @override
@@ -1755,6 +1828,54 @@ class $SalesEntriesTable extends SalesEntries
     } else if (isInserting) {
       context.missing(_paymentsJsonMeta);
     }
+    if (data.containsKey('command_id')) {
+      context.handle(
+        _commandIdMeta,
+        commandId.isAcceptableOrUnknown(data['command_id']!, _commandIdMeta),
+      );
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+        _syncStatusMeta,
+        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
+      );
+    }
+    if (data.containsKey('backend_receipt_id')) {
+      context.handle(
+        _backendReceiptIdMeta,
+        backendReceiptId.isAcceptableOrUnknown(
+          data['backend_receipt_id']!,
+          _backendReceiptIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('backend_sale_id')) {
+      context.handle(
+        _backendSaleIdMeta,
+        backendSaleId.isAcceptableOrUnknown(
+          data['backend_sale_id']!,
+          _backendSaleIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_sync_error')) {
+      context.handle(
+        _lastSyncErrorMeta,
+        lastSyncError.isAcceptableOrUnknown(
+          data['last_sync_error']!,
+          _lastSyncErrorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_synced_at')) {
+      context.handle(
+        _lastSyncedAtMeta,
+        lastSyncedAt.isAcceptableOrUnknown(
+          data['last_synced_at']!,
+          _lastSyncedAtMeta,
+        ),
+      );
+    }
     if (data.containsKey('tombstone')) {
       context.handle(
         _tombstoneMeta,
@@ -1826,6 +1947,30 @@ class $SalesEntriesTable extends SalesEntries
         DriftSqlType.string,
         data['${effectivePrefix}payments_json'],
       )!,
+      commandId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}command_id'],
+      ),
+      syncStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_status'],
+      )!,
+      backendReceiptId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}backend_receipt_id'],
+      ),
+      backendSaleId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}backend_sale_id'],
+      ),
+      lastSyncError: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_sync_error'],
+      ),
+      lastSyncedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_synced_at'],
+      ),
       tombstone: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}tombstone'],
@@ -1854,6 +1999,12 @@ class SalesEntry extends DataClass implements Insertable<SalesEntry> {
   final String? footerNote;
   final String itemsJson;
   final String paymentsJson;
+  final String? commandId;
+  final String syncStatus;
+  final String? backendReceiptId;
+  final String? backendSaleId;
+  final String? lastSyncError;
+  final int? lastSyncedAt;
   final bool tombstone;
   const SalesEntry({
     required this.id,
@@ -1870,6 +2021,12 @@ class SalesEntry extends DataClass implements Insertable<SalesEntry> {
     this.footerNote,
     required this.itemsJson,
     required this.paymentsJson,
+    this.commandId,
+    required this.syncStatus,
+    this.backendReceiptId,
+    this.backendSaleId,
+    this.lastSyncError,
+    this.lastSyncedAt,
     required this.tombstone,
   });
   @override
@@ -1897,6 +2054,22 @@ class SalesEntry extends DataClass implements Insertable<SalesEntry> {
     }
     map['items_json'] = Variable<String>(itemsJson);
     map['payments_json'] = Variable<String>(paymentsJson);
+    if (!nullToAbsent || commandId != null) {
+      map['command_id'] = Variable<String>(commandId);
+    }
+    map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || backendReceiptId != null) {
+      map['backend_receipt_id'] = Variable<String>(backendReceiptId);
+    }
+    if (!nullToAbsent || backendSaleId != null) {
+      map['backend_sale_id'] = Variable<String>(backendSaleId);
+    }
+    if (!nullToAbsent || lastSyncError != null) {
+      map['last_sync_error'] = Variable<String>(lastSyncError);
+    }
+    if (!nullToAbsent || lastSyncedAt != null) {
+      map['last_synced_at'] = Variable<int>(lastSyncedAt);
+    }
     map['tombstone'] = Variable<bool>(tombstone);
     return map;
   }
@@ -1925,6 +2098,22 @@ class SalesEntry extends DataClass implements Insertable<SalesEntry> {
           : Value(footerNote),
       itemsJson: Value(itemsJson),
       paymentsJson: Value(paymentsJson),
+      commandId: commandId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(commandId),
+      syncStatus: Value(syncStatus),
+      backendReceiptId: backendReceiptId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(backendReceiptId),
+      backendSaleId: backendSaleId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(backendSaleId),
+      lastSyncError: lastSyncError == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastSyncError),
+      lastSyncedAt: lastSyncedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastSyncedAt),
       tombstone: Value(tombstone),
     );
   }
@@ -1949,6 +2138,12 @@ class SalesEntry extends DataClass implements Insertable<SalesEntry> {
       footerNote: serializer.fromJson<String?>(json['footerNote']),
       itemsJson: serializer.fromJson<String>(json['itemsJson']),
       paymentsJson: serializer.fromJson<String>(json['paymentsJson']),
+      commandId: serializer.fromJson<String?>(json['commandId']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      backendReceiptId: serializer.fromJson<String?>(json['backendReceiptId']),
+      backendSaleId: serializer.fromJson<String?>(json['backendSaleId']),
+      lastSyncError: serializer.fromJson<String?>(json['lastSyncError']),
+      lastSyncedAt: serializer.fromJson<int?>(json['lastSyncedAt']),
       tombstone: serializer.fromJson<bool>(json['tombstone']),
     );
   }
@@ -1970,6 +2165,12 @@ class SalesEntry extends DataClass implements Insertable<SalesEntry> {
       'footerNote': serializer.toJson<String?>(footerNote),
       'itemsJson': serializer.toJson<String>(itemsJson),
       'paymentsJson': serializer.toJson<String>(paymentsJson),
+      'commandId': serializer.toJson<String?>(commandId),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'backendReceiptId': serializer.toJson<String?>(backendReceiptId),
+      'backendSaleId': serializer.toJson<String?>(backendSaleId),
+      'lastSyncError': serializer.toJson<String?>(lastSyncError),
+      'lastSyncedAt': serializer.toJson<int?>(lastSyncedAt),
       'tombstone': serializer.toJson<bool>(tombstone),
     };
   }
@@ -1989,6 +2190,12 @@ class SalesEntry extends DataClass implements Insertable<SalesEntry> {
     Value<String?> footerNote = const Value.absent(),
     String? itemsJson,
     String? paymentsJson,
+    Value<String?> commandId = const Value.absent(),
+    String? syncStatus,
+    Value<String?> backendReceiptId = const Value.absent(),
+    Value<String?> backendSaleId = const Value.absent(),
+    Value<String?> lastSyncError = const Value.absent(),
+    Value<int?> lastSyncedAt = const Value.absent(),
     bool? tombstone,
   }) => SalesEntry(
     id: id ?? this.id,
@@ -2007,6 +2214,18 @@ class SalesEntry extends DataClass implements Insertable<SalesEntry> {
     footerNote: footerNote.present ? footerNote.value : this.footerNote,
     itemsJson: itemsJson ?? this.itemsJson,
     paymentsJson: paymentsJson ?? this.paymentsJson,
+    commandId: commandId.present ? commandId.value : this.commandId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    backendReceiptId: backendReceiptId.present
+        ? backendReceiptId.value
+        : this.backendReceiptId,
+    backendSaleId: backendSaleId.present
+        ? backendSaleId.value
+        : this.backendSaleId,
+    lastSyncError: lastSyncError.present
+        ? lastSyncError.value
+        : this.lastSyncError,
+    lastSyncedAt: lastSyncedAt.present ? lastSyncedAt.value : this.lastSyncedAt,
     tombstone: tombstone ?? this.tombstone,
   );
   SalesEntry copyWithCompanion(SalesEntriesCompanion data) {
@@ -2039,6 +2258,22 @@ class SalesEntry extends DataClass implements Insertable<SalesEntry> {
       paymentsJson: data.paymentsJson.present
           ? data.paymentsJson.value
           : this.paymentsJson,
+      commandId: data.commandId.present ? data.commandId.value : this.commandId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      backendReceiptId: data.backendReceiptId.present
+          ? data.backendReceiptId.value
+          : this.backendReceiptId,
+      backendSaleId: data.backendSaleId.present
+          ? data.backendSaleId.value
+          : this.backendSaleId,
+      lastSyncError: data.lastSyncError.present
+          ? data.lastSyncError.value
+          : this.lastSyncError,
+      lastSyncedAt: data.lastSyncedAt.present
+          ? data.lastSyncedAt.value
+          : this.lastSyncedAt,
       tombstone: data.tombstone.present ? data.tombstone.value : this.tombstone,
     );
   }
@@ -2060,13 +2295,19 @@ class SalesEntry extends DataClass implements Insertable<SalesEntry> {
           ..write('footerNote: $footerNote, ')
           ..write('itemsJson: $itemsJson, ')
           ..write('paymentsJson: $paymentsJson, ')
+          ..write('commandId: $commandId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('backendReceiptId: $backendReceiptId, ')
+          ..write('backendSaleId: $backendSaleId, ')
+          ..write('lastSyncError: $lastSyncError, ')
+          ..write('lastSyncedAt: $lastSyncedAt, ')
           ..write('tombstone: $tombstone')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     total,
     discount,
@@ -2081,8 +2322,14 @@ class SalesEntry extends DataClass implements Insertable<SalesEntry> {
     footerNote,
     itemsJson,
     paymentsJson,
+    commandId,
+    syncStatus,
+    backendReceiptId,
+    backendSaleId,
+    lastSyncError,
+    lastSyncedAt,
     tombstone,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2101,6 +2348,12 @@ class SalesEntry extends DataClass implements Insertable<SalesEntry> {
           other.footerNote == this.footerNote &&
           other.itemsJson == this.itemsJson &&
           other.paymentsJson == this.paymentsJson &&
+          other.commandId == this.commandId &&
+          other.syncStatus == this.syncStatus &&
+          other.backendReceiptId == this.backendReceiptId &&
+          other.backendSaleId == this.backendSaleId &&
+          other.lastSyncError == this.lastSyncError &&
+          other.lastSyncedAt == this.lastSyncedAt &&
           other.tombstone == this.tombstone);
 }
 
@@ -2119,6 +2372,12 @@ class SalesEntriesCompanion extends UpdateCompanion<SalesEntry> {
   final Value<String?> footerNote;
   final Value<String> itemsJson;
   final Value<String> paymentsJson;
+  final Value<String?> commandId;
+  final Value<String> syncStatus;
+  final Value<String?> backendReceiptId;
+  final Value<String?> backendSaleId;
+  final Value<String?> lastSyncError;
+  final Value<int?> lastSyncedAt;
   final Value<bool> tombstone;
   final Value<int> rowid;
   const SalesEntriesCompanion({
@@ -2136,6 +2395,12 @@ class SalesEntriesCompanion extends UpdateCompanion<SalesEntry> {
     this.footerNote = const Value.absent(),
     this.itemsJson = const Value.absent(),
     this.paymentsJson = const Value.absent(),
+    this.commandId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.backendReceiptId = const Value.absent(),
+    this.backendSaleId = const Value.absent(),
+    this.lastSyncError = const Value.absent(),
+    this.lastSyncedAt = const Value.absent(),
     this.tombstone = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -2154,6 +2419,12 @@ class SalesEntriesCompanion extends UpdateCompanion<SalesEntry> {
     this.footerNote = const Value.absent(),
     required String itemsJson,
     required String paymentsJson,
+    this.commandId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.backendReceiptId = const Value.absent(),
+    this.backendSaleId = const Value.absent(),
+    this.lastSyncError = const Value.absent(),
+    this.lastSyncedAt = const Value.absent(),
     this.tombstone = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -2177,6 +2448,12 @@ class SalesEntriesCompanion extends UpdateCompanion<SalesEntry> {
     Expression<String>? footerNote,
     Expression<String>? itemsJson,
     Expression<String>? paymentsJson,
+    Expression<String>? commandId,
+    Expression<String>? syncStatus,
+    Expression<String>? backendReceiptId,
+    Expression<String>? backendSaleId,
+    Expression<String>? lastSyncError,
+    Expression<int>? lastSyncedAt,
     Expression<bool>? tombstone,
     Expression<int>? rowid,
   }) {
@@ -2195,6 +2472,12 @@ class SalesEntriesCompanion extends UpdateCompanion<SalesEntry> {
       if (footerNote != null) 'footer_note': footerNote,
       if (itemsJson != null) 'items_json': itemsJson,
       if (paymentsJson != null) 'payments_json': paymentsJson,
+      if (commandId != null) 'command_id': commandId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (backendReceiptId != null) 'backend_receipt_id': backendReceiptId,
+      if (backendSaleId != null) 'backend_sale_id': backendSaleId,
+      if (lastSyncError != null) 'last_sync_error': lastSyncError,
+      if (lastSyncedAt != null) 'last_synced_at': lastSyncedAt,
       if (tombstone != null) 'tombstone': tombstone,
       if (rowid != null) 'rowid': rowid,
     });
@@ -2215,6 +2498,12 @@ class SalesEntriesCompanion extends UpdateCompanion<SalesEntry> {
     Value<String?>? footerNote,
     Value<String>? itemsJson,
     Value<String>? paymentsJson,
+    Value<String?>? commandId,
+    Value<String>? syncStatus,
+    Value<String?>? backendReceiptId,
+    Value<String?>? backendSaleId,
+    Value<String?>? lastSyncError,
+    Value<int?>? lastSyncedAt,
     Value<bool>? tombstone,
     Value<int>? rowid,
   }) {
@@ -2233,6 +2522,12 @@ class SalesEntriesCompanion extends UpdateCompanion<SalesEntry> {
       footerNote: footerNote ?? this.footerNote,
       itemsJson: itemsJson ?? this.itemsJson,
       paymentsJson: paymentsJson ?? this.paymentsJson,
+      commandId: commandId ?? this.commandId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      backendReceiptId: backendReceiptId ?? this.backendReceiptId,
+      backendSaleId: backendSaleId ?? this.backendSaleId,
+      lastSyncError: lastSyncError ?? this.lastSyncError,
+      lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
       tombstone: tombstone ?? this.tombstone,
       rowid: rowid ?? this.rowid,
     );
@@ -2283,6 +2578,24 @@ class SalesEntriesCompanion extends UpdateCompanion<SalesEntry> {
     if (paymentsJson.present) {
       map['payments_json'] = Variable<String>(paymentsJson.value);
     }
+    if (commandId.present) {
+      map['command_id'] = Variable<String>(commandId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (backendReceiptId.present) {
+      map['backend_receipt_id'] = Variable<String>(backendReceiptId.value);
+    }
+    if (backendSaleId.present) {
+      map['backend_sale_id'] = Variable<String>(backendSaleId.value);
+    }
+    if (lastSyncError.present) {
+      map['last_sync_error'] = Variable<String>(lastSyncError.value);
+    }
+    if (lastSyncedAt.present) {
+      map['last_synced_at'] = Variable<int>(lastSyncedAt.value);
+    }
     if (tombstone.present) {
       map['tombstone'] = Variable<bool>(tombstone.value);
     }
@@ -2309,7 +2622,797 @@ class SalesEntriesCompanion extends UpdateCompanion<SalesEntry> {
           ..write('footerNote: $footerNote, ')
           ..write('itemsJson: $itemsJson, ')
           ..write('paymentsJson: $paymentsJson, ')
+          ..write('commandId: $commandId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('backendReceiptId: $backendReceiptId, ')
+          ..write('backendSaleId: $backendSaleId, ')
+          ..write('lastSyncError: $lastSyncError, ')
+          ..write('lastSyncedAt: $lastSyncedAt, ')
           ..write('tombstone: $tombstone, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CommerceOutboxEntriesTable extends CommerceOutboxEntries
+    with TableInfo<$CommerceOutboxEntriesTable, CommerceOutboxEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CommerceOutboxEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _commandIdMeta = const VerificationMeta(
+    'commandId',
+  );
+  @override
+  late final GeneratedColumn<String> commandId = GeneratedColumn<String>(
+    'command_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _shopIdMeta = const VerificationMeta('shopId');
+  @override
+  late final GeneratedColumn<String> shopId = GeneratedColumn<String>(
+    'shop_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _commandTypeMeta = const VerificationMeta(
+    'commandType',
+  );
+  @override
+  late final GeneratedColumn<String> commandType = GeneratedColumn<String>(
+    'command_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _domainMeta = const VerificationMeta('domain');
+  @override
+  late final GeneratedColumn<String> domain = GeneratedColumn<String>(
+    'domain',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _baseDomainEpochMeta = const VerificationMeta(
+    'baseDomainEpoch',
+  );
+  @override
+  late final GeneratedColumn<int> baseDomainEpoch = GeneratedColumn<int>(
+    'base_domain_epoch',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _payloadJsonMeta = const VerificationMeta(
+    'payloadJson',
+  );
+  @override
+  late final GeneratedColumn<String> payloadJson = GeneratedColumn<String>(
+    'payload_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
+    'syncStatus',
+  );
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+    'sync_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pending'),
+  );
+  static const VerificationMeta _attemptCountMeta = const VerificationMeta(
+    'attemptCount',
+  );
+  @override
+  late final GeneratedColumn<int> attemptCount = GeneratedColumn<int>(
+    'attempt_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _lastErrorMeta = const VerificationMeta(
+    'lastError',
+  );
+  @override
+  late final GeneratedColumn<String> lastError = GeneratedColumn<String>(
+    'last_error',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _lastAttemptAtMeta = const VerificationMeta(
+    'lastAttemptAt',
+  );
+  @override
+  late final GeneratedColumn<int> lastAttemptAt = GeneratedColumn<int>(
+    'last_attempt_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _completedAtMeta = const VerificationMeta(
+    'completedAt',
+  );
+  @override
+  late final GeneratedColumn<int> completedAt = GeneratedColumn<int>(
+    'completed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    commandId,
+    shopId,
+    commandType,
+    domain,
+    baseDomainEpoch,
+    payloadJson,
+    syncStatus,
+    attemptCount,
+    lastError,
+    createdAt,
+    updatedAt,
+    lastAttemptAt,
+    completedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'commerce_outbox';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CommerceOutboxEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('command_id')) {
+      context.handle(
+        _commandIdMeta,
+        commandId.isAcceptableOrUnknown(data['command_id']!, _commandIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_commandIdMeta);
+    }
+    if (data.containsKey('shop_id')) {
+      context.handle(
+        _shopIdMeta,
+        shopId.isAcceptableOrUnknown(data['shop_id']!, _shopIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_shopIdMeta);
+    }
+    if (data.containsKey('command_type')) {
+      context.handle(
+        _commandTypeMeta,
+        commandType.isAcceptableOrUnknown(
+          data['command_type']!,
+          _commandTypeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_commandTypeMeta);
+    }
+    if (data.containsKey('domain')) {
+      context.handle(
+        _domainMeta,
+        domain.isAcceptableOrUnknown(data['domain']!, _domainMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_domainMeta);
+    }
+    if (data.containsKey('base_domain_epoch')) {
+      context.handle(
+        _baseDomainEpochMeta,
+        baseDomainEpoch.isAcceptableOrUnknown(
+          data['base_domain_epoch']!,
+          _baseDomainEpochMeta,
+        ),
+      );
+    }
+    if (data.containsKey('payload_json')) {
+      context.handle(
+        _payloadJsonMeta,
+        payloadJson.isAcceptableOrUnknown(
+          data['payload_json']!,
+          _payloadJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadJsonMeta);
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+        _syncStatusMeta,
+        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
+      );
+    }
+    if (data.containsKey('attempt_count')) {
+      context.handle(
+        _attemptCountMeta,
+        attemptCount.isAcceptableOrUnknown(
+          data['attempt_count']!,
+          _attemptCountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_error')) {
+      context.handle(
+        _lastErrorMeta,
+        lastError.isAcceptableOrUnknown(data['last_error']!, _lastErrorMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('last_attempt_at')) {
+      context.handle(
+        _lastAttemptAtMeta,
+        lastAttemptAt.isAcceptableOrUnknown(
+          data['last_attempt_at']!,
+          _lastAttemptAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('completed_at')) {
+      context.handle(
+        _completedAtMeta,
+        completedAt.isAcceptableOrUnknown(
+          data['completed_at']!,
+          _completedAtMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {commandId};
+  @override
+  CommerceOutboxEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CommerceOutboxEntry(
+      commandId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}command_id'],
+      )!,
+      shopId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}shop_id'],
+      )!,
+      commandType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}command_type'],
+      )!,
+      domain: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}domain'],
+      )!,
+      baseDomainEpoch: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}base_domain_epoch'],
+      )!,
+      payloadJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload_json'],
+      )!,
+      syncStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_status'],
+      )!,
+      attemptCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}attempt_count'],
+      )!,
+      lastError: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_error'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      lastAttemptAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_attempt_at'],
+      ),
+      completedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}completed_at'],
+      ),
+    );
+  }
+
+  @override
+  $CommerceOutboxEntriesTable createAlias(String alias) {
+    return $CommerceOutboxEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class CommerceOutboxEntry extends DataClass
+    implements Insertable<CommerceOutboxEntry> {
+  final String commandId;
+  final String shopId;
+  final String commandType;
+  final String domain;
+  final int baseDomainEpoch;
+  final String payloadJson;
+  final String syncStatus;
+  final int attemptCount;
+  final String? lastError;
+  final int createdAt;
+  final int updatedAt;
+  final int? lastAttemptAt;
+  final int? completedAt;
+  const CommerceOutboxEntry({
+    required this.commandId,
+    required this.shopId,
+    required this.commandType,
+    required this.domain,
+    required this.baseDomainEpoch,
+    required this.payloadJson,
+    required this.syncStatus,
+    required this.attemptCount,
+    this.lastError,
+    required this.createdAt,
+    required this.updatedAt,
+    this.lastAttemptAt,
+    this.completedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['command_id'] = Variable<String>(commandId);
+    map['shop_id'] = Variable<String>(shopId);
+    map['command_type'] = Variable<String>(commandType);
+    map['domain'] = Variable<String>(domain);
+    map['base_domain_epoch'] = Variable<int>(baseDomainEpoch);
+    map['payload_json'] = Variable<String>(payloadJson);
+    map['sync_status'] = Variable<String>(syncStatus);
+    map['attempt_count'] = Variable<int>(attemptCount);
+    if (!nullToAbsent || lastError != null) {
+      map['last_error'] = Variable<String>(lastError);
+    }
+    map['created_at'] = Variable<int>(createdAt);
+    map['updated_at'] = Variable<int>(updatedAt);
+    if (!nullToAbsent || lastAttemptAt != null) {
+      map['last_attempt_at'] = Variable<int>(lastAttemptAt);
+    }
+    if (!nullToAbsent || completedAt != null) {
+      map['completed_at'] = Variable<int>(completedAt);
+    }
+    return map;
+  }
+
+  CommerceOutboxEntriesCompanion toCompanion(bool nullToAbsent) {
+    return CommerceOutboxEntriesCompanion(
+      commandId: Value(commandId),
+      shopId: Value(shopId),
+      commandType: Value(commandType),
+      domain: Value(domain),
+      baseDomainEpoch: Value(baseDomainEpoch),
+      payloadJson: Value(payloadJson),
+      syncStatus: Value(syncStatus),
+      attemptCount: Value(attemptCount),
+      lastError: lastError == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastError),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      lastAttemptAt: lastAttemptAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastAttemptAt),
+      completedAt: completedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(completedAt),
+    );
+  }
+
+  factory CommerceOutboxEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CommerceOutboxEntry(
+      commandId: serializer.fromJson<String>(json['commandId']),
+      shopId: serializer.fromJson<String>(json['shopId']),
+      commandType: serializer.fromJson<String>(json['commandType']),
+      domain: serializer.fromJson<String>(json['domain']),
+      baseDomainEpoch: serializer.fromJson<int>(json['baseDomainEpoch']),
+      payloadJson: serializer.fromJson<String>(json['payloadJson']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      attemptCount: serializer.fromJson<int>(json['attemptCount']),
+      lastError: serializer.fromJson<String?>(json['lastError']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+      lastAttemptAt: serializer.fromJson<int?>(json['lastAttemptAt']),
+      completedAt: serializer.fromJson<int?>(json['completedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'commandId': serializer.toJson<String>(commandId),
+      'shopId': serializer.toJson<String>(shopId),
+      'commandType': serializer.toJson<String>(commandType),
+      'domain': serializer.toJson<String>(domain),
+      'baseDomainEpoch': serializer.toJson<int>(baseDomainEpoch),
+      'payloadJson': serializer.toJson<String>(payloadJson),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'attemptCount': serializer.toJson<int>(attemptCount),
+      'lastError': serializer.toJson<String?>(lastError),
+      'createdAt': serializer.toJson<int>(createdAt),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+      'lastAttemptAt': serializer.toJson<int?>(lastAttemptAt),
+      'completedAt': serializer.toJson<int?>(completedAt),
+    };
+  }
+
+  CommerceOutboxEntry copyWith({
+    String? commandId,
+    String? shopId,
+    String? commandType,
+    String? domain,
+    int? baseDomainEpoch,
+    String? payloadJson,
+    String? syncStatus,
+    int? attemptCount,
+    Value<String?> lastError = const Value.absent(),
+    int? createdAt,
+    int? updatedAt,
+    Value<int?> lastAttemptAt = const Value.absent(),
+    Value<int?> completedAt = const Value.absent(),
+  }) => CommerceOutboxEntry(
+    commandId: commandId ?? this.commandId,
+    shopId: shopId ?? this.shopId,
+    commandType: commandType ?? this.commandType,
+    domain: domain ?? this.domain,
+    baseDomainEpoch: baseDomainEpoch ?? this.baseDomainEpoch,
+    payloadJson: payloadJson ?? this.payloadJson,
+    syncStatus: syncStatus ?? this.syncStatus,
+    attemptCount: attemptCount ?? this.attemptCount,
+    lastError: lastError.present ? lastError.value : this.lastError,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    lastAttemptAt: lastAttemptAt.present
+        ? lastAttemptAt.value
+        : this.lastAttemptAt,
+    completedAt: completedAt.present ? completedAt.value : this.completedAt,
+  );
+  CommerceOutboxEntry copyWithCompanion(CommerceOutboxEntriesCompanion data) {
+    return CommerceOutboxEntry(
+      commandId: data.commandId.present ? data.commandId.value : this.commandId,
+      shopId: data.shopId.present ? data.shopId.value : this.shopId,
+      commandType: data.commandType.present
+          ? data.commandType.value
+          : this.commandType,
+      domain: data.domain.present ? data.domain.value : this.domain,
+      baseDomainEpoch: data.baseDomainEpoch.present
+          ? data.baseDomainEpoch.value
+          : this.baseDomainEpoch,
+      payloadJson: data.payloadJson.present
+          ? data.payloadJson.value
+          : this.payloadJson,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      attemptCount: data.attemptCount.present
+          ? data.attemptCount.value
+          : this.attemptCount,
+      lastError: data.lastError.present ? data.lastError.value : this.lastError,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      lastAttemptAt: data.lastAttemptAt.present
+          ? data.lastAttemptAt.value
+          : this.lastAttemptAt,
+      completedAt: data.completedAt.present
+          ? data.completedAt.value
+          : this.completedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CommerceOutboxEntry(')
+          ..write('commandId: $commandId, ')
+          ..write('shopId: $shopId, ')
+          ..write('commandType: $commandType, ')
+          ..write('domain: $domain, ')
+          ..write('baseDomainEpoch: $baseDomainEpoch, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('attemptCount: $attemptCount, ')
+          ..write('lastError: $lastError, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('lastAttemptAt: $lastAttemptAt, ')
+          ..write('completedAt: $completedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    commandId,
+    shopId,
+    commandType,
+    domain,
+    baseDomainEpoch,
+    payloadJson,
+    syncStatus,
+    attemptCount,
+    lastError,
+    createdAt,
+    updatedAt,
+    lastAttemptAt,
+    completedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CommerceOutboxEntry &&
+          other.commandId == this.commandId &&
+          other.shopId == this.shopId &&
+          other.commandType == this.commandType &&
+          other.domain == this.domain &&
+          other.baseDomainEpoch == this.baseDomainEpoch &&
+          other.payloadJson == this.payloadJson &&
+          other.syncStatus == this.syncStatus &&
+          other.attemptCount == this.attemptCount &&
+          other.lastError == this.lastError &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.lastAttemptAt == this.lastAttemptAt &&
+          other.completedAt == this.completedAt);
+}
+
+class CommerceOutboxEntriesCompanion
+    extends UpdateCompanion<CommerceOutboxEntry> {
+  final Value<String> commandId;
+  final Value<String> shopId;
+  final Value<String> commandType;
+  final Value<String> domain;
+  final Value<int> baseDomainEpoch;
+  final Value<String> payloadJson;
+  final Value<String> syncStatus;
+  final Value<int> attemptCount;
+  final Value<String?> lastError;
+  final Value<int> createdAt;
+  final Value<int> updatedAt;
+  final Value<int?> lastAttemptAt;
+  final Value<int?> completedAt;
+  final Value<int> rowid;
+  const CommerceOutboxEntriesCompanion({
+    this.commandId = const Value.absent(),
+    this.shopId = const Value.absent(),
+    this.commandType = const Value.absent(),
+    this.domain = const Value.absent(),
+    this.baseDomainEpoch = const Value.absent(),
+    this.payloadJson = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.attemptCount = const Value.absent(),
+    this.lastError = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.lastAttemptAt = const Value.absent(),
+    this.completedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CommerceOutboxEntriesCompanion.insert({
+    required String commandId,
+    required String shopId,
+    required String commandType,
+    required String domain,
+    this.baseDomainEpoch = const Value.absent(),
+    required String payloadJson,
+    this.syncStatus = const Value.absent(),
+    this.attemptCount = const Value.absent(),
+    this.lastError = const Value.absent(),
+    required int createdAt,
+    this.updatedAt = const Value.absent(),
+    this.lastAttemptAt = const Value.absent(),
+    this.completedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : commandId = Value(commandId),
+       shopId = Value(shopId),
+       commandType = Value(commandType),
+       domain = Value(domain),
+       payloadJson = Value(payloadJson),
+       createdAt = Value(createdAt);
+  static Insertable<CommerceOutboxEntry> custom({
+    Expression<String>? commandId,
+    Expression<String>? shopId,
+    Expression<String>? commandType,
+    Expression<String>? domain,
+    Expression<int>? baseDomainEpoch,
+    Expression<String>? payloadJson,
+    Expression<String>? syncStatus,
+    Expression<int>? attemptCount,
+    Expression<String>? lastError,
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<int>? lastAttemptAt,
+    Expression<int>? completedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (commandId != null) 'command_id': commandId,
+      if (shopId != null) 'shop_id': shopId,
+      if (commandType != null) 'command_type': commandType,
+      if (domain != null) 'domain': domain,
+      if (baseDomainEpoch != null) 'base_domain_epoch': baseDomainEpoch,
+      if (payloadJson != null) 'payload_json': payloadJson,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (attemptCount != null) 'attempt_count': attemptCount,
+      if (lastError != null) 'last_error': lastError,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (lastAttemptAt != null) 'last_attempt_at': lastAttemptAt,
+      if (completedAt != null) 'completed_at': completedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CommerceOutboxEntriesCompanion copyWith({
+    Value<String>? commandId,
+    Value<String>? shopId,
+    Value<String>? commandType,
+    Value<String>? domain,
+    Value<int>? baseDomainEpoch,
+    Value<String>? payloadJson,
+    Value<String>? syncStatus,
+    Value<int>? attemptCount,
+    Value<String?>? lastError,
+    Value<int>? createdAt,
+    Value<int>? updatedAt,
+    Value<int?>? lastAttemptAt,
+    Value<int?>? completedAt,
+    Value<int>? rowid,
+  }) {
+    return CommerceOutboxEntriesCompanion(
+      commandId: commandId ?? this.commandId,
+      shopId: shopId ?? this.shopId,
+      commandType: commandType ?? this.commandType,
+      domain: domain ?? this.domain,
+      baseDomainEpoch: baseDomainEpoch ?? this.baseDomainEpoch,
+      payloadJson: payloadJson ?? this.payloadJson,
+      syncStatus: syncStatus ?? this.syncStatus,
+      attemptCount: attemptCount ?? this.attemptCount,
+      lastError: lastError ?? this.lastError,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      lastAttemptAt: lastAttemptAt ?? this.lastAttemptAt,
+      completedAt: completedAt ?? this.completedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (commandId.present) {
+      map['command_id'] = Variable<String>(commandId.value);
+    }
+    if (shopId.present) {
+      map['shop_id'] = Variable<String>(shopId.value);
+    }
+    if (commandType.present) {
+      map['command_type'] = Variable<String>(commandType.value);
+    }
+    if (domain.present) {
+      map['domain'] = Variable<String>(domain.value);
+    }
+    if (baseDomainEpoch.present) {
+      map['base_domain_epoch'] = Variable<int>(baseDomainEpoch.value);
+    }
+    if (payloadJson.present) {
+      map['payload_json'] = Variable<String>(payloadJson.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (attemptCount.present) {
+      map['attempt_count'] = Variable<int>(attemptCount.value);
+    }
+    if (lastError.present) {
+      map['last_error'] = Variable<String>(lastError.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (lastAttemptAt.present) {
+      map['last_attempt_at'] = Variable<int>(lastAttemptAt.value);
+    }
+    if (completedAt.present) {
+      map['completed_at'] = Variable<int>(completedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CommerceOutboxEntriesCompanion(')
+          ..write('commandId: $commandId, ')
+          ..write('shopId: $shopId, ')
+          ..write('commandType: $commandType, ')
+          ..write('domain: $domain, ')
+          ..write('baseDomainEpoch: $baseDomainEpoch, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('attemptCount: $attemptCount, ')
+          ..write('lastError: $lastError, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('lastAttemptAt: $lastAttemptAt, ')
+          ..write('completedAt: $completedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2327,6 +3430,8 @@ abstract class _$BusinessHubDatabase extends GeneratedDatabase {
   late final $InventoryPrivateEntriesTable inventoryPrivateEntries =
       $InventoryPrivateEntriesTable(this);
   late final $SalesEntriesTable salesEntries = $SalesEntriesTable(this);
+  late final $CommerceOutboxEntriesTable commerceOutboxEntries =
+      $CommerceOutboxEntriesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2336,6 +3441,7 @@ abstract class _$BusinessHubDatabase extends GeneratedDatabase {
     inventoryEntries,
     inventoryPrivateEntries,
     salesEntries,
+    commerceOutboxEntries,
   ];
 }
 
@@ -3143,6 +4249,12 @@ typedef $$SalesEntriesTableCreateCompanionBuilder =
       Value<String?> footerNote,
       required String itemsJson,
       required String paymentsJson,
+      Value<String?> commandId,
+      Value<String> syncStatus,
+      Value<String?> backendReceiptId,
+      Value<String?> backendSaleId,
+      Value<String?> lastSyncError,
+      Value<int?> lastSyncedAt,
       Value<bool> tombstone,
       Value<int> rowid,
     });
@@ -3162,6 +4274,12 @@ typedef $$SalesEntriesTableUpdateCompanionBuilder =
       Value<String?> footerNote,
       Value<String> itemsJson,
       Value<String> paymentsJson,
+      Value<String?> commandId,
+      Value<String> syncStatus,
+      Value<String?> backendReceiptId,
+      Value<String?> backendSaleId,
+      Value<String?> lastSyncError,
+      Value<int?> lastSyncedAt,
       Value<bool> tombstone,
       Value<int> rowid,
     });
@@ -3242,6 +4360,36 @@ class $$SalesEntriesTableFilterComposer
 
   ColumnFilters<String> get paymentsJson => $composableBuilder(
     column: $table.paymentsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get commandId => $composableBuilder(
+    column: $table.commandId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get backendReceiptId => $composableBuilder(
+    column: $table.backendReceiptId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get backendSaleId => $composableBuilder(
+    column: $table.backendSaleId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastSyncError => $composableBuilder(
+    column: $table.lastSyncError,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastSyncedAt => $composableBuilder(
+    column: $table.lastSyncedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3330,6 +4478,36 @@ class $$SalesEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get commandId => $composableBuilder(
+    column: $table.commandId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get backendReceiptId => $composableBuilder(
+    column: $table.backendReceiptId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get backendSaleId => $composableBuilder(
+    column: $table.backendSaleId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastSyncError => $composableBuilder(
+    column: $table.lastSyncError,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lastSyncedAt => $composableBuilder(
+    column: $table.lastSyncedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get tombstone => $composableBuilder(
     column: $table.tombstone,
     builder: (column) => ColumnOrderings(column),
@@ -3401,6 +4579,34 @@ class $$SalesEntriesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get commandId =>
+      $composableBuilder(column: $table.commandId, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get backendReceiptId => $composableBuilder(
+    column: $table.backendReceiptId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get backendSaleId => $composableBuilder(
+    column: $table.backendSaleId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastSyncError => $composableBuilder(
+    column: $table.lastSyncError,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get lastSyncedAt => $composableBuilder(
+    column: $table.lastSyncedAt,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<bool> get tombstone =>
       $composableBuilder(column: $table.tombstone, builder: (column) => column);
 }
@@ -3456,6 +4662,12 @@ class $$SalesEntriesTableTableManager
                 Value<String?> footerNote = const Value.absent(),
                 Value<String> itemsJson = const Value.absent(),
                 Value<String> paymentsJson = const Value.absent(),
+                Value<String?> commandId = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<String?> backendReceiptId = const Value.absent(),
+                Value<String?> backendSaleId = const Value.absent(),
+                Value<String?> lastSyncError = const Value.absent(),
+                Value<int?> lastSyncedAt = const Value.absent(),
                 Value<bool> tombstone = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SalesEntriesCompanion(
@@ -3473,6 +4685,12 @@ class $$SalesEntriesTableTableManager
                 footerNote: footerNote,
                 itemsJson: itemsJson,
                 paymentsJson: paymentsJson,
+                commandId: commandId,
+                syncStatus: syncStatus,
+                backendReceiptId: backendReceiptId,
+                backendSaleId: backendSaleId,
+                lastSyncError: lastSyncError,
+                lastSyncedAt: lastSyncedAt,
                 tombstone: tombstone,
                 rowid: rowid,
               ),
@@ -3492,6 +4710,12 @@ class $$SalesEntriesTableTableManager
                 Value<String?> footerNote = const Value.absent(),
                 required String itemsJson,
                 required String paymentsJson,
+                Value<String?> commandId = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<String?> backendReceiptId = const Value.absent(),
+                Value<String?> backendSaleId = const Value.absent(),
+                Value<String?> lastSyncError = const Value.absent(),
+                Value<int?> lastSyncedAt = const Value.absent(),
                 Value<bool> tombstone = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SalesEntriesCompanion.insert(
@@ -3509,6 +4733,12 @@ class $$SalesEntriesTableTableManager
                 footerNote: footerNote,
                 itemsJson: itemsJson,
                 paymentsJson: paymentsJson,
+                commandId: commandId,
+                syncStatus: syncStatus,
+                backendReceiptId: backendReceiptId,
+                backendSaleId: backendSaleId,
+                lastSyncError: lastSyncError,
+                lastSyncedAt: lastSyncedAt,
                 tombstone: tombstone,
                 rowid: rowid,
               ),
@@ -3537,6 +4767,391 @@ typedef $$SalesEntriesTableProcessedTableManager =
       SalesEntry,
       PrefetchHooks Function()
     >;
+typedef $$CommerceOutboxEntriesTableCreateCompanionBuilder =
+    CommerceOutboxEntriesCompanion Function({
+      required String commandId,
+      required String shopId,
+      required String commandType,
+      required String domain,
+      Value<int> baseDomainEpoch,
+      required String payloadJson,
+      Value<String> syncStatus,
+      Value<int> attemptCount,
+      Value<String?> lastError,
+      required int createdAt,
+      Value<int> updatedAt,
+      Value<int?> lastAttemptAt,
+      Value<int?> completedAt,
+      Value<int> rowid,
+    });
+typedef $$CommerceOutboxEntriesTableUpdateCompanionBuilder =
+    CommerceOutboxEntriesCompanion Function({
+      Value<String> commandId,
+      Value<String> shopId,
+      Value<String> commandType,
+      Value<String> domain,
+      Value<int> baseDomainEpoch,
+      Value<String> payloadJson,
+      Value<String> syncStatus,
+      Value<int> attemptCount,
+      Value<String?> lastError,
+      Value<int> createdAt,
+      Value<int> updatedAt,
+      Value<int?> lastAttemptAt,
+      Value<int?> completedAt,
+      Value<int> rowid,
+    });
+
+class $$CommerceOutboxEntriesTableFilterComposer
+    extends Composer<_$BusinessHubDatabase, $CommerceOutboxEntriesTable> {
+  $$CommerceOutboxEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get commandId => $composableBuilder(
+    column: $table.commandId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get shopId => $composableBuilder(
+    column: $table.shopId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get commandType => $composableBuilder(
+    column: $table.commandType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get domain => $composableBuilder(
+    column: $table.domain,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get baseDomainEpoch => $composableBuilder(
+    column: $table.baseDomainEpoch,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get attemptCount => $composableBuilder(
+    column: $table.attemptCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastAttemptAt => $composableBuilder(
+    column: $table.lastAttemptAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CommerceOutboxEntriesTableOrderingComposer
+    extends Composer<_$BusinessHubDatabase, $CommerceOutboxEntriesTable> {
+  $$CommerceOutboxEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get commandId => $composableBuilder(
+    column: $table.commandId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get shopId => $composableBuilder(
+    column: $table.shopId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get commandType => $composableBuilder(
+    column: $table.commandType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get domain => $composableBuilder(
+    column: $table.domain,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get baseDomainEpoch => $composableBuilder(
+    column: $table.baseDomainEpoch,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get attemptCount => $composableBuilder(
+    column: $table.attemptCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lastAttemptAt => $composableBuilder(
+    column: $table.lastAttemptAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CommerceOutboxEntriesTableAnnotationComposer
+    extends Composer<_$BusinessHubDatabase, $CommerceOutboxEntriesTable> {
+  $$CommerceOutboxEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get commandId =>
+      $composableBuilder(column: $table.commandId, builder: (column) => column);
+
+  GeneratedColumn<String> get shopId =>
+      $composableBuilder(column: $table.shopId, builder: (column) => column);
+
+  GeneratedColumn<String> get commandType => $composableBuilder(
+    column: $table.commandType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get domain =>
+      $composableBuilder(column: $table.domain, builder: (column) => column);
+
+  GeneratedColumn<int> get baseDomainEpoch => $composableBuilder(
+    column: $table.baseDomainEpoch,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get attemptCount => $composableBuilder(
+    column: $table.attemptCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastError =>
+      $composableBuilder(column: $table.lastError, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get lastAttemptAt => $composableBuilder(
+    column: $table.lastAttemptAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => column,
+  );
+}
+
+class $$CommerceOutboxEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$BusinessHubDatabase,
+          $CommerceOutboxEntriesTable,
+          CommerceOutboxEntry,
+          $$CommerceOutboxEntriesTableFilterComposer,
+          $$CommerceOutboxEntriesTableOrderingComposer,
+          $$CommerceOutboxEntriesTableAnnotationComposer,
+          $$CommerceOutboxEntriesTableCreateCompanionBuilder,
+          $$CommerceOutboxEntriesTableUpdateCompanionBuilder,
+          (
+            CommerceOutboxEntry,
+            BaseReferences<
+              _$BusinessHubDatabase,
+              $CommerceOutboxEntriesTable,
+              CommerceOutboxEntry
+            >,
+          ),
+          CommerceOutboxEntry,
+          PrefetchHooks Function()
+        > {
+  $$CommerceOutboxEntriesTableTableManager(
+    _$BusinessHubDatabase db,
+    $CommerceOutboxEntriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CommerceOutboxEntriesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$CommerceOutboxEntriesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CommerceOutboxEntriesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> commandId = const Value.absent(),
+                Value<String> shopId = const Value.absent(),
+                Value<String> commandType = const Value.absent(),
+                Value<String> domain = const Value.absent(),
+                Value<int> baseDomainEpoch = const Value.absent(),
+                Value<String> payloadJson = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<int> attemptCount = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<int?> lastAttemptAt = const Value.absent(),
+                Value<int?> completedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CommerceOutboxEntriesCompanion(
+                commandId: commandId,
+                shopId: shopId,
+                commandType: commandType,
+                domain: domain,
+                baseDomainEpoch: baseDomainEpoch,
+                payloadJson: payloadJson,
+                syncStatus: syncStatus,
+                attemptCount: attemptCount,
+                lastError: lastError,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                lastAttemptAt: lastAttemptAt,
+                completedAt: completedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String commandId,
+                required String shopId,
+                required String commandType,
+                required String domain,
+                Value<int> baseDomainEpoch = const Value.absent(),
+                required String payloadJson,
+                Value<String> syncStatus = const Value.absent(),
+                Value<int> attemptCount = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
+                required int createdAt,
+                Value<int> updatedAt = const Value.absent(),
+                Value<int?> lastAttemptAt = const Value.absent(),
+                Value<int?> completedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CommerceOutboxEntriesCompanion.insert(
+                commandId: commandId,
+                shopId: shopId,
+                commandType: commandType,
+                domain: domain,
+                baseDomainEpoch: baseDomainEpoch,
+                payloadJson: payloadJson,
+                syncStatus: syncStatus,
+                attemptCount: attemptCount,
+                lastError: lastError,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                lastAttemptAt: lastAttemptAt,
+                completedAt: completedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CommerceOutboxEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$BusinessHubDatabase,
+      $CommerceOutboxEntriesTable,
+      CommerceOutboxEntry,
+      $$CommerceOutboxEntriesTableFilterComposer,
+      $$CommerceOutboxEntriesTableOrderingComposer,
+      $$CommerceOutboxEntriesTableAnnotationComposer,
+      $$CommerceOutboxEntriesTableCreateCompanionBuilder,
+      $$CommerceOutboxEntriesTableUpdateCompanionBuilder,
+      (
+        CommerceOutboxEntry,
+        BaseReferences<
+          _$BusinessHubDatabase,
+          $CommerceOutboxEntriesTable,
+          CommerceOutboxEntry
+        >,
+      ),
+      CommerceOutboxEntry,
+      PrefetchHooks Function()
+    >;
 
 class $BusinessHubDatabaseManager {
   final _$BusinessHubDatabase _db;
@@ -3552,4 +5167,6 @@ class $BusinessHubDatabaseManager {
       );
   $$SalesEntriesTableTableManager get salesEntries =>
       $$SalesEntriesTableTableManager(_db, _db.salesEntries);
+  $$CommerceOutboxEntriesTableTableManager get commerceOutboxEntries =>
+      $$CommerceOutboxEntriesTableTableManager(_db, _db.commerceOutboxEntries);
 }

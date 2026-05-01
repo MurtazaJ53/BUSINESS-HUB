@@ -137,6 +137,26 @@ class PosPayment {
   Map<String, dynamic> toJson() => {'mode': mode, 'amount': amount};
 }
 
+enum CommerceCommandType { saleCreate, paymentCreate }
+
+enum CommerceSyncState { localOnly, queued, syncing, synced, failed }
+
+class CommerceSyncResult {
+  const CommerceSyncResult({
+    required this.commandId,
+    required this.state,
+    this.backendEntityId,
+    this.message,
+  });
+
+  final String commandId;
+  final CommerceSyncState state;
+  final String? backendEntityId;
+  final String? message;
+
+  bool get acceptedByBackend => state == CommerceSyncState.synced;
+}
+
 class PosCartItem {
   const PosCartItem({
     required this.id,
@@ -202,6 +222,7 @@ class RecentSaleSummary {
     required this.total,
     required this.date,
     required this.paymentMode,
+    required this.syncState,
     this.customerName,
   });
 
@@ -209,12 +230,48 @@ class RecentSaleSummary {
   final double total;
   final String date;
   final String paymentMode;
+  final CommerceSyncState syncState;
   final String? customerName;
+}
+
+class CommerceOutboxEntryModel {
+  const CommerceOutboxEntryModel({
+    required this.commandId,
+    required this.shopId,
+    required this.commandType,
+    required this.domain,
+    required this.baseDomainEpoch,
+    required this.payloadJson,
+    required this.syncStatus,
+    required this.attemptCount,
+    required this.createdAt,
+    required this.updatedAt,
+    this.lastAttemptAt,
+    this.completedAt,
+    this.lastError,
+  });
+
+  final String commandId;
+  final String shopId;
+  final String commandType;
+  final String domain;
+  final int baseDomainEpoch;
+  final String payloadJson;
+  final String syncStatus;
+  final int attemptCount;
+  final int createdAt;
+  final int updatedAt;
+  final int? lastAttemptAt;
+  final int? completedAt;
+  final String? lastError;
 }
 
 class LocalSaleCommit {
   const LocalSaleCommit({
+    required this.commandId,
     required this.saleId,
+    required this.shopId,
+    required this.baseDomainEpoch,
     required this.date,
     required this.createdAt,
     required this.total,
@@ -229,7 +286,10 @@ class LocalSaleCommit {
     required this.inventoryDeltas,
   });
 
+  final String commandId;
   final String saleId;
+  final String shopId;
+  final int baseDomainEpoch;
   final String date;
   final String createdAt;
   final double total;
@@ -242,6 +302,44 @@ class LocalSaleCommit {
   final String? customerPhone;
   final String? footerNote;
   final Map<String, int> inventoryDeltas;
+
+  Map<String, dynamic> toBackendCommandPayload() => {
+    'command_id': commandId,
+    'base_domain_epoch': baseDomainEpoch,
+    'source_surface': 'flutter_pos',
+    'sale': {
+      'customer_name': customerName ?? '',
+      'customer_phone': customerPhone ?? '',
+      'discount_amount': discount.toStringAsFixed(2),
+      'payment_mode': paymentMode,
+      'footer_note': footerNote ?? '',
+      'sale_date': date,
+      'occurred_at': createdAt,
+      'items': items
+          .map(
+            (item) => {
+              'inventory_item_id': item['itemId'],
+              'name': item['name'],
+              'sku': item['sku'] ?? '',
+              'size': item['size'] ?? '',
+              'quantity': item['quantity'],
+              'unit_price': (item['price'] as num).toStringAsFixed(2),
+              'unit_cost': item['costPrice'] == null
+                  ? null
+                  : (item['costPrice'] as num).toStringAsFixed(2),
+            },
+          )
+          .toList(growable: false),
+      'payments': payments
+          .map(
+            (payment) => {
+              'payment_method': payment['mode'],
+              'amount': (payment['amount'] as num).toStringAsFixed(2),
+            },
+          )
+          .toList(growable: false),
+    },
+  };
 
   Map<String, dynamic> toFirestorePayload({String? staffId}) => {
     'id': saleId,

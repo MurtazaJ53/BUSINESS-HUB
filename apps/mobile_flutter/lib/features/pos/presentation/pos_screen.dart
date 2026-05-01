@@ -52,6 +52,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final syncStatus = ref.watch(syncStatusProvider);
     final shopStream = ref.watch(shopRepositoryProvider).watchShopInfo();
     final categoriesStream = inventoryRepository.watchCategories();
+    final pendingOutboxStream = salesRepository.watchPendingOutboxCount();
     final catalogStream = inventoryRepository.watchCatalogPage(
       search: _search,
       category: _selectedCategory,
@@ -74,6 +75,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 salesRepository: salesRepository,
                 syncCoordinator: syncCoordinator,
                 shopStream: shopStream,
+                activeShopId: session?.shopId,
               ),
               backgroundColor: const Color(0xFF2563EB),
               icon: const Icon(Icons.shopping_bag_rounded),
@@ -89,14 +91,26 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             eyebrow: 'Sales hub',
             title: 'Premium checkout, native speed.',
             subtitle:
-                'The cart opens from local SQLite first, then Firestore sync keeps the mobile checkout aligned with your live workspace.',
+                'The cart opens from local SQLite first, then the commerce outbox pushes accepted sales into the new backend without blocking checkout speed.',
             trailing: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: <Widget>[
-                MobileTag(
-                  label: '${_cart.length} in cart',
-                  icon: Icons.shopping_cart_checkout_rounded,
-                  accent: const Color(0xFF22C55E),
+                StreamBuilder<int>(
+                  stream: pendingOutboxStream,
+                  builder: (context, snapshot) {
+                    final pending = snapshot.data ?? 0;
+                    return MobileTag(
+                      label: pending > 0
+                          ? '$pending queued'
+                          : '${_cart.length} in cart',
+                      icon: pending > 0
+                          ? Icons.cloud_upload_rounded
+                          : Icons.shopping_cart_checkout_rounded,
+                      accent: pending > 0
+                          ? const Color(0xFFF59E0B)
+                          : const Color(0xFF22C55E),
+                    );
+                  },
                 ),
                 const SizedBox(height: 10),
                 MobileTag(
@@ -501,6 +515,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     required SalesRepository salesRepository,
     required MobileSyncCoordinator syncCoordinator,
     required Stream<ShopInfo> shopStream,
+    required String? activeShopId,
   }) async {
     final shop = await shopStream.first;
     if (!context.mounted) {
@@ -746,9 +761,25 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                       ),
                       const SizedBox(height: 18),
                       FilledButton(
-                        onPressed: _saving
+                              onPressed: _saving
                             ? null
                             : () async {
+                                if (activeShopId == null || activeShopId.isEmpty) {
+                                  if (!mounted) {
+                                    return;
+                                  }
+                                  ScaffoldMessenger.of(
+                                    this.context,
+                                  ).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Mobile session is not ready yet. Please wait for the shop to load.',
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+
                                 final shortages = _cart
                                     .where((item) => item.quantity > item.stock)
                                     .toList(growable: false);
@@ -769,6 +800,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                 try {
                                   final commit = await salesRepository
                                       .recordLocalSale(
+                                        shopId: activeShopId,
                                         items: List<PosCartItem>.from(_cart),
                                         payments: <PosPayment>[
                                           PosPayment(
@@ -790,7 +822,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                         footerNote: _footerController.text
                                             .trim(),
                                       );
-                                  await syncCoordinator.submitSale(commit);
+                                  final syncResult = await syncCoordinator
+                                      .submitSale(commit);
                                   if (!mounted || !context.mounted) {
                                     return;
                                   }
@@ -800,7 +833,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                   ).showSnackBar(
                                     SnackBar(
                                       content: Text(
-                                        'Sale saved for ${formatCurrency(commit.total)}',
+                                        syncResult.acceptedByBackend
+                                            ? 'Sale saved for ${formatCurrency(commit.total)} and synced to backend'
+                                            : 'Sale saved for ${formatCurrency(commit.total)} and queued for backend sync',
                                       ),
                                     ),
                                   );

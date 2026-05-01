@@ -76,7 +76,44 @@ class SalesEntries extends Table {
   TextColumn get footerNote => text().named('footer_note').nullable()();
   TextColumn get itemsJson => text().named('items_json')();
   TextColumn get paymentsJson => text().named('payments_json')();
+  TextColumn get commandId => text().named('command_id').nullable()();
+  TextColumn get syncStatus =>
+      text().named('sync_status').withDefault(const Constant('local_only'))();
+  TextColumn get backendReceiptId =>
+      text().named('backend_receipt_id').nullable()();
+  TextColumn get backendSaleId =>
+      text().named('backend_sale_id').nullable()();
+  TextColumn get lastSyncError =>
+      text().named('last_sync_error').nullable()();
+  IntColumn get lastSyncedAt => integer().named('last_synced_at').nullable()();
   BoolColumn get tombstone => boolean().withDefault(const Constant(false))();
+}
+
+class CommerceOutboxEntries extends Table {
+  @override
+  String get tableName => 'commerce_outbox';
+
+  TextColumn get commandId => text().named('command_id')();
+  TextColumn get shopId => text().named('shop_id')();
+  TextColumn get commandType => text().named('command_type')();
+  TextColumn get domain => text()();
+  IntColumn get baseDomainEpoch =>
+      integer().named('base_domain_epoch').withDefault(const Constant(1))();
+  TextColumn get payloadJson => text().named('payload_json')();
+  TextColumn get syncStatus =>
+      text().named('sync_status').withDefault(const Constant('pending'))();
+  IntColumn get attemptCount =>
+      integer().named('attempt_count').withDefault(const Constant(0))();
+  TextColumn get lastError => text().named('last_error').nullable()();
+  IntColumn get createdAt => integer().named('created_at')();
+  IntColumn get updatedAt =>
+      integer().named('updated_at').withDefault(const Constant(0))();
+  IntColumn get lastAttemptAt =>
+      integer().named('last_attempt_at').nullable()();
+  IntColumn get completedAt => integer().named('completed_at').nullable()();
+
+  @override
+  Set<Column<Object>>? get primaryKey => {commandId};
 }
 
 @DriftDatabase(
@@ -85,6 +122,7 @@ class SalesEntries extends Table {
     InventoryEntries,
     InventoryPrivateEntries,
     SalesEntries,
+    CommerceOutboxEntries,
   ],
 )
 class BusinessHubDatabase extends _$BusinessHubDatabase {
@@ -97,12 +135,25 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       );
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
       await m.createAll();
+    },
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        await m.addColumn(salesEntries, salesEntries.commandId);
+        await m.addColumn(salesEntries, salesEntries.syncStatus);
+        await m.addColumn(salesEntries, salesEntries.backendReceiptId);
+        await m.addColumn(salesEntries, salesEntries.lastSyncError);
+        await m.addColumn(salesEntries, salesEntries.lastSyncedAt);
+        await m.createTable(commerceOutboxEntries);
+      }
+      if (from < 3) {
+        await m.addColumn(salesEntries, salesEntries.backendSaleId);
+      }
     },
   );
 }

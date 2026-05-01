@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../backend/backend_api_client.dart';
 import '../database/mobile_repository.dart';
 import '../models/mobile_models.dart';
 import '../models/mobile_session.dart';
@@ -26,6 +28,7 @@ class SyncStatusNotifier extends Notifier<MobileSyncStatus> {
 
 final mobileSyncCoordinatorProvider = Provider<MobileSyncCoordinator>((ref) {
   final coordinator = MobileSyncCoordinator(
+    backendApiClient: ref.read(backendApiClientProvider),
     firestore: FirebaseFirestore.instance,
     shopRepository: ref.read(shopRepositoryProvider),
     inventoryRepository: ref.read(inventoryRepositoryProvider),
@@ -47,16 +50,19 @@ enum MobileSyncStatus { idle, syncing, offline, error }
 
 class MobileSyncCoordinator {
   MobileSyncCoordinator({
+    required BackendApiClient backendApiClient,
     required FirebaseFirestore firestore,
     required ShopRepository shopRepository,
     required InventoryRepository inventoryRepository,
     required SalesRepository salesRepository,
     required this.setStatus,
-  }) : _firestore = firestore,
+  }) : _backendApiClient = backendApiClient,
+       _firestore = firestore,
        _shopRepository = shopRepository,
        _inventoryRepository = inventoryRepository,
        _salesRepository = salesRepository;
 
+  final BackendApiClient _backendApiClient;
   final FirebaseFirestore _firestore;
   final ShopRepository _shopRepository;
   final InventoryRepository _inventoryRepository;
@@ -64,6 +70,9 @@ class MobileSyncCoordinator {
   final void Function(MobileSyncStatus status) setStatus;
 
   MobileSession? _session;
+  bool _salesReadsUseBackend = false;
+  bool _isFlushingOutbox = false;
+  Timer? _outboxRetryTimer;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
 
   Future<void> handleSession(
@@ -79,13 +88,16 @@ class MobileSyncCoordinator {
 
     await _cancelSubscriptions();
 
-    if (force || previousShopId != session?.shopId || session == null) {
-      await _clearWorkspaceCache();
+    if (session == null || previousShopId != session.shopId) {
+      await _clearWorkspaceCache(clearSales: true);
+    } else if (force) {
+      await _clearWorkspaceCache(clearSales: false);
     }
 
     _session = session;
 
     if (session == null || !session.hasShop) {
+      _salesReadsUseBackend = false;
       setStatus(MobileSyncStatus.idle);
       return;
     }
@@ -93,7 +105,14 @@ class MobileSyncCoordinator {
     setStatus(MobileSyncStatus.syncing);
     final shopId = session.shopId!;
     await _ensureAdminBootstrap(session, shopId);
-    await _primeWorkspaceSnapshot(shopId, includeCost: session.canViewCost);
+    final domainStates = await _refreshBackendDomainEpochs(session, shopId);
+    final salesState = domainStates['sales'];
+    _salesReadsUseBackend = salesState?.writeMaster == 'postgres';
+    await _primeWorkspaceSnapshot(
+      shopId,
+      includeCost: session.canViewCost,
+      includeFirestoreSales: !_salesReadsUseBackend,
+    );
 
     _subscriptions.add(
       _firestore
@@ -146,86 +165,196 @@ class MobileSyncCoordinator {
       );
     }
 
-    _subscriptions.add(
-      _firestore
-          .collection('shops/$shopId/sales')
-          .orderBy('date', descending: true)
-          .limit(1500)
-          .snapshots()
-          .listen(
-            (snapshot) async {
-              await _mergeSalesChanges(snapshot.docChanges);
-              setStatus(MobileSyncStatus.idle);
-            },
-            onError: (error, stackTrace) {
-              debugPrint('Sales sync failed: $error');
-              setStatus(MobileSyncStatus.error);
-            },
-          ),
-    );
+    if (_salesReadsUseBackend) {
+      await _syncBackendSalesSnapshot(session, shopId);
+    } else {
+      _subscriptions.add(
+        _firestore
+            .collection('shops/$shopId/sales')
+            .orderBy('date', descending: true)
+            .limit(1500)
+            .snapshots()
+            .listen(
+              (snapshot) async {
+                await _mergeSalesChanges(snapshot.docChanges);
+                setStatus(MobileSyncStatus.idle);
+              },
+              onError: (error, stackTrace) {
+                debugPrint('Sales sync failed: $error');
+                setStatus(MobileSyncStatus.error);
+              },
+            ),
+      );
+    }
 
     setStatus(MobileSyncStatus.idle);
+    _startOutboxRetryLoop();
+    await flushCommerceOutbox();
   }
 
   Future<void> refresh() => handleSession(_session, force: true);
 
-  Future<void> submitSale(LocalSaleCommit commit) async {
+  Future<CommerceSyncResult> submitSale(LocalSaleCommit commit) async {
     final session = _session;
     if (session == null || !session.hasShop) {
-      return;
+      return CommerceSyncResult(
+        commandId: commit.commandId,
+        state: CommerceSyncState.queued,
+        message: 'Sale saved locally. Sign in again to sync it.',
+      );
     }
 
-    final shopId = session.shopId!;
-    final batch = _firestore.batch();
-    final saleRef = _firestore.doc('shops/$shopId/sales/${commit.saleId}');
-    batch.set(
-      saleRef,
-      commit.toFirestorePayload(staffId: session.uid),
-      SetOptions(merge: true),
-    );
-
-    for (final entry in commit.inventoryDeltas.entries) {
-      final ref = _firestore.doc('shops/$shopId/inventory/${entry.key}');
-      batch.set(ref, {
-        'stock': FieldValue.increment(entry.value),
-        'updatedAt': DateTime.now().millisecondsSinceEpoch,
-      }, SetOptions(merge: true));
-    }
-
-    try {
-      setStatus(MobileSyncStatus.syncing);
-      await batch.commit();
-      setStatus(MobileSyncStatus.idle);
-    } catch (error) {
-      debugPrint('Sale upload failed: $error');
-      setStatus(MobileSyncStatus.error);
-      rethrow;
-    }
+    return flushCommerceOutbox(triggerCommandId: commit.commandId);
   }
 
   Future<void> dispose() => _cancelSubscriptions();
 
-  Future<void> _clearWorkspaceCache() async {
-    await Future.wait<void>([
+  Future<CommerceSyncResult> flushCommerceOutbox({
+    String? triggerCommandId,
+  }) async {
+    if (_isFlushingOutbox) {
+      return CommerceSyncResult(
+        commandId: triggerCommandId ?? 'pending',
+        state: CommerceSyncState.syncing,
+        message: 'Commerce outbox sync is already in progress.',
+      );
+    }
+
+    final session = _session;
+    if (session == null || !session.hasShop) {
+      return CommerceSyncResult(
+        commandId: triggerCommandId ?? 'unknown',
+        state: CommerceSyncState.queued,
+        message: 'Outbox is waiting for an authenticated workspace.',
+      );
+    }
+
+    _isFlushingOutbox = true;
+    final entries = await _salesRepository.getPendingOutboxEntries();
+    if (entries.isEmpty) {
+      _isFlushingOutbox = false;
+      return CommerceSyncResult(
+        commandId: triggerCommandId ?? 'none',
+        state: CommerceSyncState.synced,
+        message: 'Nothing is waiting in the mobile outbox.',
+      );
+    }
+
+    setStatus(MobileSyncStatus.syncing);
+    CommerceSyncResult? targetResult;
+    var hadFailure = false;
+
+    try {
+      for (final entry in entries) {
+        await _salesRepository.registerOutboxAttempt(entry.commandId);
+        await _salesRepository.markOutboxSyncing(entry.commandId);
+        try {
+          final payload = Map<String, dynamic>.from(
+            jsonDecode(entry.payloadJson) as Map<String, dynamic>,
+          );
+          late BackendCommandResponse response;
+          switch (entry.commandType) {
+            case 'sale_create':
+              response = await _backendApiClient.submitSaleCommand(
+                user: session.user,
+                shopId: entry.shopId,
+                payload: payload,
+              );
+              break;
+            case 'payment_create':
+              response = await _backendApiClient.submitPaymentCommand(
+                user: session.user,
+                shopId: entry.shopId,
+                payload: payload,
+              );
+              break;
+            default:
+              throw BackendApiException(
+                'Unknown mobile commerce command type: ${entry.commandType}',
+              );
+          }
+
+          await _salesRepository.markCommandSynced(
+            commandId: entry.commandId,
+            receiptId: response.receiptId,
+            backendSaleId: entry.commandType == 'sale_create'
+                ? response.entityId
+                : null,
+          );
+          if (entry.commandId == triggerCommandId) {
+            targetResult = CommerceSyncResult(
+              commandId: entry.commandId,
+              state: CommerceSyncState.synced,
+              backendEntityId: response.entityId,
+              message: response.duplicate
+                  ? 'Sale was already accepted by the backend earlier.'
+                  : 'Sale saved locally and synced to the backend.',
+            );
+          }
+        } catch (error) {
+          debugPrint('Commerce outbox sync failed: $error');
+          hadFailure = true;
+          await _salesRepository.markCommandFailed(
+            commandId: entry.commandId,
+            error: error.toString(),
+          );
+          if (entry.commandId == triggerCommandId) {
+            targetResult = CommerceSyncResult(
+              commandId: entry.commandId,
+              state: CommerceSyncState.queued,
+              message:
+                  'Sale saved locally. Backend sync is pending and will retry later.',
+            );
+          }
+        }
+      }
+
+      if (_salesReadsUseBackend) {
+        await _syncBackendSalesSnapshot(session, session.shopId!);
+      }
+
+      setStatus(hadFailure ? MobileSyncStatus.error : MobileSyncStatus.idle);
+      return targetResult ??
+          CommerceSyncResult(
+            commandId: triggerCommandId ?? entries.first.commandId,
+            state: hadFailure
+                ? CommerceSyncState.queued
+                : CommerceSyncState.synced,
+            message: hadFailure
+                ? 'Some commerce commands are still queued for retry.'
+                : 'Pending commerce commands were flushed.',
+          );
+    } finally {
+      _isFlushingOutbox = false;
+    }
+  }
+
+  Future<void> _clearWorkspaceCache({required bool clearSales}) async {
+    final futures = <Future<void>>[
       _shopRepository.clearWorkspace(),
       _inventoryRepository.clearWorkspace(),
-      _salesRepository.clearWorkspace(),
-    ]);
+    ];
+    if (clearSales) {
+      futures.add(_salesRepository.clearWorkspace());
+    }
+    await Future.wait<void>(futures);
   }
 
   Future<void> _primeWorkspaceSnapshot(
     String shopId, {
     required bool includeCost,
+    required bool includeFirestoreSales,
   }) async {
     try {
       final snapshotFutures = await Future.wait([
         _firestore.doc('shops/$shopId').get(),
         _firestore.collection('shops/$shopId/inventory').get(),
-        _firestore
-            .collection('shops/$shopId/sales')
-            .orderBy('date', descending: true)
-            .limit(1500)
-            .get(),
+        if (includeFirestoreSales)
+          _firestore
+              .collection('shops/$shopId/sales')
+              .orderBy('date', descending: true)
+              .limit(1500)
+              .get(),
         if (includeCost)
           _firestore.collection('shops/$shopId/inventory_private').get(),
       ]);
@@ -234,10 +363,12 @@ class MobileSyncCoordinator {
           snapshotFutures[0] as DocumentSnapshot<Map<String, dynamic>>;
       final inventorySnapshot =
           snapshotFutures[1] as QuerySnapshot<Map<String, dynamic>>;
-      final salesSnapshot =
-          snapshotFutures[2] as QuerySnapshot<Map<String, dynamic>>;
+      final salesSnapshot = includeFirestoreSales
+          ? snapshotFutures[2] as QuerySnapshot<Map<String, dynamic>>
+          : null;
       final inventoryPrivateSnapshot = includeCost
-          ? snapshotFutures[3] as QuerySnapshot<Map<String, dynamic>>
+          ? snapshotFutures[includeFirestoreSales ? 3 : 2]
+                as QuerySnapshot<Map<String, dynamic>>
           : null;
 
       if (shopSnapshot.exists && shopSnapshot.data() != null) {
@@ -248,18 +379,104 @@ class MobileSyncCoordinator {
       if (inventoryPrivateSnapshot != null) {
         await _mergeInventoryPrivateDocuments(inventoryPrivateSnapshot.docs);
       }
-      await _mergeSalesDocuments(salesSnapshot.docs);
+      if (salesSnapshot != null) {
+        await _mergeSalesDocuments(salesSnapshot.docs);
+      }
     } catch (error) {
       debugPrint('Initial workspace bootstrap failed: $error');
       setStatus(MobileSyncStatus.error);
     }
   }
 
+  Future<Map<String, BackendDomainState>> _refreshBackendDomainEpochs(
+    MobileSession session,
+    String shopId,
+  ) async {
+    final states = <String, BackendDomainState>{};
+    try {
+      final salesState = await _backendApiClient.getDomainState(
+        user: session.user,
+        shopId: shopId,
+        domain: 'sales',
+      );
+      await _shopRepository.saveDomainState(
+        domain: 'sales',
+        currentEpoch: salesState.currentEpoch,
+        cutoverStatus: salesState.cutoverStatus,
+        writeMaster: salesState.writeMaster,
+      );
+      states['sales'] = salesState;
+    } catch (error) {
+      debugPrint('Sales domain state refresh skipped: $error');
+    }
+
+    try {
+      final paymentsState = await _backendApiClient.getDomainState(
+        user: session.user,
+        shopId: shopId,
+        domain: 'payments',
+      );
+      await _shopRepository.saveDomainState(
+        domain: 'payments',
+        currentEpoch: paymentsState.currentEpoch,
+        cutoverStatus: paymentsState.cutoverStatus,
+        writeMaster: paymentsState.writeMaster,
+      );
+      states['payments'] = paymentsState;
+    } catch (error) {
+      debugPrint('Payments domain state refresh skipped: $error');
+    }
+
+    return states;
+  }
+
   Future<void> _cancelSubscriptions() async {
+    _outboxRetryTimer?.cancel();
+    _outboxRetryTimer = null;
     for (final subscription in _subscriptions) {
       await subscription.cancel();
     }
     _subscriptions.clear();
+  }
+
+  void _startOutboxRetryLoop() {
+    _outboxRetryTimer?.cancel();
+    _outboxRetryTimer = Timer.periodic(const Duration(seconds: 25), (_) {
+      final session = _session;
+      if (session == null || !session.hasShop) {
+        return;
+      }
+      unawaited(flushCommerceOutbox());
+      if (_salesReadsUseBackend) {
+        unawaited(_syncBackendSalesSnapshot(session, session.shopId!));
+      }
+    });
+  }
+
+  Future<void> _syncBackendSalesSnapshot(
+    MobileSession session,
+    String shopId,
+  ) async {
+    try {
+      final backendSales = await _backendApiClient.fetchRecentSales(
+        user: session.user,
+        shopId: shopId,
+        limit: 200,
+      );
+      for (final sale in backendSales) {
+        final updatedAt = _toEpoch(
+          sale['occurred_at'] ?? sale['updated_at'] ?? sale['sale_date'],
+        );
+        await _salesRepository.mergeBackendSaleDocument(
+          sale,
+          updatedAt: updatedAt,
+        );
+      }
+      setStatus(MobileSyncStatus.idle);
+    } catch (error) {
+      debugPrint('Backend sales snapshot sync failed: $error');
+      setStatus(MobileSyncStatus.error);
+    }
   }
 
   Future<void> _ensureAdminBootstrap(

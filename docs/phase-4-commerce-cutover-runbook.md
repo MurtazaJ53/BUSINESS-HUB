@@ -30,11 +30,18 @@ That means:
 
 - endpoint: `/api/v1/shops/<shop_id>/sales/commands/`
 - purpose: capture a sale command with items and payments in one atomic request
+- current mobile posture:
+  - Flutter POS writes the sale to local SQLite first
+  - the mobile commerce outbox replays the command to Django
+  - if the `sales` domain is PostgreSQL-primary, the mobile app refreshes recent sales from Django instead of Firestore
 
 ### Payments
 
 - endpoint: `/api/v1/shops/<shop_id>/payments/commands/`
 - purpose: capture a post-sale payment command against an existing sale
+- current rollout note:
+  - initial tender is already captured inside the sales command
+  - standalone payment commands are reserved for follow-up credit collection and later mobile payment workflows
 
 ## Required guards
 
@@ -74,6 +81,16 @@ Rules:
 - one command ID is unique per shop
 - duplicate replay must return the original accepted fact, not create a second fact
 - duplicate replay is expected during mobile reconnect and must be safe
+
+## Mobile replay posture
+
+- mobile outbox storage: `commerce_outbox`
+- sync trigger:
+  - immediately after local checkout
+  - after session bootstrap
+  - periodic retry while the app remains open
+- failed replay stays queued with an error marker
+- stale epoch rejection must not overwrite local facts; the operator must rehydrate from current server truth
 
 ## Fact side effects
 

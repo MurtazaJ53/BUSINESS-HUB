@@ -34,6 +34,26 @@ flutter test
 flutter build apk --release
 ```
 
+## Phase 4 commerce setup
+
+The mobile POS now queues commerce commands locally and replays them to Django when the shop domain is ready.
+
+- backend base URL is injected with:
+  - `--dart-define=BUSINESS_HUB_API_BASE_URL=http://<host>:8000/api/v1`
+- Android emulator default is:
+  - `http://10.0.2.2:8000/api/v1`
+- local sales are stored first in SQLite
+- accepted sales are replayed to:
+  - `/shops/<shop_id>/sales/commands/`
+- queued commands retry automatically while the app is open
+- when the `sales` domain becomes PostgreSQL-primary, recent sales refresh from Django instead of Firestore
+
+Current Phase 4 scope:
+
+- sale command replay is active
+- initial sale payments travel inside the sale command
+- standalone follow-up payment command infrastructure exists in the backend for later mobile credit-collection UI
+
 ## Package strategy
 
 - keep the Flutter beta app on a side-by-side package while migration is in progress
