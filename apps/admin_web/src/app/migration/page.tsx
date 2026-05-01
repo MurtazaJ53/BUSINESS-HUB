@@ -37,6 +37,7 @@ function buildActionBanner(searchParams: SearchParams) {
   const domain = getSearchParamValue(searchParams, "domain");
   const shop = getSearchParamValue(searchParams, "shop");
   const message = getSearchParamValue(searchParams, "message");
+  const issue = getSearchParamValue(searchParams, "issue");
   const jobStatus = getSearchParamValue(searchParams, "jobStatus");
   const rowsScanned = getSearchParamValue(searchParams, "rowsScanned");
   const rowsWritten = getSearchParamValue(searchParams, "rowsWritten");
@@ -47,6 +48,10 @@ function buildActionBanner(searchParams: SearchParams) {
   const healthy = getSearchParamValue(searchParams, "healthy");
   const requiresRollback = getSearchParamValue(searchParams, "requiresRollback");
   const criticalCount = getSearchParamValue(searchParams, "criticalCount");
+  const reconciliationStatus = getSearchParamValue(
+    searchParams,
+    "reconciliationStatus",
+  );
 
   if (!status || !action) {
     return null;
@@ -58,6 +63,8 @@ function buildActionBanner(searchParams: SearchParams) {
         ? ` Jobs created: ${jobsCreated || "0"}. ready_for_pilot=${readyForPilot || "false"}. remaining blockers=${blockingCount || "0"}.`
         : action === "verify-pilot"
         ? ` healthy=${healthy || "false"}. requires_rollback=${requiresRollback || "false"}. mismatch_count=${mismatchCount || "0"}. critical_events=${criticalCount || "0"}.`
+        : action.startsWith("reconciliation-")
+        ? ` Issue ${issue || "unknown"} is now ${reconciliationStatus || "updated"}.`
         : action.startsWith("run-") && jobStatus
         ? ` Latest job status: ${jobStatus}. rows_scanned=${rowsScanned || "0"}, rows_written=${rowsWritten || "0"}, mismatch_count=${mismatchCount || "0"}.`
         : "";

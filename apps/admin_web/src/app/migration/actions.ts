@@ -19,6 +19,14 @@ function getRequiredControlId(formData: FormData): string {
   return controlId;
 }
 
+function getRequiredEventId(formData: FormData): string {
+  const eventId = String(formData.get("eventId") || "").trim();
+  if (!eventId) {
+    throw new Error("Missing reconciliation event id.");
+  }
+  return eventId;
+}
+
 function getOptionalField(formData: FormData, key: string): string {
   return String(formData.get(key) || "").trim();
 }
@@ -64,6 +72,60 @@ async function runPilotAction(
         action,
         domain,
         shop,
+        message,
+      }),
+    );
+  }
+}
+
+async function runReconciliationAction(
+  formData: FormData,
+  {
+    nextStatus,
+    action,
+    resolutionNote,
+  }: {
+    nextStatus: "acknowledged" | "resolved" | "open";
+    action: string;
+    resolutionNote: string;
+  },
+) {
+  const eventId = getRequiredEventId(formData);
+  const domain = getOptionalField(formData, "domain");
+  const shop = getOptionalField(formData, "shop");
+  const issue = getOptionalField(formData, "issue");
+
+  try {
+    await apiMutation(`/migration/reconciliation/${eventId}/`, {
+      method: "PATCH",
+      body: {
+        status: nextStatus,
+        resolution_note: resolutionNote,
+      },
+    });
+    revalidatePath("/migration");
+    redirect(
+      buildRedirectUrl({
+        status: "success",
+        action,
+        domain,
+        shop,
+        issue,
+        reconciliationStatus: nextStatus,
+      }),
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message.replace(/\s+/g, " ").slice(0, 220)
+        : "Unknown reconciliation action failure.";
+    redirect(
+      buildRedirectUrl({
+        status: "error",
+        action,
+        domain,
+        shop,
+        issue,
         message,
       }),
     );
@@ -257,4 +319,31 @@ export async function runPilotVerificationAction(formData: FormData) {
       }),
     );
   }
+}
+
+
+export async function acknowledgeReconciliationAction(formData: FormData) {
+  await runReconciliationAction(formData, {
+    nextStatus: "acknowledged",
+    action: "reconciliation-acknowledge",
+    resolutionNote: "Acknowledged from the migration console for operator follow-up.",
+  });
+}
+
+
+export async function resolveReconciliationAction(formData: FormData) {
+  await runReconciliationAction(formData, {
+    nextStatus: "resolved",
+    action: "reconciliation-resolve",
+    resolutionNote: "Resolved from the migration console after operator review.",
+  });
+}
+
+
+export async function reopenReconciliationAction(formData: FormData) {
+  await runReconciliationAction(formData, {
+    nextStatus: "open",
+    action: "reconciliation-reopen",
+    resolutionNote: "Reopened from the migration console.",
+  });
 }
