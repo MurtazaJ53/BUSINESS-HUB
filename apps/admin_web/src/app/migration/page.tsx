@@ -1,6 +1,7 @@
 import { AdminShell } from "@/components/admin-shell";
 import { EmptyState } from "@/components/empty-state";
 import { MigrationBridgeReceiptsTable } from "@/components/migration-bridge-receipts-table";
+import { MigrationPilotCheckpointBoard } from "@/components/migration-pilot-checkpoint-board";
 import { MetricCard } from "@/components/metric-card";
 import { MigrationControlsTable } from "@/components/migration-controls-table";
 import { MigrationJobsTable } from "@/components/migration-jobs-table";
@@ -194,6 +195,8 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
         </section>
 
         <MigrationRunbookPanel readiness={pilotReadiness} />
+
+        <MigrationPilotCheckpointBoard readiness={pilotReadiness} />
 
         <MigrationPilotStageStrip readiness={pilotReadiness} />
 
