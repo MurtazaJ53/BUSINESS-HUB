@@ -25,6 +25,7 @@ It also supports an incident escalation pack when rollout support needs a direct
 It also now includes an evidence tracker so the device can show which rollout exports have already been captured and which core artifacts are still missing.
 That evidence tracker now persists across app restarts on the same workspace, so shift handoff is less fragile on shared devices.
 It now also supports named evidence sessions so operators can separate one shift or rollout wave from the next.
+It now also keeps a short archive of recent completed evidence sessions so the previous shift summary is still available after a fresh session starts.
 
 ## Version source
 
@@ -110,6 +111,7 @@ Reference sheet:
 - [D:/business-hub/docs/mobile-pilot-evidence-tracker.md](D:/business-hub/docs/mobile-pilot-evidence-tracker.md)
 - [D:/business-hub/docs/mobile-pilot-evidence-persistence.md](D:/business-hub/docs/mobile-pilot-evidence-persistence.md)
 - [D:/business-hub/docs/mobile-pilot-evidence-sessions.md](D:/business-hub/docs/mobile-pilot-evidence-sessions.md)
+- [D:/business-hub/docs/mobile-pilot-evidence-session-history.md](D:/business-hub/docs/mobile-pilot-evidence-session-history.md)
 
 1. login
 2. inventory lookup

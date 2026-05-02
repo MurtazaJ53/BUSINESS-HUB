@@ -942,6 +942,74 @@ class SettingsScreen extends ConsumerWidget {
                                             : '${evidenceTracker.latestCapturedArtifact!.label} at ${evidenceTracker.latestCapturedAt!.toUtc().toIso8601String()}',
                                         icon: Icons.history_edu_rounded,
                                       ),
+                                      _SettingsRow(
+                                        label: 'Archived sessions',
+                                        value:
+                                            '${evidenceTracker.archivedSessions.length} saved',
+                                        icon: Icons.archive_rounded,
+                                      ),
+                                      if (evidenceTracker.hasArchivedSessions)
+                                        ...<Widget>[
+                                          Text(
+                                            'Recent archived sessions:',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .labelLarge
+                                                ?.copyWith(
+                                                  color: const Color(
+                                                    0xFF38BDF8,
+                                                  ),
+                                                  fontWeight: FontWeight.w900,
+                                                ),
+                                          ),
+                                          const SizedBox(height: 10),
+                                          ...evidenceTracker.archivedSessions
+                                              .take(3)
+                                              .map(
+                                                (entry) => _ReadinessNoteRow(
+                                                  message: entry.summaryLine,
+                                                  tone: const Color(
+                                                    0xFF38BDF8,
+                                                  ),
+                                                ),
+                                              ),
+                                          const SizedBox(height: 14),
+                                          FilledButton.tonalIcon(
+                                            onPressed: () async {
+                                              final archived =
+                                                  evidenceTracker
+                                                      .latestArchivedSession;
+                                              if (archived == null) {
+                                                return;
+                                              }
+                                              await Clipboard.setData(
+                                                ClipboardData(
+                                                  text: archived
+                                                      .toMultilineText(),
+                                                ),
+                                              );
+                                              if (!context.mounted) {
+                                                return;
+                                              }
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    'Latest archived session copied: ${archived.sessionLabel}.',
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                            icon: const Icon(
+                                              Icons.history_toggle_off_rounded,
+                                            ),
+                                            label: const Text(
+                                              'Copy latest archived session',
+                                            ),
+                                          ),
+                                          const SizedBox(height: 14),
+                                        ],
                                       if (evidenceTracker.missingCoreArtifacts
                                           .isNotEmpty) ...<Widget>[
                                         Text(

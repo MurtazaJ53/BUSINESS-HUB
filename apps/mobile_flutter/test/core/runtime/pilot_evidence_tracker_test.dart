@@ -99,4 +99,48 @@ void main() {
     expect(tracker.sessionStartedAt, DateTime.utc(2026, 5, 2, 10));
     expect(tracker.lastResetAt, DateTime.utc(2026, 5, 2, 10));
   });
+
+  test('startFreshSession archives the previous session summary', () {
+    final tracker = const PilotEvidenceTrackerState()
+        .ensureSession(
+          defaultLabel: 'Wave 1 shift A',
+          startedAt: DateTime.utc(2026, 5, 2, 7, 30),
+        )
+        .markCaptured('pilot_snapshot', capturedAt: DateTime.utc(2026, 5, 2, 8))
+        .markCaptured(
+          'readiness_signoff',
+          capturedAt: DateTime.utc(2026, 5, 2, 8, 10),
+        )
+        .startFreshSession(
+          sessionLabel: 'Wave 1 shift B',
+          startedAt: DateTime.utc(2026, 5, 2, 12),
+        );
+
+    expect(tracker.sessionLabel, 'Wave 1 shift B');
+    expect(tracker.archivedSessions, hasLength(1));
+    expect(tracker.latestArchivedSession?.sessionLabel, 'Wave 1 shift A');
+    expect(tracker.latestArchivedSession?.capturedCoreCount, 2);
+    expect(
+      tracker.latestArchivedSession?.latestCapturedArtifactLabel,
+      'Readiness signoff',
+    );
+  });
+
+  test('tracker text includes archived session summaries', () {
+    final tracker = const PilotEvidenceTrackerState()
+        .ensureSession(
+          defaultLabel: 'Wave 1 shift A',
+          startedAt: DateTime.utc(2026, 5, 2, 7, 30),
+        )
+        .markCaptured('pilot_snapshot', capturedAt: DateTime.utc(2026, 5, 2, 8))
+        .startFreshSession(
+          sessionLabel: 'Wave 1 shift B',
+          startedAt: DateTime.utc(2026, 5, 2, 12),
+        );
+
+    final report = tracker.toMultilineText();
+
+    expect(report, contains('Archived sessions: 1'));
+    expect(report, contains('Wave 1 shift A'));
+  });
 }

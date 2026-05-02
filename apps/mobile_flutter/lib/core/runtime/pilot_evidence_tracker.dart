@@ -4,37 +4,36 @@ class PilotEvidenceTrackerState {
     this.sessionLabel,
     this.sessionStartedAt,
     this.lastResetAt,
+    this.archivedSessions = const <PilotEvidenceSessionArchiveEntry>[],
   });
 
   factory PilotEvidenceTrackerState.fromJson(Map<String, dynamic> json) {
     final rawEntries = json['captured_at_by_artifact'];
-    if (rawEntries is! Map) {
-      return const PilotEvidenceTrackerState();
-    }
-
     final captured = <String, DateTime>{};
-    for (final entry in rawEntries.entries) {
-      final artifactId = entry.key.toString().trim();
-      if (artifactId.isEmpty) {
-        continue;
-      }
-
-      final value = entry.value;
-      if (value is String) {
-        final parsed = DateTime.tryParse(value);
-        if (parsed != null) {
-          captured[artifactId] = parsed.toUtc();
+    if (rawEntries is Map) {
+      for (final entry in rawEntries.entries) {
+        final artifactId = entry.key.toString().trim();
+        if (artifactId.isEmpty) {
+          continue;
         }
-      } else if (value is int) {
-        captured[artifactId] = DateTime.fromMillisecondsSinceEpoch(
-          value,
-          isUtc: true,
-        );
-      } else if (value is num) {
-        captured[artifactId] = DateTime.fromMillisecondsSinceEpoch(
-          value.toInt(),
-          isUtc: true,
-        );
+
+        final value = entry.value;
+        if (value is String) {
+          final parsed = DateTime.tryParse(value);
+          if (parsed != null) {
+            captured[artifactId] = parsed.toUtc();
+          }
+        } else if (value is int) {
+          captured[artifactId] = DateTime.fromMillisecondsSinceEpoch(
+            value,
+            isUtc: true,
+          );
+        } else if (value is num) {
+          captured[artifactId] = DateTime.fromMillisecondsSinceEpoch(
+            value.toInt(),
+            isUtc: true,
+          );
+        }
       }
     }
 
@@ -43,6 +42,7 @@ class PilotEvidenceTrackerState {
       sessionLabel: _readNullableString(json['session_label']),
       sessionStartedAt: _readNullableDateTime(json['session_started_at']),
       lastResetAt: _readNullableDateTime(json['last_reset_at']),
+      archivedSessions: _readArchivedSessions(json['archived_sessions']),
     );
   }
 
@@ -50,6 +50,7 @@ class PilotEvidenceTrackerState {
   final String? sessionLabel;
   final DateTime? sessionStartedAt;
   final DateTime? lastResetAt;
+  final List<PilotEvidenceSessionArchiveEntry> archivedSessions;
 
   static const List<PilotEvidenceArtifact> artifacts = <PilotEvidenceArtifact>[
     PilotEvidenceArtifact(
@@ -131,6 +132,7 @@ class PilotEvidenceTrackerState {
   bool get isCoreComplete => missingCoreCount == 0;
   bool get hasSessionContext =>
       sessionLabel?.trim().isNotEmpty == true && sessionStartedAt != null;
+  bool get hasArchivedSessions => archivedSessions.isNotEmpty;
 
   String get statusLabel => isCoreComplete ? 'CORE COMPLETE' : 'ACTION NEEDED';
 
@@ -166,6 +168,9 @@ class PilotEvidenceTrackerState {
 
   bool isCaptured(String artifactId) => capturedAtByArtifact.containsKey(artifactId);
 
+  PilotEvidenceSessionArchiveEntry? get latestArchivedSession =>
+      archivedSessions.isEmpty ? null : archivedSessions.first;
+
   PilotEvidenceTrackerState markCaptured(
     String artifactId, {
     DateTime? capturedAt,
@@ -182,6 +187,7 @@ class PilotEvidenceTrackerState {
       sessionLabel: sessionLabel,
       sessionStartedAt: sessionStartedAt,
       lastResetAt: lastResetAt,
+      archivedSessions: archivedSessions,
     );
   }
 
@@ -197,6 +203,7 @@ class PilotEvidenceTrackerState {
       sessionLabel: defaultLabel.trim().isEmpty ? 'Pilot session' : defaultLabel.trim(),
       sessionStartedAt: startedAt ?? DateTime.now(),
       lastResetAt: lastResetAt,
+      archivedSessions: archivedSessions,
     );
   }
 
@@ -205,6 +212,7 @@ class PilotEvidenceTrackerState {
     DateTime? startedAt,
   }) {
     final nextStartedAt = startedAt ?? DateTime.now();
+    final nextArchivedSessions = _buildArchivedSessions(nextStartedAt);
     return PilotEvidenceTrackerState(
       capturedAtByArtifact: const <String, DateTime>{},
       sessionLabel: sessionLabel.trim().isEmpty
@@ -212,6 +220,7 @@ class PilotEvidenceTrackerState {
           : sessionLabel.trim(),
       sessionStartedAt: nextStartedAt,
       lastResetAt: nextStartedAt,
+      archivedSessions: nextArchivedSessions,
     );
   }
 
@@ -220,6 +229,9 @@ class PilotEvidenceTrackerState {
       'session_label': sessionLabel,
       'session_started_at': sessionStartedAt?.toUtc().toIso8601String(),
       'last_reset_at': lastResetAt?.toUtc().toIso8601String(),
+      'archived_sessions': archivedSessions
+          .map((entry) => entry.toJson())
+          .toList(growable: false),
       'captured_at_by_artifact': <String, String>{
         for (final entry in capturedAtByArtifact.entries)
           entry.key: entry.value.toUtc().toIso8601String(),
@@ -238,6 +250,7 @@ class PilotEvidenceTrackerState {
       'Optional completion: $capturedOptionalCount / $totalOptionalCount',
       'Latest capture: ${latestCapturedArtifact?.label ?? 'none'}',
       'Latest capture at (UTC): ${latestCapturedAt?.toUtc().toIso8601String() ?? 'none'}',
+      'Archived sessions: ${archivedSessions.length}',
       'Captured artifacts:',
     ];
 
@@ -268,7 +281,46 @@ class PilotEvidenceTrackerState {
       );
     }
 
+    lines.add('Archived sessions:');
+    if (archivedSessions.isEmpty) {
+      lines.add('- none');
+    } else {
+      lines.addAll(
+        archivedSessions.map((entry) => '- ${entry.summaryLine}'),
+      );
+    }
+
     return lines.join('\n');
+  }
+
+  List<PilotEvidenceSessionArchiveEntry> _buildArchivedSessions(
+    DateTime closedAt,
+  ) {
+    final nextEntries = <PilotEvidenceSessionArchiveEntry>[
+      if (_shouldArchiveCurrentSession())
+        PilotEvidenceSessionArchiveEntry(
+          sessionLabel: sessionLabel ?? 'Pilot session',
+          sessionStartedAt: sessionStartedAt ?? closedAt,
+          sessionClosedAt: closedAt,
+          capturedCoreCount: capturedCoreCount,
+          totalCoreCount: totalCoreCount,
+          capturedOptionalCount: capturedOptionalCount,
+          totalOptionalCount: totalOptionalCount,
+          latestCapturedArtifactLabel: latestCapturedArtifact?.label,
+          latestCapturedAt: latestCapturedAt,
+          statusLabel: statusLabel,
+        ),
+      ...archivedSessions,
+    ];
+
+    if (nextEntries.length <= 5) {
+      return nextEntries;
+    }
+    return nextEntries.take(5).toList(growable: false);
+  }
+
+  bool _shouldArchiveCurrentSession() {
+    return hasSessionContext || capturedAtByArtifact.isNotEmpty;
   }
 }
 
@@ -289,6 +341,119 @@ DateTime? _readNullableDateTime(Object? value) {
   }
   if (value is num) {
     return DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true);
+  }
+  return null;
+}
+
+List<PilotEvidenceSessionArchiveEntry> _readArchivedSessions(Object? value) {
+  if (value is! List) {
+    return const <PilotEvidenceSessionArchiveEntry>[];
+  }
+
+  final sessions = <PilotEvidenceSessionArchiveEntry>[];
+  for (final item in value) {
+    if (item is Map<String, dynamic>) {
+      sessions.add(PilotEvidenceSessionArchiveEntry.fromJson(item));
+      continue;
+    }
+    if (item is Map) {
+      sessions.add(
+        PilotEvidenceSessionArchiveEntry.fromJson(
+          Map<String, dynamic>.from(item),
+        ),
+      );
+    }
+  }
+  return sessions;
+}
+
+class PilotEvidenceSessionArchiveEntry {
+  const PilotEvidenceSessionArchiveEntry({
+    required this.sessionLabel,
+    required this.sessionStartedAt,
+    required this.sessionClosedAt,
+    required this.capturedCoreCount,
+    required this.totalCoreCount,
+    required this.capturedOptionalCount,
+    required this.totalOptionalCount,
+    required this.statusLabel,
+    this.latestCapturedArtifactLabel,
+    this.latestCapturedAt,
+  });
+
+  factory PilotEvidenceSessionArchiveEntry.fromJson(Map<String, dynamic> json) {
+    return PilotEvidenceSessionArchiveEntry(
+      sessionLabel:
+          _readNullableString(json['session_label']) ?? 'Pilot session',
+      sessionStartedAt:
+          _readNullableDateTime(json['session_started_at']) ?? DateTime.now(),
+      sessionClosedAt:
+          _readNullableDateTime(json['session_closed_at']) ?? DateTime.now(),
+      capturedCoreCount: _readNullableInt(json['captured_core_count']) ?? 0,
+      totalCoreCount: _readNullableInt(json['total_core_count']) ?? 0,
+      capturedOptionalCount:
+          _readNullableInt(json['captured_optional_count']) ?? 0,
+      totalOptionalCount: _readNullableInt(json['total_optional_count']) ?? 0,
+      statusLabel: _readNullableString(json['status_label']) ?? 'UNKNOWN',
+      latestCapturedArtifactLabel:
+          _readNullableString(json['latest_captured_artifact_label']),
+      latestCapturedAt: _readNullableDateTime(json['latest_captured_at']),
+    );
+  }
+
+  final String sessionLabel;
+  final DateTime sessionStartedAt;
+  final DateTime sessionClosedAt;
+  final int capturedCoreCount;
+  final int totalCoreCount;
+  final int capturedOptionalCount;
+  final int totalOptionalCount;
+  final String statusLabel;
+  final String? latestCapturedArtifactLabel;
+  final DateTime? latestCapturedAt;
+
+  String get summaryLine =>
+      '$sessionLabel | $statusLabel | core $capturedCoreCount / $totalCoreCount | closed ${sessionClosedAt.toUtc().toIso8601String()}';
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'session_label': sessionLabel,
+      'session_started_at': sessionStartedAt.toUtc().toIso8601String(),
+      'session_closed_at': sessionClosedAt.toUtc().toIso8601String(),
+      'captured_core_count': capturedCoreCount,
+      'total_core_count': totalCoreCount,
+      'captured_optional_count': capturedOptionalCount,
+      'total_optional_count': totalOptionalCount,
+      'status_label': statusLabel,
+      'latest_captured_artifact_label': latestCapturedArtifactLabel,
+      'latest_captured_at': latestCapturedAt?.toUtc().toIso8601String(),
+    };
+  }
+
+  String toMultilineText() {
+    return <String>[
+      'Business Hub archived evidence session',
+      'Session label: $sessionLabel',
+      'Status: $statusLabel',
+      'Session started at (UTC): ${sessionStartedAt.toUtc().toIso8601String()}',
+      'Session closed at (UTC): ${sessionClosedAt.toUtc().toIso8601String()}',
+      'Core completion: $capturedCoreCount / $totalCoreCount',
+      'Optional completion: $capturedOptionalCount / $totalOptionalCount',
+      'Latest capture: ${latestCapturedArtifactLabel ?? 'none'}',
+      'Latest capture at (UTC): ${latestCapturedAt?.toUtc().toIso8601String() ?? 'none'}',
+    ].join('\n');
+  }
+}
+
+int? _readNullableInt(Object? value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  if (value is String) {
+    return int.tryParse(value);
   }
   return null;
 }

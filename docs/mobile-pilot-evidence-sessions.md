@@ -49,6 +49,7 @@ Starting a fresh session:
 - clears the captured evidence list
 - stamps a new session start
 - preserves a clear operational boundary between shifts or rollout waves
+- archives the previous session summary so the last rollout window is not lost immediately
 
 ## Recommended use
 
@@ -59,3 +60,7 @@ Start a fresh session when:
 - a device is reassigned to a different pilot context
 
 Avoid starting a fresh session in the middle of an active validation run unless the rollout lead explicitly wants to discard the earlier capture trail.
+
+## Related
+
+- [D:/business-hub/docs/mobile-pilot-evidence-session-history.md](D:/business-hub/docs/mobile-pilot-evidence-session-history.md)
