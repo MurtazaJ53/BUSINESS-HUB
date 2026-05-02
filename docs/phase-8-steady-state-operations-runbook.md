@@ -139,5 +139,8 @@ Phase 8 is successful when Business Hub is not just live, but:
 
 ## Supporting references
 
+- [SLO and Error Budget Review Cadence](./slo-and-error-budget-review-cadence.md)
+- [Incident and Postmortem Cadence](./incident-and-postmortem-cadence.md)
+- [Cost and Capacity Review Cadence](./cost-and-capacity-review-cadence.md)
 - [Dependency Upgrade Policy](./dependency-upgrade-policy.md)
 - [Phase 8 Quarterly Architecture Review Checklist](./phase-8-quarterly-architecture-review-checklist.md)

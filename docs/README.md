@@ -52,14 +52,17 @@ It is designed to support:
 28. [Phase 7 Live Rollout Runbook](./phase-7-live-rollout-runbook.md)
 29. [Master Launch and Rollout Checklist](./master-launch-and-rollout-checklist.md)
 30. [Phase 8 Steady-State Operations Runbook](./phase-8-steady-state-operations-runbook.md)
-31. [Dependency Upgrade Policy](./dependency-upgrade-policy.md)
-32. [Phase 8 Quarterly Architecture Review Checklist](./phase-8-quarterly-architecture-review-checklist.md)
+31. [SLO and Error Budget Review Cadence](./slo-and-error-budget-review-cadence.md)
+32. [Incident and Postmortem Cadence](./incident-and-postmortem-cadence.md)
+33. [Cost and Capacity Review Cadence](./cost-and-capacity-review-cadence.md)
+34. [Dependency Upgrade Policy](./dependency-upgrade-policy.md)
+35. [Phase 8 Quarterly Architecture Review Checklist](./phase-8-quarterly-architecture-review-checklist.md)
 
 ### Existing strategy docs
 
-33. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
-34. [Global Scale Blueprint](./global-scale-blueprint.md)
-35. [Scale Certification Checklist](./scale-certification-checklist.md)
+36. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
+37. [Global Scale Blueprint](./global-scale-blueprint.md)
+38. [Scale Certification Checklist](./scale-certification-checklist.md)
 
 ## Current truth
 
