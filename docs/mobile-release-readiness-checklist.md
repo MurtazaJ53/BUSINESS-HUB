@@ -41,6 +41,7 @@ This checklist is the final gate before shipping a Flutter APK outside the inter
    - `BusinessHub-Mobile-<release-tag>.prep.txt`
    - `BusinessHub-Mobile-<release-tag>.prep.json`
    - `BusinessHub-Mobile-<release-tag>.release-notes.md`
+   - `BusinessHub-Mobile-<release-tag>.changelog.md`
 
 ## Mobile smoke gate
 
