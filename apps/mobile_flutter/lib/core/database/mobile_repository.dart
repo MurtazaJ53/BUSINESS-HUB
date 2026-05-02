@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/mobile_models.dart';
+import '../runtime/pilot_evidence_tracker.dart';
 import 'local_database.dart';
 
 final shopRepositoryProvider = Provider<ShopRepository>((ref) {
@@ -22,6 +23,7 @@ class ShopRepository {
   ShopRepository(this._db);
 
   final BusinessHubDatabase _db;
+  static const String _pilotEvidenceTrackerKey = 'pilot_evidence_tracker';
 
   Stream<ShopInfo> watchShopInfo() {
     final query = (_db.select(
@@ -174,8 +176,73 @@ class ShopRepository {
     }
   }
 
+  Stream<PilotEvidenceTrackerState> watchPilotEvidenceTracker() {
+    final query =
+        (_db.select(_db.shopSettingsEntries)
+              ..where((tbl) => tbl.key.equals(_pilotEvidenceTrackerKey)))
+            .watchSingleOrNull();
+
+    return query.map((row) {
+      if (row == null) {
+        return const PilotEvidenceTrackerState();
+      }
+      return _decodePilotEvidenceTracker(row.value);
+    });
+  }
+
+  Future<PilotEvidenceTrackerState> getPilotEvidenceTracker() async {
+    final row =
+        await (_db.select(_db.shopSettingsEntries)
+              ..where((tbl) => tbl.key.equals(_pilotEvidenceTrackerKey)))
+            .getSingleOrNull();
+
+    if (row == null) {
+      return const PilotEvidenceTrackerState();
+    }
+    return _decodePilotEvidenceTracker(row.value);
+  }
+
+  Future<void> savePilotEvidenceTracker(PilotEvidenceTrackerState state) async {
+    if (state.capturedAtByArtifact.isEmpty) {
+      await (_db.delete(
+        _db.shopSettingsEntries,
+      )..where((tbl) => tbl.key.equals(_pilotEvidenceTrackerKey))).go();
+      return;
+    }
+
+    await _db.into(_db.shopSettingsEntries).insertOnConflictUpdate(
+      ShopSettingsEntriesCompanion.insert(
+        key: _pilotEvidenceTrackerKey,
+        value: jsonEncode(state.toJson()),
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+  }
+
+  Future<void> markPilotEvidenceCaptured(
+    String artifactId, {
+    DateTime? capturedAt,
+  }) async {
+    final current = await getPilotEvidenceTracker();
+    final next = current.markCaptured(artifactId, capturedAt: capturedAt);
+    await savePilotEvidenceTracker(next);
+  }
+
+  Future<void> resetPilotEvidenceTracker() async {
+    await savePilotEvidenceTracker(const PilotEvidenceTrackerState());
+  }
+
   Future<void> clearWorkspace() async {
     await _db.delete(_db.shopSettingsEntries).go();
+  }
+
+  PilotEvidenceTrackerState _decodePilotEvidenceTracker(String rawValue) {
+    try {
+      final decoded = jsonDecode(rawValue) as Map<String, dynamic>;
+      return PilotEvidenceTrackerState.fromJson(decoded);
+    } catch (_) {
+      return const PilotEvidenceTrackerState();
+    }
   }
 }
 

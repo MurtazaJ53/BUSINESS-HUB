@@ -69,12 +69,13 @@ It is designed to support:
 45. [Mobile Pilot Incident Escalation Pack](./mobile-pilot-incident-escalation-pack.md)
 46. [Mobile Operator Action Center](./mobile-operator-action-center.md)
 47. [Mobile Pilot Evidence Tracker](./mobile-pilot-evidence-tracker.md)
+48. [Mobile Pilot Evidence Persistence](./mobile-pilot-evidence-persistence.md)
 
 ### Existing strategy docs
 
-48. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
-49. [Global Scale Blueprint](./global-scale-blueprint.md)
-50. [Scale Certification Checklist](./scale-certification-checklist.md)
+49. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
+50. [Global Scale Blueprint](./global-scale-blueprint.md)
+51. [Scale Certification Checklist](./scale-certification-checklist.md)
 
 ## Current truth
 
@@ -128,6 +129,7 @@ As of April 29, 2026:
 - then Mobile Pilot Incident Escalation Pack
 - then Mobile Operator Action Center
 - then Mobile Pilot Evidence Tracker
+- then Mobile Pilot Evidence Persistence
 
 ## Notes
 

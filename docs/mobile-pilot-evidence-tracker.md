@@ -45,6 +45,7 @@ These are only needed when the situation calls for them:
 ## Important behavior
 
 - the tracker updates automatically when the operator uses the built-in copy/export flows
+- the tracker now survives app restarts on the same device and workspace
 - it is meant for session-level operational awareness, not permanent audit storage
 - it does not replace the actual evidence packs; it only shows what has already been captured
 
@@ -57,3 +58,4 @@ Use it alongside:
 - [D:/business-hub/docs/mobile-pilot-smoke-sheet.md](D:/business-hub/docs/mobile-pilot-smoke-sheet.md)
 - [D:/business-hub/docs/mobile-pilot-shift-closeout.md](D:/business-hub/docs/mobile-pilot-shift-closeout.md)
 - [D:/business-hub/docs/mobile-pilot-rollout-evidence-pack.md](D:/business-hub/docs/mobile-pilot-rollout-evidence-pack.md)
+- [D:/business-hub/docs/mobile-pilot-evidence-persistence.md](D:/business-hub/docs/mobile-pilot-evidence-persistence.md)

@@ -57,4 +57,21 @@ void main() {
     expect(report, contains('Readiness signoff'));
     expect(report, contains('Missing optional artifacts:'));
   });
+
+  test('state round-trips through json payload', () {
+    final tracker = const PilotEvidenceTrackerState()
+        .markCaptured('pilot_snapshot', capturedAt: DateTime.utc(2026, 5, 2, 8))
+        .markCaptured(
+          'rollout_evidence',
+          capturedAt: DateTime.utc(2026, 5, 2, 9, 30),
+        );
+
+    final decoded = PilotEvidenceTrackerState.fromJson(
+      tracker.toJson(),
+    );
+
+    expect(decoded.capturedCoreCount, tracker.capturedCoreCount);
+    expect(decoded.latestCapturedArtifact?.id, 'rollout_evidence');
+    expect(decoded.latestCapturedAt, DateTime.utc(2026, 5, 2, 9, 30));
+  });
 }

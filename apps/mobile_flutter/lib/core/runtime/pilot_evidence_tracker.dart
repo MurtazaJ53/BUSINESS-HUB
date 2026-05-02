@@ -1,27 +1,42 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-final pilotEvidenceTrackerProvider =
-    NotifierProvider<PilotEvidenceTrackerNotifier, PilotEvidenceTrackerState>(
-      PilotEvidenceTrackerNotifier.new,
-    );
-
-class PilotEvidenceTrackerNotifier extends Notifier<PilotEvidenceTrackerState> {
-  @override
-  PilotEvidenceTrackerState build() => const PilotEvidenceTrackerState();
-
-  void markCaptured(String artifactId, {DateTime? capturedAt}) {
-    state = state.markCaptured(artifactId, capturedAt: capturedAt);
-  }
-
-  void reset() {
-    state = const PilotEvidenceTrackerState();
-  }
-}
-
 class PilotEvidenceTrackerState {
   const PilotEvidenceTrackerState({
     this.capturedAtByArtifact = const <String, DateTime>{},
   });
+
+  factory PilotEvidenceTrackerState.fromJson(Map<String, dynamic> json) {
+    final rawEntries = json['captured_at_by_artifact'];
+    if (rawEntries is! Map) {
+      return const PilotEvidenceTrackerState();
+    }
+
+    final captured = <String, DateTime>{};
+    for (final entry in rawEntries.entries) {
+      final artifactId = entry.key.toString().trim();
+      if (artifactId.isEmpty) {
+        continue;
+      }
+
+      final value = entry.value;
+      if (value is String) {
+        final parsed = DateTime.tryParse(value);
+        if (parsed != null) {
+          captured[artifactId] = parsed.toUtc();
+        }
+      } else if (value is int) {
+        captured[artifactId] = DateTime.fromMillisecondsSinceEpoch(
+          value,
+          isUtc: true,
+        );
+      } else if (value is num) {
+        captured[artifactId] = DateTime.fromMillisecondsSinceEpoch(
+          value.toInt(),
+          isUtc: true,
+        );
+      }
+    }
+
+    return PilotEvidenceTrackerState(capturedAtByArtifact: captured);
+  }
 
   final Map<String, DateTime> capturedAtByArtifact;
 
@@ -151,6 +166,15 @@ class PilotEvidenceTrackerState {
         artifactId: capturedAt ?? DateTime.now(),
       },
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'captured_at_by_artifact': <String, String>{
+        for (final entry in capturedAtByArtifact.entries)
+          entry.key: entry.value.toUtc().toIso8601String(),
+      },
+    };
   }
 
   String toMultilineText() {

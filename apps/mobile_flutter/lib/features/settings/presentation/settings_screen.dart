@@ -9,6 +9,7 @@ import '../../../core/models/mobile_session.dart';
 import '../../../core/runtime/app_runtime_info.dart';
 import '../../../core/runtime/pilot_diagnostics_snapshot.dart';
 import '../../../core/runtime/pilot_evidence_tracker.dart';
+import '../../../core/runtime/pilot_evidence_tracker_store.dart';
 import '../../../core/runtime/pilot_handoff_report.dart';
 import '../../../core/runtime/pilot_incident_escalation_report.dart';
 import '../../../core/runtime/pilot_operator_action_plan.dart';
@@ -34,9 +35,11 @@ class SettingsScreen extends ConsumerWidget {
     final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
     final syncStatus = ref.watch(syncStatusProvider);
     final runtimeInfoAsync = ref.watch(appRuntimeInfoProvider);
-    final evidenceTracker = ref.watch(pilotEvidenceTrackerProvider);
-    final evidenceTrackerNotifier = ref.read(
-      pilotEvidenceTrackerProvider.notifier,
+    final evidenceTrackerAsync = ref.watch(pilotEvidenceTrackerProvider);
+    final evidenceTracker = evidenceTrackerAsync.asData?.value ??
+        const PilotEvidenceTrackerState();
+    final evidenceTrackerController = ref.watch(
+      pilotEvidenceTrackerControllerProvider,
     );
     final shopStream = shopRepository.watchShopInfo();
     final historyStream = salesRepository.watchHistoryOverview();
@@ -47,7 +50,7 @@ class SettingsScreen extends ConsumerWidget {
     final outboxAttentionStream = salesRepository.watchOutboxAttentionEntries();
 
     void markEvidenceCaptured(String artifactId) {
-      evidenceTrackerNotifier.markCaptured(artifactId);
+      evidenceTrackerController.markCaptured(artifactId);
     }
 
     return StreamBuilder<ShopInfo>(
@@ -849,11 +852,17 @@ class SettingsScreen extends ConsumerWidget {
                                 MobilePanel(
                                   title: 'Evidence tracker',
                                   action: MobileTag(
-                                    label: evidenceTracker.statusLabel,
-                                    icon: evidenceTracker.isCoreComplete
+                                    label: evidenceTrackerAsync.asData == null
+                                        ? 'Loading'
+                                        : evidenceTracker.statusLabel,
+                                    icon: evidenceTrackerAsync.asData == null
+                                        ? Icons.sync_rounded
+                                        : evidenceTracker.isCoreComplete
                                         ? Icons.task_alt_rounded
                                         : Icons.assignment_late_rounded,
-                                    accent: evidenceTracker.isCoreComplete
+                                    accent: evidenceTrackerAsync.asData == null
+                                        ? const Color(0xFFF59E0B)
+                                        : evidenceTracker.isCoreComplete
                                         ? const Color(0xFF22C55E)
                                         : const Color(0xFFF59E0B),
                                   ),
@@ -862,7 +871,7 @@ class SettingsScreen extends ConsumerWidget {
                                         CrossAxisAlignment.start,
                                     children: <Widget>[
                                       Text(
-                                        'This tracker records which operator evidence exports have already been captured on this device during the current rollout session, so the team can see what is still missing before handoff.',
+                                        'This tracker records which operator evidence exports have already been captured on this device for the current workspace, and it survives app restarts so the team can see what is still missing before handoff.',
                                         style: Theme.of(context)
                                             .textTheme
                                             .bodySmall
@@ -970,8 +979,8 @@ class SettingsScreen extends ConsumerWidget {
                                                         .capturedAtByArtifact
                                                         .isEmpty
                                                     ? null
-                                                    : () {
-                                                        evidenceTrackerNotifier
+                                                    : () async {
+                                                        await evidenceTrackerController
                                                             .reset();
                                                         ScaffoldMessenger.of(
                                                           context,
