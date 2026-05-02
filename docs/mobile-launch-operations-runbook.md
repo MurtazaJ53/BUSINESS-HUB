@@ -66,11 +66,16 @@ Local runner:
 - [D:/business-hub/scripts/mobile_flutter_release.ps1](D:/business-hub/scripts/mobile_flutter_release.ps1)
 - [D:/business-hub/docs/mobile-local-release-runner.md](D:/business-hub/docs/mobile-local-release-runner.md)
 
+Bundle runner:
+- [D:/business-hub/scripts/mobile_flutter_release_bundle.ps1](D:/business-hub/scripts/mobile_flutter_release_bundle.ps1)
+- [D:/business-hub/docs/mobile-local-release-bundle-runner.md](D:/business-hub/docs/mobile-local-release-bundle-runner.md)
+
 Recommended local sequence:
 - release prep
 - `-Doctor` for Flutter resolution
 - `-PreflightOnly` for release tag and signing verification
 - full release run for APK packaging
+- bundle the prep + local artifacts for handoff
 
 Triggers:
 - push tag matching `mobile-v*`
