@@ -588,16 +588,24 @@ class SalesRepository {
 
     return query.watch().map(
       (rows) => rows
-          .map(
-            (row) => RecentSaleSummary(
+          .map((row) {
+            final payments = _parseSalePayments(row.paymentsJson);
+            final amountReceived = payments.fold<double>(
+              0,
+              (sum, payment) => sum + payment.amount,
+            );
+            final amountDue = row.total - amountReceived;
+            return RecentSaleSummary(
               id: row.id,
               total: row.total,
+              amountReceived: amountReceived,
+              amountDue: amountDue > 0 ? amountDue : 0,
               date: row.date,
               paymentMode: row.paymentMode,
               customerName: row.customerName,
               syncState: _parseSyncState(row.syncStatus),
-            ),
-          )
+            );
+          })
           .toList(growable: false),
     );
   }

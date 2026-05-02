@@ -684,6 +684,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                     )
                   : _parseMoney(collectedController.text);
               final checkoutDue = total - checkoutCollected;
+              final currentCustomerBalance = _selectedCustomer?.balance ?? 0;
+              final projectedCustomerBalance =
+                  currentCustomerBalance + (checkoutDue > 0 ? checkoutDue : 0);
               return SafeArea(
                 child: Padding(
                   padding: EdgeInsets.only(
@@ -1131,6 +1134,93 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                             ),
                           ),
                         ),
+                        if (_selectedCustomer != null &&
+                            customerDomainState.isPostgresPrimary) ...<Widget>[
+                          const SizedBox(height: 12),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0A1220),
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(
+                                color:
+                                    (checkoutDue > 0
+                                            ? const Color(0xFFF59E0B)
+                                            : const Color(0xFF14B8A6))
+                                        .withValues(alpha: 0.2),
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  Row(
+                                    children: <Widget>[
+                                      Expanded(
+                                        child: Text(
+                                          'Ledger projection',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                        ),
+                                      ),
+                                      MobileTag(
+                                        label: checkoutDue > 0
+                                            ? 'Credit exposed'
+                                            : 'Settles clean',
+                                        icon: checkoutDue > 0
+                                            ? Icons
+                                                  .account_balance_wallet_rounded
+                                            : Icons.verified_rounded,
+                                        accent: checkoutDue > 0
+                                            ? const Color(0xFFF59E0B)
+                                            : const Color(0xFF22C55E),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _CheckoutSummaryRow(
+                                    label: 'Current customer balance',
+                                    value: formatCurrency(
+                                      currentCustomerBalance,
+                                    ),
+                                    tone: currentCustomerBalance > 0
+                                        ? const Color(0xFFF59E0B)
+                                        : const Color(0xFF38BDF8),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  _CheckoutSummaryRow(
+                                    label: 'Projected after this sale',
+                                    value: formatCurrency(
+                                      projectedCustomerBalance,
+                                    ),
+                                    tone: projectedCustomerBalance > 0
+                                        ? const Color(0xFFF59E0B)
+                                        : const Color(0xFF22C55E),
+                                  ),
+                                  if (checkoutDue > 0) ...<Widget>[
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      'This sale leaves ${formatCurrency(checkoutDue)} due on ${_selectedCustomer!.name}, so the ledger will carry that balance after replay.',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.62,
+                                            ),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 18),
                         FilledButton(
                           onPressed: _saving

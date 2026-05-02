@@ -422,6 +422,8 @@ class RecentSaleSummary {
   const RecentSaleSummary({
     required this.id,
     required this.total,
+    required this.amountReceived,
+    required this.amountDue,
     required this.date,
     required this.paymentMode,
     required this.syncState,
@@ -430,10 +432,14 @@ class RecentSaleSummary {
 
   final String id;
   final double total;
+  final double amountReceived;
+  final double amountDue;
   final String date;
   final String paymentMode;
   final CommerceSyncState syncState;
   final String? customerName;
+
+  bool get hasOutstandingDue => amountDue > 0.009;
 }
 
 class SaleDetailItem {
@@ -509,6 +515,16 @@ class SaleRecordDetail {
 
   double get subtotal =>
       items.fold<double>(0, (sum, item) => sum + item.lineTotal);
+
+  double get amountReceived =>
+      payments.fold<double>(0, (sum, payment) => sum + payment.amount);
+
+  double get amountDue {
+    final due = total - amountReceived;
+    return due > 0 ? due : 0;
+  }
+
+  bool get hasOutstandingDue => amountDue > 0.009;
 }
 
 class CommerceOutboxEntryModel {

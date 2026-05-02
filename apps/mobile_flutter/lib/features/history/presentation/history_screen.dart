@@ -305,6 +305,82 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               },
             ),
             const SizedBox(height: 18),
+            StreamBuilder<List<RecentSaleSummary>>(
+              stream: recentSalesStream,
+              builder: (context, snapshot) {
+                final sales = snapshot.data ?? const <RecentSaleSummary>[];
+                final report = _HistoryReportSnapshot.fromSales(sales);
+                return MobilePanel(
+                  title: 'Filtered report pulse',
+                  action: MobileTag(
+                    label: _selectedDateWindow.label,
+                    icon: Icons.insights_rounded,
+                    accent: const Color(0xFF22C55E),
+                  ),
+                  child: sales.isEmpty
+                      ? const MobileEmptyState(
+                          icon: Icons.query_stats_rounded,
+                          title: 'No data for this filter',
+                          body:
+                              'Broaden the search, date window, or payment filters to generate a live report pulse.',
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: <Widget>[
+                                _HistoryMetricTile(
+                                  label: 'Receipts',
+                                  value: '${report.receiptCount}',
+                                  tone: const Color(0xFFF59E0B),
+                                ),
+                                _HistoryMetricTile(
+                                  label: 'Gross',
+                                  value: formatCurrency(report.grossTotal),
+                                  tone: const Color(0xFF22C55E),
+                                ),
+                                _HistoryMetricTile(
+                                  label: 'Collected',
+                                  value: formatCurrency(report.collectedTotal),
+                                  tone: const Color(0xFF38BDF8),
+                                ),
+                                _HistoryMetricTile(
+                                  label: 'Due',
+                                  value: formatCurrency(report.dueTotal),
+                                  tone: report.dueTotal > 0
+                                      ? const Color(0xFFF59E0B)
+                                      : const Color(0xFF22C55E),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              '${report.syncedCount} synced · ${report.queuedCount} queued · ${report.failedCount} failed',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.62),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              report.topPaymentMode == null
+                                  ? 'No payment mode mix available yet.'
+                                  : 'Top mode ${report.topPaymentMode} · ${report.dueReceiptCount} receipt(s) still carry due balance.',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.54),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                          ],
+                        ),
+                );
+              },
+            ),
+            const SizedBox(height: 18),
             MobilePanel(
               title: 'Recent receipt feed',
               action: MobileTag(
@@ -458,6 +534,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                             icon: Icons.shopping_bag_rounded,
                             accent: const Color(0xFFA78BFA),
                           ),
+                          if (detail.hasOutstandingDue)
+                            MobileTag(
+                              label: 'Due ${formatCurrency(detail.amountDue)}',
+                              icon: Icons.warning_amber_rounded,
+                              accent: const Color(0xFFF59E0B),
+                            ),
                         ],
                       ),
                       const SizedBox(height: 18),
@@ -505,6 +587,15 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                               label: 'Total',
                               value: formatCurrency(detail.total),
                               emphasize: true,
+                            ),
+                            _SaleSummaryRow(
+                              label: 'Collected',
+                              value: formatCurrency(detail.amountReceived),
+                            ),
+                            _SaleSummaryRow(
+                              label: 'Due outstanding',
+                              value: formatCurrency(detail.amountDue),
+                              emphasize: detail.hasOutstandingDue,
                             ),
                             if ((detail.customerPhone ?? '').isNotEmpty)
                               _SaleSummaryRow(
@@ -709,14 +800,21 @@ class _HistorySaleRow extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Row(
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
                         children: <Widget>[
                           MobileTag(
                             label: sale.paymentMode,
                             icon: Icons.payments_rounded,
                             accent: const Color(0xFF38BDF8),
                           ),
-                          const SizedBox(width: 8),
+                          if (sale.hasOutstandingDue)
+                            MobileTag(
+                              label: 'Due ${formatCurrency(sale.amountDue)}',
+                              icon: Icons.warning_amber_rounded,
+                              accent: const Color(0xFFF59E0B),
+                            ),
                           Text(
                             'Tap for detail',
                             style: Theme.of(context).textTheme.labelSmall
@@ -868,6 +966,52 @@ class _SalePaymentRow extends StatelessWidget {
   }
 }
 
+class _HistoryMetricTile extends StatelessWidget {
+  const _HistoryMetricTile({
+    required this.label,
+    required this.value,
+    required this.tone,
+  });
+
+  final String label;
+  final String value;
+  final Color tone;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1220),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: tone.withValues(alpha: 0.18)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: Colors.white.withValues(alpha: 0.58),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: tone,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SaleSummaryRow extends StatelessWidget {
   const _SaleSummaryRow({
     required this.label,
@@ -897,6 +1041,89 @@ class _SaleSummaryRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _HistoryReportSnapshot {
+  const _HistoryReportSnapshot({
+    required this.receiptCount,
+    required this.grossTotal,
+    required this.collectedTotal,
+    required this.dueTotal,
+    required this.dueReceiptCount,
+    required this.syncedCount,
+    required this.queuedCount,
+    required this.failedCount,
+    required this.topPaymentMode,
+  });
+
+  final int receiptCount;
+  final double grossTotal;
+  final double collectedTotal;
+  final double dueTotal;
+  final int dueReceiptCount;
+  final int syncedCount;
+  final int queuedCount;
+  final int failedCount;
+  final String? topPaymentMode;
+
+  factory _HistoryReportSnapshot.fromSales(List<RecentSaleSummary> sales) {
+    var grossTotal = 0.0;
+    var collectedTotal = 0.0;
+    var dueTotal = 0.0;
+    var dueReceiptCount = 0;
+    var syncedCount = 0;
+    var queuedCount = 0;
+    var failedCount = 0;
+    final paymentModeCounts = <String, int>{};
+
+    for (final sale in sales) {
+      grossTotal += sale.total;
+      collectedTotal += sale.amountReceived;
+      dueTotal += sale.amountDue;
+      if (sale.hasOutstandingDue) {
+        dueReceiptCount += 1;
+      }
+      switch (sale.syncState) {
+        case CommerceSyncState.synced:
+          syncedCount += 1;
+          break;
+        case CommerceSyncState.queued:
+          queuedCount += 1;
+          break;
+        case CommerceSyncState.failed:
+          failedCount += 1;
+          break;
+        case CommerceSyncState.localOnly:
+        case CommerceSyncState.syncing:
+          break;
+      }
+      paymentModeCounts.update(
+        sale.paymentMode,
+        (value) => value + 1,
+        ifAbsent: () => 1,
+      );
+    }
+
+    String? topPaymentMode;
+    for (final entry in paymentModeCounts.entries) {
+      if (topPaymentMode == null ||
+          entry.value > (paymentModeCounts[topPaymentMode] ?? 0)) {
+        topPaymentMode = entry.key;
+      }
+    }
+
+    return _HistoryReportSnapshot(
+      receiptCount: sales.length,
+      grossTotal: grossTotal,
+      collectedTotal: collectedTotal,
+      dueTotal: dueTotal,
+      dueReceiptCount: dueReceiptCount,
+      syncedCount: syncedCount,
+      queuedCount: queuedCount,
+      failedCount: failedCount,
+      topPaymentMode: topPaymentMode,
     );
   }
 }
