@@ -50,12 +50,13 @@ It is designed to support:
 26. [Phase 5 Retirement Runbook](./phase-5-retirement-runbook.md)
 27. [Phase 6 Go-Live Runbook](./phase-6-go-live-runbook.md)
 28. [Phase 7 Live Rollout Runbook](./phase-7-live-rollout-runbook.md)
+29. [Master Launch and Rollout Checklist](./master-launch-and-rollout-checklist.md)
 
 ### Existing strategy docs
 
-29. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
-30. [Global Scale Blueprint](./global-scale-blueprint.md)
-31. [Scale Certification Checklist](./scale-certification-checklist.md)
+30. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
+31. [Global Scale Blueprint](./global-scale-blueprint.md)
+32. [Scale Certification Checklist](./scale-certification-checklist.md)
 
 ## Current truth
 
