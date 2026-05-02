@@ -35,6 +35,7 @@ This checklist is the final gate before shipping a Flutter APK outside the inter
 
 Reference sheet:
 - [D:/business-hub/docs/mobile-pilot-smoke-sheet.md](D:/business-hub/docs/mobile-pilot-smoke-sheet.md)
+- [D:/business-hub/docs/mobile-pilot-recovery-playbook.md](D:/business-hub/docs/mobile-pilot-recovery-playbook.md)
 
 1. Owner login works.
 2. Staff login works.
@@ -66,6 +67,7 @@ Reference sheet:
 2. Outbox replay succeeds after connectivity returns.
 3. Failed receipt retry works from History and Settings.
 4. Domain-state posture still matches the backend migration state.
+5. Recovery report can be copied from Settings if a replay issue is forced during testing.
 
 ## Release packaging
 

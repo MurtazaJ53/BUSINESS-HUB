@@ -83,6 +83,7 @@ Signing path:
 
 Reference sheet:
 - [D:/business-hub/docs/mobile-pilot-smoke-sheet.md](D:/business-hub/docs/mobile-pilot-smoke-sheet.md)
+- [D:/business-hub/docs/mobile-pilot-recovery-playbook.md](D:/business-hub/docs/mobile-pilot-recovery-playbook.md)
 
 1. login
 2. inventory lookup
@@ -102,6 +103,7 @@ If the released APK fails smoke or pilot checks:
 - reference the previous stable APK from release notes
 - redeploy the older version
 - record the rollback reason
+- if replay or queue health is the issue, archive the in-app recovery report before rollback
 
 ## Important note
 

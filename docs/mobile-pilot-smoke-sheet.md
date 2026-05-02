@@ -74,3 +74,11 @@ Accept the pilot device only if:
 - payment replay failure
 - customer credit flow corruption
 - persistent outbox failure after reconnect
+
+## If a smoke step fails
+
+1. Open the in-app `Recovery desk`.
+2. Retry the affected receipt or all attention items.
+3. Copy the recovery report.
+4. Attach the recovery report to the rollout/support thread.
+5. Use [D:/business-hub/docs/mobile-pilot-recovery-playbook.md](D:/business-hub/docs/mobile-pilot-recovery-playbook.md) to decide whether the device can stay in pilot.

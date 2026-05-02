@@ -8,6 +8,7 @@ import '../../../core/models/mobile_models.dart';
 import '../../../core/models/mobile_session.dart';
 import '../../../core/runtime/app_runtime_info.dart';
 import '../../../core/runtime/pilot_diagnostics_snapshot.dart';
+import '../../../core/runtime/pilot_recovery_report.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/utils/formatters.dart';
@@ -31,6 +32,7 @@ class SettingsScreen extends ConsumerWidget {
       const <String>['inventory', 'customers', 'sales', 'payments'],
     );
     final pendingOutboxStream = salesRepository.watchPendingOutboxCount();
+    final outboxAttentionStream = salesRepository.watchOutboxAttentionEntries();
 
     return StreamBuilder<ShopInfo>(
       stream: shopStream,
@@ -481,6 +483,219 @@ class SettingsScreen extends ConsumerWidget {
                 );
               },
             ),
+            const SizedBox(height: 18),
+            StreamBuilder<List<CommerceOutboxAttentionEntry>>(
+              stream: outboxAttentionStream,
+              builder: (context, attentionSnapshot) {
+                final attentionEntries =
+                    attentionSnapshot.data ??
+                    const <CommerceOutboxAttentionEntry>[];
+                return StreamBuilder<List<DomainControlState>>(
+                  stream: domainStatesStream,
+                  builder: (context, domainSnapshot) {
+                    final domainStates =
+                        domainSnapshot.data ??
+                        <DomainControlState>[
+                          DomainControlState.legacy('inventory'),
+                          DomainControlState.legacy('customers'),
+                          DomainControlState.legacy('sales'),
+                          DomainControlState.legacy('payments'),
+                        ];
+                    return StreamBuilder<int>(
+                      stream: pendingOutboxStream,
+                      builder: (context, outboxSnapshot) {
+                        final pending = outboxSnapshot.data ?? 0;
+                        return StreamBuilder<HistoryOverview>(
+                          stream: historyStream,
+                          builder: (context, historySnapshot) {
+                            final history =
+                                historySnapshot.data ?? HistoryOverview.empty();
+                            final runtimeInfo = runtimeInfoAsync.asData?.value;
+                            final diagnostics = runtimeInfo == null
+                                ? null
+                                : PilotDiagnosticsSnapshot(
+                                    runtimeInfo: runtimeInfo,
+                                    shop: shop,
+                                    session: session,
+                                    backendBaseUrl: backendApiClient.baseUrl,
+                                    syncStatus: syncStatus,
+                                    historyOverview: history,
+                                    pendingOutboxCount: pending,
+                                    domainStates: domainStates,
+                                  );
+                            final recoveryReport = diagnostics == null
+                                ? null
+                                : PilotRecoveryReport(
+                                    diagnosticsSnapshot: diagnostics,
+                                    attentionEntries: attentionEntries,
+                                  );
+
+                            return MobilePanel(
+                              title: 'Recovery desk',
+                              action: MobileTag(
+                                label: attentionEntries.isEmpty
+                                    ? 'Stable'
+                                    : '${attentionEntries.length} attention',
+                                icon: attentionEntries.isEmpty
+                                    ? Icons.health_and_safety_rounded
+                                    : Icons.build_circle_rounded,
+                                accent: attentionEntries.isEmpty
+                                    ? const Color(0xFF22C55E)
+                                    : const Color(0xFFFB7185),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  Text(
+                                    'Use this when a pilot device has replay trouble. It shows the highest-risk queued or failed commerce commands, lets you retry one receipt at a time, and creates a recovery report you can hand to support or QA.',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall?.copyWith(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.68,
+                                      ),
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.45,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  if (attentionEntries.isEmpty)
+                                    const MobileEmptyState(
+                                      icon: Icons.health_and_safety_rounded,
+                                      title: 'No recovery work is waiting',
+                                      body:
+                                          'Queued and failed commerce commands are clear on this device right now.',
+                                    )
+                                  else
+                                    ...attentionEntries.map(
+                                      (entry) => Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 12,
+                                        ),
+                                        child: _OutboxAttentionRow(
+                                          entry: entry,
+                                          onRetry: () async {
+                                            final result = await syncCoordinator
+                                                .retryCommerceCommand(
+                                                  entry.commandId,
+                                                );
+                                            if (!context.mounted) {
+                                              return;
+                                            }
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  result.message ??
+                                                      'Retry requested for ${entry.commandId}.',
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  const SizedBox(height: 6),
+                                  LayoutBuilder(
+                                    builder: (context, constraints) {
+                                      final stacked =
+                                          constraints.maxWidth < 430;
+                                      final buttons = <Widget>[
+                                        Expanded(
+                                          child: FilledButton.tonalIcon(
+                                            onPressed: attentionEntries.isEmpty
+                                                ? null
+                                                : () async {
+                                                    final result =
+                                                        await syncCoordinator
+                                                            .flushCommerceOutbox();
+                                                    if (!context.mounted) {
+                                                      return;
+                                                    }
+                                                    ScaffoldMessenger.of(
+                                                      context,
+                                                    ).showSnackBar(
+                                                      SnackBar(
+                                                        content: Text(
+                                                          result.message ??
+                                                              'Recovery replay requested.',
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                            icon: const Icon(
+                                              Icons.cloud_sync_rounded,
+                                            ),
+                                            label: const Text(
+                                              'Retry all attention items',
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: FilledButton.tonalIcon(
+                                            onPressed: recoveryReport == null
+                                                ? null
+                                                : () async {
+                                                    await Clipboard.setData(
+                                                      ClipboardData(
+                                                        text: recoveryReport
+                                                            .toMultilineText(),
+                                                      ),
+                                                    );
+                                                    if (!context.mounted) {
+                                                      return;
+                                                    }
+                                                    ScaffoldMessenger.of(
+                                                      context,
+                                                    ).showSnackBar(
+                                                      const SnackBar(
+                                                        content: Text(
+                                                          'Pilot recovery report copied for support handoff.',
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                            icon: const Icon(
+                                              Icons.copy_all_rounded,
+                                            ),
+                                            label: const Text(
+                                              'Copy recovery report',
+                                            ),
+                                          ),
+                                        ),
+                                      ];
+
+                                      if (stacked) {
+                                        return Column(
+                                          children: <Widget>[
+                                            buttons[0],
+                                            const SizedBox(height: 10),
+                                            buttons[1],
+                                          ],
+                                        );
+                                      }
+
+                                      return Row(
+                                        children: <Widget>[
+                                          buttons[0],
+                                          const SizedBox(width: 10),
+                                          buttons[1],
+                                        ],
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
           ],
         );
       },
@@ -617,6 +832,99 @@ class SettingsScreen extends ConsumerWidget {
       footerController.dispose();
       phoneController.dispose();
     }
+  }
+}
+
+class _OutboxAttentionRow extends StatelessWidget {
+  const _OutboxAttentionRow({required this.entry, required this.onRetry});
+
+  final CommerceOutboxAttentionEntry entry;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = entry.isFailed
+        ? const Color(0xFFFB7185)
+        : entry.isSyncing
+        ? const Color(0xFF38BDF8)
+        : const Color(0xFFF59E0B);
+    final customerLabel =
+        entry.customerName?.trim().isNotEmpty == true
+        ? entry.customerName!.trim()
+        : 'Walk-in customer';
+    final errorLabel =
+        entry.lastError?.trim().isNotEmpty == true
+        ? entry.lastError!.trim()
+        : 'No error detail captured';
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1220),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: tone.withValues(alpha: 0.18)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    entry.commandLabel,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                MobileTag(
+                  label: entry.statusLabel,
+                  icon: entry.isFailed
+                      ? Icons.error_outline_rounded
+                      : entry.isSyncing
+                      ? Icons.sync_rounded
+                      : Icons.schedule_rounded,
+                  accent: tone,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '$customerLabel | ${formatCurrency(entry.total)}',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Command ${entry.commandId} | attempts ${entry.attemptCount}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.62),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              errorLabel,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: tone,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.tonalIcon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Retry this receipt'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

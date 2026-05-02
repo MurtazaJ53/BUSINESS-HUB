@@ -260,6 +260,11 @@ class MobileSyncCoordinator {
 
   Future<void> dispose() => _cancelSubscriptions();
 
+  Future<CommerceSyncResult> retryCommerceCommand(String commandId) async {
+    await _salesRepository.markCommandQueued(commandId);
+    return flushCommerceOutbox(triggerCommandId: commandId);
+  }
+
   Future<CommerceSyncResult> flushCommerceOutbox({
     String? triggerCommandId,
   }) async {

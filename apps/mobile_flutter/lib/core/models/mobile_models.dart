@@ -559,6 +559,62 @@ class CommerceOutboxEntryModel {
   final String? lastError;
 }
 
+class CommerceOutboxAttentionEntry {
+  const CommerceOutboxAttentionEntry({
+    required this.commandId,
+    required this.commandType,
+    required this.syncStatus,
+    required this.attemptCount,
+    required this.updatedAt,
+    this.lastAttemptAt,
+    this.lastError,
+    this.saleId,
+    this.customerName,
+    this.total = 0,
+    this.saleDate,
+  });
+
+  final String commandId;
+  final String commandType;
+  final String syncStatus;
+  final int attemptCount;
+  final int updatedAt;
+  final int? lastAttemptAt;
+  final String? lastError;
+  final String? saleId;
+  final String? customerName;
+  final double total;
+  final String? saleDate;
+
+  bool get isFailed => syncStatus == 'failed';
+  bool get isQueued => syncStatus == 'pending';
+  bool get isSyncing => syncStatus == 'syncing';
+
+  String get statusLabel {
+    switch (syncStatus) {
+      case 'failed':
+        return 'FAILED';
+      case 'syncing':
+        return 'SYNCING';
+      case 'pending':
+        return 'QUEUED';
+      default:
+        return syncStatus.toUpperCase();
+    }
+  }
+
+  String get commandLabel {
+    switch (commandType) {
+      case 'sale_create':
+        return 'Sale replay';
+      case 'payment_create':
+        return 'Payment replay';
+      default:
+        return commandType;
+    }
+  }
+}
+
 class LocalSaleCommit {
   const LocalSaleCommit({
     required this.commandId,

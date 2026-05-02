@@ -64,6 +64,7 @@ When preparing a real APK handoff, use:
 - [D:/business-hub/docs/mobile-release-notes-template.md](D:/business-hub/docs/mobile-release-notes-template.md)
 - [D:/business-hub/docs/mobile-launch-operations-runbook.md](D:/business-hub/docs/mobile-launch-operations-runbook.md)
 - [D:/business-hub/docs/mobile-pilot-smoke-sheet.md](D:/business-hub/docs/mobile-pilot-smoke-sheet.md)
+- [D:/business-hub/docs/mobile-pilot-recovery-playbook.md](D:/business-hub/docs/mobile-pilot-recovery-playbook.md)
 
 Versioning currently follows `pubspec.yaml`:
 
@@ -104,6 +105,7 @@ The mobile app now includes:
 The remaining work is mostly production polish and deeper analytics, not basic workflow absence.
 
 The Settings screen also now includes a copyable pilot launch snapshot so operators can archive build, queue, and domain posture directly from a real device.
+It also includes a recovery desk for queued or failed receipt replay during pilot rollout.
 
 ## Package strategy
 

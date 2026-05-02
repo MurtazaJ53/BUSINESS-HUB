@@ -712,6 +712,63 @@ class SalesRepository {
         .map((row) => row.read<int>('total'));
   }
 
+  Stream<List<CommerceOutboxAttentionEntry>> watchOutboxAttentionEntries({
+    int limit = 6,
+  }) {
+    return _db
+        .customSelect(
+          '''
+            SELECT
+              o.command_id,
+              o.command_type,
+              o.sync_status,
+              o.attempt_count,
+              o.last_attempt_at,
+              o.updated_at,
+              o.last_error,
+              s.id AS sale_id,
+              COALESCE(s.customer_name, '') AS customer_name,
+              COALESCE(s.total, 0.0) AS total,
+              s.date AS sale_date
+            FROM commerce_outbox o
+            LEFT JOIN sales s ON s.command_id = o.command_id
+            WHERE o.sync_status IN ('pending', 'failed', 'syncing')
+            ORDER BY
+              CASE o.sync_status
+                WHEN 'failed' THEN 0
+                WHEN 'syncing' THEN 1
+                ELSE 2
+              END,
+              COALESCE(o.last_attempt_at, o.updated_at, o.created_at) DESC
+            LIMIT ?;
+          ''',
+          variables: [Variable<int>(limit)],
+          readsFrom: {_db.commerceOutboxEntries, _db.salesEntries},
+        )
+        .watch()
+        .map(
+          (rows) => rows
+              .map(
+                (row) => CommerceOutboxAttentionEntry(
+                  commandId: row.read<String>('command_id'),
+                  commandType: row.read<String>('command_type'),
+                  syncStatus: row.read<String>('sync_status'),
+                  attemptCount: row.read<int>('attempt_count'),
+                  updatedAt: row.read<int>('updated_at'),
+                  lastAttemptAt: row.readNullable<int>('last_attempt_at'),
+                  lastError: _asStringOrNull(row.readNullable<String>('last_error')),
+                  saleId: _asStringOrNull(row.readNullable<String>('sale_id')),
+                  customerName: _asStringOrNull(
+                    row.readNullable<String>('customer_name'),
+                  ),
+                  total: row.read<double>('total'),
+                  saleDate: _asStringOrNull(row.readNullable<String>('sale_date')),
+                ),
+              )
+              .toList(growable: false),
+        );
+  }
+
   Future<void> mergeRemoteSaleDocument(
     String id,
     Map<String, dynamic> data, {
