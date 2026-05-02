@@ -925,8 +925,10 @@ enum _HistoryDateWindow {
 const List<String> _historyPaymentModes = <String>[
   'CASH',
   'UPI',
+  'BANK',
   'CARD',
   'CREDIT',
+  'OTHER',
   'SPLIT',
   'OTHERS',
 ];

@@ -536,58 +536,179 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     if (!context.mounted) {
       return;
     }
+    final collectedController = TextEditingController(
+      text: _cartTotal.toStringAsFixed(2),
+    );
+    final splitPayments = <_CheckoutPaymentDraft>[
+      _CheckoutPaymentDraft(
+        mode: _paymentMode == 'SPLIT' ? 'CASH' : _paymentMode,
+        initialAmount: _paymentMode == 'SPLIT' ? _cartTotal : null,
+      ),
+    ];
     if (_footerController.text.trim().isEmpty) {
       _footerController.text = shop.footer;
     }
-
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF0A1220),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final total = _cartTotal;
-            return SafeArea(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: 20,
-                  right: 20,
-                  top: 20,
-                  bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Row(
-                        children: <Widget>[
-                          Expanded(
-                            child: Text(
-                              'Checkout cart',
-                              style: Theme.of(context).textTheme.headlineSmall
-                                  ?.copyWith(fontWeight: FontWeight.w900),
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: const Color(0xFF0A1220),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        ),
+        builder: (context) {
+          return StatefulBuilder(
+            builder: (context, setSheetState) {
+              final total = _cartTotal;
+              final checkoutCollected = _paymentMode == 'SPLIT'
+                  ? splitPayments.fold<double>(
+                      0,
+                      (sum, payment) => sum + payment.amount,
+                    )
+                  : _parseMoney(collectedController.text);
+              final checkoutDue = total - checkoutCollected;
+              return SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    left: 20,
+                    right: 20,
+                    top: 20,
+                    bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: Text(
+                                'Checkout cart',
+                                style: Theme.of(context).textTheme.headlineSmall
+                                    ?.copyWith(fontWeight: FontWeight.w900),
+                              ),
+                            ),
+                            MobileTag(
+                              label: '${_cart.length} lines',
+                              icon: Icons.shopping_basket_rounded,
+                              accent: const Color(0xFF22C55E),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        ..._cart.map(
+                          (item) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0F172A),
+                                borderRadius: BorderRadius.circular(22),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(14),
+                                child: Row(
+                                  children: <Widget>[
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: <Widget>[
+                                          Text(
+                                            item.name,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleMedium
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '${formatCurrency(item.price)} | Stock ${item.stock}',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall
+                                                ?.copyWith(
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.58),
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Row(
+                                      children: <Widget>[
+                                        IconButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              final next = item.quantity - 1;
+                                              if (next <= 0) {
+                                                _cart.removeWhere(
+                                                  (entry) =>
+                                                      entry.id == item.id,
+                                                );
+                                              } else {
+                                                final idx = _cart.indexWhere(
+                                                  (entry) =>
+                                                      entry.id == item.id,
+                                                );
+                                                _cart[idx] = _cart[idx]
+                                                    .copyWith(quantity: next);
+                                              }
+                                            });
+                                            setSheetState(() {});
+                                          },
+                                          icon: const Icon(
+                                            Icons.remove_circle_outline_rounded,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${item.quantity}',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                        ),
+                                        IconButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              final idx = _cart.indexWhere(
+                                                (entry) => entry.id == item.id,
+                                              );
+                                              _cart[idx] = _cart[idx].copyWith(
+                                                quantity:
+                                                    _cart[idx].quantity + 1,
+                                              );
+                                            });
+                                            setSheetState(() {});
+                                          },
+                                          icon: const Icon(
+                                            Icons.add_circle_outline_rounded,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
-                          MobileTag(
-                            label: '${_cart.length} lines',
-                            icon: Icons.shopping_basket_rounded,
-                            accent: const Color(0xFF22C55E),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
-                      ..._cart.map(
-                        (item) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: DecoratedBox(
+                        ),
+                        const SizedBox(height: 12),
+                        if (customerDomainState.isPostgresPrimary) ...<Widget>[
+                          DecoratedBox(
                             decoration: BoxDecoration(
-                              color: const Color(0xFF0F172A),
+                              color: const Color(0xFF0B1622),
                               borderRadius: BorderRadius.circular(22),
+                              border: Border.all(
+                                color: const Color(
+                                  0xFF14B8A6,
+                                ).withValues(alpha: 0.18),
+                              ),
                             ),
                             child: Padding(
                               padding: const EdgeInsets.all(14),
@@ -599,7 +720,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                           CrossAxisAlignment.start,
                                       children: <Widget>[
                                         Text(
-                                          item.name,
+                                          _selectedCustomer == null
+                                              ? 'Attach known customer'
+                                              : _selectedCustomer!.name,
                                           style: Theme.of(context)
                                               .textTheme
                                               .titleMedium
@@ -609,13 +732,17 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          '${formatCurrency(item.price)} | Stock ${item.stock}',
+                                          _selectedCustomer == null
+                                              ? 'Use migrated customer records so the sale links directly to ledger history.'
+                                              : (_selectedCustomer!.phone ??
+                                                    _selectedCustomer!.email ??
+                                                    'Known customer attached'),
                                           style: Theme.of(context)
                                               .textTheme
                                               .bodySmall
                                               ?.copyWith(
                                                 color: Colors.white.withValues(
-                                                  alpha: 0.58,
+                                                  alpha: 0.62,
                                                 ),
                                                 fontWeight: FontWeight.w600,
                                               ),
@@ -623,78 +750,192 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                       ],
                                     ),
                                   ),
-                                  Row(
-                                    children: <Widget>[
-                                      IconButton(
-                                        onPressed: () {
-                                          setState(() {
-                                            final next = item.quantity - 1;
-                                            if (next <= 0) {
-                                              _cart.removeWhere(
-                                                (entry) => entry.id == item.id,
-                                              );
-                                            } else {
-                                              final idx = _cart.indexWhere(
-                                                (entry) => entry.id == item.id,
-                                              );
-                                              _cart[idx] = _cart[idx].copyWith(
-                                                quantity: next,
-                                              );
-                                            }
-                                          });
-                                          setSheetState(() {});
-                                        },
-                                        icon: const Icon(
-                                          Icons.remove_circle_outline_rounded,
-                                        ),
-                                      ),
-                                      Text(
-                                        '${item.quantity}',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w800,
-                                            ),
-                                      ),
-                                      IconButton(
-                                        onPressed: () {
-                                          setState(() {
-                                            final idx = _cart.indexWhere(
-                                              (entry) => entry.id == item.id,
-                                            );
-                                            _cart[idx] = _cart[idx].copyWith(
-                                              quantity: _cart[idx].quantity + 1,
-                                            );
-                                          });
-                                          setSheetState(() {});
-                                        },
-                                        icon: const Icon(
-                                          Icons.add_circle_outline_rounded,
-                                        ),
-                                      ),
-                                    ],
+                                  const SizedBox(width: 12),
+                                  FilledButton.tonal(
+                                    onPressed: () async {
+                                      final picked = await _showCustomerPicker(
+                                        context,
+                                        backendApiClient: backendApiClient,
+                                        session: session,
+                                        activeShopId: activeShopId,
+                                      );
+                                      if (picked == null) {
+                                        return;
+                                      }
+                                      setState(() {
+                                        _selectedCustomer = picked;
+                                        _customerController.text = picked.name;
+                                        _phoneController.text =
+                                            picked.phone ?? '';
+                                      });
+                                      setSheetState(() {});
+                                    },
+                                    child: Text(
+                                      _selectedCustomer == null
+                                          ? 'Pick'
+                                          : 'Change',
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
                           ),
+                          if (_selectedCustomer != null) ...<Widget>[
+                            const SizedBox(height: 10),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: () {
+                                  setState(() {
+                                    _selectedCustomer = null;
+                                    _customerController.clear();
+                                    _phoneController.clear();
+                                  });
+                                  setSheetState(() {});
+                                },
+                                icon: const Icon(Icons.link_off_rounded),
+                                label: const Text(
+                                  'Use walk-in or manual customer',
+                                ),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                        ],
+                        TextField(
+                          controller: _customerController,
+                          onChanged: (value) {
+                            if (_selectedCustomer != null &&
+                                value.trim() != _selectedCustomer!.name) {
+                              setState(() {
+                                _selectedCustomer = null;
+                              });
+                              setSheetState(() {});
+                            }
+                          },
+                          decoration: const InputDecoration(
+                            labelText: 'Customer name (optional)',
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (customerDomainState.isPostgresPrimary) ...<Widget>[
-                        DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0B1622),
-                            borderRadius: BorderRadius.circular(22),
-                            border: Border.all(
-                              color: const Color(
-                                0xFF14B8A6,
-                              ).withValues(alpha: 0.18),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _phoneController,
+                          onChanged: (value) {
+                            if (_selectedCustomer != null &&
+                                value.trim() !=
+                                    (_selectedCustomer!.phone ?? '').trim()) {
+                              setState(() {
+                                _selectedCustomer = null;
+                              });
+                              setSheetState(() {});
+                            }
+                          },
+                          keyboardType: TextInputType.phone,
+                          decoration: const InputDecoration(
+                            labelText: 'Customer phone (optional)',
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _paymentModes
+                              .map(
+                                (mode) => ChoiceChip(
+                                  label: Text(mode),
+                                  selected: _paymentMode == mode,
+                                  onSelected: (_) {
+                                    setState(() {
+                                      _paymentMode = mode;
+                                    });
+                                    if (mode != 'SPLIT') {
+                                      splitPayments
+                                        ..forEach(
+                                          (payment) => payment.dispose(),
+                                        )
+                                        ..clear()
+                                        ..add(
+                                          _CheckoutPaymentDraft(mode: mode),
+                                        );
+                                      collectedController.text = total
+                                          .toStringAsFixed(2);
+                                    } else {
+                                      splitPayments
+                                        ..forEach(
+                                          (payment) => payment.dispose(),
+                                        )
+                                        ..clear()
+                                        ..add(
+                                          _CheckoutPaymentDraft(
+                                            mode: 'CASH',
+                                            initialAmount: total,
+                                          ),
+                                        );
+                                    }
+                                    setSheetState(() {});
+                                  },
+                                ),
+                              )
+                              .toList(growable: false),
+                        ),
+                        const SizedBox(height: 12),
+                        if (_paymentMode == 'SPLIT')
+                          _SplitPaymentPanel(
+                            payments: splitPayments,
+                            total: total,
+                            onChanged: () => setSheetState(() {}),
+                            onAdd: () {
+                              splitPayments.add(
+                                _CheckoutPaymentDraft(
+                                  mode: 'CASH',
+                                  initialAmount: checkoutDue > 0
+                                      ? checkoutDue
+                                      : total,
+                                ),
+                              );
+                              setSheetState(() {});
+                            },
+                            onRemove: (payment) {
+                              if (splitPayments.length == 1) {
+                                return;
+                              }
+                              payment.dispose();
+                              splitPayments.remove(payment);
+                              setSheetState(() {});
+                            },
+                          )
+                        else
+                          TextField(
+                            controller: collectedController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              signed: false,
+                              decimal: true,
+                            ),
+                            onChanged: (_) => setSheetState(() {}),
+                            decoration: InputDecoration(
+                              labelText: _paymentMode == 'CREDIT'
+                                  ? 'Collected now (must be positive)'
+                                  : 'Collected now',
+                              helperText:
+                                  'Enter less than the total if part of this bill should remain due.',
                             ),
                           ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _footerController,
+                          maxLines: 2,
+                          decoration: const InputDecoration(
+                            labelText: 'Receipt footer',
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0D1A11),
+                            borderRadius: BorderRadius.circular(22),
+                          ),
                           child: Padding(
-                            padding: const EdgeInsets.all(14),
+                            padding: const EdgeInsets.all(16),
                             child: Row(
                               children: <Widget>[
                                 Expanded(
@@ -703,9 +944,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                         CrossAxisAlignment.start,
                                     children: <Widget>[
                                       Text(
-                                        _selectedCustomer == null
-                                            ? 'Attach known customer'
-                                            : _selectedCustomer!.name,
+                                        'Sale total',
                                         style: Theme.of(context)
                                             .textTheme
                                             .titleMedium
@@ -715,17 +954,13 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        _selectedCustomer == null
-                                            ? 'Use migrated customer records so the sale links directly to ledger history.'
-                                            : (_selectedCustomer!.phone ??
-                                                  _selectedCustomer!.email ??
-                                                  'Known customer attached'),
+                                        'Payment mode: $_paymentMode',
                                         style: Theme.of(context)
                                             .textTheme
                                             .bodySmall
                                             ?.copyWith(
                                               color: Colors.white.withValues(
-                                                alpha: 0.62,
+                                                alpha: 0.58,
                                               ),
                                               fontWeight: FontWeight.w600,
                                             ),
@@ -733,297 +968,226 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                     ],
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                FilledButton.tonal(
-                                  onPressed: () async {
-                                    final picked = await _showCustomerPicker(
-                                      context,
-                                      backendApiClient: backendApiClient,
-                                      session: session,
-                                      activeShopId: activeShopId,
-                                    );
-                                    if (picked == null) {
-                                      return;
-                                    }
-                                    setState(() {
-                                      _selectedCustomer = picked;
-                                      _customerController.text = picked.name;
-                                      _phoneController.text =
-                                          picked.phone ?? '';
-                                    });
-                                    setSheetState(() {});
-                                  },
-                                  child: Text(
-                                    _selectedCustomer == null
-                                        ? 'Pick'
-                                        : 'Change',
-                                  ),
+                                Text(
+                                  formatCurrency(total),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(
+                                        color: const Color(0xFF22C55E),
+                                        fontWeight: FontWeight.w900,
+                                      ),
                                 ),
                               ],
                             ),
                           ),
                         ),
-                        if (_selectedCustomer != null) ...<Widget>[
-                          const SizedBox(height: 10),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton.icon(
-                              onPressed: () {
-                                setState(() {
-                                  _selectedCustomer = null;
-                                  _customerController.clear();
-                                  _phoneController.clear();
-                                });
-                                setSheetState(() {});
-                              },
-                              icon: const Icon(Icons.link_off_rounded),
-                              label: const Text(
-                                'Use walk-in or manual customer',
-                              ),
+                        const SizedBox(height: 12),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0A1220),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.05),
                             ),
                           ),
-                        ],
-                        const SizedBox(height: 12),
-                      ],
-                      TextField(
-                        controller: _customerController,
-                        onChanged: (value) {
-                          if (_selectedCustomer != null &&
-                              value.trim() != _selectedCustomer!.name) {
-                            setState(() {
-                              _selectedCustomer = null;
-                            });
-                            setSheetState(() {});
-                          }
-                        },
-                        decoration: const InputDecoration(
-                          labelText: 'Customer name (optional)',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _phoneController,
-                        onChanged: (value) {
-                          if (_selectedCustomer != null &&
-                              value.trim() !=
-                                  (_selectedCustomer!.phone ?? '').trim()) {
-                            setState(() {
-                              _selectedCustomer = null;
-                            });
-                            setSheetState(() {});
-                          }
-                        },
-                        keyboardType: TextInputType.phone,
-                        decoration: const InputDecoration(
-                          labelText: 'Customer phone (optional)',
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _paymentModes
-                            .map(
-                              (mode) => ChoiceChip(
-                                label: Text(mode),
-                                selected: _paymentMode == mode,
-                                onSelected: (_) {
-                                  setState(() {
-                                    _paymentMode = mode;
-                                  });
-                                  setSheetState(() {});
-                                },
-                              ),
-                            )
-                            .toList(growable: false),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _footerController,
-                        maxLines: 2,
-                        decoration: const InputDecoration(
-                          labelText: 'Receipt footer',
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0D1A11),
-                          borderRadius: BorderRadius.circular(22),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            children: <Widget>[
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: <Widget>[
-                                    Text(
-                                      'Collect now',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Payment mode: $_paymentMode',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: Colors.white.withValues(
-                                              alpha: 0.58,
-                                            ),
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                    ),
-                                  ],
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: <Widget>[
+                                _CheckoutSummaryRow(
+                                  label: 'Collected now',
+                                  value: formatCurrency(checkoutCollected),
+                                  tone: const Color(0xFF38BDF8),
                                 ),
-                              ),
-                              Text(
-                                formatCurrency(total),
-                                style: Theme.of(context).textTheme.headlineSmall
-                                    ?.copyWith(
-                                      color: const Color(0xFF22C55E),
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                              ),
-                            ],
+                                const SizedBox(height: 10),
+                                _CheckoutSummaryRow(
+                                  label: 'Due after sale',
+                                  value: formatCurrency(
+                                    checkoutDue > 0 ? checkoutDue : 0,
+                                  ),
+                                  tone: checkoutDue > 0
+                                      ? const Color(0xFFF59E0B)
+                                      : const Color(0xFF22C55E),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 18),
-                      FilledButton(
-                        onPressed: _saving
-                            ? null
-                            : () async {
-                                if (activeShopId == null ||
-                                    activeShopId.isEmpty) {
-                                  if (!mounted) {
-                                    return;
-                                  }
-                                  ScaffoldMessenger.of(
-                                    this.context,
-                                  ).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Mobile session is not ready yet. Please wait for the shop to load.',
+                        const SizedBox(height: 18),
+                        FilledButton(
+                          onPressed: _saving
+                              ? null
+                              : () async {
+                                  if (activeShopId == null ||
+                                      activeShopId.isEmpty) {
+                                    if (!mounted) {
+                                      return;
+                                    }
+                                    ScaffoldMessenger.of(
+                                      this.context,
+                                    ).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Mobile session is not ready yet. Please wait for the shop to load.',
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                  return;
-                                }
-
-                                final shortages = _cart
-                                    .where((item) => item.quantity > item.stock)
-                                    .toList(growable: false);
-                                if (shortages.isNotEmpty) {
-                                  final force = await _showForceSaleDialog(
-                                    context,
-                                    shortages,
-                                  );
-                                  if (!force) {
+                                    );
                                     return;
                                   }
-                                }
 
-                                setState(() {
-                                  _saving = true;
-                                });
-                                setSheetState(() {});
-                                try {
-                                  final commit = await salesRepository
-                                      .recordLocalSale(
-                                        shopId: activeShopId,
-                                        items: List<PosCartItem>.from(_cart),
-                                        payments: <PosPayment>[
-                                          PosPayment(
-                                            mode: _paymentMode,
-                                            amount: total,
-                                          ),
-                                        ],
+                                  final shortages = _cart
+                                      .where(
+                                        (item) => item.quantity > item.stock,
+                                      )
+                                      .toList(growable: false);
+                                  if (shortages.isNotEmpty) {
+                                    final force = await _showForceSaleDialog(
+                                      context,
+                                      shortages,
+                                    );
+                                    if (!force) {
+                                      return;
+                                    }
+                                  }
+
+                                  final resolvedPayments =
+                                      _resolveCheckoutPayments(
                                         paymentMode: _paymentMode,
-                                        customerId: _selectedCustomer?.id,
-                                        customerName:
-                                            _customerController.text
-                                                .trim()
-                                                .isEmpty
-                                            ? null
-                                            : _customerController.text.trim(),
-                                        customerPhone:
-                                            _phoneController.text.trim().isEmpty
-                                            ? null
-                                            : _phoneController.text.trim(),
-                                        footerNote: _footerController.text
-                                            .trim(),
+                                        total: total,
+                                        collectedText: collectedController.text,
+                                        splitPayments: splitPayments,
                                       );
-                                  final syncResult = await syncCoordinator
-                                      .submitSale(commit);
-                                  if (!mounted || !context.mounted) {
-                                    return;
-                                  }
-                                  Navigator.of(context).pop();
-                                  ScaffoldMessenger.of(
-                                    this.context,
-                                  ).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        syncResult.acceptedByBackend
-                                            ? 'Sale saved for ${formatCurrency(commit.total)} and synced to backend'
-                                            : 'Sale saved for ${formatCurrency(commit.total)} and queued for backend sync',
+                                  if (resolvedPayments == null) {
+                                    if (!mounted) {
+                                      return;
+                                    }
+                                    ScaffoldMessenger.of(
+                                      this.context,
+                                    ).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Checkout payment details are incomplete. Fix the amounts before completing the sale.',
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                  setState(() {
-                                    _saving = false;
-                                    _cart.clear();
-                                    _selectedCustomer = null;
-                                    _customerController.clear();
-                                    _phoneController.clear();
-                                  });
-                                } catch (error) {
-                                  if (!mounted) {
+                                    );
                                     return;
                                   }
-                                  ScaffoldMessenger.of(
-                                    this.context,
-                                  ).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Sale failed: $error'),
-                                    ),
-                                  );
+
+                                  final customerName = _customerController.text
+                                      .trim();
+                                  final customerPhone = _phoneController.text
+                                      .trim();
+                                  final amountDue =
+                                      total - resolvedPayments.totalCollected;
+                                  if (amountDue > 0 &&
+                                      _selectedCustomer == null &&
+                                      customerName.isEmpty) {
+                                    if (!mounted) {
+                                      return;
+                                    }
+                                    ScaffoldMessenger.of(
+                                      this.context,
+                                    ).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Outstanding balance needs a named customer before this sale can be saved.',
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+
                                   setState(() {
-                                    _saving = false;
+                                    _saving = true;
                                   });
                                   setSheetState(() {});
-                                }
-                              },
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(56),
+                                  try {
+                                    final commit = await salesRepository
+                                        .recordLocalSale(
+                                          shopId: activeShopId,
+                                          items: List<PosCartItem>.from(_cart),
+                                          payments: resolvedPayments.payments,
+                                          paymentMode: _paymentMode,
+                                          customerId: _selectedCustomer?.id,
+                                          customerName: customerName.isEmpty
+                                              ? null
+                                              : customerName,
+                                          customerPhone: customerPhone.isEmpty
+                                              ? null
+                                              : customerPhone,
+                                          footerNote: _footerController.text
+                                              .trim(),
+                                        );
+                                    final syncResult = await syncCoordinator
+                                        .submitSale(commit);
+                                    if (!mounted || !context.mounted) {
+                                      return;
+                                    }
+                                    Navigator.of(context).pop();
+                                    ScaffoldMessenger.of(
+                                      this.context,
+                                    ).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          syncResult.acceptedByBackend
+                                              ? 'Sale saved for ${formatCurrency(commit.total)} and synced to backend'
+                                              : 'Sale saved for ${formatCurrency(commit.total)} and queued for backend sync',
+                                        ),
+                                      ),
+                                    );
+                                    setState(() {
+                                      _saving = false;
+                                      _cart.clear();
+                                      _selectedCustomer = null;
+                                      _customerController.clear();
+                                      _phoneController.clear();
+                                    });
+                                  } catch (error) {
+                                    if (!mounted) {
+                                      return;
+                                    }
+                                    ScaffoldMessenger.of(
+                                      this.context,
+                                    ).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Sale failed: $error'),
+                                      ),
+                                    );
+                                    setState(() {
+                                      _saving = false;
+                                    });
+                                    setSheetState(() {});
+                                  }
+                                },
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(56),
+                          ),
+                          child: _saving
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.2,
+                                  ),
+                                )
+                              : const Text('Complete sale'),
                         ),
-                        child: _saving
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.2,
-                                ),
-                              )
-                            : const Text('Complete sale'),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
-        );
-      },
-    );
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      collectedController.dispose();
+      for (final payment in splitPayments) {
+        payment.dispose();
+      }
+    }
   }
 
   Future<BackendCustomerSummary?> _showCustomerPicker(
@@ -1304,6 +1468,47 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     );
     return result == true;
   }
+
+  double _parseMoney(String raw) {
+    final sanitized = raw.trim().replaceAll(',', '');
+    return double.tryParse(sanitized) ?? 0;
+  }
+
+  _CheckoutPaymentResolution? _resolveCheckoutPayments({
+    required String paymentMode,
+    required double total,
+    required String collectedText,
+    required List<_CheckoutPaymentDraft> splitPayments,
+  }) {
+    if (paymentMode == 'SPLIT') {
+      final payments = <PosPayment>[];
+      var collected = 0.0;
+      for (final payment in splitPayments) {
+        final amount = payment.amount;
+        if (amount <= 0) {
+          return null;
+        }
+        payments.add(PosPayment(mode: payment.mode, amount: amount));
+        collected += amount;
+      }
+      if (payments.isEmpty || collected > total + 0.009) {
+        return null;
+      }
+      return _CheckoutPaymentResolution(
+        payments: payments,
+        totalCollected: collected,
+      );
+    }
+
+    final collected = _parseMoney(collectedText);
+    if (collected <= 0 || collected > total + 0.009) {
+      return null;
+    }
+    return _CheckoutPaymentResolution(
+      payments: <PosPayment>[PosPayment(mode: paymentMode, amount: collected)],
+      totalCollected: collected,
+    );
+  }
 }
 
 class _PosCatalogRow extends StatelessWidget {
@@ -1430,7 +1635,201 @@ class _PosCategoryChip extends StatelessWidget {
 const List<String> _paymentModes = <String>[
   'CASH',
   'UPI',
+  'BANK',
   'CARD',
   'CREDIT',
-  'OTHERS',
+  'OTHER',
+  'SPLIT',
 ];
+
+const List<String> _splitPaymentModes = <String>[
+  'CASH',
+  'UPI',
+  'BANK',
+  'CARD',
+  'CREDIT',
+  'OTHER',
+];
+
+class _CheckoutPaymentDraft {
+  _CheckoutPaymentDraft({required this.mode, double? initialAmount})
+    : controller = TextEditingController(
+        text: (initialAmount ?? 0).toStringAsFixed(2),
+      );
+
+  final TextEditingController controller;
+  String mode;
+
+  double get amount {
+    final sanitized = controller.text.trim().replaceAll(',', '');
+    return double.tryParse(sanitized) ?? 0;
+  }
+
+  void dispose() {
+    controller.dispose();
+  }
+}
+
+class _CheckoutPaymentResolution {
+  const _CheckoutPaymentResolution({
+    required this.payments,
+    required this.totalCollected,
+  });
+
+  final List<PosPayment> payments;
+  final double totalCollected;
+}
+
+class _SplitPaymentPanel extends StatelessWidget {
+  const _SplitPaymentPanel({
+    required this.payments,
+    required this.total,
+    required this.onChanged,
+    required this.onAdd,
+    required this.onRemove,
+  });
+
+  final List<_CheckoutPaymentDraft> payments;
+  final double total;
+  final VoidCallback onChanged;
+  final VoidCallback onAdd;
+  final void Function(_CheckoutPaymentDraft payment) onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final allocated = payments.fold<double>(
+      0,
+      (sum, payment) => sum + payment.amount,
+    );
+    final remaining = total - allocated;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1220),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    'Split payment plan',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Add line'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ...payments.map(
+              (payment) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      flex: 4,
+                      child: DropdownButtonFormField<String>(
+                        initialValue: payment.mode,
+                        items: _splitPaymentModes
+                            .map(
+                              (mode) => DropdownMenuItem<String>(
+                                value: mode,
+                                child: Text(mode),
+                              ),
+                            )
+                            .toList(growable: false),
+                        onChanged: (value) {
+                          if (value == null) {
+                            return;
+                          }
+                          payment.mode = value;
+                          onChanged();
+                        },
+                        decoration: const InputDecoration(labelText: 'Method'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 4,
+                      child: TextField(
+                        controller: payment.controller,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          signed: false,
+                          decimal: true,
+                        ),
+                        onChanged: (_) => onChanged(),
+                        decoration: const InputDecoration(labelText: 'Amount'),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    IconButton(
+                      onPressed: payments.length > 1
+                          ? () => onRemove(payment)
+                          : null,
+                      icon: const Icon(Icons.delete_outline_rounded),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Allocated ${formatCurrency(allocated)} | Remaining ${formatCurrency(remaining > 0 ? remaining : 0)}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.62),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CheckoutSummaryRow extends StatelessWidget {
+  const _CheckoutSummaryRow({
+    required this.label,
+    required this.value,
+    required this.tone,
+  });
+
+  final String label;
+  final String value;
+  final Color tone;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Colors.white.withValues(alpha: 0.68),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: tone,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+}
