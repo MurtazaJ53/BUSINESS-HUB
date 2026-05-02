@@ -103,6 +103,11 @@ class PilotEvidenceTrackerState {
       label: 'Rollout decision summary',
       isCore: false,
     ),
+    PilotEvidenceArtifact(
+      id: 'wave_closeout_readiness',
+      label: 'Wave closeout readiness',
+      isCore: false,
+    ),
   ];
 
   static final Map<String, PilotEvidenceArtifact> _artifactById =

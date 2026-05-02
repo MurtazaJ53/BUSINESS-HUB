@@ -75,12 +75,13 @@ It is designed to support:
 51. [Mobile Pilot Evidence Archive Control](./mobile-pilot-evidence-archive-control.md)
 52. [Mobile Pilot Evidence Archive Insights](./mobile-pilot-evidence-archive-insights.md)
 53. [Mobile Pilot Rollout Decision Summary](./mobile-pilot-rollout-decision-summary.md)
+54. [Mobile Pilot Wave Closeout Readiness](./mobile-pilot-wave-closeout-readiness.md)
 
 ### Existing strategy docs
 
-54. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
-55. [Global Scale Blueprint](./global-scale-blueprint.md)
-56. [Scale Certification Checklist](./scale-certification-checklist.md)
+55. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
+56. [Global Scale Blueprint](./global-scale-blueprint.md)
+57. [Scale Certification Checklist](./scale-certification-checklist.md)
 
 ## Current truth
 
@@ -140,6 +141,7 @@ As of April 29, 2026:
 - then Mobile Pilot Evidence Archive Control
 - then Mobile Pilot Evidence Archive Insights
 - then Mobile Pilot Rollout Decision Summary
+- then Mobile Pilot Wave Closeout Readiness
 
 ## Notes
 

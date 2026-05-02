@@ -29,6 +29,7 @@ It now also keeps a short archive of recent completed evidence sessions so the p
 It now also supports archive export and archive reset controls so stale shared-device history can be managed without deleting the active session.
 It now also summarizes recent archive health so a rollout lead can see whether the last few shifts are trending clean or still closing with missing evidence.
 It now also provides a rollout decision summary so the device can state whether the current posture supports expansion, monitoring, investigation, or rollback.
+It now also provides wave closeout readiness so the device can state whether the current wave record is actually complete enough to close.
 
 ## Version source
 
@@ -101,6 +102,7 @@ Signing path:
 17. Use `Copy evidence tracker` before final handoff if the rollout lead wants one quick summary of which core artifacts were already captured on-device.
 18. Use `Copy archive insights` when you want the recent archived-session trend without pasting the full archive pack.
 19. Use `Copy decision summary` when the rollout lead wants one short wave verdict that combines current readiness, next action, and archive trend.
+20. Use `Copy wave closeout readiness` before closing the wave record so the handoff explicitly states whether closeout is ready, monitor-only, evidence-incomplete, or blocked.
 
 ## Pilot smoke focus
 
@@ -120,6 +122,7 @@ Reference sheet:
 - [D:/business-hub/docs/mobile-pilot-evidence-archive-control.md](D:/business-hub/docs/mobile-pilot-evidence-archive-control.md)
 - [D:/business-hub/docs/mobile-pilot-evidence-archive-insights.md](D:/business-hub/docs/mobile-pilot-evidence-archive-insights.md)
 - [D:/business-hub/docs/mobile-pilot-rollout-decision-summary.md](D:/business-hub/docs/mobile-pilot-rollout-decision-summary.md)
+- [D:/business-hub/docs/mobile-pilot-wave-closeout-readiness.md](D:/business-hub/docs/mobile-pilot-wave-closeout-readiness.md)
 
 1. login
 2. inventory lookup

@@ -19,6 +19,7 @@ import '../../../core/runtime/pilot_rollout_decision_summary.dart';
 import '../../../core/runtime/pilot_rollout_evidence_report.dart';
 import '../../../core/runtime/pilot_smoke_report.dart';
 import '../../../core/runtime/pilot_shift_closeout_report.dart';
+import '../../../core/runtime/pilot_wave_closeout_readiness.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/utils/formatters.dart';
@@ -619,6 +620,22 @@ class SettingsScreen extends ConsumerWidget {
                                     readinessReport: readinessReport,
                                     recoveryReport: recoveryReport,
                                     actionPlan: actionPlan,
+                                    evidenceTracker: evidenceTracker,
+                                  );
+                            final waveCloseoutReadiness =
+                                diagnostics == null ||
+                                    readinessReport == null ||
+                                    recoveryReport == null ||
+                                    actionPlan == null ||
+                                    rolloutDecisionSummary == null
+                                ? null
+                                : PilotWaveCloseoutReadiness.evaluate(
+                                    diagnosticsSnapshot: diagnostics,
+                                    readinessReport: readinessReport,
+                                    recoveryReport: recoveryReport,
+                                    actionPlan: actionPlan,
+                                    rolloutDecisionSummary:
+                                        rolloutDecisionSummary,
                                     evidenceTracker: evidenceTracker,
                                   );
 
@@ -1929,6 +1946,161 @@ class SettingsScreen extends ConsumerWidget {
                                               ),
                                               label: const Text(
                                                 'Copy decision summary',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                                const SizedBox(height: 18),
+                                MobilePanel(
+                                  title: 'Wave closeout readiness',
+                                  action: MobileTag(
+                                    label: waveCloseoutReadiness == null
+                                        ? 'Loading'
+                                        : waveCloseoutReadiness.statusLabel,
+                                    icon: waveCloseoutReadiness == null
+                                        ? Icons.sync_rounded
+                                        : waveCloseoutReadiness.shouldNotClose
+                                        ? Icons.block_rounded
+                                        : waveCloseoutReadiness
+                                                  .shouldCaptureMoreEvidence
+                                        ? Icons.assignment_late_rounded
+                                        : waveCloseoutReadiness
+                                                  .isCloseoutWithMonitoring
+                                        ? Icons.visibility_rounded
+                                        : Icons.task_alt_rounded,
+                                    accent: waveCloseoutReadiness == null
+                                        ? const Color(0xFFF59E0B)
+                                        : waveCloseoutReadiness.shouldNotClose
+                                        ? const Color(0xFFFB7185)
+                                        : waveCloseoutReadiness
+                                                  .shouldCaptureMoreEvidence
+                                        ? const Color(0xFFF59E0B)
+                                        : waveCloseoutReadiness
+                                                  .isCloseoutWithMonitoring
+                                        ? const Color(0xFF38BDF8)
+                                        : const Color(0xFF22C55E),
+                                  ),
+                                  child: waveCloseoutReadiness == null
+                                      ? const MobileEmptyState(
+                                          icon: Icons.sync_rounded,
+                                          title: 'Preparing wave closeout readiness',
+                                          body:
+                                              'The device is still evaluating whether this rollout wave can be closed cleanly.',
+                                        )
+                                      : Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: <Widget>[
+                                            Text(
+                                              waveCloseoutReadiness.summary,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color: Colors.white
+                                                        .withValues(
+                                                          alpha: 0.68,
+                                                        ),
+                                                    fontWeight: FontWeight.w600,
+                                                    height: 1.45,
+                                                  ),
+                                            ),
+                                            const SizedBox(height: 14),
+                                            _SettingsRow(
+                                              label: 'Closeout status',
+                                              value: waveCloseoutReadiness
+                                                  .statusLabel,
+                                              icon: Icons.playlist_add_check_rounded,
+                                            ),
+                                            _SettingsRow(
+                                              label: 'Required artifacts',
+                                              value: waveCloseoutReadiness
+                                                  .closeoutArtifactsLabel,
+                                              icon: Icons.fact_check_rounded,
+                                            ),
+                                            _SettingsRow(
+                                              label: 'Decision posture',
+                                              value: rolloutDecisionSummary
+                                                  .verdictLabel,
+                                              icon: Icons.gavel_rounded,
+                                            ),
+                                            ...waveCloseoutReadiness.reasons.map(
+                                              (reason) => _ReadinessNoteRow(
+                                                message: reason,
+                                                tone: waveCloseoutReadiness
+                                                        .shouldNotClose
+                                                    ? const Color(0xFFFB7185)
+                                                    : waveCloseoutReadiness
+                                                              .shouldCaptureMoreEvidence
+                                                    ? const Color(0xFFF59E0B)
+                                                    : waveCloseoutReadiness
+                                                              .isCloseoutWithMonitoring
+                                                    ? const Color(0xFF38BDF8)
+                                                    : const Color(0xFF22C55E),
+                                              ),
+                                            ),
+                                            if (waveCloseoutReadiness
+                                                .missingCloseoutArtifacts
+                                                .isNotEmpty) ...<Widget>[
+                                              const SizedBox(height: 14),
+                                              Text(
+                                                'Still missing for closeout:',
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .labelLarge
+                                                    ?.copyWith(
+                                                      color: const Color(
+                                                        0xFFF59E0B,
+                                                      ),
+                                                      fontWeight:
+                                                          FontWeight.w900,
+                                                    ),
+                                              ),
+                                              const SizedBox(height: 10),
+                                              ...waveCloseoutReadiness
+                                                  .missingCloseoutArtifacts
+                                                  .map(
+                                                    (artifact) =>
+                                                        _ReadinessNoteRow(
+                                                      message: artifact.label,
+                                                      tone: const Color(
+                                                        0xFFF59E0B,
+                                                      ),
+                                                    ),
+                                                  ),
+                                            ],
+                                            const SizedBox(height: 14),
+                                            FilledButton.tonalIcon(
+                                              onPressed: () async {
+                                                await Clipboard.setData(
+                                                  ClipboardData(
+                                                    text:
+                                                        waveCloseoutReadiness
+                                                            .toMultilineText(),
+                                                  ),
+                                                );
+                                                await markEvidenceCaptured(
+                                                  'wave_closeout_readiness',
+                                                );
+                                                if (!context.mounted) {
+                                                  return;
+                                                }
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      'Wave closeout readiness copied with status ${waveCloseoutReadiness.statusLabel}.',
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              icon: const Icon(
+                                                Icons.assignment_turned_in_rounded,
+                                              ),
+                                              label: const Text(
+                                                'Copy wave closeout readiness',
                                               ),
                                             ),
                                           ],
