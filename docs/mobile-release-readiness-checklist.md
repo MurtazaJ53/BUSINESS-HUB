@@ -52,6 +52,10 @@ This checklist is the final gate before shipping a Flutter APK outside the inter
 10. Run the local release tag gate before creating the final `mobile-v*` tag:
    - `BusinessHub-Mobile-<release-tag>.tag-summary.txt`
    - `BusinessHub-Mobile-<release-tag>.tag-summary.json`
+11. Build the final local handoff pack when you want one portable release folder:
+   - `BusinessHub-Mobile-<release-tag>.handoff-summary.txt`
+   - `BusinessHub-Mobile-<release-tag>.handoff-summary.json`
+   - `BusinessHub-Mobile-<release-tag>.handoff-readme.md`
 
 ## Mobile smoke gate
 

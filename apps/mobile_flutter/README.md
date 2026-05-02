@@ -78,6 +78,13 @@ pwsh ./scripts/mobile_flutter_release_tag.ps1 -Doctor -ReleaseTag mobile-v1.4.0
 pwsh ./scripts/mobile_flutter_release_tag.ps1 -ReleaseTag mobile-v1.4.0
 ```
 
+Local release handoff pack:
+
+```powershell
+pwsh ./scripts/mobile_flutter_release_handoff.ps1 -Doctor -ReleaseTag mobile-v1.4.0
+pwsh ./scripts/mobile_flutter_release_handoff.ps1 -ReleaseTag mobile-v1.4.0
+```
+
 If Flutter is not on PATH:
 
 ```powershell
@@ -113,6 +120,8 @@ For local validation from the repo root, use:
 - [D:/business-hub/docs/mobile-local-release-registry-runner.md](D:/business-hub/docs/mobile-local-release-registry-runner.md)
 - [D:/business-hub/scripts/mobile_flutter_release_tag.ps1](D:/business-hub/scripts/mobile_flutter_release_tag.ps1)
 - [D:/business-hub/docs/mobile-local-release-tag-runner.md](D:/business-hub/docs/mobile-local-release-tag-runner.md)
+- [D:/business-hub/scripts/mobile_flutter_release_handoff.ps1](D:/business-hub/scripts/mobile_flutter_release_handoff.ps1)
+- [D:/business-hub/docs/mobile-local-release-handoff-runner.md](D:/business-hub/docs/mobile-local-release-handoff-runner.md)
 
 Release automation now also supports:
 

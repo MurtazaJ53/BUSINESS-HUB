@@ -78,6 +78,10 @@ Tag runner:
 - [D:/business-hub/scripts/mobile_flutter_release_tag.ps1](D:/business-hub/scripts/mobile_flutter_release_tag.ps1)
 - [D:/business-hub/docs/mobile-local-release-tag-runner.md](D:/business-hub/docs/mobile-local-release-tag-runner.md)
 
+Handoff runner:
+- [D:/business-hub/scripts/mobile_flutter_release_handoff.ps1](D:/business-hub/scripts/mobile_flutter_release_handoff.ps1)
+- [D:/business-hub/docs/mobile-local-release-handoff-runner.md](D:/business-hub/docs/mobile-local-release-handoff-runner.md)
+
 Recommended local sequence:
 - release prep
 - `-Doctor` for Flutter resolution
@@ -86,6 +90,7 @@ Recommended local sequence:
 - bundle the prep + local artifacts for handoff
 - regenerate the release registry for cross-tag visibility
 - run the release tag gate before creating `mobile-v*`
+- build the final release handoff pack for the rollout lead or archive owner
 
 Triggers:
 - push tag matching `mobile-v*`
