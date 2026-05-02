@@ -27,6 +27,7 @@ That evidence tracker now persists across app restarts on the same workspace, so
 It now also supports named evidence sessions so operators can separate one shift or rollout wave from the next.
 It now also keeps a short archive of recent completed evidence sessions so the previous shift summary is still available after a fresh session starts.
 It now also supports archive export and archive reset controls so stale shared-device history can be managed without deleting the active session.
+It now also summarizes recent archive health so a rollout lead can see whether the last few shifts are trending clean or still closing with missing evidence.
 
 ## Version source
 
@@ -97,6 +98,7 @@ Signing path:
 15. If the rollout lead needs a single combined pack, run `Build evidence pack` and archive that output too.
 16. If the device enters an incident posture, run `Build escalation pack` and attach it to the support thread.
 17. Use `Copy evidence tracker` before final handoff if the rollout lead wants one quick summary of which core artifacts were already captured on-device.
+18. Use `Copy archive insights` when you want the recent archived-session trend without pasting the full archive pack.
 
 ## Pilot smoke focus
 
@@ -114,6 +116,7 @@ Reference sheet:
 - [D:/business-hub/docs/mobile-pilot-evidence-sessions.md](D:/business-hub/docs/mobile-pilot-evidence-sessions.md)
 - [D:/business-hub/docs/mobile-pilot-evidence-session-history.md](D:/business-hub/docs/mobile-pilot-evidence-session-history.md)
 - [D:/business-hub/docs/mobile-pilot-evidence-archive-control.md](D:/business-hub/docs/mobile-pilot-evidence-archive-control.md)
+- [D:/business-hub/docs/mobile-pilot-evidence-archive-insights.md](D:/business-hub/docs/mobile-pilot-evidence-archive-insights.md)
 
 1. login
 2. inventory lookup

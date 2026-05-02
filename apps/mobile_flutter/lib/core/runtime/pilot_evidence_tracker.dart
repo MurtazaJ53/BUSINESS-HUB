@@ -129,6 +129,18 @@ class PilotEvidenceTrackerState {
 
   int get missingOptionalCount => missingOptionalArtifacts.length;
 
+  int get archivedHealthyCount => archivedSessions
+      .where((entry) => entry.isCoreComplete)
+      .length;
+
+  int get archivedAttentionCount => archivedSessions
+      .where((entry) => !entry.isCoreComplete)
+      .length;
+
+  bool get recentArchiveShowsAttention => archivedSessions
+      .take(3)
+      .any((entry) => !entry.isCoreComplete);
+
   bool get isCoreComplete => missingCoreCount == 0;
   bool get hasSessionContext =>
       sessionLabel?.trim().isNotEmpty == true && sessionStartedAt != null;
@@ -143,6 +155,44 @@ class PilotEvidenceTrackerState {
 
   String get completionLabel =>
       '$capturedCoreCount / $totalCoreCount core exports captured';
+
+  String get archiveTrendLabel {
+    if (!hasArchivedSessions) {
+      return 'No trend yet';
+    }
+    if (archivedAttentionCount == 0) {
+      return 'Healthy trend';
+    }
+    if (archivedHealthyCount == 0) {
+      return 'Attention trend';
+    }
+    return recentArchiveShowsAttention ? 'Mixed trend' : 'Recovering trend';
+  }
+
+  String get archiveInsightSummary {
+    if (!hasArchivedSessions) {
+      return 'No archived sessions captured yet.';
+    }
+    final recentSessions = archivedSessions.take(3).toList(growable: false);
+    final healthyRecent = recentSessions
+        .where((entry) => entry.isCoreComplete)
+        .length;
+    final attentionRecent = recentSessions.length - healthyRecent;
+    return '$healthyRecent healthy / $attentionRecent attention across last ${recentSessions.length} archived sessions';
+  }
+
+  String get archiveOperationalGuidance {
+    if (!hasArchivedSessions) {
+      return 'Once a fresh session rolls over, archive posture will appear here so the rollout lead can compare recent shifts quickly.';
+    }
+    if (archivedAttentionCount == 0) {
+      return 'Recent archived sessions closed cleanly. This device is building a stable evidence trail for the rollout record.';
+    }
+    if (recentArchiveShowsAttention) {
+      return 'One or more recent archived sessions closed with missing core evidence. Review those gaps before widening the rollout wave.';
+    }
+    return 'Older archived sessions needed attention, but the most recent archive looks healthier. Keep monitoring before you expand rollout.';
+  }
 
   List<PilotEvidenceArtifact> get missingCoreArtifacts => coreArtifacts
       .where((artifact) => !isCaptured(artifact.id))
@@ -340,6 +390,29 @@ class PilotEvidenceTrackerState {
     return lines.join('\n');
   }
 
+  String toArchiveInsightsText() {
+    final lines = <String>[
+      'Business Hub pilot evidence archive insights',
+      'Archive posture: $archiveTrendLabel',
+      'Archive summary: $archiveInsightSummary',
+      'Guidance: $archiveOperationalGuidance',
+      'Archived session count: ${archivedSessions.length}',
+      'Latest archived session: ${latestArchivedSession?.sessionLabel ?? 'none'}',
+      '',
+      'Recent archived sessions:',
+    ];
+
+    if (archivedSessions.isEmpty) {
+      lines.add('none');
+    } else {
+      for (final entry in archivedSessions.take(3)) {
+        lines.add('- ${entry.summaryLine}');
+      }
+    }
+
+    return lines.join('\n');
+  }
+
   List<PilotEvidenceSessionArchiveEntry> _buildArchivedSessions(
     DateTime closedAt,
   ) {
@@ -458,6 +531,10 @@ class PilotEvidenceSessionArchiveEntry {
   final String statusLabel;
   final String? latestCapturedArtifactLabel;
   final DateTime? latestCapturedAt;
+
+  bool get isCoreComplete =>
+      statusLabel.trim().toUpperCase() == 'CORE COMPLETE' ||
+      (totalCoreCount > 0 && capturedCoreCount >= totalCoreCount);
 
   String get summaryLine =>
       '$sessionLabel | $statusLabel | core $capturedCoreCount / $totalCoreCount | closed ${sessionClosedAt.toUtc().toIso8601String()}';

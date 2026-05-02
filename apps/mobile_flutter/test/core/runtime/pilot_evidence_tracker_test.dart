@@ -191,4 +191,104 @@ void main() {
     expect(report, contains('=== ARCHIVED SESSIONS ==='));
     expect(report, contains('Wave 1 shift A'));
   });
+
+  test('archive insights summarize recent healthy and attention posture', () {
+    final tracker = const PilotEvidenceTrackerState()
+        .ensureSession(
+          defaultLabel: 'Wave 1 shift A',
+          startedAt: DateTime.utc(2026, 5, 2, 7, 30),
+        )
+        .markCaptured(
+          'pilot_snapshot',
+          capturedAt: DateTime.utc(2026, 5, 2, 8),
+        )
+        .markCaptured(
+          'readiness_signoff',
+          capturedAt: DateTime.utc(2026, 5, 2, 8, 10),
+        )
+        .startFreshSession(
+          sessionLabel: 'Wave 1 shift B',
+          startedAt: DateTime.utc(2026, 5, 2, 12),
+        )
+        .markCaptured(
+          'pilot_snapshot',
+          capturedAt: DateTime.utc(2026, 5, 2, 12, 20),
+        )
+        .markCaptured(
+          'readiness_signoff',
+          capturedAt: DateTime.utc(2026, 5, 2, 12, 25),
+        )
+        .markCaptured(
+          'smoke_report',
+          capturedAt: DateTime.utc(2026, 5, 2, 12, 30),
+        )
+        .markCaptured(
+          'handoff_pack',
+          capturedAt: DateTime.utc(2026, 5, 2, 12, 35),
+        )
+        .markCaptured(
+          'shift_closeout',
+          capturedAt: DateTime.utc(2026, 5, 2, 12, 45),
+        )
+        .markCaptured(
+          'rollout_evidence',
+          capturedAt: DateTime.utc(2026, 5, 2, 13),
+        )
+        .startFreshSession(
+          sessionLabel: 'Wave 1 shift C',
+          startedAt: DateTime.utc(2026, 5, 2, 16),
+        );
+
+    expect(tracker.archivedSessions, hasLength(2));
+    expect(tracker.archivedHealthyCount, 1);
+    expect(tracker.archivedAttentionCount, 1);
+    expect(tracker.archiveTrendLabel, 'Mixed trend');
+    expect(
+      tracker.archiveInsightSummary,
+      '1 healthy / 1 attention across last 2 archived sessions',
+    );
+    expect(tracker.recentArchiveShowsAttention, isTrue);
+  });
+
+  test('archive insights text includes posture and recent archived lines', () {
+    final tracker = const PilotEvidenceTrackerState()
+        .ensureSession(
+          defaultLabel: 'Wave 4 shift A',
+          startedAt: DateTime.utc(2026, 5, 3, 7),
+        )
+        .markCaptured(
+          'pilot_snapshot',
+          capturedAt: DateTime.utc(2026, 5, 3, 7, 5),
+        )
+        .markCaptured(
+          'readiness_signoff',
+          capturedAt: DateTime.utc(2026, 5, 3, 7, 10),
+        )
+        .markCaptured(
+          'smoke_report',
+          capturedAt: DateTime.utc(2026, 5, 3, 7, 15),
+        )
+        .markCaptured(
+          'handoff_pack',
+          capturedAt: DateTime.utc(2026, 5, 3, 7, 20),
+        )
+        .markCaptured(
+          'shift_closeout',
+          capturedAt: DateTime.utc(2026, 5, 3, 7, 25),
+        )
+        .markCaptured(
+          'rollout_evidence',
+          capturedAt: DateTime.utc(2026, 5, 3, 7, 30),
+        )
+        .startFreshSession(
+          sessionLabel: 'Wave 4 shift B',
+          startedAt: DateTime.utc(2026, 5, 3, 12),
+        );
+
+    final report = tracker.toArchiveInsightsText();
+
+    expect(report, contains('Business Hub pilot evidence archive insights'));
+    expect(report, contains('Archive posture: Healthy trend'));
+    expect(report, contains('Wave 4 shift A'));
+  });
 }

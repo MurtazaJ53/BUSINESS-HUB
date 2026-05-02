@@ -948,8 +948,70 @@ class SettingsScreen extends ConsumerWidget {
                                             '${evidenceTracker.archivedSessions.length} saved',
                                         icon: Icons.archive_rounded,
                                       ),
+                                      _SettingsRow(
+                                        label: 'Archive posture',
+                                        value: evidenceTracker.archiveTrendLabel,
+                                        icon: Icons.insights_rounded,
+                                      ),
+                                      _SettingsRow(
+                                        label: 'Archive summary',
+                                        value:
+                                            evidenceTracker.archiveInsightSummary,
+                                        icon: Icons.monitor_heart_rounded,
+                                      ),
+                                      Text(
+                                        evidenceTracker
+                                            .archiveOperationalGuidance,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: !evidenceTracker
+                                                      .hasArchivedSessions
+                                                  ? const Color(0xFF38BDF8)
+                                                  : evidenceTracker
+                                                          .recentArchiveShowsAttention
+                                                  ? const Color(0xFFF59E0B)
+                                                  : const Color(0xFF22C55E),
+                                              fontWeight: FontWeight.w700,
+                                              height: 1.45,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 14),
+                                      FilledButton.tonalIcon(
+                                        onPressed:
+                                            evidenceTrackerAsync.asData == null
+                                            ? null
+                                            : () async {
+                                                await Clipboard.setData(
+                                                  ClipboardData(
+                                                    text: evidenceTracker
+                                                        .toArchiveInsightsText(),
+                                                  ),
+                                                );
+                                                if (!context.mounted) {
+                                                  return;
+                                                }
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      'Archive insights copied for the rollout lead.',
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                        icon: const Icon(
+                                          Icons.insights_rounded,
+                                        ),
+                                        label: const Text(
+                                          'Copy archive insights',
+                                        ),
+                                      ),
                                       if (evidenceTracker.hasArchivedSessions)
                                         ...<Widget>[
+                                          const SizedBox(height: 14),
                                           Text(
                                             'Recent archived sessions:',
                                             style: Theme.of(context)
