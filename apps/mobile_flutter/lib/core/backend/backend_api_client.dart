@@ -133,20 +133,56 @@ class BackendApiClient {
         ? '/shops/$shopId/customers/'
         : '/shops/$shopId/customers/?q=${Uri.encodeQueryComponent(normalized)}';
     final decoded = await _requestList(user: user, method: 'GET', path: path);
-    return decoded
-        .map(
-          (row) => BackendCustomerSummary(
-            id: (row['id'] ?? '').toString(),
-            name: (row['name'] ?? 'Unnamed customer').toString(),
-            phone: _nullableText(row['phone']),
-            email: _nullableText(row['email']),
-            totalSpent: _asDouble(row['total_spent']),
-            balance: _asDouble(row['balance']),
-            status: (row['status'] ?? 'active').toString(),
-            notes: _nullableText(row['notes']),
-          ),
-        )
-        .toList(growable: false);
+    return decoded.map(_mapCustomerSummary).toList(growable: false);
+  }
+
+  Future<BackendCustomerSummary> createCustomer({
+    required User user,
+    required String shopId,
+    required String name,
+    String? phone,
+    String? email,
+    String? notes,
+    double openingBalance = 0,
+  }) async {
+    final decoded = await _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/customers/',
+      body: <String, dynamic>{
+        'name': name,
+        'phone': phone ?? '',
+        'email': email ?? '',
+        'notes': notes ?? '',
+        'opening_balance': openingBalance.toStringAsFixed(2),
+      },
+    );
+    return _mapCustomerSummary(decoded);
+  }
+
+  Future<BackendCustomerSummary> updateCustomer({
+    required User user,
+    required String shopId,
+    required String customerId,
+    required String name,
+    String? phone,
+    String? email,
+    String? notes,
+    String status = 'active',
+  }) async {
+    final decoded = await _request(
+      user: user,
+      method: 'PUT',
+      path: '/shops/$shopId/customers/$customerId/',
+      body: <String, dynamic>{
+        'name': name,
+        'phone': phone ?? '',
+        'email': email ?? '',
+        'notes': notes ?? '',
+        'status': status,
+      },
+    );
+    return _mapCustomerSummary(decoded);
   }
 
   Future<List<CustomerLedgerPreviewEntry>> fetchCustomerLedger({
@@ -297,6 +333,19 @@ class BackendApiClient {
     } finally {
       client.close(force: true);
     }
+  }
+
+  BackendCustomerSummary _mapCustomerSummary(Map<String, dynamic> row) {
+    return BackendCustomerSummary(
+      id: (row['id'] ?? '').toString(),
+      name: (row['name'] ?? 'Unnamed customer').toString(),
+      phone: _nullableText(row['phone']),
+      email: _nullableText(row['email']),
+      totalSpent: _asDouble(row['total_spent']),
+      balance: _asDouble(row['balance']),
+      status: (row['status'] ?? 'active').toString(),
+      notes: _nullableText(row['notes']),
+    );
   }
 }
 

@@ -18,6 +18,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _search = '';
   CommerceSyncState? _selectedSyncState;
+  String? _selectedPaymentMode;
+  _HistoryDateWindow _selectedDateWindow = _HistoryDateWindow.all;
 
   @override
   void dispose() {
@@ -29,13 +31,21 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   Widget build(BuildContext context) {
     final salesRepository = ref.watch(salesRepositoryProvider);
     final shopRepository = ref.watch(shopRepositoryProvider);
+    final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
     final syncStatus = ref.watch(syncStatusProvider);
     final historyStream = salesRepository.watchHistoryOverview();
-    final recentSalesStream = salesRepository.watchRecentSales(
-      limit: 60,
-      search: _search,
-      syncState: _selectedSyncState,
-    );
+    final recentSalesStream = salesRepository
+        .watchRecentSales(
+          limit: 100,
+          search: _search,
+          syncState: _selectedSyncState,
+          paymentMode: _selectedPaymentMode,
+        )
+        .map(
+          (sales) => sales
+              .where((sale) => _matchesDateWindow(sale.date))
+              .toList(growable: false),
+        );
     final domainStatesStream = shopRepository.watchTrackedDomainStates(
       const <String>['sales', 'payments'],
     );
@@ -187,6 +197,74 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: <Widget>[
+                      _SyncFilterChip(
+                        label: 'Any pay',
+                        active: _selectedPaymentMode == null,
+                        onTap: () {
+                          setState(() {
+                            _selectedPaymentMode = null;
+                          });
+                        },
+                      ),
+                      ..._historyPaymentModes.map(
+                        (mode) => _SyncFilterChip(
+                          label: mode,
+                          active: _selectedPaymentMode == mode,
+                          onTap: () {
+                            setState(() {
+                              _selectedPaymentMode = mode;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _HistoryDateWindow.values
+                        .map(
+                          (window) => _SyncFilterChip(
+                            label: window.label,
+                            active: _selectedDateWindow == window,
+                            onTap: () {
+                              setState(() {
+                                _selectedDateWindow = window;
+                              });
+                            },
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.tonalIcon(
+                    onPressed:
+                        overview.queuedSales > 0 || overview.failedSales > 0
+                        ? () async {
+                            final result = await syncCoordinator
+                                .flushCommerceOutbox();
+                            if (!context.mounted) {
+                              return;
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  result.message ??
+                                      'Queued receipts are being retried.',
+                                ),
+                              ),
+                            );
+                          }
+                        : null,
+                    icon: const Icon(Icons.cloud_upload_rounded),
+                    label: const Text('Retry queued receipts'),
+                  ),
                 ],
               ),
             ),
@@ -278,6 +356,31 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         );
       },
     );
+  }
+
+  bool _matchesDateWindow(String rawDate) {
+    if (_selectedDateWindow == _HistoryDateWindow.all) {
+      return true;
+    }
+
+    final parsed = DateTime.tryParse(rawDate);
+    if (parsed == null) {
+      return true;
+    }
+
+    final saleDate = DateTime(parsed.year, parsed.month, parsed.day);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return switch (_selectedDateWindow) {
+      _HistoryDateWindow.all => true,
+      _HistoryDateWindow.today => saleDate == today,
+      _HistoryDateWindow.sevenDays => !saleDate.isBefore(
+        today.subtract(const Duration(days: 6)),
+      ),
+      _HistoryDateWindow.thirtyDays => !saleDate.isBefore(
+        today.subtract(const Duration(days: 29)),
+      ),
+    };
   }
 
   Future<void> _openSaleDetail(
@@ -807,6 +910,26 @@ String _syncLabel(CommerceSyncState state) {
     CommerceSyncState.failed => 'FAILED',
   };
 }
+
+enum _HistoryDateWindow {
+  all('All time'),
+  today('Today'),
+  sevenDays('7 days'),
+  thirtyDays('30 days');
+
+  const _HistoryDateWindow(this.label);
+
+  final String label;
+}
+
+const List<String> _historyPaymentModes = <String>[
+  'CASH',
+  'UPI',
+  'CARD',
+  'CREDIT',
+  'SPLIT',
+  'OTHERS',
+];
 
 Color _syncTone(CommerceSyncState state) {
   return switch (state) {

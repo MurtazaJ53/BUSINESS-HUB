@@ -6,6 +6,7 @@ import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
+import '../../../core/utils/formatters.dart';
 import '../../shell/presentation/mobile_surface.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -17,8 +18,10 @@ class SettingsScreen extends ConsumerWidget {
     final shopRepository = ref.watch(shopRepositoryProvider);
     final salesRepository = ref.watch(salesRepositoryProvider);
     final backendApiClient = ref.watch(backendApiClientProvider);
+    final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
     final syncStatus = ref.watch(syncStatusProvider);
     final shopStream = shopRepository.watchShopInfo();
+    final historyStream = salesRepository.watchHistoryOverview();
     final domainStatesStream = shopRepository.watchTrackedDomainStates(
       const <String>['inventory', 'customers', 'sales', 'payments'],
     );
@@ -100,43 +103,141 @@ class SettingsScreen extends ConsumerWidget {
               stream: pendingOutboxStream,
               builder: (context, outboxSnapshot) {
                 final pending = outboxSnapshot.data ?? 0;
-                return MobilePanel(
-                  title: 'Mobile runtime',
-                  action: MobileTag(
-                    label: pending > 0 ? '$pending queued' : 'Queue clear',
-                    icon: pending > 0
-                        ? Icons.cloud_upload_rounded
-                        : Icons.check_circle_rounded,
-                    accent: pending > 0
-                        ? const Color(0xFFF59E0B)
-                        : const Color(0xFF22C55E),
-                  ),
-                  child: Column(
-                    children: <Widget>[
-                      _SettingsRow(
-                        label: 'Sync posture',
-                        value: syncStatus.name.toUpperCase(),
-                        icon: Icons.sync_alt_rounded,
+                return StreamBuilder<HistoryOverview>(
+                  stream: historyStream,
+                  builder: (context, historySnapshot) {
+                    final history =
+                        historySnapshot.data ?? HistoryOverview.empty();
+                    return MobilePanel(
+                      title: 'Mobile runtime',
+                      action: MobileTag(
+                        label: pending > 0 ? '$pending queued' : 'Queue clear',
+                        icon: pending > 0
+                            ? Icons.cloud_upload_rounded
+                            : Icons.check_circle_rounded,
+                        accent: pending > 0
+                            ? const Color(0xFFF59E0B)
+                            : const Color(0xFF22C55E),
                       ),
-                      _SettingsRow(
-                        label: 'Queued commerce commands',
-                        value: '$pending',
-                        icon: Icons.outbox_rounded,
+                      child: Column(
+                        children: <Widget>[
+                          _SettingsRow(
+                            label: 'Sync posture',
+                            value: syncStatus.name.toUpperCase(),
+                            icon: Icons.sync_alt_rounded,
+                          ),
+                          _SettingsRow(
+                            label: 'Queued commerce commands',
+                            value: '$pending',
+                            icon: Icons.outbox_rounded,
+                          ),
+                          _SettingsRow(
+                            label: 'Queued receipt value',
+                            value: formatCurrency(history.queuedRevenue),
+                            icon: Icons.currency_rupee_rounded,
+                          ),
+                          _SettingsRow(
+                            label: 'Failed receipts',
+                            value: '${history.failedSales}',
+                            icon: Icons.error_outline_rounded,
+                          ),
+                          _SettingsRow(
+                            label: 'Last receipt sync',
+                            value: history.lastSyncedAt == null
+                                ? 'Unknown'
+                                : formatCompactDate(history.lastSyncedAt!),
+                            icon: Icons.schedule_rounded,
+                          ),
+                          _SettingsRow(
+                            label: 'Operator role',
+                            value: session?.role?.toUpperCase() ?? 'UNKNOWN',
+                            icon: Icons.admin_panel_settings_rounded,
+                          ),
+                          _SettingsRow(
+                            label: 'Cost visibility',
+                            value: session?.canViewCost == true
+                                ? 'Enabled'
+                                : 'Restricted',
+                            icon: Icons.visibility_rounded,
+                          ),
+                          const SizedBox(height: 6),
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              final stacked = constraints.maxWidth < 430;
+                              final buttons = <Widget>[
+                                Expanded(
+                                  child: FilledButton.tonalIcon(
+                                    onPressed: () async {
+                                      await syncCoordinator.refresh();
+                                      if (!context.mounted) {
+                                        return;
+                                      }
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Workspace refresh requested.',
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.refresh_rounded),
+                                    label: const Text('Refresh workspace'),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: FilledButton.tonalIcon(
+                                    onPressed: pending > 0
+                                        ? () async {
+                                            final result = await syncCoordinator
+                                                .flushCommerceOutbox();
+                                            if (!context.mounted) {
+                                              return;
+                                            }
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  result.message ??
+                                                      'Outbox flush requested.',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        : null,
+                                    icon: const Icon(
+                                      Icons.cloud_upload_rounded,
+                                    ),
+                                    label: const Text('Flush outbox'),
+                                  ),
+                                ),
+                              ];
+
+                              if (stacked) {
+                                return Column(
+                                  children: <Widget>[
+                                    buttons[0],
+                                    const SizedBox(height: 10),
+                                    buttons[1],
+                                  ],
+                                );
+                              }
+
+                              return Row(
+                                children: <Widget>[
+                                  buttons[0],
+                                  const SizedBox(width: 10),
+                                  buttons[1],
+                                ],
+                              );
+                            },
+                          ),
+                        ],
                       ),
-                      _SettingsRow(
-                        label: 'Operator role',
-                        value: session?.role?.toUpperCase() ?? 'UNKNOWN',
-                        icon: Icons.admin_panel_settings_rounded,
-                      ),
-                      _SettingsRow(
-                        label: 'Cost visibility',
-                        value: session?.canViewCost == true
-                            ? 'Enabled'
-                            : 'Restricted',
-                        icon: Icons.visibility_rounded,
-                      ),
-                    ],
-                  ),
+                    );
+                  },
                 );
               },
             ),

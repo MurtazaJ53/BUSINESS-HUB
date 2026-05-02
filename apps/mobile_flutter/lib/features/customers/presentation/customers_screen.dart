@@ -201,6 +201,27 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                     ),
                   ),
                 ),
+                if (domainState.isPostgresPrimary &&
+                    session?.hasShop == true) ...<Widget>[
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: FilledButton.tonalIcon(
+                      onPressed: () async {
+                        final changed = await _showCustomerUpsertDialog(
+                          context,
+                          backendApiClient: backendApiClient,
+                          session: session!,
+                        );
+                        if (changed && mounted) {
+                          _resetBackendLookup();
+                        }
+                      },
+                      icon: const Icon(Icons.person_add_alt_1_rounded),
+                      label: const Text('Create migrated customer'),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 18),
                 if (backendFuture != null)
                   FutureBuilder<List<BackendCustomerSummary>>(
@@ -229,13 +250,37 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                       final customers =
                           snapshot.data ?? const <BackendCustomerSummary>[];
                       if (customers.isEmpty) {
-                        return const MobilePanel(
+                        return MobilePanel(
                           title: 'Customer ledger view',
-                          child: MobileEmptyState(
-                            icon: Icons.groups_outlined,
-                            title: 'No customers matched',
-                            body:
-                                'This PostgreSQL customer surface is live, but no records matched the current lookup.',
+                          child: Column(
+                            children: <Widget>[
+                              const MobileEmptyState(
+                                icon: Icons.groups_outlined,
+                                title: 'No customers matched',
+                                body:
+                                    'This PostgreSQL customer surface is live, but no records matched the current lookup.',
+                              ),
+                              if (session?.hasShop == true) ...<Widget>[
+                                const SizedBox(height: 12),
+                                FilledButton.tonalIcon(
+                                  onPressed: () async {
+                                    final changed =
+                                        await _showCustomerUpsertDialog(
+                                          context,
+                                          backendApiClient: backendApiClient,
+                                          session: session!,
+                                        );
+                                    if (changed && mounted) {
+                                      _resetBackendLookup();
+                                    }
+                                  },
+                                  icon: const Icon(
+                                    Icons.person_add_alt_1_rounded,
+                                  ),
+                                  label: const Text('Create first customer'),
+                                ),
+                              ],
+                            ],
                           ),
                         );
                       }
@@ -263,10 +308,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                                         ledgerDomainState: ledgerDomainState,
                                       );
                                       if (changed == true && mounted) {
-                                        setState(() {
-                                          _backendLookupFuture = null;
-                                          _backendLookupKey = null;
-                                        });
+                                        _resetBackendLookup();
                                       }
                                     },
                                   ),
@@ -311,6 +353,13 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
       );
     }
     return _backendLookupFuture;
+  }
+
+  void _resetBackendLookup() {
+    setState(() {
+      _backendLookupFuture = null;
+      _backendLookupKey = null;
+    });
   }
 
   Future<bool?> _openLedgerSheet(
@@ -398,20 +447,41 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                     ),
                     if (ledgerDomainState.isPostgresPrimary) ...<Widget>[
                       const SizedBox(height: 14),
-                      FilledButton.tonalIcon(
-                        onPressed: () async {
-                          final changed = await _showLedgerMutationDialog(
-                            context,
-                            backendApiClient: backendApiClient,
-                            session: session,
-                            customer: customer,
-                          );
-                          if (changed == true && context.mounted) {
-                            Navigator.of(context).pop(true);
-                          }
-                        },
-                        icon: const Icon(Icons.edit_note_rounded),
-                        label: const Text('Record payment or adjustment'),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: <Widget>[
+                          FilledButton.tonalIcon(
+                            onPressed: () async {
+                              final changed = await _showCustomerUpsertDialog(
+                                context,
+                                backendApiClient: backendApiClient,
+                                session: session,
+                                existingCustomer: customer,
+                              );
+                              if (changed && context.mounted) {
+                                Navigator.of(context).pop(true);
+                              }
+                            },
+                            icon: const Icon(Icons.edit_rounded),
+                            label: const Text('Edit customer'),
+                          ),
+                          FilledButton.tonalIcon(
+                            onPressed: () async {
+                              final changed = await _showLedgerMutationDialog(
+                                context,
+                                backendApiClient: backendApiClient,
+                                session: session,
+                                customer: customer,
+                              );
+                              if (changed == true && context.mounted) {
+                                Navigator.of(context).pop(true);
+                              }
+                            },
+                            icon: const Icon(Icons.edit_note_rounded),
+                            label: const Text('Record payment or adjustment'),
+                          ),
+                        ],
                       ),
                     ],
                     const SizedBox(height: 18),
@@ -634,6 +704,207 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     } finally {
       amountController.dispose();
       noteController.dispose();
+    }
+  }
+
+  Future<bool> _showCustomerUpsertDialog(
+    BuildContext context, {
+    required BackendApiClient backendApiClient,
+    required MobileSession session,
+    BackendCustomerSummary? existingCustomer,
+  }) async {
+    final nameController = TextEditingController(text: existingCustomer?.name);
+    final phoneController = TextEditingController(
+      text: existingCustomer?.phone,
+    );
+    final emailController = TextEditingController(
+      text: existingCustomer?.email,
+    );
+    final notesController = TextEditingController(
+      text: existingCustomer?.notes,
+    );
+    final openingBalanceController = TextEditingController();
+    var status = existingCustomer?.status ?? 'active';
+    var saving = false;
+
+    try {
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return AlertDialog(
+                title: Text(
+                  existingCustomer == null
+                      ? 'Create migrated customer'
+                      : 'Edit ${existingCustomer.name}',
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      TextField(
+                        controller: nameController,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(
+                          labelText: 'Customer name',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(labelText: 'Phone'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(labelText: 'Email'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: notesController,
+                        minLines: 2,
+                        maxLines: 3,
+                        decoration: const InputDecoration(labelText: 'Notes'),
+                      ),
+                      if (existingCustomer == null) ...<Widget>[
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: openingBalanceController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            signed: true,
+                            decimal: true,
+                          ),
+                          decoration: const InputDecoration(
+                            labelText: 'Opening balance (optional)',
+                          ),
+                        ),
+                      ] else ...<Widget>[
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          initialValue: status,
+                          items: const <DropdownMenuItem<String>>[
+                            DropdownMenuItem(
+                              value: 'active',
+                              child: Text('Active'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'inactive',
+                              child: Text('Inactive'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value == null) {
+                              return;
+                            }
+                            setDialogState(() {
+                              status = value;
+                            });
+                          },
+                          decoration: const InputDecoration(
+                            labelText: 'Status',
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: saving
+                        ? null
+                        : () => Navigator.of(dialogContext).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: saving
+                        ? null
+                        : () async {
+                            final name = nameController.text.trim();
+                            if (name.isEmpty) {
+                              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Customer name is required.'),
+                                ),
+                              );
+                              return;
+                            }
+
+                            setDialogState(() {
+                              saving = true;
+                            });
+
+                            try {
+                              if (existingCustomer == null) {
+                                await backendApiClient.createCustomer(
+                                  user: session.user,
+                                  shopId: session.shopId!,
+                                  name: name,
+                                  phone: phoneController.text.trim(),
+                                  email: emailController.text.trim(),
+                                  notes: notesController.text.trim(),
+                                  openingBalance:
+                                      double.tryParse(
+                                        openingBalanceController.text.trim(),
+                                      ) ??
+                                      0,
+                                );
+                              } else {
+                                await backendApiClient.updateCustomer(
+                                  user: session.user,
+                                  shopId: session.shopId!,
+                                  customerId: existingCustomer.id,
+                                  name: name,
+                                  phone: phoneController.text.trim(),
+                                  email: emailController.text.trim(),
+                                  notes: notesController.text.trim(),
+                                  status: status,
+                                );
+                              }
+                              if (dialogContext.mounted) {
+                                Navigator.of(dialogContext).pop(true);
+                              }
+                            } catch (error) {
+                              if (dialogContext.mounted) {
+                                ScaffoldMessenger.of(
+                                  dialogContext,
+                                ).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Customer save failed: $error',
+                                    ),
+                                  ),
+                                );
+                              }
+                              setDialogState(() {
+                                saving = false;
+                              });
+                            }
+                          },
+                    child: saving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(existingCustomer == null ? 'Create' : 'Save'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+      return result == true;
+    } finally {
+      nameController.dispose();
+      phoneController.dispose();
+      emailController.dispose();
+      notesController.dispose();
+      openingBalanceController.dispose();
     }
   }
 }
