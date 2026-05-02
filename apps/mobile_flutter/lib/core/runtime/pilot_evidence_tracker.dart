@@ -1,6 +1,9 @@
 class PilotEvidenceTrackerState {
   const PilotEvidenceTrackerState({
     this.capturedAtByArtifact = const <String, DateTime>{},
+    this.sessionLabel,
+    this.sessionStartedAt,
+    this.lastResetAt,
   });
 
   factory PilotEvidenceTrackerState.fromJson(Map<String, dynamic> json) {
@@ -35,10 +38,18 @@ class PilotEvidenceTrackerState {
       }
     }
 
-    return PilotEvidenceTrackerState(capturedAtByArtifact: captured);
+    return PilotEvidenceTrackerState(
+      capturedAtByArtifact: captured,
+      sessionLabel: _readNullableString(json['session_label']),
+      sessionStartedAt: _readNullableDateTime(json['session_started_at']),
+      lastResetAt: _readNullableDateTime(json['last_reset_at']),
+    );
   }
 
   final Map<String, DateTime> capturedAtByArtifact;
+  final String? sessionLabel;
+  final DateTime? sessionStartedAt;
+  final DateTime? lastResetAt;
 
   static const List<PilotEvidenceArtifact> artifacts = <PilotEvidenceArtifact>[
     PilotEvidenceArtifact(
@@ -118,6 +129,8 @@ class PilotEvidenceTrackerState {
   int get missingOptionalCount => missingOptionalArtifacts.length;
 
   bool get isCoreComplete => missingCoreCount == 0;
+  bool get hasSessionContext =>
+      sessionLabel?.trim().isNotEmpty == true && sessionStartedAt != null;
 
   String get statusLabel => isCoreComplete ? 'CORE COMPLETE' : 'ACTION NEEDED';
 
@@ -160,16 +173,53 @@ class PilotEvidenceTrackerState {
     if (!_artifactById.containsKey(artifactId)) {
       return this;
     }
+    final nextCapturedAt = capturedAt ?? DateTime.now();
     return PilotEvidenceTrackerState(
       capturedAtByArtifact: <String, DateTime>{
         ...capturedAtByArtifact,
-        artifactId: capturedAt ?? DateTime.now(),
+        artifactId: nextCapturedAt,
       },
+      sessionLabel: sessionLabel,
+      sessionStartedAt: sessionStartedAt,
+      lastResetAt: lastResetAt,
+    );
+  }
+
+  PilotEvidenceTrackerState ensureSession({
+    required String defaultLabel,
+    DateTime? startedAt,
+  }) {
+    if (hasSessionContext) {
+      return this;
+    }
+    return PilotEvidenceTrackerState(
+      capturedAtByArtifact: capturedAtByArtifact,
+      sessionLabel: defaultLabel.trim().isEmpty ? 'Pilot session' : defaultLabel.trim(),
+      sessionStartedAt: startedAt ?? DateTime.now(),
+      lastResetAt: lastResetAt,
+    );
+  }
+
+  PilotEvidenceTrackerState startFreshSession({
+    required String sessionLabel,
+    DateTime? startedAt,
+  }) {
+    final nextStartedAt = startedAt ?? DateTime.now();
+    return PilotEvidenceTrackerState(
+      capturedAtByArtifact: const <String, DateTime>{},
+      sessionLabel: sessionLabel.trim().isEmpty
+          ? 'Pilot session'
+          : sessionLabel.trim(),
+      sessionStartedAt: nextStartedAt,
+      lastResetAt: nextStartedAt,
     );
   }
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
+      'session_label': sessionLabel,
+      'session_started_at': sessionStartedAt?.toUtc().toIso8601String(),
+      'last_reset_at': lastResetAt?.toUtc().toIso8601String(),
       'captured_at_by_artifact': <String, String>{
         for (final entry in capturedAtByArtifact.entries)
           entry.key: entry.value.toUtc().toIso8601String(),
@@ -180,6 +230,9 @@ class PilotEvidenceTrackerState {
   String toMultilineText() {
     final lines = <String>[
       'Business Hub pilot evidence tracker',
+      'Session label: ${sessionLabel ?? 'none'}',
+      'Session started at (UTC): ${sessionStartedAt?.toUtc().toIso8601String() ?? 'none'}',
+      'Last session reset at (UTC): ${lastResetAt?.toUtc().toIso8601String() ?? 'none'}',
       'Status: $statusLabel',
       'Core completion: $capturedCoreCount / $totalCoreCount',
       'Optional completion: $capturedOptionalCount / $totalOptionalCount',
@@ -217,6 +270,27 @@ class PilotEvidenceTrackerState {
 
     return lines.join('\n');
   }
+}
+
+String? _readNullableString(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  final next = value.toString().trim();
+  return next.isEmpty ? null : next;
+}
+
+DateTime? _readNullableDateTime(Object? value) {
+  if (value is String) {
+    return DateTime.tryParse(value)?.toUtc();
+  }
+  if (value is int) {
+    return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
+  }
+  if (value is num) {
+    return DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true);
+  }
+  return null;
 }
 
 class PilotEvidenceArtifact {

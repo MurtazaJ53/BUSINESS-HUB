@@ -24,6 +24,7 @@ It also supports a final rollout evidence pack so the rollout lead can archive o
 It also supports an incident escalation pack when rollout support needs a direct device-side failure export.
 It also now includes an evidence tracker so the device can show which rollout exports have already been captured and which core artifacts are still missing.
 That evidence tracker now persists across app restarts on the same workspace, so shift handoff is less fragile on shared devices.
+It now also supports named evidence sessions so operators can separate one shift or rollout wave from the next.
 
 ## Version source
 
@@ -108,6 +109,7 @@ Reference sheet:
 - [D:/business-hub/docs/mobile-operator-action-center.md](D:/business-hub/docs/mobile-operator-action-center.md)
 - [D:/business-hub/docs/mobile-pilot-evidence-tracker.md](D:/business-hub/docs/mobile-pilot-evidence-tracker.md)
 - [D:/business-hub/docs/mobile-pilot-evidence-persistence.md](D:/business-hub/docs/mobile-pilot-evidence-persistence.md)
+- [D:/business-hub/docs/mobile-pilot-evidence-sessions.md](D:/business-hub/docs/mobile-pilot-evidence-sessions.md)
 
 1. login
 2. inventory lookup

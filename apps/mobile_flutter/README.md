@@ -74,6 +74,7 @@ When preparing a real APK handoff, use:
 - [D:/business-hub/docs/mobile-operator-action-center.md](D:/business-hub/docs/mobile-operator-action-center.md)
 - [D:/business-hub/docs/mobile-pilot-evidence-tracker.md](D:/business-hub/docs/mobile-pilot-evidence-tracker.md)
 - [D:/business-hub/docs/mobile-pilot-evidence-persistence.md](D:/business-hub/docs/mobile-pilot-evidence-persistence.md)
+- [D:/business-hub/docs/mobile-pilot-evidence-sessions.md](D:/business-hub/docs/mobile-pilot-evidence-sessions.md)
 
 Versioning currently follows `pubspec.yaml`:
 
@@ -124,6 +125,7 @@ It now also includes a consolidated rollout evidence pack for a single wave-leve
 It now also includes an incident escalation pack so support and engineering can get one structured failure export directly from the affected device.
 It now also includes an evidence tracker so operators can see which rollout exports have already been captured and which core handoff artifacts are still missing.
 That evidence tracker now survives app restarts on the same workspace because it is persisted in the local SQLite layer.
+It now also supports named evidence sessions so a shared device can clearly separate one shift or rollout wave from the next.
 
 ## Package strategy
 

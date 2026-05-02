@@ -25,6 +25,14 @@ class PilotEvidenceTrackerController {
     );
   }
 
+  Future<void> ensureSession(String defaultLabel) {
+    return _shopRepository.ensurePilotEvidenceSession(defaultLabel);
+  }
+
+  Future<void> startFreshSession(String sessionLabel) {
+    return _shopRepository.startFreshPilotEvidenceSession(sessionLabel);
+  }
+
   Future<void> reset() {
     return _shopRepository.resetPilotEvidenceTracker();
   }

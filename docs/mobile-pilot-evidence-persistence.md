@@ -41,6 +41,8 @@ The tracker then reconstructs:
 
 The tracker is still intentionally resettable from the mobile Settings screen.
 
+That reset is now better understood as starting a fresh named evidence session.
+
 Use reset when:
 
 - starting a clearly new rollout session
@@ -56,3 +58,4 @@ This persistence closes a real floor-use gap:
 - operators no longer lose tracker progress after an app restart
 - rollout leads can trust the evidence checklist on shared devices
 - shift handoff is cleaner because the next operator sees what has already been copied
+- session labels make it clearer whether the visible evidence belongs to the current shift or an older one

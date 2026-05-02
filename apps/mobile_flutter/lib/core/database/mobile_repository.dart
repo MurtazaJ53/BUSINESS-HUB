@@ -228,6 +228,22 @@ class ShopRepository {
     await savePilotEvidenceTracker(next);
   }
 
+  Future<void> ensurePilotEvidenceSession(String defaultLabel) async {
+    final current = await getPilotEvidenceTracker();
+    final next = current.ensureSession(defaultLabel: defaultLabel);
+    if (identical(next, current)) {
+      return;
+    }
+    await savePilotEvidenceTracker(next);
+  }
+
+  Future<void> startFreshPilotEvidenceSession(String sessionLabel) async {
+    final next = const PilotEvidenceTrackerState().startFreshSession(
+      sessionLabel: sessionLabel,
+    );
+    await savePilotEvidenceTracker(next);
+  }
+
   Future<void> resetPilotEvidenceTracker() async {
     await savePilotEvidenceTracker(const PilotEvidenceTrackerState());
   }

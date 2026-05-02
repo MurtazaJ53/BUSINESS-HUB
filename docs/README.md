@@ -70,12 +70,13 @@ It is designed to support:
 46. [Mobile Operator Action Center](./mobile-operator-action-center.md)
 47. [Mobile Pilot Evidence Tracker](./mobile-pilot-evidence-tracker.md)
 48. [Mobile Pilot Evidence Persistence](./mobile-pilot-evidence-persistence.md)
+49. [Mobile Pilot Evidence Sessions](./mobile-pilot-evidence-sessions.md)
 
 ### Existing strategy docs
 
-49. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
-50. [Global Scale Blueprint](./global-scale-blueprint.md)
-51. [Scale Certification Checklist](./scale-certification-checklist.md)
+50. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
+51. [Global Scale Blueprint](./global-scale-blueprint.md)
+52. [Scale Certification Checklist](./scale-certification-checklist.md)
 
 ## Current truth
 
@@ -130,6 +131,7 @@ As of April 29, 2026:
 - then Mobile Operator Action Center
 - then Mobile Pilot Evidence Tracker
 - then Mobile Pilot Evidence Persistence
+- then Mobile Pilot Evidence Sessions
 
 ## Notes
 

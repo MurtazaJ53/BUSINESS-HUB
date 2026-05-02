@@ -49,8 +49,8 @@ class SettingsScreen extends ConsumerWidget {
     final pendingOutboxStream = salesRepository.watchPendingOutboxCount();
     final outboxAttentionStream = salesRepository.watchOutboxAttentionEntries();
 
-    void markEvidenceCaptured(String artifactId) {
-      evidenceTrackerController.markCaptured(artifactId);
+    Future<void> markEvidenceCaptured(String artifactId) async {
+      await evidenceTrackerController.markCaptured(artifactId);
     }
 
     return StreamBuilder<ShopInfo>(
@@ -487,7 +487,7 @@ class SettingsScreen extends ConsumerWidget {
                                             text: snapshot.toMultilineText(),
                                           ),
                                         );
-                                        markEvidenceCaptured(
+                                        await markEvidenceCaptured(
                                           'pilot_snapshot',
                                         );
                                         if (!context.mounted) {
@@ -555,6 +555,26 @@ class SettingsScreen extends ConsumerWidget {
                                     pendingOutboxCount: pending,
                                     domainStates: domainStates,
                                   );
+                            final suggestedEvidenceSessionLabel =
+                                runtimeInfo == null
+                                ? _buildEvidenceSessionLabel(
+                                    shop: shop,
+                                    runtimeInfo: null,
+                                    session: session,
+                                  )
+                                : _buildEvidenceSessionLabel(
+                                    shop: shop,
+                                    runtimeInfo: runtimeInfo,
+                                    session: session,
+                                  );
+                            if (evidenceTrackerAsync.asData != null &&
+                                !evidenceTracker.hasSessionContext) {
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                evidenceTrackerController.ensureSession(
+                                  suggestedEvidenceSessionLabel,
+                                );
+                              });
+                            }
                             final recoveryReport = diagnostics == null
                                 ? null
                                 : PilotRecoveryReport(
@@ -673,7 +693,7 @@ class SettingsScreen extends ConsumerWidget {
                                                           if (report == null) {
                                                             return;
                                                           }
-                                                          markEvidenceCaptured(
+                                                          await markEvidenceCaptured(
                                                             'incident_escalation',
                                                           );
                                                           if (!context.mounted) {
@@ -699,7 +719,7 @@ class SettingsScreen extends ConsumerWidget {
                                                                   .toMultilineText(),
                                                             ),
                                                           );
-                                                          markEvidenceCaptured(
+                                                          await markEvidenceCaptured(
                                                             'recovery_report',
                                                           );
                                                           if (!context.mounted) {
@@ -730,7 +750,7 @@ class SettingsScreen extends ConsumerWidget {
                                                           if (report == null) {
                                                             return;
                                                           }
-                                                          markEvidenceCaptured(
+                                                          await markEvidenceCaptured(
                                                             'smoke_report',
                                                           );
                                                           if (!context.mounted) {
@@ -754,7 +774,7 @@ class SettingsScreen extends ConsumerWidget {
                                                                 .toMultilineText(),
                                                           ),
                                                         );
-                                                        markEvidenceCaptured(
+                                                        await markEvidenceCaptured(
                                                           'pilot_snapshot',
                                                         );
                                                         if (!context.mounted) {
@@ -800,7 +820,7 @@ class SettingsScreen extends ConsumerWidget {
                                                                 .toMultilineText(),
                                                           ),
                                                         );
-                                                        markEvidenceCaptured(
+                                                        await markEvidenceCaptured(
                                                           'operator_action_brief',
                                                         );
                                                         if (!context.mounted) {
@@ -884,6 +904,24 @@ class SettingsScreen extends ConsumerWidget {
                                             ),
                                       ),
                                       const SizedBox(height: 14),
+                                      _SettingsRow(
+                                        label: 'Evidence session',
+                                        value: evidenceTracker.sessionLabel ??
+                                            suggestedEvidenceSessionLabel,
+                                        icon: Icons.bookmark_added_rounded,
+                                      ),
+                                      _SettingsRow(
+                                        label: 'Session started',
+                                        value:
+                                            evidenceTracker.sessionStartedAt ==
+                                                null
+                                            ? 'Not started yet'
+                                            : formatCompactDate(
+                                                evidenceTracker
+                                                    .sessionStartedAt!,
+                                              ),
+                                        icon: Icons.play_circle_rounded,
+                                      ),
                                       _SettingsRow(
                                         label: 'Core exports',
                                         value: evidenceTracker.completionLabel,
@@ -975,19 +1013,33 @@ class SettingsScreen extends ConsumerWidget {
                                             Expanded(
                                               child: FilledButton.tonalIcon(
                                                 onPressed:
-                                                    evidenceTracker
-                                                        .capturedAtByArtifact
-                                                        .isEmpty
+                                                    evidenceTrackerAsync.asData ==
+                                                        null
                                                     ? null
                                                     : () async {
+                                                        final sessionLabel =
+                                                            await _showEvidenceSessionDialog(
+                                                              context,
+                                                              currentLabel:
+                                                                  evidenceTracker
+                                                                      .sessionLabel,
+                                                              suggestedLabel:
+                                                                  suggestedEvidenceSessionLabel,
+                                                            );
+                                                        if (sessionLabel ==
+                                                            null) {
+                                                          return;
+                                                        }
                                                         await evidenceTrackerController
-                                                            .reset();
+                                                            .startFreshSession(
+                                                              sessionLabel,
+                                                            );
                                                         ScaffoldMessenger.of(
                                                           context,
                                                         ).showSnackBar(
-                                                          const SnackBar(
+                                                          SnackBar(
                                                             content: Text(
-                                                              'Evidence tracker reset for a fresh rollout session.',
+                                                              'Started a fresh evidence session: $sessionLabel',
                                                             ),
                                                           ),
                                                         );
@@ -995,9 +1047,8 @@ class SettingsScreen extends ConsumerWidget {
                                                 icon: const Icon(
                                                   Icons.restart_alt_rounded,
                                                 ),
-                                                label: const Text(
-                                                  'Reset tracker',
-                                                ),
+                                                label:
+                                                    const Text('Fresh session'),
                                               ),
                                             ),
                                           ];
@@ -1134,7 +1185,7 @@ class SettingsScreen extends ConsumerWidget {
                                                         .toMultilineText(),
                                                   ),
                                                 );
-                                                markEvidenceCaptured(
+                                                await markEvidenceCaptured(
                                                   'readiness_signoff',
                                                 );
                                                 if (!context.mounted) {
@@ -1168,7 +1219,7 @@ class SettingsScreen extends ConsumerWidget {
                                                               .toMultilineText(),
                                                         ),
                                                       );
-                                                      markEvidenceCaptured(
+                                                      await markEvidenceCaptured(
                                                         'handoff_pack',
                                                       );
                                                       if (!context.mounted) {
@@ -1260,7 +1311,7 @@ class SettingsScreen extends ConsumerWidget {
                                                 if (smokeReport == null) {
                                                   return;
                                                 }
-                                                markEvidenceCaptured(
+                                                await markEvidenceCaptured(
                                                   'smoke_report',
                                                 );
                                                 if (!context.mounted) {
@@ -1406,7 +1457,7 @@ class SettingsScreen extends ConsumerWidget {
                                                                     .toMultilineText(),
                                                           ),
                                                         );
-                                                        markEvidenceCaptured(
+                                                        await markEvidenceCaptured(
                                                           'recovery_report',
                                                         );
                                                         if (!context.mounted) {
@@ -1533,7 +1584,7 @@ class SettingsScreen extends ConsumerWidget {
                                                 if (closeoutReport == null) {
                                                   return;
                                                 }
-                                                markEvidenceCaptured(
+                                                await markEvidenceCaptured(
                                                   'shift_closeout',
                                                 );
                                                 if (!context.mounted) {
@@ -1634,7 +1685,7 @@ class SettingsScreen extends ConsumerWidget {
                                                 if (evidenceReport == null) {
                                                   return;
                                                 }
-                                                markEvidenceCaptured(
+                                                await markEvidenceCaptured(
                                                   'rollout_evidence',
                                                 );
                                                 if (!context.mounted) {
@@ -1729,7 +1780,7 @@ class SettingsScreen extends ConsumerWidget {
                                                 if (escalationReport == null) {
                                                   return;
                                                 }
-                                                markEvidenceCaptured(
+                                                await markEvidenceCaptured(
                                                   'incident_escalation',
                                                 );
                                                 if (!context.mounted) {
@@ -2658,6 +2709,97 @@ class SettingsScreen extends ConsumerWidget {
       );
     } finally {
       notesController.dispose();
+    }
+  }
+
+  String _buildEvidenceSessionLabel({
+    required ShopInfo shop,
+    required AppRuntimeInfo? runtimeInfo,
+    required MobileSession? session,
+  }) {
+    final scope = runtimeInfo?.rolloutScopeLabel.trim();
+    final tag = runtimeInfo?.releaseTag.trim();
+    final operator = session?.email.trim();
+    final dateLabel = DateTime.now().toIso8601String().split('T').first;
+    final parts = <String>[
+      shop.name.trim().isEmpty ? 'Business Hub' : shop.name.trim(),
+      if (scope != null && scope.isNotEmpty) scope,
+      if (tag != null && tag.isNotEmpty) tag,
+      if (operator != null && operator.isNotEmpty) operator,
+      dateLabel,
+    ];
+    return parts.join(' | ');
+  }
+
+  Future<String?> _showEvidenceSessionDialog(
+    BuildContext context, {
+    required String suggestedLabel,
+    String? currentLabel,
+  }) async {
+    final controller = TextEditingController(
+      text: currentLabel?.trim().isNotEmpty == true
+          ? currentLabel!.trim()
+          : suggestedLabel,
+    );
+
+    try {
+      return await showDialog<String>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Start fresh evidence session'),
+            content: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    'Use a clear session label for this rollout wave or shift. Starting a fresh session clears the captured evidence list and begins a new tracker window.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.68),
+                      fontWeight: FontWeight.w600,
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: controller,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(
+                      labelText: 'Session label',
+                      hintText: 'Wave or shift label',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final nextLabel = controller.text.trim();
+                  if (nextLabel.isEmpty) {
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      const SnackBar(
+                        content: Text('Session label is required.'),
+                      ),
+                    );
+                    return;
+                  }
+                  Navigator.of(dialogContext).pop(nextLabel);
+                },
+                child: const Text('Start session'),
+              ),
+            ],
+          );
+        },
+      );
+    } finally {
+      controller.dispose();
     }
   }
 

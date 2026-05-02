@@ -23,6 +23,10 @@ void main() {
 
   test('markCaptured records timestamps and advances core completion', () {
     final tracker = const PilotEvidenceTrackerState()
+        .ensureSession(
+          defaultLabel: 'Bhavnagar wave 1',
+          startedAt: DateTime.utc(2026, 5, 2, 7, 45),
+        )
         .markCaptured('pilot_snapshot', capturedAt: DateTime.utc(2026, 5, 2, 8))
         .markCaptured(
           'readiness_signoff',
@@ -33,6 +37,7 @@ void main() {
     expect(tracker.latestCapturedArtifact?.id, 'readiness_signoff');
     expect(tracker.latestCapturedAt, DateTime.utc(2026, 5, 2, 8, 5));
     expect(tracker.isCaptured('pilot_snapshot'), isTrue);
+    expect(tracker.sessionLabel, 'Bhavnagar wave 1');
   });
 
   test('markCaptured ignores unknown artifact ids', () {
@@ -60,6 +65,10 @@ void main() {
 
   test('state round-trips through json payload', () {
     final tracker = const PilotEvidenceTrackerState()
+        .ensureSession(
+          defaultLabel: 'Wave 1 shift A',
+          startedAt: DateTime.utc(2026, 5, 2, 7, 30),
+        )
         .markCaptured('pilot_snapshot', capturedAt: DateTime.utc(2026, 5, 2, 8))
         .markCaptured(
           'rollout_evidence',
@@ -73,5 +82,21 @@ void main() {
     expect(decoded.capturedCoreCount, tracker.capturedCoreCount);
     expect(decoded.latestCapturedArtifact?.id, 'rollout_evidence');
     expect(decoded.latestCapturedAt, DateTime.utc(2026, 5, 2, 9, 30));
+    expect(decoded.sessionLabel, 'Wave 1 shift A');
+    expect(decoded.sessionStartedAt, DateTime.utc(2026, 5, 2, 7, 30));
+  });
+
+  test('startFreshSession clears captures and stamps a new session window', () {
+    final tracker = const PilotEvidenceTrackerState()
+        .markCaptured('pilot_snapshot', capturedAt: DateTime.utc(2026, 5, 2, 8))
+        .startFreshSession(
+          sessionLabel: 'Wave 2 shift B',
+          startedAt: DateTime.utc(2026, 5, 2, 10),
+        );
+
+    expect(tracker.capturedAtByArtifact, isEmpty);
+    expect(tracker.sessionLabel, 'Wave 2 shift B');
+    expect(tracker.sessionStartedAt, DateTime.utc(2026, 5, 2, 10));
+    expect(tracker.lastResetAt, DateTime.utc(2026, 5, 2, 10));
   });
 }
