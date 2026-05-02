@@ -93,7 +93,10 @@ As of now:
 ### Flutter mobile beta
 
 1. build release APK
-2. if packaging locally, use [D:/business-hub/scripts/mobile_flutter_release.ps1](D:/business-hub/scripts/mobile_flutter_release.ps1)
+2. if packaging locally, run [D:/business-hub/scripts/mobile_flutter_release.ps1](D:/business-hub/scripts/mobile_flutter_release.ps1) in this order:
+   - `-Doctor`
+   - `-PreflightOnly`
+   - full release run
 3. archive the generated local release folder under `release-artifacts/mobile-local/<release-tag>/` when not using GitHub Actions
 4. confirm `.github/workflows/flutter_mobile_validate.yml` is green
 5. if using the dedicated mobile release lane, trigger `.github/workflows/flutter_mobile_release.yml`

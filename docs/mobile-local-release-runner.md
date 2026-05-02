@@ -44,7 +44,18 @@ Doctor mode also reports:
 - release tag/channel/pilot scope
 - commit + short SHA
 - signing mode and signing source
+- keystore path, alias, and keytool verification result
 - intended artifact folder
+
+Preflight mode adds:
+
+- release-tag posture (`recommended`, `custom_mobile_tag`, or `custom_nonstandard`)
+- a preflight verdict such as:
+  - `ready_for_signed_release`
+  - `ready_with_debug_signing`
+  - `ready_nonstandard_tag`
+  - `blocked`
+- preflight `.txt` and `.json` reports under the local artifact folder
 
 ## Recommended commands
 
@@ -58,6 +69,12 @@ pwsh ./scripts/mobile_flutter_release.ps1 -Doctor
 
 ```powershell
 pwsh ./scripts/mobile_flutter_release.ps1 -ReleaseTag mobile-v1.4.0 -ReleaseChannel pilot -PilotScope limbdi-wave-1
+```
+
+### Signing and release preflight only
+
+```powershell
+pwsh ./scripts/mobile_flutter_release.ps1 -PreflightOnly -ReleaseTag mobile-v1.4.0 -ReleaseChannel pilot -PilotScope limbdi-wave-1
 ```
 
 ### Explicit Flutter SDK path
@@ -79,11 +96,14 @@ Expected files:
 - `BusinessHub-Mobile-<release-tag>.manifest.txt`
 - `BusinessHub-Mobile-<release-tag>.manifest.json`
 - `BusinessHub-Mobile-<release-tag>.handoff.md`
+- `BusinessHub-Mobile-<release-tag>.preflight.txt`
+- `BusinessHub-Mobile-<release-tag>.preflight.json`
 
 ## Notes
 
 - local signing readiness depends on:
   - Android signing env vars, or
   - [D:/business-hub/apps/mobile_flutter/android/key.properties](D:/business-hub/apps/mobile_flutter/android/key.properties)
+- `-PreflightOnly` is the best first command before a real local signed handoff because it verifies the release tag, expected keystore path, and alias health with `keytool` when signing is configured
 - if signing is not configured, the script still allows the build lane to continue and records `fallback_debug` in the manifest/handoff output
 - if Flutter is missing, `-Doctor` fails cleanly and tells you how to fix resolution

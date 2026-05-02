@@ -24,6 +24,7 @@ This checklist is the final gate before shipping a Flutter APK outside the inter
 3. Build release APK:
    - `flutter build apk --release`
    - or [D:/business-hub/scripts/mobile_flutter_release.ps1](D:/business-hub/scripts/mobile_flutter_release.ps1)
+   - preferably run `-PreflightOnly` first for signing and tag verification
 4. If using the dedicated mobile release lane, confirm:
    - `.github/workflows/flutter_mobile_release.yml`
    - release channel is chosen correctly
@@ -32,6 +33,9 @@ This checklist is the final gate before shipping a Flutter APK outside the inter
 5. Confirm release signing is available:
    - GitHub secrets are present, or
    - local `android/key.properties` is configured from [D:/business-hub/apps/mobile_flutter/android/key.properties.example](D:/business-hub/apps/mobile_flutter/android/key.properties.example)
+6. If packaging locally, archive the generated preflight reports:
+   - `BusinessHub-Mobile-<release-tag>.preflight.txt`
+   - `BusinessHub-Mobile-<release-tag>.preflight.json`
 
 ## Mobile smoke gate
 

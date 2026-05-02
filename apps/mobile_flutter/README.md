@@ -46,6 +46,7 @@ Local release packaging:
 
 ```powershell
 pwsh ./scripts/mobile_flutter_release.ps1 -Doctor
+pwsh ./scripts/mobile_flutter_release.ps1 -PreflightOnly -ReleaseTag mobile-v1.4.0 -ReleaseChannel pilot -PilotScope limbdi-wave-1
 pwsh ./scripts/mobile_flutter_release.ps1 -ReleaseTag mobile-v1.4.0 -ReleaseChannel pilot -PilotScope limbdi-wave-1
 ```
 
