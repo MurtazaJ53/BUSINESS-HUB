@@ -8,6 +8,7 @@ import '../../../core/models/mobile_session.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/utils/formatters.dart';
+import 'pos_scanner_sheet.dart';
 import '../../shell/presentation/mobile_surface.dart';
 
 class PosScreen extends ConsumerStatefulWidget {
@@ -331,27 +332,13 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                             icon: const Icon(Icons.close_rounded),
                           ),
                         IconButton(
-                          tooltip: 'Exact lookup',
+                          tooltip: 'Scan or exact lookup',
                           onPressed: () async {
-                            final found = await inventoryRepository
-                                .findByExactLookup(
-                                  _searchController.text,
-                                  includeCost: session?.canViewCost ?? false,
-                                );
-                            if (found == null) {
-                              if (!context.mounted) {
-                                return;
-                              }
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'No exact SKU or code match was found.',
-                                  ),
-                                ),
-                              );
-                              return;
-                            }
-                            _addToCart(found);
+                            await _showLookupActions(
+                              context,
+                              inventoryRepository: inventoryRepository,
+                              includeCost: session?.canViewCost ?? false,
+                            );
                           },
                           icon: const Icon(Icons.qr_code_scanner_rounded),
                         ),
@@ -492,6 +479,136 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _showLookupActions(
+    BuildContext context, {
+    required InventoryRepository inventoryRepository,
+    required bool includeCost,
+  }) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF070B13),
+      builder: (context) {
+        final typedCode = _searchController.text.trim();
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Scanner actions',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Use the camera for live scanning or run an exact lookup against the code already typed into search.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.68),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.qr_code_scanner_rounded),
+                  title: const Text('Open live scanner'),
+                  subtitle: const Text('Scan barcode, QR, or SKU with camera'),
+                  onTap: () => Navigator.of(context).pop('scan'),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.search_rounded),
+                  title: const Text('Lookup typed code'),
+                  subtitle: Text(
+                    typedCode.isEmpty
+                        ? 'Type a SKU or barcode into search first'
+                        : typedCode,
+                  ),
+                  enabled: typedCode.isNotEmpty,
+                  onTap: typedCode.isEmpty
+                      ? null
+                      : () => Navigator.of(context).pop('typed'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!context.mounted || choice == null) {
+      return;
+    }
+
+    if (choice == 'typed') {
+      await _runExactLookup(
+        context,
+        inventoryRepository: inventoryRepository,
+        includeCost: includeCost,
+        lookup: _searchController.text,
+      );
+      return;
+    }
+
+    final scannedCode = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF070B13),
+      builder: (context) => const PosScannerSheet(),
+    );
+    if (!context.mounted || scannedCode == null) {
+      return;
+    }
+
+    _searchController.text = scannedCode;
+    setState(() {
+      _search = scannedCode;
+      _page = 1;
+    });
+    await _runExactLookup(
+      context,
+      inventoryRepository: inventoryRepository,
+      includeCost: includeCost,
+      lookup: scannedCode,
+    );
+  }
+
+  Future<void> _runExactLookup(
+    BuildContext context, {
+    required InventoryRepository inventoryRepository,
+    required bool includeCost,
+    required String lookup,
+  }) async {
+    final found = await inventoryRepository.findByExactLookup(
+      lookup,
+      includeCost: includeCost,
+    );
+    if (found == null) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'No exact SKU or code match was found for "${lookup.trim()}".',
+          ),
+        ),
+      );
+      return;
+    }
+
+    _addToCart(found);
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${found.name} added to cart from exact lookup.')),
     );
   }
 
