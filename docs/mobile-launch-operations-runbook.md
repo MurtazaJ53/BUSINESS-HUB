@@ -79,7 +79,8 @@ Signing path:
    - pilot scope
    - release SHA
 10. Use `Copy pilot snapshot` and archive the output in the rollout record.
-11. Run device smoke checks.
+11. Run `Run smoke checklist` from the device and archive the copied smoke report.
+12. Run any remaining manual device smoke checks.
 12. Distribute to pilot shops only after smoke pass.
 
 ## Pilot smoke focus

@@ -11,6 +11,7 @@ import '../../../core/runtime/pilot_diagnostics_snapshot.dart';
 import '../../../core/runtime/pilot_handoff_report.dart';
 import '../../../core/runtime/pilot_readiness_report.dart';
 import '../../../core/runtime/pilot_recovery_report.dart';
+import '../../../core/runtime/pilot_smoke_report.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/utils/formatters.dart';
@@ -725,6 +726,93 @@ class SettingsScreen extends ConsumerWidget {
                                 ),
                                 const SizedBox(height: 18),
                                 MobilePanel(
+                                  title: 'Pilot smoke execution',
+                                  action: MobileTag(
+                                    label: readinessReport == null
+                                        ? 'Loading'
+                                        : 'Floor check',
+                                    icon: readinessReport == null
+                                        ? Icons.sync_rounded
+                                        : Icons.playlist_add_check_circle_rounded,
+                                    accent: readinessReport == null
+                                        ? const Color(0xFFF59E0B)
+                                        : const Color(0xFF38BDF8),
+                                  ),
+                                  child: diagnostics == null ||
+                                          readinessReport == null
+                                      ? const MobileEmptyState(
+                                          icon: Icons.sync_rounded,
+                                          title: 'Preparing smoke execution',
+                                          body:
+                                              'The launch snapshot and readiness posture are still loading for this device.',
+                                        )
+                                      : Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: <Widget>[
+                                            Text(
+                                              'Run the floor smoke checklist from the device itself and copy the resulting evidence block into the rollout log. This keeps the final operator decision tied to the exact installed release and workspace binding.',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color: Colors.white
+                                                        .withValues(
+                                                          alpha: 0.68,
+                                                        ),
+                                                    fontWeight: FontWeight.w600,
+                                                    height: 1.45,
+                                                  ),
+                                            ),
+                                            const SizedBox(height: 14),
+                                            _SettingsRow(
+                                              label: 'Release target',
+                                              value:
+                                                  '${diagnostics.runtimeInfo.releaseTag} | ${diagnostics.runtimeInfo.rolloutScopeLabel}',
+                                              icon: Icons.route_rounded,
+                                            ),
+                                            _SettingsRow(
+                                              label: 'Readiness gate',
+                                              value:
+                                                  readinessReport.statusLabel,
+                                              icon: Icons.fact_check_rounded,
+                                            ),
+                                            FilledButton.tonalIcon(
+                                              onPressed: () async {
+                                                final smokeReport =
+                                                    await _showPilotSmokeChecklistDialog(
+                                                      context,
+                                                      diagnosticsSnapshot:
+                                                          diagnostics,
+                                                      readinessReport:
+                                                          readinessReport,
+                                                    );
+                                                if (smokeReport == null ||
+                                                    !context.mounted) {
+                                                  return;
+                                                }
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      'Pilot smoke report copied with verdict ${smokeReport.verdictLabel}.',
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              icon: const Icon(
+                                                Icons.assignment_turned_in_rounded,
+                                              ),
+                                              label: const Text(
+                                                'Run smoke checklist',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                                const SizedBox(height: 18),
+                                MobilePanel(
                                   title: 'Recovery desk',
                                   action: MobileTag(
                                     label: attentionEntries.isEmpty
@@ -904,6 +992,176 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
+  Future<PilotSmokeReport?> _showPilotSmokeChecklistDialog(
+    BuildContext context, {
+    required PilotDiagnosticsSnapshot diagnosticsSnapshot,
+    required PilotReadinessReport readinessReport,
+  }) async {
+    final notesController = TextEditingController();
+    final outcomes = <String, PilotSmokeCheckOutcome>{
+      for (final check in defaultPilotSmokeChecks)
+        check.id: PilotSmokeCheckOutcome.pending,
+    };
+
+    PilotSmokeReport buildPreview() {
+      return PilotSmokeReport(
+        diagnosticsSnapshot: diagnosticsSnapshot,
+        readinessReport: readinessReport,
+        operatorNotes: notesController.text.trim(),
+        results: defaultPilotSmokeChecks
+            .map(
+              (check) => PilotSmokeCheckResult(
+                check: check,
+                outcome: outcomes[check.id] ?? PilotSmokeCheckOutcome.pending,
+              ),
+            )
+            .toList(growable: false),
+      );
+    }
+
+    try {
+      return await showDialog<PilotSmokeReport>(
+        context: context,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              final preview = buildPreview();
+              final verdictTone = switch (preview.verdict) {
+                'pass' => const Color(0xFF22C55E),
+                'monitor' => const Color(0xFFF59E0B),
+                'blocked' => const Color(0xFFFB7185),
+                _ => const Color(0xFF38BDF8),
+              };
+
+              return AlertDialog(
+                title: const Text('Run pilot smoke checklist'),
+                content: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          'Mark each floor check from the device you are holding. The copied report becomes the operator-side evidence for the release tag and pilot scope currently installed.',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.68),
+                                fontWeight: FontWeight.w600,
+                                height: 1.45,
+                              ),
+                        ),
+                        const SizedBox(height: 14),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: verdictTone.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: verdictTone.withValues(alpha: 0.28),
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  preview.verdictLabel,
+                                  style: Theme.of(context).textTheme.titleSmall
+                                      ?.copyWith(
+                                        color: verdictTone,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  preview.summary,
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.76,
+                                        ),
+                                        fontWeight: FontWeight.w600,
+                                        height: 1.45,
+                                      ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'Pass ${preview.passedCount} | Fail ${preview.failedCount} | Pending ${preview.pendingCount}',
+                                  style: Theme.of(context).textTheme.labelLarge
+                                      ?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ...defaultPilotSmokeChecks.map((check) {
+                          final outcome =
+                              outcomes[check.id] ??
+                              PilotSmokeCheckOutcome.pending;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _PilotSmokeCheckCard(
+                              check: check,
+                              outcome: outcome,
+                              onOutcomeChanged: (next) {
+                                setDialogState(() {
+                                  outcomes[check.id] = next;
+                                });
+                              },
+                            ),
+                          );
+                        }),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: notesController,
+                          minLines: 2,
+                          maxLines: 4,
+                          onChanged: (_) {
+                            setDialogState(() {});
+                          },
+                          decoration: const InputDecoration(
+                            labelText: 'Operator notes',
+                            hintText:
+                                'Optional context for any failure, retry, or floor observation.',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: () async {
+                      final report = buildPreview();
+                      await Clipboard.setData(
+                        ClipboardData(text: report.toMultilineText()),
+                      );
+                      if (dialogContext.mounted) {
+                        Navigator.of(dialogContext).pop(report);
+                      }
+                    },
+                    child: const Text('Copy smoke report'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      notesController.dispose();
+    }
+  }
+
   Future<bool?> _showWorkspaceSettingsDialog(
     BuildContext context, {
     required ShopInfo currentShop,
@@ -1034,6 +1292,133 @@ class SettingsScreen extends ConsumerWidget {
       footerController.dispose();
       phoneController.dispose();
     }
+  }
+}
+
+class _PilotSmokeCheckCard extends StatelessWidget {
+  const _PilotSmokeCheckCard({
+    required this.check,
+    required this.outcome,
+    required this.onOutcomeChanged,
+  });
+
+  final PilotSmokeCheckDefinition check;
+  final PilotSmokeCheckOutcome outcome;
+  final ValueChanged<PilotSmokeCheckOutcome> onOutcomeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = switch (outcome) {
+      PilotSmokeCheckOutcome.passed => const Color(0xFF22C55E),
+      PilotSmokeCheckOutcome.failed => const Color(0xFFFB7185),
+      PilotSmokeCheckOutcome.pending => const Color(0xFF38BDF8),
+    };
+
+    Widget buildChoice(
+      String label,
+      PilotSmokeCheckOutcome value,
+      IconData icon,
+    ) {
+      final selected = outcome == value;
+      return Expanded(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => onOutcomeChanged(value),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            decoration: BoxDecoration(
+              color: selected
+                  ? tone.withValues(alpha: 0.14)
+                  : Colors.white.withValues(alpha: 0.02),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: selected
+                    ? tone.withValues(alpha: 0.42)
+                    : Colors.white.withValues(alpha: 0.08),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Icon(
+                  icon,
+                  size: 16,
+                  color: selected ? tone : Colors.white.withValues(alpha: 0.62),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: selected ? tone : Colors.white.withValues(alpha: 0.8),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1220),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    check.label,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                MobileTag(
+                  label: check.isCritical ? 'CRITICAL' : 'STANDARD',
+                  icon: check.isCritical
+                      ? Icons.priority_high_rounded
+                      : Icons.rule_rounded,
+                  accent: check.isCritical
+                      ? const Color(0xFFFB7185)
+                      : const Color(0xFF38BDF8),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: <Widget>[
+                buildChoice(
+                  'Pending',
+                  PilotSmokeCheckOutcome.pending,
+                  Icons.hourglass_empty_rounded,
+                ),
+                const SizedBox(width: 8),
+                buildChoice(
+                  'Pass',
+                  PilotSmokeCheckOutcome.passed,
+                  Icons.check_circle_rounded,
+                ),
+                const SizedBox(width: 8),
+                buildChoice(
+                  'Fail',
+                  PilotSmokeCheckOutcome.failed,
+                  Icons.cancel_rounded,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

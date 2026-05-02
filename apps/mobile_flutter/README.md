@@ -111,6 +111,7 @@ The Settings screen also now includes a copyable pilot launch snapshot so operat
 It also includes a recovery desk for queued or failed receipt replay during pilot rollout.
 It now also includes a readiness signoff verdict so a rollout lead can decide whether the device is safe to start a pilot shift.
 It also includes a full handoff pack copy action so release evidence can be archived from the device in one paste.
+It now also includes a guided smoke checklist runner that copies a structured floor-execution report from the device itself.
 
 ## Package strategy
 

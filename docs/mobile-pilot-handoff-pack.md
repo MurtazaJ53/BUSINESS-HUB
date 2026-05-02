@@ -14,6 +14,7 @@ This document defines the complete evidence bundle for handing a signed mobile b
 - JSON manifest
 - generated handoff markdown
 - release tag and pilot scope embedded in all of the above
+- smoke execution context tied to the same release tag and pilot scope
 
 Workflow:
 - [D:/business-hub/.github/workflows/flutter_mobile_release.yml](D:/business-hub/.github/workflows/flutter_mobile_release.yml)
@@ -21,6 +22,7 @@ Workflow:
 ### From the mobile app
 
 - copied pilot snapshot
+- copied smoke report
 - copied readiness signoff
 - copied full handoff pack
 - copied recovery report if a replay issue appears
@@ -37,8 +39,10 @@ Before a pilot device is approved, archive:
 3. release manifest text
 4. release manifest JSON
 5. generated handoff markdown
-6. copied readiness signoff
-7. copied full handoff pack
+6. copied pilot snapshot
+7. copied smoke report
+8. copied readiness signoff
+9. copied full handoff pack
 
 ## Why this matters
 

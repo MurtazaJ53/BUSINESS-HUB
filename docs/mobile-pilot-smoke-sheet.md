@@ -9,6 +9,7 @@ Use it after the signed APK is built and before a shop is allowed to treat the F
 ## Release identity to record
 
 - release tag:
+- pilot scope:
 - version + build:
 - release channel:
 - short release SHA:
@@ -25,8 +26,10 @@ Use it after the signed APK is built and before a shop is allowed to treat the F
 2. Open:
    - [D:/business-hub/apps/mobile_flutter/lib/features/settings/presentation/settings_screen.dart](D:/business-hub/apps/mobile_flutter/lib/features/settings/presentation/settings_screen.dart)
 3. Confirm `Pilot readiness signoff` is not `BLOCKED STARTUP`.
-4. Use `Copy pilot snapshot`.
-5. Paste the snapshot into:
+4. Run `Run smoke checklist` and mark the floor checks from the real device.
+5. Use `Copy smoke report`.
+6. Use `Copy pilot snapshot`.
+7. Paste the smoke report and snapshot into:
    - the rollout thread, or
    - the release ticket, or
    - the QA signoff log
@@ -66,6 +69,7 @@ Accept the pilot device only if:
 - APK checksum matches release output
 - readiness signoff is not `BLOCKED STARTUP`
 - all critical smoke checks pass
+- copied smoke report is archived with the release record
 - copied pilot snapshot is archived with the release record
 
 ## Blockers that require rollback
