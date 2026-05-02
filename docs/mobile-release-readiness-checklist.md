@@ -7,6 +7,7 @@ This checklist is the final gate before shipping a Flutter APK outside the inter
 ## Versioning
 
 1. Update [D:/business-hub/apps/mobile_flutter/pubspec.yaml](D:/business-hub/apps/mobile_flutter/pubspec.yaml) `version: x.y.z+build`.
+   - or prepare it first with [D:/business-hub/scripts/mobile_flutter_release_prep.ps1](D:/business-hub/scripts/mobile_flutter_release_prep.ps1)
 2. Write the exact user-facing changes in [D:/business-hub/docs/mobile-release-notes-template.md](D:/business-hub/docs/mobile-release-notes-template.md).
 3. Confirm the release target:
    - internal beta
@@ -36,6 +37,10 @@ This checklist is the final gate before shipping a Flutter APK outside the inter
 6. If packaging locally, archive the generated preflight reports:
    - `BusinessHub-Mobile-<release-tag>.preflight.txt`
    - `BusinessHub-Mobile-<release-tag>.preflight.json`
+7. If using local release prep, archive the generated prep pack:
+   - `BusinessHub-Mobile-<release-tag>.prep.txt`
+   - `BusinessHub-Mobile-<release-tag>.prep.json`
+   - `BusinessHub-Mobile-<release-tag>.release-notes.md`
 
 ## Mobile smoke gate
 

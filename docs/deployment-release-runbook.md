@@ -45,6 +45,8 @@ Preferred local runner:
 
 - [D:/business-hub/scripts/mobile_flutter_validate.ps1](D:/business-hub/scripts/mobile_flutter_validate.ps1)
 - [D:/business-hub/docs/mobile-local-validation-runner.md](D:/business-hub/docs/mobile-local-validation-runner.md)
+- [D:/business-hub/scripts/mobile_flutter_release_prep.ps1](D:/business-hub/scripts/mobile_flutter_release_prep.ps1)
+- [D:/business-hub/docs/mobile-local-release-prep-runner.md](D:/business-hub/docs/mobile-local-release-prep-runner.md)
 - [D:/business-hub/scripts/mobile_flutter_release.ps1](D:/business-hub/scripts/mobile_flutter_release.ps1)
 - [D:/business-hub/docs/mobile-local-release-runner.md](D:/business-hub/docs/mobile-local-release-runner.md)
 6. dashboard/inventory/POS smoke tested
@@ -92,23 +94,24 @@ As of now:
 
 ### Flutter mobile beta
 
-1. build release APK
-2. if packaging locally, run [D:/business-hub/scripts/mobile_flutter_release.ps1](D:/business-hub/scripts/mobile_flutter_release.ps1) in this order:
+1. prepare release version/tag/notes with [D:/business-hub/scripts/mobile_flutter_release_prep.ps1](D:/business-hub/scripts/mobile_flutter_release_prep.ps1)
+2. build release APK
+3. if packaging locally, run [D:/business-hub/scripts/mobile_flutter_release.ps1](D:/business-hub/scripts/mobile_flutter_release.ps1) in this order:
    - `-Doctor`
    - `-PreflightOnly`
    - full release run
-3. archive the generated local release folder under `release-artifacts/mobile-local/<release-tag>/` when not using GitHub Actions
-4. confirm `.github/workflows/flutter_mobile_validate.yml` is green
-5. if using the dedicated mobile release lane, trigger `.github/workflows/flutter_mobile_release.yml`
-6. copy into `release-artifacts/`
-7. distribute to internal testers
-8. verify:
+4. archive the generated local release folder under `release-artifacts/mobile-local/<release-tag>/` when not using GitHub Actions
+5. confirm `.github/workflows/flutter_mobile_validate.yml` is green
+6. if using the dedicated mobile release lane, trigger `.github/workflows/flutter_mobile_release.yml`
+7. copy into `release-artifacts/`
+8. distribute to internal testers
+9. verify:
    - login
    - data hydration
    - sales creation
    - back navigation
    - multi-screen movement
-9. complete:
+10. complete:
    - [D:/business-hub/docs/mobile-pilot-readiness-signoff.md](D:/business-hub/docs/mobile-pilot-readiness-signoff.md)
    - [D:/business-hub/docs/mobile-release-readiness-checklist.md](D:/business-hub/docs/mobile-release-readiness-checklist.md)
    - [D:/business-hub/docs/mobile-release-notes-template.md](D:/business-hub/docs/mobile-release-notes-template.md)

@@ -58,11 +58,16 @@ Use for:
 Workflow:
 - [D:/business-hub/.github/workflows/flutter_mobile_release.yml](D:/business-hub/.github/workflows/flutter_mobile_release.yml)
 
+Prep runner:
+- [D:/business-hub/scripts/mobile_flutter_release_prep.ps1](D:/business-hub/scripts/mobile_flutter_release_prep.ps1)
+- [D:/business-hub/docs/mobile-local-release-prep-runner.md](D:/business-hub/docs/mobile-local-release-prep-runner.md)
+
 Local runner:
 - [D:/business-hub/scripts/mobile_flutter_release.ps1](D:/business-hub/scripts/mobile_flutter_release.ps1)
 - [D:/business-hub/docs/mobile-local-release-runner.md](D:/business-hub/docs/mobile-local-release-runner.md)
 
 Recommended local sequence:
+- release prep
 - `-Doctor` for Flutter resolution
 - `-PreflightOnly` for release tag and signing verification
 - full release run for APK packaging

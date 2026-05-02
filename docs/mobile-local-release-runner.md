@@ -101,6 +101,10 @@ Expected files:
 
 ## Notes
 
+- the normal local sequence is:
+  - [D:/business-hub/scripts/mobile_flutter_release_prep.ps1](D:/business-hub/scripts/mobile_flutter_release_prep.ps1)
+  - then `-PreflightOnly`
+  - then the full release run
 - local signing readiness depends on:
   - Android signing env vars, or
   - [D:/business-hub/apps/mobile_flutter/android/key.properties](D:/business-hub/apps/mobile_flutter/android/key.properties)
