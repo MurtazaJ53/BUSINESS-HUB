@@ -22,6 +22,7 @@ from platform_apps.jobs.models import (
     MigrationJobRun,
     MigrationLaunchCheckpointEvent,
     MigrationRolloutCheckpointEvent,
+    MigrationSteadyStateCheckpointEvent,
     MigrationShopCheckpointEvent,
 )
 
@@ -859,4 +860,119 @@ def build_phase7_rollout_readiness(
         "recommended_action": recommended_action,
         "summary": summary,
         "shops": go_live_readiness["shops"],
+    }
+
+
+def build_phase8_steady_state_readiness(
+    controls: list[MigrationDomainControl],
+    launch_events: list[MigrationLaunchCheckpointEvent],
+    go_live_events: list[MigrationGoLiveCheckpointEvent],
+    rollout_events: list[MigrationRolloutCheckpointEvent],
+    steady_state_events: list[MigrationSteadyStateCheckpointEvent],
+) -> dict[str, Any]:
+    rollout_readiness = build_phase7_rollout_readiness(
+        controls,
+        launch_events,
+        go_live_events,
+        rollout_events,
+    )
+    latest_steady_state_event = steady_state_events[0] if steady_state_events else None
+
+    if rollout_readiness["overall_status"] == "rollback_recommended":
+        overall_status = "rollback_recommended"
+        recommended_action = (
+            "Do not treat the platform as steady-state yet. Clear rollout rollback pressure before normal operations signoff."
+        )
+        summary = (
+            "Phase 8 is blocked by rollback pressure inherited from the rollout program."
+        )
+    elif rollout_readiness["overall_status"] != "completed":
+        overall_status = "blocked"
+        recommended_action = (
+            "Finish the rollout program and record rollout completion before entering steady-state governance."
+        )
+        summary = (
+            "Phase 8 cannot begin until rollout expansion is marked complete."
+        )
+    elif (
+        latest_steady_state_event
+        and latest_steady_state_event.decision == "incident_stabilization_active"
+    ):
+        overall_status = "incident_stabilization"
+        recommended_action = (
+            "Keep the platform in an incident-stabilization posture until service health, replay health, and reconciliation pressure return to normal."
+        )
+        summary = (
+            "Steady-state governance is active, but current incident pressure means the platform should stay in a stabilization window."
+        )
+    elif (
+        latest_steady_state_event
+        and latest_steady_state_event.decision == "architecture_review_required"
+    ):
+        overall_status = "architecture_review_required"
+        recommended_action = (
+            "Run the quarterly architecture review, confirm that new product demands still fit the target platform, and record follow-up actions."
+        )
+        summary = (
+            "The platform is live, but the latest governance checkpoint requires architecture review before declaring routine operations."
+        )
+    elif (
+        latest_steady_state_event
+        and latest_steady_state_event.decision == "hold_for_improvement"
+    ):
+        overall_status = "improvement_window"
+        recommended_action = (
+            "Keep steady-state operations active, but treat the current period as an improvement window for reliability, cost, or support pain."
+        )
+        summary = (
+            "The platform is stable enough to stay live, but leadership has intentionally held steady-state signoff for further improvements."
+        )
+    elif (
+        latest_steady_state_event
+        and latest_steady_state_event.decision == "accept_steady_state"
+    ):
+        overall_status = "operating_normally"
+        recommended_action = (
+            "Operate under normal steady-state cadences: SLO review, incident review, cost review, and product-evolution governance."
+        )
+        summary = (
+            "Steady-state has been explicitly accepted and the platform should now be operated under normal production governance."
+        )
+    else:
+        overall_status = "steady_state_ready"
+        recommended_action = (
+            "Record the first steady-state checkpoint once rollout completion, operations ownership, and governance cadence are confirmed."
+        )
+        summary = (
+            "Rollout is complete and the platform is ready to enter formal steady-state operations."
+        )
+
+    return {
+        "phase": "phase_8",
+        "overall_status": overall_status,
+        "shop_count": rollout_readiness["shop_count"],
+        "ready_for_launch_shop_count": rollout_readiness["ready_for_launch_shop_count"],
+        "monitoring_shop_count": rollout_readiness["monitoring_shop_count"],
+        "blocked_shop_count": rollout_readiness["blocked_shop_count"],
+        "rollback_recommended_shop_count": rollout_readiness["rollback_recommended_shop_count"],
+        "latest_rollout_decision": rollout_readiness["latest_rollout_decision"],
+        "latest_rollout_status_snapshot": rollout_readiness["latest_rollout_status_snapshot"],
+        "latest_rollout_at": rollout_readiness["latest_rollout_at"],
+        "latest_steady_state_decision": (
+            latest_steady_state_event.decision if latest_steady_state_event else None
+        ),
+        "latest_steady_state_status_snapshot": (
+            latest_steady_state_event.overall_status_snapshot if latest_steady_state_event else None
+        ),
+        "latest_steady_state_at": (
+            latest_steady_state_event.occurred_at if latest_steady_state_event else None
+        ),
+        "rollout_completed": rollout_readiness["overall_status"] == "completed",
+        "steady_state_accepted": overall_status == "operating_normally",
+        "improvement_window_active": overall_status == "improvement_window",
+        "architecture_review_active": overall_status == "architecture_review_required",
+        "incident_stabilization_active": overall_status == "incident_stabilization",
+        "recommended_action": recommended_action,
+        "summary": summary,
+        "shops": rollout_readiness["shops"],
     }

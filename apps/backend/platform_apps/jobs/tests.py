@@ -15,6 +15,7 @@ from platform_apps.common.migration import (
     MigrationJobType,
     MigrationLaunchCheckpointDecision,
     MigrationRolloutCheckpointDecision,
+    MigrationSteadyStateCheckpointDecision,
     MigrationShopCheckpointDecision,
     MigrationWriteMaster,
 )
@@ -29,6 +30,7 @@ from platform_apps.jobs.models import (
     MigrationPhaseCheckpointEvent,
     MigrationJobRun,
     MigrationRolloutCheckpointEvent,
+    MigrationSteadyStateCheckpointEvent,
     MigrationShopCheckpointEvent,
 )
 from platform_apps.jobs.services import execute_migration_job
@@ -1482,6 +1484,186 @@ class MigrationControlApiTests(TestCase):
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.data["overall_status"], "blocked")
         self.assertEqual(MigrationRolloutCheckpointEvent.objects.count(), 0)
+
+    def test_steady_state_readiness_reports_ready_after_rollout_completion(self):
+        required_domains = [
+            MigrationDomain.INVENTORY,
+            MigrationDomain.CUSTOMERS,
+            MigrationDomain.CUSTOMER_LEDGER,
+            MigrationDomain.EXPENSES,
+            MigrationDomain.ATTENDANCE,
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+            MigrationDomain.REPORTING,
+        ]
+        for domain in required_domains:
+            MigrationDomainControl.objects.create(
+                shop=self.shop,
+                domain=domain,
+                write_master=MigrationWriteMaster.POSTGRES,
+                bridge_mode=MigrationBridgeMode.DISABLED,
+                cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+                current_epoch=8,
+                shadow_reads_enabled=True,
+            )
+        MigrationLaunchCheckpointEvent.objects.create(
+            phase="phase_5",
+            actor_user=self.user,
+            decision=MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH,
+            overall_status_snapshot="ready_for_launch",
+            summary="Launch is approved.",
+            recommended_action_snapshot="Execute go-live.",
+            occurred_at=timezone.now(),
+        )
+        MigrationGoLiveCheckpointEvent.objects.create(
+            phase="phase_6",
+            actor_user=self.user,
+            decision=MigrationGoLiveCheckpointDecision.HANDOFF_TO_STEADY_STATE,
+            overall_status_snapshot="hypercare_active",
+            summary="Hypercare closed cleanly.",
+            recommended_action_snapshot="Operate as steady state.",
+            occurred_at=timezone.now(),
+        )
+        MigrationRolloutCheckpointEvent.objects.create(
+            phase="phase_7",
+            actor_user=self.user,
+            decision=MigrationRolloutCheckpointDecision.COMPLETE_ROLLOUT,
+            overall_status_snapshot="scale_tuning",
+            summary="Rollout completed cleanly.",
+            recommended_action_snapshot="Move to steady-state governance.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/steady-state-readiness/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["overall_status"], "steady_state_ready")
+        self.assertTrue(response.data["rollout_completed"])
+        self.assertEqual(response.data["latest_steady_state_decision"], None)
+
+    def test_create_steady_state_checkpoint_records_acceptance(self):
+        required_domains = [
+            MigrationDomain.INVENTORY,
+            MigrationDomain.CUSTOMERS,
+            MigrationDomain.CUSTOMER_LEDGER,
+            MigrationDomain.EXPENSES,
+            MigrationDomain.ATTENDANCE,
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+            MigrationDomain.REPORTING,
+        ]
+        for domain in required_domains:
+            MigrationDomainControl.objects.create(
+                shop=self.shop,
+                domain=domain,
+                write_master=MigrationWriteMaster.POSTGRES,
+                bridge_mode=MigrationBridgeMode.DISABLED,
+                cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+                current_epoch=8,
+                shadow_reads_enabled=True,
+            )
+        MigrationLaunchCheckpointEvent.objects.create(
+            phase="phase_5",
+            actor_user=self.user,
+            decision=MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH,
+            overall_status_snapshot="ready_for_launch",
+            summary="Launch is approved.",
+            recommended_action_snapshot="Execute go-live.",
+            occurred_at=timezone.now(),
+        )
+        MigrationGoLiveCheckpointEvent.objects.create(
+            phase="phase_6",
+            actor_user=self.user,
+            decision=MigrationGoLiveCheckpointDecision.HANDOFF_TO_STEADY_STATE,
+            overall_status_snapshot="hypercare_active",
+            summary="Hypercare closed cleanly.",
+            recommended_action_snapshot="Operate as steady state.",
+            occurred_at=timezone.now(),
+        )
+        MigrationRolloutCheckpointEvent.objects.create(
+            phase="phase_7",
+            actor_user=self.user,
+            decision=MigrationRolloutCheckpointDecision.COMPLETE_ROLLOUT,
+            overall_status_snapshot="scale_tuning",
+            summary="Rollout completed cleanly.",
+            recommended_action_snapshot="Move to steady-state governance.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.post(
+            "/api/v1/migration/steady-state-checkpoints/",
+            {
+                "phase": "phase_8",
+                "decision": MigrationSteadyStateCheckpointDecision.ACCEPT_STEADY_STATE,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(MigrationSteadyStateCheckpointEvent.objects.count(), 1)
+        event = MigrationSteadyStateCheckpointEvent.objects.get()
+        self.assertEqual(event.phase, "phase_8")
+        self.assertEqual(
+            event.decision,
+            MigrationSteadyStateCheckpointDecision.ACCEPT_STEADY_STATE,
+        )
+        self.assertEqual(event.overall_status_snapshot, "steady_state_ready")
+
+    def test_create_steady_state_checkpoint_blocks_before_rollout_completion(self):
+        required_domains = [
+            MigrationDomain.INVENTORY,
+            MigrationDomain.CUSTOMERS,
+            MigrationDomain.CUSTOMER_LEDGER,
+            MigrationDomain.EXPENSES,
+            MigrationDomain.ATTENDANCE,
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+            MigrationDomain.REPORTING,
+        ]
+        for domain in required_domains:
+            MigrationDomainControl.objects.create(
+                shop=self.shop,
+                domain=domain,
+                write_master=MigrationWriteMaster.POSTGRES,
+                bridge_mode=MigrationBridgeMode.DISABLED,
+                cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+                current_epoch=8,
+                shadow_reads_enabled=True,
+            )
+        MigrationLaunchCheckpointEvent.objects.create(
+            phase="phase_5",
+            actor_user=self.user,
+            decision=MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH,
+            overall_status_snapshot="ready_for_launch",
+            summary="Launch is approved.",
+            recommended_action_snapshot="Execute go-live.",
+            occurred_at=timezone.now(),
+        )
+        MigrationGoLiveCheckpointEvent.objects.create(
+            phase="phase_6",
+            actor_user=self.user,
+            decision=MigrationGoLiveCheckpointDecision.HANDOFF_TO_STEADY_STATE,
+            overall_status_snapshot="hypercare_active",
+            summary="Hypercare closed cleanly.",
+            recommended_action_snapshot="Operate as steady state.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.post(
+            "/api/v1/migration/steady-state-checkpoints/",
+            {
+                "phase": "phase_8",
+                "decision": MigrationSteadyStateCheckpointDecision.ACCEPT_STEADY_STATE,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data["overall_status"], "blocked")
+        self.assertEqual(MigrationSteadyStateCheckpointEvent.objects.count(), 0)
 
     def test_non_platform_admin_is_blocked(self):
         non_admin = PlatformUser.objects.create_user(email="staff@example.com", password="secret", full_name="Staff")

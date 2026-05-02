@@ -16,6 +16,7 @@ from platform_apps.common.migration import (
     MigrationJobStatus,
     MigrationJobType,
     MigrationRolloutCheckpointDecision,
+    MigrationSteadyStateCheckpointDecision,
     MigrationShopCheckpointDecision,
     MigrationWriteMaster,
 )
@@ -29,6 +30,7 @@ from platform_apps.jobs.models import (
     MigrationPhaseCheckpointEvent,
     MigrationJobRun,
     MigrationRolloutCheckpointEvent,
+    MigrationSteadyStateCheckpointEvent,
     MigrationShopCheckpointEvent,
 )
 from platform_apps.jobs.readiness import (
@@ -38,6 +40,7 @@ from platform_apps.jobs.readiness import (
     build_phase5_retirement_readiness,
     build_phase3_program_readiness,
     build_phase7_rollout_readiness,
+    build_phase8_steady_state_readiness,
     build_pilot_readiness,
     build_pilot_signoff,
     build_shop_pilot_scorecards,
@@ -60,6 +63,8 @@ from platform_apps.jobs.serializers import (
     MigrationRetirementReadinessSerializer,
     MigrationRolloutCheckpointEventSerializer,
     MigrationRolloutReadinessSerializer,
+    MigrationSteadyStateCheckpointEventSerializer,
+    MigrationSteadyStateReadinessSerializer,
     MigrationShopCheckpointEventSerializer,
     MigrationShadowSummarySerializer,
 )
@@ -680,6 +685,113 @@ class MigrationRolloutCheckpointEventListCreateView(generics.ListCreateAPIView):
         return Response(serializer.data, status=201)
 
 
+class MigrationSteadyStateCheckpointEventListCreateView(generics.ListCreateAPIView):
+    serializer_class = MigrationSteadyStateCheckpointEventSerializer
+    permission_classes = [IsPlatformAdminUser]
+    pagination_class = None
+
+    def get_queryset(self):
+        queryset = MigrationSteadyStateCheckpointEvent.objects.select_related("actor_user")
+        phase = self.request.query_params.get("phase", "").strip()
+        decision = self.request.query_params.get("decision", "").strip()
+
+        if phase:
+            queryset = queryset.filter(phase=phase)
+        if decision:
+            queryset = queryset.filter(decision=decision)
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        phase = str(request.data.get("phase") or "phase_8").strip() or "phase_8"
+        decision = str(request.data.get("decision") or "").strip()
+        note = str(request.data.get("note") or "").strip()
+
+        if not decision:
+            return Response({"detail": "decision is required."}, status=400)
+
+        if decision not in MigrationSteadyStateCheckpointDecision.values:
+            return Response({"detail": "Unknown steady-state checkpoint decision."}, status=400)
+
+        controls = list(
+            MigrationDomainControl.objects.select_related("shop")
+            .filter(domain__in=tuple(PHASE5_REQUIRED_DOMAINS))
+            .order_by("shop__name", "domain")
+        )
+        launch_events = list(
+            MigrationLaunchCheckpointEvent.objects.select_related("actor_user").order_by(
+                "-occurred_at", "-created_at"
+            )
+        )
+        go_live_events = list(
+            MigrationGoLiveCheckpointEvent.objects.select_related("actor_user").order_by(
+                "-occurred_at", "-created_at"
+            )
+        )
+        rollout_events = list(
+            MigrationRolloutCheckpointEvent.objects.select_related("actor_user").order_by(
+                "-occurred_at", "-created_at"
+            )
+        )
+        steady_state_events = list(
+            MigrationSteadyStateCheckpointEvent.objects.select_related("actor_user").order_by(
+                "-occurred_at", "-created_at"
+            )
+        )
+        steady_state_readiness = build_phase8_steady_state_readiness(
+            controls,
+            launch_events,
+            go_live_events,
+            rollout_events,
+            steady_state_events,
+        )
+
+        if steady_state_readiness["overall_status"] == "blocked":
+            return Response(
+                {
+                    "detail": "Phase 8 cannot be checkpointed before rollout completion.",
+                    "overall_status": steady_state_readiness["overall_status"],
+                    "recommended_action": steady_state_readiness["recommended_action"],
+                },
+                status=409,
+            )
+
+        if (
+            decision == MigrationSteadyStateCheckpointDecision.ACCEPT_STEADY_STATE
+            and steady_state_readiness["overall_status"]
+            not in {"steady_state_ready", "improvement_window", "operating_normally"}
+        ):
+            return Response(
+                {
+                    "detail": "Steady-state acceptance is blocked until rollout completion and governance blockers are clear.",
+                    "overall_status": steady_state_readiness["overall_status"],
+                    "recommended_action": steady_state_readiness["recommended_action"],
+                },
+                status=409,
+            )
+
+        event = MigrationSteadyStateCheckpointEvent.objects.create(
+            phase=phase,
+            actor_user=request.user,
+            decision=decision,
+            overall_status_snapshot=steady_state_readiness["overall_status"],
+            summary=steady_state_readiness["summary"],
+            recommended_action_snapshot=steady_state_readiness["recommended_action"],
+            metadata_json={
+                "note": note,
+                "shop_count": steady_state_readiness["shop_count"],
+                "latest_rollout_decision": steady_state_readiness["latest_rollout_decision"],
+                "rollout_completed": steady_state_readiness["rollout_completed"],
+                "steady_state_accepted": steady_state_readiness["steady_state_accepted"],
+                "improvement_window_active": steady_state_readiness["improvement_window_active"],
+                "architecture_review_active": steady_state_readiness["architecture_review_active"],
+                "incident_stabilization_active": steady_state_readiness["incident_stabilization_active"],
+            },
+            occurred_at=timezone.now(),
+        )
+        serializer = self.get_serializer(event)
+        return Response(serializer.data, status=201)
+
+
 class MigrationShadowSummaryListView(APIView):
     permission_classes = [IsPlatformAdminUser]
 
@@ -905,6 +1017,51 @@ class MigrationRolloutReadinessView(APIView):
             rollout_events,
         )
         serializer = MigrationRolloutReadinessSerializer(payload)
+        return Response(serializer.data)
+
+
+class MigrationSteadyStateReadinessView(APIView):
+    permission_classes = [IsPlatformAdminUser]
+
+    def get(self, request):
+        controls = list(
+            MigrationDomainControl.objects.select_related("shop")
+            .filter(domain__in=tuple(PHASE5_REQUIRED_DOMAINS))
+            .order_by("shop__name", "domain")
+        )
+        shop_id = request.query_params.get("shop_id", "").strip()
+        if shop_id:
+            controls = [control for control in controls if str(control.shop_id) == shop_id]
+
+        launch_events = list(
+            MigrationLaunchCheckpointEvent.objects.select_related("actor_user").order_by(
+                "-occurred_at", "-created_at"
+            )
+        )
+        go_live_events = list(
+            MigrationGoLiveCheckpointEvent.objects.select_related("actor_user").order_by(
+                "-occurred_at", "-created_at"
+            )
+        )
+        rollout_events = list(
+            MigrationRolloutCheckpointEvent.objects.select_related("actor_user").order_by(
+                "-occurred_at", "-created_at"
+            )
+        )
+        steady_state_events = list(
+            MigrationSteadyStateCheckpointEvent.objects.select_related("actor_user").order_by(
+                "-occurred_at", "-created_at"
+            )
+        )
+
+        payload = build_phase8_steady_state_readiness(
+            controls,
+            launch_events,
+            go_live_events,
+            rollout_events,
+            steady_state_events,
+        )
+        serializer = MigrationSteadyStateReadinessSerializer(payload)
         return Response(serializer.data)
 
 

@@ -12,6 +12,7 @@ import type {
   MigrationPilotPreparationResult,
   MigrationPilotVerificationResult,
   MigrationRolloutCheckpointEvent,
+  MigrationSteadyStateCheckpointEvent,
   MigrationShopCheckpointEvent,
 } from "@/lib/types";
 
@@ -587,6 +588,59 @@ export async function recordRolloutCheckpointAction(formData: FormData) {
       buildRedirectUrl({
         status: "error",
         action: "rollout-checkpoint",
+        phase,
+        decision,
+        message,
+      }),
+    );
+  }
+}
+
+
+export async function recordSteadyStateCheckpointAction(formData: FormData) {
+  const phase = getOptionalField(formData, "phase") || "phase_8";
+  const decision = getOptionalField(formData, "decision");
+
+  if (!decision) {
+    redirect(
+      buildRedirectUrl({
+        status: "error",
+        action: "steady-state-checkpoint",
+        message: "Missing steady-state checkpoint decision.",
+      }),
+    );
+  }
+
+  try {
+    const result = await apiMutation<MigrationSteadyStateCheckpointEvent>(
+      "/migration/steady-state-checkpoints/",
+      {
+        method: "POST",
+        body: {
+          phase,
+          decision,
+        },
+      },
+    );
+    revalidatePath("/migration");
+    redirect(
+      buildRedirectUrl({
+        status: "success",
+        action: "steady-state-checkpoint",
+        phase: result.phase,
+        decision: result.decision,
+        steadyStateCheckpointStatus: result.overall_status_snapshot,
+      }),
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message.replace(/\s+/g, " ").slice(0, 220)
+        : "Unknown steady-state checkpoint failure.";
+    redirect(
+      buildRedirectUrl({
+        status: "error",
+        action: "steady-state-checkpoint",
         phase,
         decision,
         message,

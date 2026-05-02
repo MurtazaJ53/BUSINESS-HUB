@@ -11,6 +11,7 @@ from platform_apps.jobs.models import (
     MigrationPhaseCheckpointEvent,
     MigrationJobRun,
     MigrationRolloutCheckpointEvent,
+    MigrationSteadyStateCheckpointEvent,
     MigrationShopCheckpointEvent,
 )
 
@@ -278,6 +279,35 @@ class MigrationRolloutCheckpointEventSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MigrationRolloutCheckpointEvent
+        fields = (
+            "id",
+            "phase",
+            "actor_user",
+            "actor_name",
+            "decision",
+            "overall_status_snapshot",
+            "summary",
+            "recommended_action_snapshot",
+            "metadata_json",
+            "occurred_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+    def get_actor_name(self, obj):
+        if obj.actor_user_id and obj.actor_user.full_name:
+            return obj.actor_user.full_name
+        if obj.actor_user_id:
+            return obj.actor_user.email
+        return None
+
+
+class MigrationSteadyStateCheckpointEventSerializer(serializers.ModelSerializer):
+    actor_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MigrationSteadyStateCheckpointEvent
         fields = (
             "id",
             "phase",
@@ -599,6 +629,57 @@ class MigrationRolloutReadinessSerializer(serializers.Serializer):
     )
     latest_rollout_status_snapshot = serializers.CharField(allow_null=True)
     latest_rollout_at = serializers.DateTimeField(allow_null=True)
+    recommended_action = serializers.CharField()
+    summary = serializers.CharField()
+    shops = MigrationRetirementShopScorecardSerializer(many=True)
+
+
+class MigrationSteadyStateReadinessSerializer(serializers.Serializer):
+    phase = serializers.CharField()
+    overall_status = serializers.ChoiceField(
+        choices=[
+            "blocked",
+            "steady_state_ready",
+            "operating_normally",
+            "improvement_window",
+            "architecture_review_required",
+            "incident_stabilization",
+            "rollback_recommended",
+        ]
+    )
+    shop_count = serializers.IntegerField()
+    ready_for_launch_shop_count = serializers.IntegerField()
+    monitoring_shop_count = serializers.IntegerField()
+    blocked_shop_count = serializers.IntegerField()
+    rollback_recommended_shop_count = serializers.IntegerField()
+    latest_rollout_decision = serializers.ChoiceField(
+        choices=[
+            "advance_rollout_wave",
+            "hold_rollout_wave",
+            "scale_tuning_active",
+            "complete_rollout",
+            "rollback_shop_wave",
+        ],
+        allow_null=True,
+    )
+    latest_rollout_status_snapshot = serializers.CharField(allow_null=True)
+    latest_rollout_at = serializers.DateTimeField(allow_null=True)
+    latest_steady_state_decision = serializers.ChoiceField(
+        choices=[
+            "accept_steady_state",
+            "hold_for_improvement",
+            "architecture_review_required",
+            "incident_stabilization_active",
+        ],
+        allow_null=True,
+    )
+    latest_steady_state_status_snapshot = serializers.CharField(allow_null=True)
+    latest_steady_state_at = serializers.DateTimeField(allow_null=True)
+    rollout_completed = serializers.BooleanField()
+    steady_state_accepted = serializers.BooleanField()
+    improvement_window_active = serializers.BooleanField()
+    architecture_review_active = serializers.BooleanField()
+    incident_stabilization_active = serializers.BooleanField()
     recommended_action = serializers.CharField()
     summary = serializers.CharField()
     shops = MigrationRetirementShopScorecardSerializer(many=True)

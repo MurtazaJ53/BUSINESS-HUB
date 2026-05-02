@@ -28,6 +28,8 @@ import type {
   MigrationRetirementReadiness,
   MigrationRolloutCheckpointEvent,
   MigrationRolloutReadiness,
+  MigrationSteadyStateCheckpointEvent,
+  MigrationSteadyStateReadiness,
   MigrationShopCheckpointEvent,
   MigrationShadowSummary,
   MigrationStats,
@@ -256,6 +258,12 @@ export const getMigrationRolloutCheckpointEvents = cache(
   },
 );
 
+export const getMigrationSteadyStateCheckpointEvents = cache(
+  async (): Promise<MigrationSteadyStateCheckpointEvent[]> => {
+    return apiFetch<MigrationSteadyStateCheckpointEvent[]>("/migration/steady-state-checkpoints/");
+  },
+);
+
 export const getMigrationShadowSummaries = cache(async (): Promise<MigrationShadowSummary[]> => {
   return apiFetch<MigrationShadowSummary[]>("/migration/shadow-summaries/");
 });
@@ -293,6 +301,12 @@ export const getMigrationGoLiveReadiness = cache(
 export const getMigrationRolloutReadiness = cache(
   async (): Promise<MigrationRolloutReadiness> => {
     return apiFetch<MigrationRolloutReadiness>("/migration/rollout-readiness/");
+  },
+);
+
+export const getMigrationSteadyStateReadiness = cache(
+  async (): Promise<MigrationSteadyStateReadiness> => {
+    return apiFetch<MigrationSteadyStateReadiness>("/migration/steady-state-readiness/");
   },
 );
 

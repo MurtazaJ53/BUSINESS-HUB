@@ -91,6 +91,13 @@ class MigrationRolloutCheckpointDecision(models.TextChoices):
     ROLLBACK_SHOP_WAVE = "rollback_shop_wave", "Rollback shop wave"
 
 
+class MigrationSteadyStateCheckpointDecision(models.TextChoices):
+    ACCEPT_STEADY_STATE = "accept_steady_state", "Accept steady state"
+    HOLD_FOR_IMPROVEMENT = "hold_for_improvement", "Hold for improvement"
+    ARCHITECTURE_REVIEW_REQUIRED = "architecture_review_required", "Architecture review required"
+    INCIDENT_STABILIZATION_ACTIVE = "incident_stabilization_active", "Incident stabilization active"
+
+
 class ReconciliationSeverity(models.TextChoices):
     INFO = "info", "Info"
     WARNING = "warning", "Warning"

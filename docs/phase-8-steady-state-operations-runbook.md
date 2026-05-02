@@ -136,3 +136,8 @@ Phase 8 is successful when Business Hub is not just live, but:
 - supportable,
 - cost-aware,
 - and safe to evolve.
+
+## Supporting references
+
+- [Dependency Upgrade Policy](./dependency-upgrade-policy.md)
+- [Phase 8 Quarterly Architecture Review Checklist](./phase-8-quarterly-architecture-review-checklist.md)
