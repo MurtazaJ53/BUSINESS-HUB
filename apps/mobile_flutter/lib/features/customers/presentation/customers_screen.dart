@@ -20,6 +20,7 @@ class CustomersScreen extends ConsumerStatefulWidget {
 class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _search = '';
+  String _statusFilter = 'all';
   Future<List<BackendCustomerSummary>>? _backendLookupFuture;
   String? _backendLookupKey;
 
@@ -173,32 +174,57 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                 MobilePanel(
                   title: 'Customer lookup',
                   action: MobileTag(
-                    label: _search.isEmpty ? 'ALL KNOWN BUYERS' : 'FILTERED',
+                    label: _statusFilter == 'all'
+                        ? (_search.isEmpty ? 'ALL KNOWN BUYERS' : 'FILTERED')
+                        : _statusFilter.replaceAll('_', ' ').toUpperCase(),
                     icon: Icons.manage_search_rounded,
                     accent: const Color(0xFF14B8A6),
                   ),
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (value) {
-                      setState(() {
-                        _search = value;
-                      });
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Search customer name or phone',
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      suffixIcon: _search.isEmpty
-                          ? null
-                          : IconButton(
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {
-                                  _search = '';
-                                });
-                              },
-                              icon: const Icon(Icons.close_rounded),
-                            ),
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      TextField(
+                        controller: _searchController,
+                        onChanged: (value) {
+                          setState(() {
+                            _search = value;
+                          });
+                        },
+                        decoration: InputDecoration(
+                          hintText: 'Search customer name or phone',
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          suffixIcon: _search.isEmpty
+                              ? null
+                              : IconButton(
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() {
+                                      _search = '';
+                                    });
+                                  },
+                                  icon: const Icon(Icons.close_rounded),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _customerStatusFilters
+                            .map(
+                              (filter) => _CustomerFilterChip(
+                                label: filter.label,
+                                active: _statusFilter == filter.value,
+                                onTap: () {
+                                  setState(() {
+                                    _statusFilter = filter.value;
+                                  });
+                                },
+                              ),
+                            )
+                            .toList(growable: false),
+                      ),
+                    ],
                   ),
                 ),
                 if (domainState.isPostgresPrimary &&
@@ -249,6 +275,9 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
 
                       final customers =
                           snapshot.data ?? const <BackendCustomerSummary>[];
+                      final filteredCustomers = _applyBackendCustomerFilters(
+                        customers,
+                      );
                       if (customers.isEmpty) {
                         return MobilePanel(
                           title: 'Customer ledger view',
@@ -285,16 +314,73 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                         );
                       }
 
+                      final summary =
+                          _BackendCustomerSummaryReport.fromCustomers(
+                            filteredCustomers,
+                          );
                       return MobilePanel(
                         title: 'Customer ledger view',
                         action: MobileTag(
-                          label: '${customers.length} live',
+                          label: '${filteredCustomers.length} live',
                           icon: Icons.verified_rounded,
                           accent: const Color(0xFF22C55E),
                         ),
                         child: Column(
-                          children: customers
-                              .map(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            if (filteredCustomers.isEmpty)
+                              const MobileEmptyState(
+                                icon: Icons.groups_outlined,
+                                title: 'No customers matched this view',
+                                body:
+                                    'Broaden the search or customer filter to bring more ledger accounts into view.',
+                              )
+                            else ...<Widget>[
+                              Wrap(
+                                spacing: 10,
+                                runSpacing: 10,
+                                children: <Widget>[
+                                  _CustomerSummaryTile(
+                                    label: 'Visible',
+                                    value: '${summary.visibleCount}',
+                                    tone: const Color(0xFF14B8A6),
+                                  ),
+                                  _CustomerSummaryTile(
+                                    label: 'Receivable',
+                                    value: formatCurrency(
+                                      summary.receivableBalance,
+                                    ),
+                                    tone: summary.receivableBalance > 0
+                                        ? const Color(0xFFF59E0B)
+                                        : const Color(0xFF22C55E),
+                                  ),
+                                  _CustomerSummaryTile(
+                                    label: 'With due',
+                                    value: '${summary.dueCount}',
+                                    tone: const Color(0xFFFB7185),
+                                  ),
+                                  _CustomerSummaryTile(
+                                    label: 'Inactive',
+                                    value: '${summary.inactiveCount}',
+                                    tone: const Color(0xFFA78BFA),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
+                              Text(
+                                summary.highestBalanceCustomer == null
+                                    ? 'No customer currently holds a due balance.'
+                                    : 'Highest due: ${summary.highestBalanceCustomer!.name} · ${formatCurrency(summary.highestBalanceCustomer!.balance)}',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.62,
+                                      ),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
+                              const SizedBox(height: 14),
+                              ...filteredCustomers.map(
                                 (customer) => Padding(
                                   padding: const EdgeInsets.only(bottom: 12),
                                   child: _BackendCustomerRow(
@@ -313,8 +399,9 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                                     },
                                   ),
                                 ),
-                              )
-                              .toList(growable: false),
+                              ),
+                            ],
+                          ],
                         ),
                       );
                     },
@@ -360,6 +447,21 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
       _backendLookupFuture = null;
       _backendLookupKey = null;
     });
+  }
+
+  List<BackendCustomerSummary> _applyBackendCustomerFilters(
+    List<BackendCustomerSummary> customers,
+  ) {
+    return customers
+        .where((customer) {
+          return switch (_statusFilter) {
+            'with_due' => customer.balance > 0.009,
+            'active_only' => customer.status.toLowerCase() == 'active',
+            'inactive_only' => customer.status.toLowerCase() != 'active',
+            _ => true,
+          };
+        })
+        .toList(growable: false);
   }
 
   Future<bool?> _openLedgerSheet(
@@ -481,6 +583,26 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                             icon: const Icon(Icons.edit_note_rounded),
                             label: const Text('Record payment or adjustment'),
                           ),
+                          if (customer.balance > 0.009)
+                            FilledButton.tonalIcon(
+                              onPressed: () async {
+                                final changed = await _showLedgerMutationDialog(
+                                  context,
+                                  backendApiClient: backendApiClient,
+                                  session: session,
+                                  customer: customer,
+                                  initialEventType: 'payment',
+                                  initialAmount: customer.balance,
+                                  initialNote:
+                                      'Full settlement from mobile ledger',
+                                );
+                                if (changed == true && context.mounted) {
+                                  Navigator.of(context).pop(true);
+                                }
+                              },
+                              icon: const Icon(Icons.payments_rounded),
+                              label: const Text('Settle full due'),
+                            ),
                         ],
                       ),
                     ],
@@ -588,10 +710,15 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     required BackendApiClient backendApiClient,
     required MobileSession session,
     required BackendCustomerSummary customer,
+    String initialEventType = 'payment',
+    double? initialAmount,
+    String? initialNote,
   }) async {
-    final amountController = TextEditingController();
-    final noteController = TextEditingController();
-    var eventType = 'payment';
+    final amountController = TextEditingController(
+      text: initialAmount == null ? '' : initialAmount.toStringAsFixed(2),
+    );
+    final noteController = TextEditingController(text: initialNote ?? '');
+    var eventType = initialEventType;
 
     try {
       final result = await showDialog<bool>(
@@ -630,6 +757,14 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
+                    Text(
+                      'Current balance ${formatCurrency(customer.balance)}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.68),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: amountController,
                       keyboardType: const TextInputType.numberWithOptions(
@@ -640,6 +775,9 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                         labelText: eventType == 'payment'
                             ? 'Amount received'
                             : 'Balance delta (+ add due, - reduce)',
+                        helperText: eventType == 'payment'
+                            ? 'Payments reduce the customer due balance.'
+                            : 'Positive adds receivable, negative reduces it.',
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -983,6 +1121,99 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
   }
 }
 
+class _CustomerFilterChip extends StatelessWidget {
+  const _CustomerFilterChip({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = const Color(0xFF14B8A6);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: active
+                ? accent.withValues(alpha: 0.16)
+                : Colors.white.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: active
+                  ? accent.withValues(alpha: 0.52)
+                  : Colors.white.withValues(alpha: 0.06),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: active ? accent : Colors.white.withValues(alpha: 0.78),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CustomerSummaryTile extends StatelessWidget {
+  const _CustomerSummaryTile({
+    required this.label,
+    required this.value,
+    required this.tone,
+  });
+
+  final String label;
+  final String value;
+  final Color tone;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1220),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: tone.withValues(alpha: 0.18)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: Colors.white.withValues(alpha: 0.58),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: tone,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _BackendCustomerRow extends StatelessWidget {
   const _BackendCustomerRow({required this.customer, required this.onTap});
 
@@ -1070,6 +1301,53 @@ class _BackendCustomerRow extends StatelessWidget {
   }
 }
 
+class _BackendCustomerSummaryReport {
+  const _BackendCustomerSummaryReport({
+    required this.visibleCount,
+    required this.dueCount,
+    required this.inactiveCount,
+    required this.receivableBalance,
+    required this.highestBalanceCustomer,
+  });
+
+  final int visibleCount;
+  final int dueCount;
+  final int inactiveCount;
+  final double receivableBalance;
+  final BackendCustomerSummary? highestBalanceCustomer;
+
+  factory _BackendCustomerSummaryReport.fromCustomers(
+    List<BackendCustomerSummary> customers,
+  ) {
+    var dueCount = 0;
+    var inactiveCount = 0;
+    var receivableBalance = 0.0;
+    BackendCustomerSummary? highestBalanceCustomer;
+
+    for (final customer in customers) {
+      if (customer.balance > 0.009) {
+        dueCount += 1;
+        receivableBalance += customer.balance;
+        if (highestBalanceCustomer == null ||
+            customer.balance > highestBalanceCustomer.balance) {
+          highestBalanceCustomer = customer;
+        }
+      }
+      if (customer.status.toLowerCase() != 'active') {
+        inactiveCount += 1;
+      }
+    }
+
+    return _BackendCustomerSummaryReport(
+      visibleCount: customers.length,
+      dueCount: dueCount,
+      inactiveCount: inactiveCount,
+      receivableBalance: receivableBalance,
+      highestBalanceCustomer: highestBalanceCustomer,
+    );
+  }
+}
+
 class _LocalCustomerRow extends StatelessWidget {
   const _LocalCustomerRow({required this.customer});
 
@@ -1152,3 +1430,18 @@ class _LocalCustomerRow extends StatelessWidget {
     );
   }
 }
+
+class _CustomerStatusFilterOption {
+  const _CustomerStatusFilterOption({required this.value, required this.label});
+
+  final String value;
+  final String label;
+}
+
+const List<_CustomerStatusFilterOption> _customerStatusFilters =
+    <_CustomerStatusFilterOption>[
+      _CustomerStatusFilterOption(value: 'all', label: 'All'),
+      _CustomerStatusFilterOption(value: 'with_due', label: 'With due'),
+      _CustomerStatusFilterOption(value: 'active_only', label: 'Active'),
+      _CustomerStatusFilterOption(value: 'inactive_only', label: 'Inactive'),
+    ];

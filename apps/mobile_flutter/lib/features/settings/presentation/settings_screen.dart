@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/backend/backend_api_client.dart';
 import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
+import '../../../core/models/mobile_session.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/utils/formatters.dart';
@@ -66,6 +67,23 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 18),
             MobilePanel(
               title: 'Workspace identity',
+              action: MobileTag(
+                label:
+                    session != null &&
+                        (session.isAdmin || session.isElevatedAdmin)
+                    ? 'ADMIN EDIT'
+                    : 'VIEW ONLY',
+                icon:
+                    session != null &&
+                        (session.isAdmin || session.isElevatedAdmin)
+                    ? Icons.edit_rounded
+                    : Icons.lock_outline_rounded,
+                accent:
+                    session != null &&
+                        (session.isAdmin || session.isElevatedAdmin)
+                    ? const Color(0xFF14B8A6)
+                    : const Color(0xFFA78BFA),
+              ),
               child: Column(
                 children: <Widget>[
                   _SettingsRow(
@@ -95,6 +113,32 @@ class SettingsScreen extends ConsumerWidget {
                     value: backendApiClient.baseUrl,
                     icon: Icons.cloud_outlined,
                   ),
+                  if (session != null &&
+                      (session.isAdmin || session.isElevatedAdmin)) ...<Widget>[
+                    const SizedBox(height: 6),
+                    FilledButton.tonalIcon(
+                      onPressed: () async {
+                        final changed = await _showWorkspaceSettingsDialog(
+                          context,
+                          currentShop: shop,
+                          session: session,
+                          syncCoordinator: syncCoordinator,
+                        );
+                        if (changed != true || !context.mounted) {
+                          return;
+                        }
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Workspace settings saved and queued to the live shop document.',
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.edit_note_rounded),
+                      label: const Text('Edit workspace settings'),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -279,6 +323,138 @@ class SettingsScreen extends ConsumerWidget {
         );
       },
     );
+  }
+
+  Future<bool?> _showWorkspaceSettingsDialog(
+    BuildContext context, {
+    required ShopInfo currentShop,
+    required MobileSession session,
+    required MobileSyncCoordinator syncCoordinator,
+  }) async {
+    final taglineController = TextEditingController(text: currentShop.tagline);
+    final footerController = TextEditingController(text: currentShop.footer);
+    final phoneController = TextEditingController(text: currentShop.phone);
+    var saving = false;
+
+    try {
+      return await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return AlertDialog(
+                title: const Text('Edit workspace settings'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'These values update the local workspace immediately and then sync back to the live shop document for ${session.shopId}.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.66),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: taglineController,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(labelText: 'Tagline'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: footerController,
+                        minLines: 2,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'Receipt footer',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(
+                          labelText: 'Workspace phone',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: saving
+                        ? null
+                        : () => Navigator.of(dialogContext).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: saving
+                        ? null
+                        : () async {
+                            final tagline = taglineController.text.trim();
+                            final footer = footerController.text.trim();
+                            final phone = phoneController.text.trim();
+                            if (tagline.isEmpty || footer.isEmpty) {
+                              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Tagline and receipt footer are required.',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+                            setDialogState(() {
+                              saving = true;
+                            });
+                            try {
+                              await syncCoordinator.updateWorkspaceSettings(
+                                currentShop: currentShop,
+                                tagline: tagline,
+                                footer: footer,
+                                phone: phone,
+                              );
+                              if (dialogContext.mounted) {
+                                Navigator.of(dialogContext).pop(true);
+                              }
+                            } catch (error) {
+                              if (dialogContext.mounted) {
+                                ScaffoldMessenger.of(
+                                  dialogContext,
+                                ).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Workspace save failed: $error',
+                                    ),
+                                  ),
+                                );
+                              }
+                              setDialogState(() {
+                                saving = false;
+                              });
+                            }
+                          },
+                    child: saving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Save'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      taglineController.dispose();
+      footerController.dispose();
+      phoneController.dispose();
+    }
   }
 }
 

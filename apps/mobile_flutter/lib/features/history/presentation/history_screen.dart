@@ -20,6 +20,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   CommerceSyncState? _selectedSyncState;
   String? _selectedPaymentMode;
   _HistoryDateWindow _selectedDateWindow = _HistoryDateWindow.all;
+  bool _onlyDueSales = false;
 
   @override
   void dispose() {
@@ -43,7 +44,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         )
         .map(
           (sales) => sales
-              .where((sale) => _matchesDateWindow(sale.date))
+              .where(
+                (sale) =>
+                    _matchesDateWindow(sale.date) &&
+                    (!_onlyDueSales || sale.hasOutstandingDue),
+              )
               .toList(growable: false),
         );
     final domainStatesStream = shopRepository.watchTrackedDomainStates(
@@ -243,6 +248,22 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                         .toList(growable: false),
                   ),
                   const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: <Widget>[
+                      _SyncFilterChip(
+                        label: _onlyDueSales ? 'Due only' : 'All balances',
+                        active: _onlyDueSales,
+                        onTap: () {
+                          setState(() {
+                            _onlyDueSales = !_onlyDueSales;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
                   FilledButton.tonalIcon(
                     onPressed:
                         overview.queuedSales > 0 || overview.failedSales > 0
@@ -353,6 +374,18 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                                       ? const Color(0xFFF59E0B)
                                       : const Color(0xFF22C55E),
                                 ),
+                                _HistoryMetricTile(
+                                  label: 'Avg ticket',
+                                  value: formatCurrency(
+                                    report.averageTicketValue,
+                                  ),
+                                  tone: const Color(0xFFA78BFA),
+                                ),
+                                _HistoryMetricTile(
+                                  label: 'Named buyers',
+                                  value: '${report.namedBuyerCount}',
+                                  tone: const Color(0xFF14B8A6),
+                                ),
                               ],
                             ),
                             const SizedBox(height: 14),
@@ -368,7 +401,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                             Text(
                               report.topPaymentMode == null
                                   ? 'No payment mode mix available yet.'
-                                  : 'Top mode ${report.topPaymentMode} · ${report.dueReceiptCount} receipt(s) still carry due balance.',
+                                  : 'Top mode ${report.topPaymentMode} · ${report.dueReceiptCount} receipt(s) still carry due balance · ${report.walkInCount} walk-in sale(s).',
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
                                     color: Colors.white.withValues(alpha: 0.54),
@@ -455,6 +488,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       ),
       _HistoryDateWindow.thirtyDays => !saleDate.isBefore(
         today.subtract(const Duration(days: 29)),
+      ),
+      _HistoryDateWindow.ninetyDays => !saleDate.isBefore(
+        today.subtract(const Duration(days: 89)),
       ),
     };
   }
@@ -1052,6 +1088,9 @@ class _HistoryReportSnapshot {
     required this.collectedTotal,
     required this.dueTotal,
     required this.dueReceiptCount,
+    required this.namedBuyerCount,
+    required this.walkInCount,
+    required this.averageTicketValue,
     required this.syncedCount,
     required this.queuedCount,
     required this.failedCount,
@@ -1063,6 +1102,9 @@ class _HistoryReportSnapshot {
   final double collectedTotal;
   final double dueTotal;
   final int dueReceiptCount;
+  final int namedBuyerCount;
+  final int walkInCount;
+  final double averageTicketValue;
   final int syncedCount;
   final int queuedCount;
   final int failedCount;
@@ -1073,6 +1115,8 @@ class _HistoryReportSnapshot {
     var collectedTotal = 0.0;
     var dueTotal = 0.0;
     var dueReceiptCount = 0;
+    var namedBuyerCount = 0;
+    var walkInCount = 0;
     var syncedCount = 0;
     var queuedCount = 0;
     var failedCount = 0;
@@ -1082,6 +1126,11 @@ class _HistoryReportSnapshot {
       grossTotal += sale.total;
       collectedTotal += sale.amountReceived;
       dueTotal += sale.amountDue;
+      if ((sale.customerName ?? '').trim().isNotEmpty) {
+        namedBuyerCount += 1;
+      } else {
+        walkInCount += 1;
+      }
       if (sale.hasOutstandingDue) {
         dueReceiptCount += 1;
       }
@@ -1120,6 +1169,9 @@ class _HistoryReportSnapshot {
       collectedTotal: collectedTotal,
       dueTotal: dueTotal,
       dueReceiptCount: dueReceiptCount,
+      namedBuyerCount: namedBuyerCount,
+      walkInCount: walkInCount,
+      averageTicketValue: sales.isEmpty ? 0 : grossTotal / sales.length,
       syncedCount: syncedCount,
       queuedCount: queuedCount,
       failedCount: failedCount,
@@ -1142,7 +1194,8 @@ enum _HistoryDateWindow {
   all('All time'),
   today('Today'),
   sevenDays('7 days'),
-  thirtyDays('30 days');
+  thirtyDays('30 days'),
+  ninetyDays('90 days');
 
   const _HistoryDateWindow(this.label);
 

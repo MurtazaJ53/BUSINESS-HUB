@@ -194,6 +194,57 @@ class MobileSyncCoordinator {
 
   Future<void> refresh() => handleSession(_session, force: true);
 
+  Future<void> updateWorkspaceSettings({
+    required ShopInfo currentShop,
+    required String tagline,
+    required String footer,
+    required String phone,
+  }) async {
+    final session = _session;
+    if (session == null || !session.hasShop) {
+      throw StateError(
+        'No active workspace is attached to this mobile session.',
+      );
+    }
+    if (!(session.isAdmin || session.isElevatedAdmin)) {
+      throw StateError(
+        'Only workspace admins can change mobile workspace settings.',
+      );
+    }
+
+    setStatus(MobileSyncStatus.syncing);
+    final payload = <String, dynamic>{
+      'name': currentShop.name,
+      'tagline': tagline,
+      'footer': footer,
+      'phone': phone,
+      'currency': currentShop.currency,
+      'settings': <String, dynamic>{
+        'name': currentShop.name,
+        'tagline': tagline,
+        'footer': footer,
+        'phone': phone,
+        'currency': currentShop.currency,
+      },
+    };
+
+    try {
+      await _shopRepository.saveShopDocument(payload);
+      await _firestore.doc('shops/${session.shopId!}').set(<String, dynamic>{
+        ...payload,
+        'settings': <String, dynamic>{
+          ...(payload['settings'] as Map<String, dynamic>),
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+      }, SetOptions(merge: true));
+      setStatus(MobileSyncStatus.idle);
+    } catch (error) {
+      debugPrint('Workspace settings update failed: $error');
+      setStatus(MobileSyncStatus.error);
+      rethrow;
+    }
+  }
+
   Future<CommerceSyncResult> submitSale(LocalSaleCommit commit) async {
     final session = _session;
     if (session == null || !session.hasShop) {
