@@ -18,6 +18,7 @@ The Flutter app now exposes build metadata inside Settings:
 
 Operators should verify those values on-device before pilot distribution.
 The Settings screen also now provides a copyable pilot launch snapshot for release tickets and rollout threads.
+It also now provides an operator action center that recommends the next operational move from the device itself.
 It also supports an end-of-shift closeout report so the next operator or rollout lead can see how the device actually finished.
 It also supports a final rollout evidence pack so the rollout lead can archive one combined operator record for the wave.
 It also supports an incident escalation pack when rollout support needs a direct device-side failure export.
@@ -101,6 +102,7 @@ Reference sheet:
 - [D:/business-hub/docs/mobile-pilot-shift-closeout.md](D:/business-hub/docs/mobile-pilot-shift-closeout.md)
 - [D:/business-hub/docs/mobile-pilot-rollout-evidence-pack.md](D:/business-hub/docs/mobile-pilot-rollout-evidence-pack.md)
 - [D:/business-hub/docs/mobile-pilot-incident-escalation-pack.md](D:/business-hub/docs/mobile-pilot-incident-escalation-pack.md)
+- [D:/business-hub/docs/mobile-operator-action-center.md](D:/business-hub/docs/mobile-operator-action-center.md)
 
 1. login
 2. inventory lookup

@@ -71,6 +71,7 @@ When preparing a real APK handoff, use:
 - [D:/business-hub/docs/mobile-pilot-shift-closeout.md](D:/business-hub/docs/mobile-pilot-shift-closeout.md)
 - [D:/business-hub/docs/mobile-pilot-rollout-evidence-pack.md](D:/business-hub/docs/mobile-pilot-rollout-evidence-pack.md)
 - [D:/business-hub/docs/mobile-pilot-incident-escalation-pack.md](D:/business-hub/docs/mobile-pilot-incident-escalation-pack.md)
+- [D:/business-hub/docs/mobile-operator-action-center.md](D:/business-hub/docs/mobile-operator-action-center.md)
 
 Versioning currently follows `pubspec.yaml`:
 
@@ -111,6 +112,7 @@ The mobile app now includes:
 The remaining work is mostly production polish and deeper analytics, not basic workflow absence.
 
 The Settings screen also now includes a copyable pilot launch snapshot so operators can archive build, queue, and domain posture directly from a real device.
+It now also includes an operator action center that recommends the next operational move based on live readiness and recovery posture.
 It also includes a recovery desk for queued or failed receipt replay during pilot rollout.
 It now also includes a readiness signoff verdict so a rollout lead can decide whether the device is safe to start a pilot shift.
 It also includes a full handoff pack copy action so release evidence can be archived from the device in one paste.

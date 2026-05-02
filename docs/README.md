@@ -67,12 +67,13 @@ It is designed to support:
 43. [Mobile Pilot Shift Closeout](./mobile-pilot-shift-closeout.md)
 44. [Mobile Pilot Rollout Evidence Pack](./mobile-pilot-rollout-evidence-pack.md)
 45. [Mobile Pilot Incident Escalation Pack](./mobile-pilot-incident-escalation-pack.md)
+46. [Mobile Operator Action Center](./mobile-operator-action-center.md)
 
 ### Existing strategy docs
 
-46. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
-47. [Global Scale Blueprint](./global-scale-blueprint.md)
-48. [Scale Certification Checklist](./scale-certification-checklist.md)
+47. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
+48. [Global Scale Blueprint](./global-scale-blueprint.md)
+49. [Scale Certification Checklist](./scale-certification-checklist.md)
 
 ## Current truth
 
@@ -124,6 +125,7 @@ As of April 29, 2026:
 - then Mobile Pilot Shift Closeout
 - then Mobile Pilot Rollout Evidence Pack
 - then Mobile Pilot Incident Escalation Pack
+- then Mobile Operator Action Center
 
 ## Notes
 

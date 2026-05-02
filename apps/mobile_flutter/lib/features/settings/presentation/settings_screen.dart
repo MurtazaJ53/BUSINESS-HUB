@@ -10,6 +10,7 @@ import '../../../core/runtime/app_runtime_info.dart';
 import '../../../core/runtime/pilot_diagnostics_snapshot.dart';
 import '../../../core/runtime/pilot_handoff_report.dart';
 import '../../../core/runtime/pilot_incident_escalation_report.dart';
+import '../../../core/runtime/pilot_operator_action_plan.dart';
 import '../../../core/runtime/pilot_readiness_report.dart';
 import '../../../core/runtime/pilot_recovery_report.dart';
 import '../../../core/runtime/pilot_rollout_evidence_report.dart';
@@ -561,9 +562,259 @@ class SettingsScreen extends ConsumerWidget {
                                     readinessReport: readinessReport,
                                     recoveryReport: recoveryReport,
                                   );
+                            final actionPlan =
+                                diagnostics == null ||
+                                    readinessReport == null ||
+                                    recoveryReport == null
+                                ? null
+                                : PilotOperatorActionPlan.evaluate(
+                                    diagnosticsSnapshot: diagnostics,
+                                    readinessReport: readinessReport,
+                                    recoveryReport: recoveryReport,
+                                  );
 
                             return Column(
                               children: <Widget>[
+                                MobilePanel(
+                                  title: 'Operator action center',
+                                  action: MobileTag(
+                                    label: actionPlan == null
+                                        ? 'Loading'
+                                        : actionPlan.actionLabel.toUpperCase(),
+                                    icon: actionPlan == null
+                                        ? Icons.sync_rounded
+                                        : actionPlan.isIncidentAction
+                                        ? Icons.crisis_alert_rounded
+                                        : actionPlan.isRecoveryAction
+                                        ? Icons.build_circle_rounded
+                                        : actionPlan.isSmokeAction
+                                        ? Icons.playlist_add_check_circle_rounded
+                                        : Icons.assignment_turned_in_rounded,
+                                    accent: actionPlan == null
+                                        ? const Color(0xFFF59E0B)
+                                        : actionPlan.isIncidentAction
+                                        ? const Color(0xFFFB7185)
+                                        : actionPlan.isRecoveryAction
+                                        ? const Color(0xFFF59E0B)
+                                        : const Color(0xFF22C55E),
+                                  ),
+                                  child: actionPlan == null
+                                      ? const MobileEmptyState(
+                                          icon: Icons.sync_rounded,
+                                          title: 'Preparing operator action plan',
+                                          body:
+                                              'The device is still resolving readiness, recovery, and queue posture.',
+                                        )
+                                      : Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: <Widget>[
+                                            Text(
+                                              actionPlan.summary,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color: Colors.white
+                                                        .withValues(
+                                                          alpha: 0.68,
+                                                        ),
+                                                    fontWeight: FontWeight.w600,
+                                                    height: 1.45,
+                                                  ),
+                                            ),
+                                            const SizedBox(height: 14),
+                                            ...actionPlan.reasons.map(
+                                              (reason) => _ReadinessNoteRow(
+                                                message: reason,
+                                                tone: actionPlan.isIncidentAction
+                                                    ? const Color(0xFFFB7185)
+                                                    : actionPlan.isRecoveryAction
+                                                    ? const Color(0xFFF59E0B)
+                                                    : const Color(0xFF22C55E),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 14),
+                                            LayoutBuilder(
+                                              builder: (context, constraints) {
+                                                final stacked =
+                                                    constraints.maxWidth < 430;
+                                                final buttons = <Widget>[
+                                                  Expanded(
+                                                    child: FilledButton.tonalIcon(
+                                                      onPressed: () async {
+                                                        if (actionPlan
+                                                            .isIncidentAction) {
+                                                          final report =
+                                                              await _showPilotIncidentEscalationDialog(
+                                                                context,
+                                                                diagnosticsSnapshot:
+                                                                    diagnostics!,
+                                                                readinessReport:
+                                                                    readinessReport!,
+                                                                recoveryReport:
+                                                                    recoveryReport!,
+                                                              );
+                                                          if (report == null ||
+                                                              !context.mounted) {
+                                                            return;
+                                                          }
+                                                          ScaffoldMessenger.of(
+                                                            context,
+                                                          ).showSnackBar(
+                                                            SnackBar(
+                                                              content: Text(
+                                                                'Incident escalation pack copied with decision ${report.escalationDecisionLabel}.',
+                                                              ),
+                                                            ),
+                                                          );
+                                                          return;
+                                                        }
+
+                                                        if (actionPlan
+                                                            .isRecoveryAction) {
+                                                          await Clipboard.setData(
+                                                            ClipboardData(
+                                                              text: recoveryReport!
+                                                                  .toMultilineText(),
+                                                            ),
+                                                          );
+                                                          if (!context.mounted) {
+                                                            return;
+                                                          }
+                                                          ScaffoldMessenger.of(
+                                                            context,
+                                                          ).showSnackBar(
+                                                            const SnackBar(
+                                                              content: Text(
+                                                                'Recovery report copied for the next operator action.',
+                                                              ),
+                                                            ),
+                                                          );
+                                                          return;
+                                                        }
+
+                                                        if (actionPlan
+                                                            .isSmokeAction) {
+                                                          final report =
+                                                              await _showPilotSmokeChecklistDialog(
+                                                                context,
+                                                                diagnosticsSnapshot:
+                                                                    diagnostics!,
+                                                                readinessReport:
+                                                                    readinessReport!,
+                                                              );
+                                                          if (report == null ||
+                                                              !context.mounted) {
+                                                            return;
+                                                          }
+                                                          ScaffoldMessenger.of(
+                                                            context,
+                                                          ).showSnackBar(
+                                                            SnackBar(
+                                                              content: Text(
+                                                                'Pilot smoke report copied with verdict ${report.verdictLabel}.',
+                                                              ),
+                                                            ),
+                                                          );
+                                                          return;
+                                                        }
+
+                                                        await Clipboard.setData(
+                                                          ClipboardData(
+                                                            text: diagnostics!
+                                                                .toMultilineText(),
+                                                          ),
+                                                        );
+                                                        if (!context.mounted) {
+                                                          return;
+                                                        }
+                                                        ScaffoldMessenger.of(
+                                                          context,
+                                                        ).showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text(
+                                                              'Pilot snapshot copied for the next operator step.',
+                                                            ),
+                                                          ),
+                                                        );
+                                                      },
+                                                      icon: Icon(
+                                                        actionPlan
+                                                                .isIncidentAction
+                                                            ? Icons
+                                                                  .crisis_alert_rounded
+                                                            : actionPlan
+                                                                  .isRecoveryAction
+                                                            ? Icons
+                                                                  .health_and_safety_rounded
+                                                            : actionPlan
+                                                                  .isSmokeAction
+                                                            ? Icons
+                                                                  .assignment_turned_in_rounded
+                                                            : Icons
+                                                                  .copy_all_rounded,
+                                                      ),
+                                                      label: Text(
+                                                        actionPlan.actionLabel,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Expanded(
+                                                    child: FilledButton.tonalIcon(
+                                                      onPressed: () async {
+                                                        await Clipboard.setData(
+                                                          ClipboardData(
+                                                            text: actionPlan
+                                                                .toMultilineText(),
+                                                          ),
+                                                        );
+                                                        if (!context.mounted) {
+                                                          return;
+                                                        }
+                                                        ScaffoldMessenger.of(
+                                                          context,
+                                                        ).showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text(
+                                                              'Operator action brief copied.',
+                                                            ),
+                                                          ),
+                                                        );
+                                                      },
+                                                      icon: const Icon(
+                                                        Icons.copy_all_rounded,
+                                                      ),
+                                                      label: const Text(
+                                                        'Copy action brief',
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ];
+
+                                                if (stacked) {
+                                                  return Column(
+                                                    children: <Widget>[
+                                                      buttons[0],
+                                                      const SizedBox(height: 10),
+                                                      buttons[1],
+                                                    ],
+                                                  );
+                                                }
+
+                                                return Row(
+                                                  children: <Widget>[
+                                                    buttons[0],
+                                                    const SizedBox(width: 10),
+                                                    buttons[1],
+                                                  ],
+                                                );
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                                const SizedBox(height: 18),
                                 MobilePanel(
                                   title: 'Pilot readiness signoff',
                                   action: MobileTag(
