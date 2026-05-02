@@ -8,6 +8,7 @@ import '../../../core/models/mobile_models.dart';
 import '../../../core/models/mobile_session.dart';
 import '../../../core/runtime/app_runtime_info.dart';
 import '../../../core/runtime/pilot_diagnostics_snapshot.dart';
+import '../../../core/runtime/pilot_evidence_tracker.dart';
 import '../../../core/runtime/pilot_handoff_report.dart';
 import '../../../core/runtime/pilot_incident_escalation_report.dart';
 import '../../../core/runtime/pilot_operator_action_plan.dart';
@@ -33,6 +34,10 @@ class SettingsScreen extends ConsumerWidget {
     final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
     final syncStatus = ref.watch(syncStatusProvider);
     final runtimeInfoAsync = ref.watch(appRuntimeInfoProvider);
+    final evidenceTracker = ref.watch(pilotEvidenceTrackerProvider);
+    final evidenceTrackerNotifier = ref.read(
+      pilotEvidenceTrackerProvider.notifier,
+    );
     final shopStream = shopRepository.watchShopInfo();
     final historyStream = salesRepository.watchHistoryOverview();
     final domainStatesStream = shopRepository.watchTrackedDomainStates(
@@ -40,6 +45,10 @@ class SettingsScreen extends ConsumerWidget {
     );
     final pendingOutboxStream = salesRepository.watchPendingOutboxCount();
     final outboxAttentionStream = salesRepository.watchOutboxAttentionEntries();
+
+    void markEvidenceCaptured(String artifactId) {
+      evidenceTrackerNotifier.markCaptured(artifactId);
+    }
 
     return StreamBuilder<ShopInfo>(
       stream: shopStream,
@@ -475,6 +484,9 @@ class SettingsScreen extends ConsumerWidget {
                                             text: snapshot.toMultilineText(),
                                           ),
                                         );
+                                        markEvidenceCaptured(
+                                          'pilot_snapshot',
+                                        );
                                         if (!context.mounted) {
                                           return;
                                         }
@@ -655,8 +667,13 @@ class SettingsScreen extends ConsumerWidget {
                                                                 recoveryReport:
                                                                     recoveryReport!,
                                                               );
-                                                          if (report == null ||
-                                                              !context.mounted) {
+                                                          if (report == null) {
+                                                            return;
+                                                          }
+                                                          markEvidenceCaptured(
+                                                            'incident_escalation',
+                                                          );
+                                                          if (!context.mounted) {
                                                             return;
                                                           }
                                                           ScaffoldMessenger.of(
@@ -678,6 +695,9 @@ class SettingsScreen extends ConsumerWidget {
                                                               text: recoveryReport!
                                                                   .toMultilineText(),
                                                             ),
+                                                          );
+                                                          markEvidenceCaptured(
+                                                            'recovery_report',
                                                           );
                                                           if (!context.mounted) {
                                                             return;
@@ -704,8 +724,13 @@ class SettingsScreen extends ConsumerWidget {
                                                                 readinessReport:
                                                                     readinessReport!,
                                                               );
-                                                          if (report == null ||
-                                                              !context.mounted) {
+                                                          if (report == null) {
+                                                            return;
+                                                          }
+                                                          markEvidenceCaptured(
+                                                            'smoke_report',
+                                                          );
+                                                          if (!context.mounted) {
                                                             return;
                                                           }
                                                           ScaffoldMessenger.of(
@@ -725,6 +750,9 @@ class SettingsScreen extends ConsumerWidget {
                                                             text: diagnostics!
                                                                 .toMultilineText(),
                                                           ),
+                                                        );
+                                                        markEvidenceCaptured(
+                                                          'pilot_snapshot',
                                                         );
                                                         if (!context.mounted) {
                                                           return;
@@ -768,6 +796,9 @@ class SettingsScreen extends ConsumerWidget {
                                                             text: actionPlan
                                                                 .toMultilineText(),
                                                           ),
+                                                        );
+                                                        markEvidenceCaptured(
+                                                          'operator_action_brief',
                                                         );
                                                         if (!context.mounted) {
                                                           return;
@@ -813,6 +844,176 @@ class SettingsScreen extends ConsumerWidget {
                                             ),
                                           ],
                                         ),
+                                ),
+                                const SizedBox(height: 18),
+                                MobilePanel(
+                                  title: 'Evidence tracker',
+                                  action: MobileTag(
+                                    label: evidenceTracker.statusLabel,
+                                    icon: evidenceTracker.isCoreComplete
+                                        ? Icons.task_alt_rounded
+                                        : Icons.assignment_late_rounded,
+                                    accent: evidenceTracker.isCoreComplete
+                                        ? const Color(0xFF22C55E)
+                                        : const Color(0xFFF59E0B),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: <Widget>[
+                                      Text(
+                                        'This tracker records which operator evidence exports have already been captured on this device during the current rollout session, so the team can see what is still missing before handoff.',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: Colors.white.withValues(
+                                                alpha: 0.68,
+                                              ),
+                                              fontWeight: FontWeight.w600,
+                                              height: 1.45,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 14),
+                                      _SettingsRow(
+                                        label: 'Core exports',
+                                        value: evidenceTracker.completionLabel,
+                                        icon: Icons.fact_check_rounded,
+                                      ),
+                                      _SettingsRow(
+                                        label: 'Optional exports',
+                                        value:
+                                            '${evidenceTracker.capturedOptionalCount} / ${evidenceTracker.totalOptionalCount} captured',
+                                        icon: Icons.library_add_check_rounded,
+                                      ),
+                                      _SettingsRow(
+                                        label: 'Latest capture',
+                                        value:
+                                            evidenceTracker.latestCapturedArtifact ==
+                                                null
+                                            ? 'No evidence copied yet'
+                                            : '${evidenceTracker.latestCapturedArtifact!.label} at ${evidenceTracker.latestCapturedAt!.toUtc().toIso8601String()}',
+                                        icon: Icons.history_edu_rounded,
+                                      ),
+                                      if (evidenceTracker.missingCoreArtifacts
+                                          .isNotEmpty) ...<Widget>[
+                                        Text(
+                                          'Still missing before handoff:',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .labelLarge
+                                              ?.copyWith(
+                                                color: const Color(0xFFF59E0B),
+                                                fontWeight: FontWeight.w900,
+                                              ),
+                                        ),
+                                        const SizedBox(height: 10),
+                                        ...evidenceTracker.missingCoreArtifacts.map(
+                                          (artifact) => _ReadinessNoteRow(
+                                            message: artifact.label,
+                                            tone: const Color(0xFFF59E0B),
+                                          ),
+                                        ),
+                                      ] else ...<Widget>[
+                                        Text(
+                                          'All core handoff artifacts have been captured on this device.',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color: const Color(0xFF22C55E),
+                                                fontWeight: FontWeight.w700,
+                                                height: 1.45,
+                                              ),
+                                        ),
+                                      ],
+                                      const SizedBox(height: 14),
+                                      LayoutBuilder(
+                                        builder: (context, constraints) {
+                                          final stacked =
+                                              constraints.maxWidth < 430;
+                                          final buttons = <Widget>[
+                                            Expanded(
+                                              child: FilledButton.tonalIcon(
+                                                onPressed: () async {
+                                                  await Clipboard.setData(
+                                                    ClipboardData(
+                                                      text: evidenceTracker
+                                                          .toMultilineText(),
+                                                    ),
+                                                  );
+                                                  if (!context.mounted) {
+                                                    return;
+                                                  }
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        'Evidence tracker copied for the rollout record.',
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                                icon: const Icon(
+                                                  Icons.copy_all_rounded,
+                                                ),
+                                                label: const Text(
+                                                  'Copy evidence tracker',
+                                                ),
+                                              ),
+                                            ),
+                                            Expanded(
+                                              child: FilledButton.tonalIcon(
+                                                onPressed:
+                                                    evidenceTracker
+                                                        .capturedAtByArtifact
+                                                        .isEmpty
+                                                    ? null
+                                                    : () {
+                                                        evidenceTrackerNotifier
+                                                            .reset();
+                                                        ScaffoldMessenger.of(
+                                                          context,
+                                                        ).showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text(
+                                                              'Evidence tracker reset for a fresh rollout session.',
+                                                            ),
+                                                          ),
+                                                        );
+                                                      },
+                                                icon: const Icon(
+                                                  Icons.restart_alt_rounded,
+                                                ),
+                                                label: const Text(
+                                                  'Reset tracker',
+                                                ),
+                                              ),
+                                            ),
+                                          ];
+
+                                          if (stacked) {
+                                            return Column(
+                                              children: <Widget>[
+                                                buttons[0],
+                                                const SizedBox(height: 10),
+                                                buttons[1],
+                                              ],
+                                            );
+                                          }
+
+                                          return Row(
+                                            children: <Widget>[
+                                              buttons[0],
+                                              const SizedBox(width: 10),
+                                              buttons[1],
+                                            ],
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
                                 ),
                                 const SizedBox(height: 18),
                                 MobilePanel(
@@ -924,6 +1125,9 @@ class SettingsScreen extends ConsumerWidget {
                                                         .toMultilineText(),
                                                   ),
                                                 );
+                                                markEvidenceCaptured(
+                                                  'readiness_signoff',
+                                                );
                                                 if (!context.mounted) {
                                                   return;
                                                 }
@@ -954,6 +1158,9 @@ class SettingsScreen extends ConsumerWidget {
                                                           text: handoffReport
                                                               .toMultilineText(),
                                                         ),
+                                                      );
+                                                      markEvidenceCaptured(
+                                                        'handoff_pack',
                                                       );
                                                       if (!context.mounted) {
                                                         return;
@@ -1041,8 +1248,13 @@ class SettingsScreen extends ConsumerWidget {
                                                       readinessReport:
                                                           readinessReport,
                                                     );
-                                                if (smokeReport == null ||
-                                                    !context.mounted) {
+                                                if (smokeReport == null) {
+                                                  return;
+                                                }
+                                                markEvidenceCaptured(
+                                                  'smoke_report',
+                                                );
+                                                if (!context.mounted) {
                                                   return;
                                                 }
                                                 ScaffoldMessenger.of(
@@ -1185,6 +1397,9 @@ class SettingsScreen extends ConsumerWidget {
                                                                     .toMultilineText(),
                                                           ),
                                                         );
+                                                        markEvidenceCaptured(
+                                                          'recovery_report',
+                                                        );
                                                         if (!context.mounted) {
                                                           return;
                                                         }
@@ -1306,8 +1521,13 @@ class SettingsScreen extends ConsumerWidget {
                                                       recoveryReport:
                                                           recoveryReport,
                                                     );
-                                                if (closeoutReport == null ||
-                                                    !context.mounted) {
+                                                if (closeoutReport == null) {
+                                                  return;
+                                                }
+                                                markEvidenceCaptured(
+                                                  'shift_closeout',
+                                                );
+                                                if (!context.mounted) {
                                                   return;
                                                 }
                                                 ScaffoldMessenger.of(
@@ -1402,8 +1622,13 @@ class SettingsScreen extends ConsumerWidget {
                                                       recoveryReport:
                                                           recoveryReport,
                                                     );
-                                                if (evidenceReport == null ||
-                                                    !context.mounted) {
+                                                if (evidenceReport == null) {
+                                                  return;
+                                                }
+                                                markEvidenceCaptured(
+                                                  'rollout_evidence',
+                                                );
+                                                if (!context.mounted) {
                                                   return;
                                                 }
                                                 ScaffoldMessenger.of(
@@ -1492,8 +1717,13 @@ class SettingsScreen extends ConsumerWidget {
                                                       recoveryReport:
                                                           recoveryReport,
                                                     );
-                                                if (escalationReport == null ||
-                                                    !context.mounted) {
+                                                if (escalationReport == null) {
+                                                  return;
+                                                }
+                                                markEvidenceCaptured(
+                                                  'incident_escalation',
+                                                );
+                                                if (!context.mounted) {
                                                   return;
                                                 }
                                                 ScaffoldMessenger.of(

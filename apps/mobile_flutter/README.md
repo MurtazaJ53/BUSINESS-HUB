@@ -72,6 +72,7 @@ When preparing a real APK handoff, use:
 - [D:/business-hub/docs/mobile-pilot-rollout-evidence-pack.md](D:/business-hub/docs/mobile-pilot-rollout-evidence-pack.md)
 - [D:/business-hub/docs/mobile-pilot-incident-escalation-pack.md](D:/business-hub/docs/mobile-pilot-incident-escalation-pack.md)
 - [D:/business-hub/docs/mobile-operator-action-center.md](D:/business-hub/docs/mobile-operator-action-center.md)
+- [D:/business-hub/docs/mobile-pilot-evidence-tracker.md](D:/business-hub/docs/mobile-pilot-evidence-tracker.md)
 
 Versioning currently follows `pubspec.yaml`:
 
@@ -120,6 +121,7 @@ It now also includes a guided smoke checklist runner that copies a structured fl
 It also now includes a shift closeout flow so the end-of-shift device state can be handed to the next operator or rollout lead with a clear decision.
 It now also includes a consolidated rollout evidence pack for a single wave-level operator export when the rollout lead wants one final copied record.
 It now also includes an incident escalation pack so support and engineering can get one structured failure export directly from the affected device.
+It now also includes an evidence tracker so operators can see which rollout exports have already been captured and which core handoff artifacts are still missing.
 
 ## Package strategy
 

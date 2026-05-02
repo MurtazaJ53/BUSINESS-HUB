@@ -22,6 +22,7 @@ It also now provides an operator action center that recommends the next operatio
 It also supports an end-of-shift closeout report so the next operator or rollout lead can see how the device actually finished.
 It also supports a final rollout evidence pack so the rollout lead can archive one combined operator record for the wave.
 It also supports an incident escalation pack when rollout support needs a direct device-side failure export.
+It also now includes an evidence tracker so the device can show which rollout exports have already been captured and which core artifacts are still missing.
 
 ## Version source
 
@@ -91,6 +92,7 @@ Signing path:
 14. At the end of the pilot shift, run `Shift closeout` and archive the copied report.
 15. If the rollout lead needs a single combined pack, run `Build evidence pack` and archive that output too.
 16. If the device enters an incident posture, run `Build escalation pack` and attach it to the support thread.
+17. Use `Copy evidence tracker` before final handoff if the rollout lead wants one quick summary of which core artifacts were already captured on-device.
 
 ## Pilot smoke focus
 
@@ -103,6 +105,7 @@ Reference sheet:
 - [D:/business-hub/docs/mobile-pilot-rollout-evidence-pack.md](D:/business-hub/docs/mobile-pilot-rollout-evidence-pack.md)
 - [D:/business-hub/docs/mobile-pilot-incident-escalation-pack.md](D:/business-hub/docs/mobile-pilot-incident-escalation-pack.md)
 - [D:/business-hub/docs/mobile-operator-action-center.md](D:/business-hub/docs/mobile-operator-action-center.md)
+- [D:/business-hub/docs/mobile-pilot-evidence-tracker.md](D:/business-hub/docs/mobile-pilot-evidence-tracker.md)
 
 1. login
 2. inventory lookup
