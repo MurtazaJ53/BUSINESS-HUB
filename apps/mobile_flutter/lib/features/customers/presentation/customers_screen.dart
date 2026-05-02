@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/backend/backend_api_client.dart';
 import '../../../core/database/mobile_repository.dart';
+import '../../../core/insights/mobile_operational_insights.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/models/mobile_session.dart';
 import '../../../core/session/mobile_session_controller.dart';
@@ -333,11 +334,12 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                         );
                       }
 
-                      final orderedCustomers = _sortBackendCustomers(
+                      final orderedCustomers = sortBackendCustomers(
                         filteredCustomers,
+                        sortMode: _sortMode,
                       );
                       final summary =
-                          _BackendCustomerSummaryReport.fromCustomers(
+                          BackendCustomerOperationalReport.fromCustomers(
                             orderedCustomers,
                           );
                       return MobilePanel(
@@ -502,22 +504,6 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
           };
         })
         .toList(growable: false);
-  }
-
-  List<BackendCustomerSummary> _sortBackendCustomers(
-    List<BackendCustomerSummary> customers,
-  ) {
-    final next = List<BackendCustomerSummary>.from(customers);
-    next.sort((left, right) {
-      return switch (_sortMode) {
-        'spent_desc' => right.totalSpent.compareTo(left.totalSpent),
-        'name_asc' => left.name.toLowerCase().compareTo(
-          right.name.toLowerCase(),
-        ),
-        _ => right.balance.compareTo(left.balance),
-      };
-    });
-    return next;
   }
 
   Future<bool?> _openLedgerSheet(
@@ -1513,62 +1499,6 @@ class _BackendCustomerRow extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _BackendCustomerSummaryReport {
-  const _BackendCustomerSummaryReport({
-    required this.visibleCount,
-    required this.dueCount,
-    required this.inactiveCount,
-    required this.receivableBalance,
-    required this.highestBalanceCustomer,
-    required this.collectionsQueue,
-  });
-
-  final int visibleCount;
-  final int dueCount;
-  final int inactiveCount;
-  final double receivableBalance;
-  final BackendCustomerSummary? highestBalanceCustomer;
-  final List<BackendCustomerSummary> collectionsQueue;
-
-  factory _BackendCustomerSummaryReport.fromCustomers(
-    List<BackendCustomerSummary> customers,
-  ) {
-    var dueCount = 0;
-    var inactiveCount = 0;
-    var receivableBalance = 0.0;
-    BackendCustomerSummary? highestBalanceCustomer;
-    final dueCustomers = <BackendCustomerSummary>[];
-
-    for (final customer in customers) {
-      if (customer.balance > 0.009) {
-        dueCount += 1;
-        receivableBalance += customer.balance;
-        dueCustomers.add(customer);
-        if (highestBalanceCustomer == null ||
-            customer.balance > highestBalanceCustomer.balance) {
-          highestBalanceCustomer = customer;
-        }
-      }
-      if (customer.status.toLowerCase() != 'active') {
-        inactiveCount += 1;
-      }
-    }
-
-    return _BackendCustomerSummaryReport(
-      visibleCount: customers.length,
-      dueCount: dueCount,
-      inactiveCount: inactiveCount,
-      receivableBalance: receivableBalance,
-      highestBalanceCustomer: highestBalanceCustomer,
-      collectionsQueue:
-          (dueCustomers
-                ..sort((left, right) => right.balance.compareTo(left.balance)))
-              .take(3)
-              .toList(growable: false),
     );
   }
 }

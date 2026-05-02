@@ -34,6 +34,20 @@ flutter test
 flutter build apk --release
 ```
 
+## Validation gate
+
+Flutter mobile now has a dedicated GitHub Actions workflow:
+
+- `.github/workflows/flutter_mobile_validate.yml`
+
+It runs:
+
+- `flutter analyze`
+- `flutter test`
+- `flutter build apk --debug`
+
+This gives the mobile track its own CI confidence gate instead of relying only on the older web/Capacitor release automation.
+
 ## Phase 4 commerce setup
 
 The mobile POS now queues commerce commands locally and replays them to Django when the shop domain is ready.
@@ -53,6 +67,19 @@ Current Phase 4 scope:
 - sale command replay is active
 - initial sale payments travel inside the sale command
 - standalone follow-up payment command infrastructure exists in the backend for later mobile credit-collection UI
+
+## Current parity posture
+
+The mobile app now includes:
+
+- dashboard, inventory, POS
+- customers with migrated-ledger actions and collections workflow
+- history with reporting pulse and payment-mix visibility
+- settings with admin workspace edits
+- scanner flow
+- split payment and credit exposure safeguards
+
+The remaining work is mostly production polish and deeper analytics, not basic workflow absence.
 
 ## Package strategy
 

@@ -1,0 +1,51 @@
+name: Flutter Mobile Validation
+
+on:
+  pull_request:
+    paths:
+      - 'apps/mobile_flutter/**'
+      - '.github/workflows/flutter_mobile_validate.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/mobile_flutter/**'
+      - '.github/workflows/flutter_mobile_validate.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-mobile:
+    name: Analyze, Test, and Build Flutter Mobile
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Flutter dependencies
+        working-directory: apps/mobile_flutter
+        run: flutter pub get
+
+      - name: Flutter analyze
+        working-directory: apps/mobile_flutter
+        run: flutter analyze
+
+      - name: Flutter test
+        working-directory: apps/mobile_flutter
+        run: flutter test
+
+      - name: Build debug APK
+        working-directory: apps/mobile_flutter
+        run: flutter build apk --debug

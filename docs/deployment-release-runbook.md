@@ -36,11 +36,12 @@ Artifacts:
 ### Flutter mobile
 
 1. `flutter analyze` passes
-2. release APK build passes
-3. owner login tested
-4. staff login tested
-5. dashboard/inventory/POS smoke tested
-6. mobile sync smoke tested
+2. dedicated mobile CI workflow passes
+3. release APK build passes
+4. owner login tested
+5. staff login tested
+6. dashboard/inventory/POS smoke tested
+7. mobile sync smoke tested
 
 ## Release types
 
@@ -85,9 +86,10 @@ As of now:
 ### Flutter mobile beta
 
 1. build release APK
-2. copy into `release-artifacts/`
-3. distribute to internal testers
-4. verify:
+2. confirm `.github/workflows/flutter_mobile_validate.yml` is green
+3. copy into `release-artifacts/`
+4. distribute to internal testers
+5. verify:
    - login
    - data hydration
    - sales creation
@@ -102,6 +104,7 @@ Do not call Flutter mobile final production-ready until:
 - settings/team parity is good enough
 - sync reliability is proven across real devices
 - release signing/distribution strategy is finalized
+- dedicated Flutter validation CI stays green on the release branch/tag
 
 ## Rollback strategy
 
