@@ -80,6 +80,7 @@ When preparing a real APK handoff, use:
 - [D:/business-hub/docs/mobile-pilot-evidence-archive-insights.md](D:/business-hub/docs/mobile-pilot-evidence-archive-insights.md)
 - [D:/business-hub/docs/mobile-pilot-rollout-decision-summary.md](D:/business-hub/docs/mobile-pilot-rollout-decision-summary.md)
 - [D:/business-hub/docs/mobile-pilot-wave-closeout-readiness.md](D:/business-hub/docs/mobile-pilot-wave-closeout-readiness.md)
+- [D:/business-hub/docs/mobile-pilot-wave-signoff-pack.md](D:/business-hub/docs/mobile-pilot-wave-signoff-pack.md)
 
 Versioning currently follows `pubspec.yaml`:
 
@@ -136,6 +137,7 @@ It now also supports full archive export and archive clearing so stale session h
 It now also summarizes recent archive health so rollout leads can quickly tell whether recent shifts are closing cleanly or still leaving evidence gaps.
 It now also produces a rollout decision summary that blends current readiness, recommended next action, and archive trend into one pasteable wave verdict.
 It now also evaluates wave closeout readiness so the device can say whether the current wave record is ready to close, needs more evidence, should stay under monitoring, or should not be closed at all.
+It now also builds a final wave signoff pack so the rollout lead gets one last device-side handoff package with the closeout result attached.
 
 ## Package strategy
 

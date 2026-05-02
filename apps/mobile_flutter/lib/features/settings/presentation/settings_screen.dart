@@ -20,6 +20,7 @@ import '../../../core/runtime/pilot_rollout_evidence_report.dart';
 import '../../../core/runtime/pilot_smoke_report.dart';
 import '../../../core/runtime/pilot_shift_closeout_report.dart';
 import '../../../core/runtime/pilot_wave_closeout_readiness.dart';
+import '../../../core/runtime/pilot_wave_signoff_pack.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/utils/formatters.dart';
@@ -636,6 +637,25 @@ class SettingsScreen extends ConsumerWidget {
                                     actionPlan: actionPlan,
                                     rolloutDecisionSummary:
                                         rolloutDecisionSummary,
+                                    evidenceTracker: evidenceTracker,
+                                  );
+                            final waveSignoffPack =
+                                diagnostics == null ||
+                                    readinessReport == null ||
+                                    recoveryReport == null ||
+                                    actionPlan == null ||
+                                    rolloutDecisionSummary == null ||
+                                    waveCloseoutReadiness == null
+                                ? null
+                                : PilotWaveSignoffPack.evaluate(
+                                    diagnosticsSnapshot: diagnostics,
+                                    readinessReport: readinessReport,
+                                    recoveryReport: recoveryReport,
+                                    actionPlan: actionPlan,
+                                    rolloutDecisionSummary:
+                                        rolloutDecisionSummary,
+                                    waveCloseoutReadiness:
+                                        waveCloseoutReadiness,
                                     evidenceTracker: evidenceTracker,
                                   );
 
@@ -2101,6 +2121,128 @@ class SettingsScreen extends ConsumerWidget {
                                               ),
                                               label: const Text(
                                                 'Copy wave closeout readiness',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                                const SizedBox(height: 18),
+                                MobilePanel(
+                                  title: 'Wave signoff pack',
+                                  action: MobileTag(
+                                    label: waveSignoffPack == null
+                                        ? 'Loading'
+                                        : waveSignoffPack.signoffStatusLabel,
+                                    icon: waveSignoffPack == null
+                                        ? Icons.sync_rounded
+                                        : waveSignoffPack.isSignoffBlocked
+                                        ? Icons.block_rounded
+                                        : waveSignoffPack.isSignoffIncomplete
+                                        ? Icons.assignment_late_rounded
+                                        : waveSignoffPack
+                                                  .isSignoffWithMonitoring
+                                        ? Icons.visibility_rounded
+                                        : Icons.verified_rounded,
+                                    accent: waveSignoffPack == null
+                                        ? const Color(0xFFF59E0B)
+                                        : waveSignoffPack.isSignoffBlocked
+                                        ? const Color(0xFFFB7185)
+                                        : waveSignoffPack.isSignoffIncomplete
+                                        ? const Color(0xFFF59E0B)
+                                        : waveSignoffPack
+                                                  .isSignoffWithMonitoring
+                                        ? const Color(0xFF38BDF8)
+                                        : const Color(0xFF22C55E),
+                                  ),
+                                  child: waveSignoffPack == null
+                                      ? const MobileEmptyState(
+                                          icon: Icons.sync_rounded,
+                                          title: 'Preparing wave signoff pack',
+                                          body:
+                                              'The device is still combining closeout, decision, and evidence posture into the final wave handoff package.',
+                                        )
+                                      : Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: <Widget>[
+                                            Text(
+                                              waveSignoffPack.summary,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color: Colors.white
+                                                        .withValues(
+                                                          alpha: 0.68,
+                                                        ),
+                                                    fontWeight: FontWeight.w600,
+                                                    height: 1.45,
+                                                  ),
+                                            ),
+                                            const SizedBox(height: 14),
+                                            _SettingsRow(
+                                              label: 'Signoff status',
+                                              value: waveSignoffPack
+                                                  .signoffStatusLabel,
+                                              icon: Icons.verified_user_rounded,
+                                            ),
+                                            _SettingsRow(
+                                              label: 'Closeout posture',
+                                              value: waveCloseoutReadiness
+                                                  .statusLabel,
+                                              icon: Icons.playlist_add_check_rounded,
+                                            ),
+                                            _SettingsRow(
+                                              label: 'Decision posture',
+                                              value: rolloutDecisionSummary
+                                                  .verdictLabel,
+                                              icon: Icons.gavel_rounded,
+                                            ),
+                                            ...waveSignoffPack.reasons.map(
+                                              (reason) => _ReadinessNoteRow(
+                                                message: reason,
+                                                tone: waveSignoffPack
+                                                        .isSignoffBlocked
+                                                    ? const Color(0xFFFB7185)
+                                                    : waveSignoffPack
+                                                              .isSignoffIncomplete
+                                                    ? const Color(0xFFF59E0B)
+                                                    : waveSignoffPack
+                                                              .isSignoffWithMonitoring
+                                                    ? const Color(0xFF38BDF8)
+                                                    : const Color(0xFF22C55E),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 14),
+                                            FilledButton.tonalIcon(
+                                              onPressed: () async {
+                                                await Clipboard.setData(
+                                                  ClipboardData(
+                                                    text: waveSignoffPack
+                                                        .toMultilineText(),
+                                                  ),
+                                                );
+                                                await markEvidenceCaptured(
+                                                  'wave_signoff_pack',
+                                                );
+                                                if (!context.mounted) {
+                                                  return;
+                                                }
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      'Wave signoff pack copied with status ${waveSignoffPack.signoffStatusLabel}.',
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              icon: const Icon(
+                                                Icons.assignment_turned_in_rounded,
+                                              ),
+                                              label: const Text(
+                                                'Copy wave signoff pack',
                                               ),
                                             ),
                                           ],

@@ -108,6 +108,11 @@ class PilotEvidenceTrackerState {
       label: 'Wave closeout readiness',
       isCore: false,
     ),
+    PilotEvidenceArtifact(
+      id: 'wave_signoff_pack',
+      label: 'Wave signoff pack',
+      isCore: false,
+    ),
   ];
 
   static final Map<String, PilotEvidenceArtifact> _artifactById =
