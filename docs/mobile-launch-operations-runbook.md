@@ -70,12 +70,17 @@ Bundle runner:
 - [D:/business-hub/scripts/mobile_flutter_release_bundle.ps1](D:/business-hub/scripts/mobile_flutter_release_bundle.ps1)
 - [D:/business-hub/docs/mobile-local-release-bundle-runner.md](D:/business-hub/docs/mobile-local-release-bundle-runner.md)
 
+Registry runner:
+- [D:/business-hub/scripts/mobile_flutter_release_registry.ps1](D:/business-hub/scripts/mobile_flutter_release_registry.ps1)
+- [D:/business-hub/docs/mobile-local-release-registry-runner.md](D:/business-hub/docs/mobile-local-release-registry-runner.md)
+
 Recommended local sequence:
 - release prep
 - `-Doctor` for Flutter resolution
 - `-PreflightOnly` for release tag and signing verification
 - full release run for APK packaging
 - bundle the prep + local artifacts for handoff
+- regenerate the release registry for cross-tag visibility
 
 Triggers:
 - push tag matching `mobile-v*`

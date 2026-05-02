@@ -46,6 +46,9 @@ This checklist is the final gate before shipping a Flutter APK outside the inter
    - `BusinessHub-Mobile-<release-tag>.bundle-summary.txt`
    - `BusinessHub-Mobile-<release-tag>.bundle-summary.json`
    - `BusinessHub-Mobile-<release-tag>.bundle-handoff.md`
+9. Regenerate the local release registry so the current tag appears in the shared mobile release index:
+   - `release-artifacts/mobile-release-registry.json`
+   - `release-artifacts/mobile-release-registry.md`
 
 ## Mobile smoke gate
 

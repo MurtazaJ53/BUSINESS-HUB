@@ -51,6 +51,8 @@ Preferred local runner:
 - [D:/business-hub/docs/mobile-local-release-runner.md](D:/business-hub/docs/mobile-local-release-runner.md)
 - [D:/business-hub/scripts/mobile_flutter_release_bundle.ps1](D:/business-hub/scripts/mobile_flutter_release_bundle.ps1)
 - [D:/business-hub/docs/mobile-local-release-bundle-runner.md](D:/business-hub/docs/mobile-local-release-bundle-runner.md)
+- [D:/business-hub/scripts/mobile_flutter_release_registry.ps1](D:/business-hub/scripts/mobile_flutter_release_registry.ps1)
+- [D:/business-hub/docs/mobile-local-release-registry-runner.md](D:/business-hub/docs/mobile-local-release-registry-runner.md)
 6. dashboard/inventory/POS smoke tested
 7. mobile sync smoke tested
 
@@ -103,18 +105,19 @@ As of now:
    - `-PreflightOnly`
    - full release run
 4. consolidate prep and local outputs with [D:/business-hub/scripts/mobile_flutter_release_bundle.ps1](D:/business-hub/scripts/mobile_flutter_release_bundle.ps1)
-5. archive the generated local release folder under `release-artifacts/mobile-local/<release-tag>/` when not using GitHub Actions
-6. confirm `.github/workflows/flutter_mobile_validate.yml` is green
-7. if using the dedicated mobile release lane, trigger `.github/workflows/flutter_mobile_release.yml`
-8. copy into `release-artifacts/`
-9. distribute to internal testers
-10. verify:
+5. regenerate the shared mobile release registry with [D:/business-hub/scripts/mobile_flutter_release_registry.ps1](D:/business-hub/scripts/mobile_flutter_release_registry.ps1)
+6. archive the generated local release folder under `release-artifacts/mobile-local/<release-tag>/` when not using GitHub Actions
+7. confirm `.github/workflows/flutter_mobile_validate.yml` is green
+8. if using the dedicated mobile release lane, trigger `.github/workflows/flutter_mobile_release.yml`
+9. copy into `release-artifacts/`
+10. distribute to internal testers
+11. verify:
    - login
    - data hydration
    - sales creation
    - back navigation
    - multi-screen movement
-11. complete:
+12. complete:
    - [D:/business-hub/docs/mobile-pilot-readiness-signoff.md](D:/business-hub/docs/mobile-pilot-readiness-signoff.md)
    - [D:/business-hub/docs/mobile-release-readiness-checklist.md](D:/business-hub/docs/mobile-release-readiness-checklist.md)
    - [D:/business-hub/docs/mobile-release-notes-template.md](D:/business-hub/docs/mobile-release-notes-template.md)
