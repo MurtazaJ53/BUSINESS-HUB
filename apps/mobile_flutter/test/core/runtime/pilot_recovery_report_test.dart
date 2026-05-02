@@ -14,6 +14,8 @@ void main() {
       buildNumber: '9',
       releaseChannel: 'pilot',
       releaseSha: 'abc1234',
+      releaseTag: 'mobile-v1.3.9',
+      pilotScope: 'limbdi-wave-1',
     );
 
     final diagnostics = PilotDiagnosticsSnapshot(
@@ -65,6 +67,8 @@ void main() {
 
     expect(text, contains('Business Hub pilot recovery report'));
     expect(text, contains('Release fingerprint: pilot | abc1234'));
+    expect(text, contains('Release tag: mobile-v1.3.9'));
+    expect(text, contains('Pilot scope: limbdi-wave-1'));
     expect(text, contains('Workspace: Pilot Shop'));
     expect(text, contains('Queued commerce commands: 3'));
     expect(text, contains('Failed receipts: 1'));

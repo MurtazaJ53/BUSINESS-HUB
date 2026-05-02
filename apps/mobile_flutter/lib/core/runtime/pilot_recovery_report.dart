@@ -17,6 +17,8 @@ class PilotRecoveryReport {
       'Business Hub pilot recovery report',
       'Generated at (UTC): ${generatedAt.toUtc().toIso8601String()}',
       'Release fingerprint: ${diagnosticsSnapshot.runtimeInfo.releaseFingerprint}',
+      'Release tag: ${diagnosticsSnapshot.runtimeInfo.releaseTag}',
+      'Pilot scope: ${diagnosticsSnapshot.runtimeInfo.rolloutScopeLabel}',
       'Version: ${diagnosticsSnapshot.runtimeInfo.versionLabel}',
       'Workspace: ${diagnosticsSnapshot.shop.name}',
       'Workspace ID: ${diagnosticsSnapshot.workspaceId}',

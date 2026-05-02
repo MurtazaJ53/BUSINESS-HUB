@@ -16,6 +16,8 @@ void main() {
       buildNumber: '9',
       releaseChannel: 'pilot',
       releaseSha: 'abc1234',
+      releaseTag: 'mobile-v1.3.9',
+      pilotScope: 'limbdi-wave-1',
     );
 
     final diagnostics = PilotDiagnosticsSnapshot(
@@ -72,5 +74,6 @@ void main() {
     expect(text, contains('=== RECOVERY REPORT ==='));
     expect(text, contains('Status: MONITOR BEFORE SHIFT'));
     expect(text, contains('Workspace ID: shop-pilot-1'));
+    expect(text, contains('Pilot scope: limbdi-wave-1'));
   });
 }

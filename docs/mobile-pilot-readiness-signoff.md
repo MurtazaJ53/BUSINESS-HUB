@@ -10,6 +10,7 @@ This document defines the final mobile device go / no-go check before a pilot op
 
 The Settings screen now includes `Pilot readiness signoff`, which evaluates:
 
+- release tag and pilot scope
 - release channel and build identity
 - signed-in operator state
 - workspace binding

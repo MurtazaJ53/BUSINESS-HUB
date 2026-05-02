@@ -13,6 +13,8 @@ class AppRuntimeInfo {
     required this.buildNumber,
     required this.releaseChannel,
     required this.releaseSha,
+    required this.releaseTag,
+    required this.pilotScope,
   });
 
   final String appName;
@@ -21,11 +23,16 @@ class AppRuntimeInfo {
   final String buildNumber;
   final String releaseChannel;
   final String releaseSha;
+  final String releaseTag;
+  final String pilotScope;
 
   String get versionLabel => '$version+$buildNumber';
 
   String get releaseFingerprint =>
       releaseSha.isEmpty ? releaseChannel : '$releaseChannel | $releaseSha';
+
+  String get rolloutScopeLabel =>
+      pilotScope.trim().isEmpty ? 'unspecified' : pilotScope.trim();
 
   static Future<AppRuntimeInfo> load() async {
     final packageInfo = await PackageInfo.fromPlatform();
@@ -41,6 +48,14 @@ class AppRuntimeInfo {
       releaseSha: const String.fromEnvironment(
         'BUSINESS_HUB_RELEASE_SHA',
         defaultValue: '',
+      ),
+      releaseTag: const String.fromEnvironment(
+        'BUSINESS_HUB_RELEASE_TAG',
+        defaultValue: 'dev-build',
+      ),
+      pilotScope: const String.fromEnvironment(
+        'BUSINESS_HUB_PILOT_SCOPE',
+        defaultValue: 'unspecified',
       ),
     );
   }

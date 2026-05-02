@@ -75,6 +75,8 @@ class PilotDiagnosticsSnapshot {
       'Package: ${runtimeInfo.packageName}',
       'Version: ${runtimeInfo.versionLabel}',
       'Release fingerprint: ${runtimeInfo.releaseFingerprint}',
+      'Release tag: ${runtimeInfo.releaseTag}',
+      'Pilot scope: ${runtimeInfo.rolloutScopeLabel}',
       'Workspace: ${shop.name}',
       'Workspace ID: $workspaceId',
       'Operator: $operatorEmail',

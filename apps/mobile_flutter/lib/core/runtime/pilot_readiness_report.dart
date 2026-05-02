@@ -140,6 +140,8 @@ class PilotReadinessReport {
       'Status: $statusLabel',
       'Summary: $summary',
       'Release fingerprint: ${diagnosticsSnapshot.runtimeInfo.releaseFingerprint}',
+      'Release tag: ${diagnosticsSnapshot.runtimeInfo.releaseTag}',
+      'Pilot scope: ${diagnosticsSnapshot.runtimeInfo.rolloutScopeLabel}',
       'Version: ${diagnosticsSnapshot.runtimeInfo.versionLabel}',
       'Workspace: ${diagnosticsSnapshot.shop.name}',
       'Workspace ID: ${diagnosticsSnapshot.workspaceId}',

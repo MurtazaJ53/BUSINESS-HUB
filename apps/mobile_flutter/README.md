@@ -53,6 +53,7 @@ Release automation now also supports:
 
 - tag-triggered mobile release builds with `mobile-v*`
 - injected release channel and short SHA visibility inside the app Settings screen
+- injected release tag and pilot scope visibility inside the app Settings screen
 - signed Flutter release builds when Android signing secrets or `key.properties` are present
 - APK checksum and manifest artifacts for pilot handoff verification
 

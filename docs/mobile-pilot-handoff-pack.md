@@ -13,6 +13,7 @@ This document defines the complete evidence bundle for handing a signed mobile b
 - text manifest
 - JSON manifest
 - generated handoff markdown
+- release tag and pilot scope embedded in all of the above
 
 Workflow:
 - [D:/business-hub/.github/workflows/flutter_mobile_release.yml](D:/business-hub/.github/workflows/flutter_mobile_release.yml)
@@ -44,6 +45,7 @@ Before a pilot device is approved, archive:
 This makes the pilot traceable from both ends:
 
 - release pipeline evidence proves what was built
+- release scope proves who it was built for
 - in-app evidence proves what the device was actually seeing at handoff time
 
 ## Supporting documents

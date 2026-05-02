@@ -13,6 +13,10 @@ on:
         description: 'Release channel label'
         required: false
         default: 'pilot'
+      pilot_scope:
+        description: 'Pilot scope label (example: limbdi-wave-1 or production-rollout)'
+        required: false
+        default: 'pilot-unspecified'
 
 permissions:
   contents: write
@@ -34,15 +38,18 @@ jobs:
           if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
             tag="${{ github.event.inputs.release_tag }}"
             channel="${{ github.event.inputs.release_channel }}"
+            scope="${{ github.event.inputs.pilot_scope }}"
           else
             tag="${GITHUB_REF_NAME}"
             channel="production"
+            scope="production-rollout"
           fi
           version_line="$(grep '^version:' apps/mobile_flutter/pubspec.yaml | head -n1 | awk '{print $2}')"
           marketing_version="${version_line%%+*}"
           build_number="${version_line#*+}"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "channel=${channel}" >> "$GITHUB_OUTPUT"
+          echo "scope=${scope}" >> "$GITHUB_OUTPUT"
           echo "sha_short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           echo "version=${marketing_version}" >> "$GITHUB_OUTPUT"
           echo "build_number=${build_number}" >> "$GITHUB_OUTPUT"
@@ -105,6 +112,8 @@ jobs:
           flutter build apk --release
           --dart-define=BUSINESS_HUB_RELEASE_CHANNEL=${{ steps.meta.outputs.channel }}
           --dart-define=BUSINESS_HUB_RELEASE_SHA=${{ steps.meta.outputs.sha_short }}
+          --dart-define=BUSINESS_HUB_RELEASE_TAG=${{ steps.meta.outputs.tag }}
+          --dart-define=BUSINESS_HUB_PILOT_SCOPE=${{ steps.meta.outputs.scope }}
         env:
           ANDROID_KEYSTORE_PATH: app/business-hub-mobile.jks
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -129,6 +138,7 @@ jobs:
           Version: ${{ steps.meta.outputs.version }}
           Build: ${{ steps.meta.outputs.build_number }}
           Channel: ${{ steps.meta.outputs.channel }}
+          Pilot Scope: ${{ steps.meta.outputs.scope }}
           Commit: ${GITHUB_SHA}
           Short SHA: ${{ steps.meta.outputs.sha_short }}
           APK: ${apk_name}
@@ -140,6 +150,7 @@ jobs:
             "version": "${{ steps.meta.outputs.version }}",
             "build_number": "${{ steps.meta.outputs.build_number }}",
             "channel": "${{ steps.meta.outputs.channel }}",
+            "pilot_scope": "${{ steps.meta.outputs.scope }}",
             "commit": "${GITHUB_SHA}",
             "short_sha": "${{ steps.meta.outputs.sha_short }}",
             "apk_name": "${apk_name}",
@@ -153,6 +164,7 @@ jobs:
           - Version: ${{ steps.meta.outputs.version }}
           - Build number: ${{ steps.meta.outputs.build_number }}
           - Channel: ${{ steps.meta.outputs.channel }}
+          - Pilot scope: ${{ steps.meta.outputs.scope }}
           - Commit: ${GITHUB_SHA}
           - Short SHA: ${{ steps.meta.outputs.sha_short }}
           - APK: ${apk_name}
@@ -178,6 +190,7 @@ jobs:
           - APK: ${apk_name}
           - Version: ${{ steps.meta.outputs.version }}+${{ steps.meta.outputs.build_number }}
           - Channel: ${{ steps.meta.outputs.channel }}
+          - Pilot scope: ${{ steps.meta.outputs.scope }}
           - Short SHA: ${{ steps.meta.outputs.sha_short }}
           - SHA256: ${checksum}
           EOF
@@ -205,6 +218,7 @@ jobs:
           Flutter mobile release build.
 
           Channel: ${{ steps.meta.outputs.channel }}
+          Pilot scope: ${{ steps.meta.outputs.scope }}
           Version: ${{ steps.meta.outputs.version }}+${{ steps.meta.outputs.build_number }}
           Commit: ${GITHUB_SHA}
           SHA256: ${{ steps.collect.outputs.apk_sha256 }}

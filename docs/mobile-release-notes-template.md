@@ -6,6 +6,7 @@
 - Build number:
 - Commit:
 - Release channel:
+- Pilot scope:
 - Short SHA:
 - APK SHA256:
 - Release date:

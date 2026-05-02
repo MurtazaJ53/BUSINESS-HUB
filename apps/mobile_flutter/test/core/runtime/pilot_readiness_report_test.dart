@@ -14,6 +14,8 @@ void main() {
       buildNumber: '9',
       releaseChannel: 'local',
       releaseSha: '',
+      releaseTag: 'dev-build',
+      pilotScope: 'unspecified',
     );
 
     final diagnostics = PilotDiagnosticsSnapshot(
@@ -73,6 +75,8 @@ void main() {
       buildNumber: '9',
       releaseChannel: 'pilot',
       releaseSha: 'abc1234',
+      releaseTag: 'mobile-v1.3.9',
+      pilotScope: 'limbdi-wave-1',
     );
 
     final diagnostics = PilotDiagnosticsSnapshot(

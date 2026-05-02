@@ -13,9 +13,12 @@ void main() {
       buildNumber: '9',
       releaseChannel: 'pilot',
       releaseSha: 'abc1234',
+      releaseTag: 'mobile-v1.3.9',
+      pilotScope: 'limbdi-wave-1',
     );
 
     expect(runtime.releaseFingerprint, 'pilot | abc1234');
+    expect(runtime.rolloutScopeLabel, 'limbdi-wave-1');
   });
 
   test('pilot snapshot exports launch-critical runtime details', () {
@@ -26,6 +29,8 @@ void main() {
       buildNumber: '9',
       releaseChannel: 'pilot',
       releaseSha: 'abc1234',
+      releaseTag: 'mobile-v1.3.9',
+      pilotScope: 'limbdi-wave-1',
     );
 
     final snapshot = PilotDiagnosticsSnapshot(
@@ -84,6 +89,8 @@ void main() {
     expect(text, contains('Business Hub pilot launch snapshot'));
     expect(text, contains('Generated at (UTC): 2026-05-02T12:30:00.000Z'));
     expect(text, contains('Release fingerprint: pilot | abc1234'));
+    expect(text, contains('Release tag: mobile-v1.3.9'));
+    expect(text, contains('Pilot scope: limbdi-wave-1'));
     expect(text, contains('Workspace: Limbdi Central'));
     expect(text, contains('Operator: Not signed in'));
     expect(text, contains('Sync posture: ERROR'));

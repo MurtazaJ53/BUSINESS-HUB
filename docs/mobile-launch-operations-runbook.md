@@ -76,6 +76,7 @@ Signing path:
 9. Open Settings and verify:
    - version
    - release channel
+   - pilot scope
    - release SHA
 10. Use `Copy pilot snapshot` and archive the output in the rollout record.
 11. Run device smoke checks.

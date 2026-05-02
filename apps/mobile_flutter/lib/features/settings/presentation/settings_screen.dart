@@ -177,6 +177,16 @@ class SettingsScreen extends ConsumerWidget {
                       icon: Icons.flag_rounded,
                     ),
                     _SettingsRow(
+                      label: 'Release tag',
+                      value: runtime.releaseTag,
+                      icon: Icons.sell_rounded,
+                    ),
+                    _SettingsRow(
+                      label: 'Pilot scope',
+                      value: runtime.rolloutScopeLabel,
+                      icon: Icons.route_rounded,
+                    ),
+                    _SettingsRow(
                       label: 'Package',
                       value: runtime.packageName,
                       icon: Icons.inventory_2_rounded,
