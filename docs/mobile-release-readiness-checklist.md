@@ -22,6 +22,10 @@ This checklist is the final gate before shipping a Flutter APK outside the inter
    - `flutter build apk --debug`
 3. Build release APK:
    - `flutter build apk --release`
+4. If using the dedicated mobile release lane, confirm:
+   - `.github/workflows/flutter_mobile_release.yml`
+   - release channel is chosen correctly
+   - tag matches the intended APK release
 
 ## Mobile smoke gate
 
@@ -42,6 +46,10 @@ This checklist is the final gate before shipping a Flutter APK outside the inter
    - payment mix
    - receipt detail
 10. Settings edit works for admin account.
+11. Settings shows the expected:
+   - version + build number
+   - release channel
+   - release SHA when provided
 
 ## Sync and recovery gate
 

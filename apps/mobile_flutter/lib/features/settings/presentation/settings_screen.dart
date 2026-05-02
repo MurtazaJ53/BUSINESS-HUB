@@ -5,6 +5,7 @@ import '../../../core/backend/backend_api_client.dart';
 import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/models/mobile_session.dart';
+import '../../../core/runtime/app_runtime_info.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/utils/formatters.dart';
@@ -21,6 +22,7 @@ class SettingsScreen extends ConsumerWidget {
     final backendApiClient = ref.watch(backendApiClientProvider);
     final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
     final syncStatus = ref.watch(syncStatusProvider);
+    final runtimeInfoAsync = ref.watch(appRuntimeInfoProvider);
     final shopStream = shopRepository.watchShopInfo();
     final historyStream = salesRepository.watchHistoryOverview();
     final domainStatesStream = shopRepository.watchTrackedDomainStates(
@@ -140,6 +142,52 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                   ],
                 ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            MobilePanel(
+              title: 'Build identity',
+              action: MobileTag(
+                label: runtimeInfoAsync.isLoading ? 'Loading' : 'Runtime',
+                icon: Icons.verified_user_rounded,
+                accent: const Color(0xFF38BDF8),
+              ),
+              child: runtimeInfoAsync.when(
+                data: (runtime) => Column(
+                  children: <Widget>[
+                    _SettingsRow(
+                      label: 'App',
+                      value: runtime.appName,
+                      icon: Icons.android_rounded,
+                    ),
+                    _SettingsRow(
+                      label: 'Version',
+                      value: runtime.versionLabel,
+                      icon: Icons.new_releases_rounded,
+                    ),
+                    _SettingsRow(
+                      label: 'Release channel',
+                      value: runtime.releaseFingerprint,
+                      icon: Icons.flag_rounded,
+                    ),
+                    _SettingsRow(
+                      label: 'Package',
+                      value: runtime.packageName,
+                      icon: Icons.inventory_2_rounded,
+                    ),
+                  ],
+                ),
+                loading: () => const MobileEmptyState(
+                  icon: Icons.sync_rounded,
+                  title: 'Loading runtime metadata',
+                  body:
+                      'The mobile shell is resolving package version, build number, and release channel.',
+                ),
+                error: (error, _) => MobileEmptyState(
+                  icon: Icons.error_outline_rounded,
+                  title: 'Runtime metadata unavailable',
+                  body: error.toString(),
+                ),
               ),
             ),
             const SizedBox(height: 18),

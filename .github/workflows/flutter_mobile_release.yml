@@ -1,0 +1,128 @@
+name: Flutter Mobile Release
+
+on:
+  push:
+    tags:
+      - 'mobile-v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to publish (example: mobile-v1.3.9)'
+        required: true
+      release_channel:
+        description: 'Release channel label'
+        required: false
+        default: 'pilot'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish-mobile:
+    name: Build and Publish Flutter Mobile APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set release metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            tag="${{ github.event.inputs.release_tag }}"
+            channel="${{ github.event.inputs.release_channel }}"
+          else
+            tag="${GITHUB_REF_NAME}"
+            channel="production"
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "channel=${channel}" >> "$GITHUB_OUTPUT"
+          echo "sha_short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Flutter dependencies
+        working-directory: apps/mobile_flutter
+        run: flutter pub get
+
+      - name: Flutter analyze
+        working-directory: apps/mobile_flutter
+        run: flutter analyze
+
+      - name: Flutter test
+        working-directory: apps/mobile_flutter
+        run: flutter test
+
+      - name: Build release APK
+        working-directory: apps/mobile_flutter
+        run: >
+          flutter build apk --release
+          --dart-define=BUSINESS_HUB_RELEASE_CHANNEL=${{ steps.meta.outputs.channel }}
+          --dart-define=BUSINESS_HUB_RELEASE_SHA=${{ steps.meta.outputs.sha_short }}
+
+      - name: Collect mobile release artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          cp \
+            apps/mobile_flutter/build/app/outputs/flutter-apk/app-release.apk \
+            "release-assets/BusinessHub-Mobile-${{ steps.meta.outputs.tag }}.apk"
+          ls -la release-assets
+
+      - name: Upload mobile release artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: BusinessHub-Mobile-${{ steps.meta.outputs.tag }}
+          path: release-assets
+          if-no-files-found: error
+
+      - name: Publish mobile GitHub release
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="${{ steps.meta.outputs.tag }}"
+          repo="${GH_REPO}"
+          notes_file="$(mktemp)"
+          cat <<EOF > "$notes_file"
+          Flutter mobile release build.
+
+          Channel: ${{ steps.meta.outputs.channel }}
+          Commit: ${GITHUB_SHA}
+
+          Included artifacts:
+          - Flutter release APK
+          EOF
+
+          apk_path="release-assets/BusinessHub-Mobile-${tag}.apk"
+          if [ ! -f "$apk_path" ]; then
+            echo "APK artifact not found"
+            exit 1
+          fi
+
+          if gh release view "$tag" --repo "$repo" >/dev/null 2>&1; then
+            gh release delete "$tag" --repo "$repo" --yes
+          fi
+
+          gh release create "$tag" \
+            --repo "$repo" \
+            --title "Business Hub Mobile $tag" \
+            --notes-file "$notes_file" \
+            "$apk_path"

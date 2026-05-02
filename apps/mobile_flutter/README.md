@@ -39,6 +39,7 @@ flutter build apk --release
 Flutter mobile now has a dedicated GitHub Actions workflow:
 
 - `.github/workflows/flutter_mobile_validate.yml`
+- `.github/workflows/flutter_mobile_release.yml`
 
 It runs:
 
@@ -48,12 +49,18 @@ It runs:
 
 This gives the mobile track its own CI confidence gate instead of relying only on the older web/Capacitor release automation.
 
+Release automation now also supports:
+
+- tag-triggered mobile release builds with `mobile-v*`
+- injected release channel and short SHA visibility inside the app Settings screen
+
 ## Release readiness
 
 When preparing a real APK handoff, use:
 
 - [D:/business-hub/docs/mobile-release-readiness-checklist.md](D:/business-hub/docs/mobile-release-readiness-checklist.md)
 - [D:/business-hub/docs/mobile-release-notes-template.md](D:/business-hub/docs/mobile-release-notes-template.md)
+- [D:/business-hub/docs/mobile-launch-operations-runbook.md](D:/business-hub/docs/mobile-launch-operations-runbook.md)
 
 Versioning currently follows `pubspec.yaml`:
 

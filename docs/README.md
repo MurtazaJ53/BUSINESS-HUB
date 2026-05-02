@@ -59,12 +59,13 @@ It is designed to support:
 35. [Phase 8 Quarterly Architecture Review Checklist](./phase-8-quarterly-architecture-review-checklist.md)
 36. [Mobile Release Readiness Checklist](./mobile-release-readiness-checklist.md)
 37. [Mobile Release Notes Template](./mobile-release-notes-template.md)
+38. [Mobile Launch Operations Runbook](./mobile-launch-operations-runbook.md)
 
 ### Existing strategy docs
 
-38. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
-39. [Global Scale Blueprint](./global-scale-blueprint.md)
-40. [Scale Certification Checklist](./scale-certification-checklist.md)
+39. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
+40. [Global Scale Blueprint](./global-scale-blueprint.md)
+41. [Scale Certification Checklist](./scale-certification-checklist.md)
 
 ## Current truth
 
@@ -108,6 +109,7 @@ As of April 29, 2026:
 - start with Deployment and Release Runbook
 - then Operations Runbook
 - then Mobile Release Readiness Checklist
+- then Mobile Launch Operations Runbook
 
 ## Notes
 

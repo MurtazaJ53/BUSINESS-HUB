@@ -87,17 +87,19 @@ As of now:
 
 1. build release APK
 2. confirm `.github/workflows/flutter_mobile_validate.yml` is green
-3. copy into `release-artifacts/`
-4. distribute to internal testers
-5. verify:
+3. if using the dedicated mobile release lane, trigger `.github/workflows/flutter_mobile_release.yml`
+4. copy into `release-artifacts/`
+5. distribute to internal testers
+6. verify:
    - login
    - data hydration
    - sales creation
    - back navigation
    - multi-screen movement
-6. complete:
+7. complete:
    - [D:/business-hub/docs/mobile-release-readiness-checklist.md](D:/business-hub/docs/mobile-release-readiness-checklist.md)
    - [D:/business-hub/docs/mobile-release-notes-template.md](D:/business-hub/docs/mobile-release-notes-template.md)
+   - [D:/business-hub/docs/mobile-launch-operations-runbook.md](D:/business-hub/docs/mobile-launch-operations-runbook.md)
 
 ## Production blockers for Flutter mobile
 
