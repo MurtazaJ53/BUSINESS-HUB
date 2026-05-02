@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/backend/backend_api_client.dart';
 import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/models/mobile_session.dart';
 import '../../../core/runtime/app_runtime_info.dart';
+import '../../../core/runtime/pilot_diagnostics_snapshot.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/utils/formatters.dart';
@@ -364,6 +366,118 @@ class SettingsScreen extends ConsumerWidget {
                         )
                         .toList(growable: false),
                   ),
+                );
+              },
+            ),
+            const SizedBox(height: 18),
+            StreamBuilder<List<DomainControlState>>(
+              stream: domainStatesStream,
+              builder: (context, domainSnapshot) {
+                final domainStates =
+                    domainSnapshot.data ??
+                    <DomainControlState>[
+                      DomainControlState.legacy('inventory'),
+                      DomainControlState.legacy('customers'),
+                      DomainControlState.legacy('sales'),
+                      DomainControlState.legacy('payments'),
+                    ];
+                return StreamBuilder<int>(
+                  stream: pendingOutboxStream,
+                  builder: (context, outboxSnapshot) {
+                    final pending = outboxSnapshot.data ?? 0;
+                    return StreamBuilder<HistoryOverview>(
+                      stream: historyStream,
+                      builder: (context, historySnapshot) {
+                        final history =
+                            historySnapshot.data ?? HistoryOverview.empty();
+                        final runtimeInfo = runtimeInfoAsync.asData?.value;
+                        final snapshot = runtimeInfo == null
+                            ? null
+                            : PilotDiagnosticsSnapshot(
+                                runtimeInfo: runtimeInfo,
+                                shop: shop,
+                                session: session,
+                                backendBaseUrl: backendApiClient.baseUrl,
+                                syncStatus: syncStatus,
+                                historyOverview: history,
+                                pendingOutboxCount: pending,
+                                domainStates: domainStates,
+                              );
+
+                        return MobilePanel(
+                          title: 'Pilot handoff snapshot',
+                          action: MobileTag(
+                            label: snapshot == null ? 'Loading' : 'Copy ready',
+                            icon: snapshot == null
+                                ? Icons.sync_rounded
+                                : Icons.assignment_turned_in_rounded,
+                            accent: snapshot == null
+                                ? const Color(0xFFF59E0B)
+                                : const Color(0xFF22C55E),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                'Use this before a pilot handoff or floor smoke run. It captures the installed build identity, workspace, queue health, and domain posture in one copyable block for release notes, QA, or operator chat.',
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.bodySmall?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.68),
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.45,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              _SettingsRow(
+                                label: 'Release fingerprint',
+                                value: runtimeInfo?.releaseFingerprint ??
+                                    'Loading runtime metadata',
+                                icon: Icons.flag_rounded,
+                              ),
+                              _SettingsRow(
+                                label: 'Pilot posture',
+                                value: snapshot?.primaryDomainCountLabel ??
+                                    'Resolving domain states',
+                                icon: Icons.fact_check_rounded,
+                              ),
+                              _SettingsRow(
+                                label: 'Last receipt sync',
+                                value: snapshot?.lastReceiptSyncLabel ??
+                                    'Unknown',
+                                icon: Icons.history_toggle_off_rounded,
+                              ),
+                              FilledButton.tonalIcon(
+                                onPressed: snapshot == null
+                                    ? null
+                                    : () async {
+                                        await Clipboard.setData(
+                                          ClipboardData(
+                                            text: snapshot.toMultilineText(),
+                                          ),
+                                        );
+                                        if (!context.mounted) {
+                                          return;
+                                        }
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Pilot launch snapshot copied. Paste it into the rollout thread or QA sheet.',
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                icon: const Icon(Icons.copy_all_rounded),
+                                label: const Text('Copy pilot snapshot'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
                 );
               },
             ),

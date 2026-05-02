@@ -54,6 +54,7 @@ Release automation now also supports:
 - tag-triggered mobile release builds with `mobile-v*`
 - injected release channel and short SHA visibility inside the app Settings screen
 - signed Flutter release builds when Android signing secrets or `key.properties` are present
+- APK checksum and manifest artifacts for pilot handoff verification
 
 ## Release readiness
 
@@ -62,6 +63,7 @@ When preparing a real APK handoff, use:
 - [D:/business-hub/docs/mobile-release-readiness-checklist.md](D:/business-hub/docs/mobile-release-readiness-checklist.md)
 - [D:/business-hub/docs/mobile-release-notes-template.md](D:/business-hub/docs/mobile-release-notes-template.md)
 - [D:/business-hub/docs/mobile-launch-operations-runbook.md](D:/business-hub/docs/mobile-launch-operations-runbook.md)
+- [D:/business-hub/docs/mobile-pilot-smoke-sheet.md](D:/business-hub/docs/mobile-pilot-smoke-sheet.md)
 
 Versioning currently follows `pubspec.yaml`:
 
@@ -100,6 +102,8 @@ The mobile app now includes:
 - split payment and credit exposure safeguards
 
 The remaining work is mostly production polish and deeper analytics, not basic workflow absence.
+
+The Settings screen also now includes a copyable pilot launch snapshot so operators can archive build, queue, and domain posture directly from a real device.
 
 ## Package strategy
 

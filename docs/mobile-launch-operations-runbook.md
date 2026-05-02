@@ -15,6 +15,7 @@ The Flutter app now exposes build metadata inside Settings:
 - short release SHA when provided at build time
 
 Operators should verify those values on-device before pilot distribution.
+The Settings screen also now provides a copyable pilot launch snapshot for release tickets and rollout threads.
 
 ## Version source
 
@@ -49,6 +50,11 @@ Build metadata injected:
 - `BUSINESS_HUB_RELEASE_CHANNEL`
 - `BUSINESS_HUB_RELEASE_SHA`
 
+Release artifacts now include:
+- signed release APK
+- `.sha256` checksum file
+- release manifest with tag, channel, SHA, and checksum
+
 Signing path:
 - GitHub workflow expects Android signing secrets
 - Flutter Android release now uses a real release signing config when keystore values are present
@@ -64,14 +70,19 @@ Signing path:
    - example: `mobile-v1.3.9`
 6. Let the release workflow build and publish the APK.
 7. Install the APK on at least one real operator device.
-8. Open Settings and verify:
+8. Verify the APK checksum against the workflow output.
+9. Open Settings and verify:
    - version
    - release channel
    - release SHA
-9. Run device smoke checks.
-10. Distribute to pilot shops only after smoke pass.
+10. Use `Copy pilot snapshot` and archive the output in the rollout record.
+11. Run device smoke checks.
+12. Distribute to pilot shops only after smoke pass.
 
 ## Pilot smoke focus
+
+Reference sheet:
+- [D:/business-hub/docs/mobile-pilot-smoke-sheet.md](D:/business-hub/docs/mobile-pilot-smoke-sheet.md)
 
 1. login
 2. inventory lookup

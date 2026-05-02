@@ -25,7 +25,7 @@ class AppRuntimeInfo {
   String get versionLabel => '$version+$buildNumber';
 
   String get releaseFingerprint =>
-      releaseSha.isEmpty ? releaseChannel : '$releaseChannel · $releaseSha';
+      releaseSha.isEmpty ? releaseChannel : '$releaseChannel | $releaseSha';
 
   static Future<AppRuntimeInfo> load() async {
     final packageInfo = await PackageInfo.fromPlatform();

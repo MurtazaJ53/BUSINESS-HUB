@@ -107,13 +107,35 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
       - name: Collect mobile release artifact
+        id: collect
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p release-assets
+          apk_name="BusinessHub-Mobile-${{ steps.meta.outputs.tag }}.apk"
+          apk_path="release-assets/${apk_name}"
           cp \
             apps/mobile_flutter/build/app/outputs/flutter-apk/app-release.apk \
-            "release-assets/BusinessHub-Mobile-${{ steps.meta.outputs.tag }}.apk"
+            "$apk_path"
+          checksum="$(sha256sum "$apk_path" | awk '{print $1}')"
+          printf '%s  %s\n' "$checksum" "$apk_name" > "${apk_path}.sha256"
+          cat <<EOF > "release-assets/BusinessHub-Mobile-${{ steps.meta.outputs.tag }}.manifest.txt"
+          Tag: ${{ steps.meta.outputs.tag }}
+          Channel: ${{ steps.meta.outputs.channel }}
+          Commit: ${GITHUB_SHA}
+          Short SHA: ${{ steps.meta.outputs.sha_short }}
+          APK: ${apk_name}
+          SHA256: ${checksum}
+          EOF
+          echo "apk_name=${apk_name}" >> "$GITHUB_OUTPUT"
+          echo "apk_sha256=${checksum}" >> "$GITHUB_OUTPUT"
+          cat <<EOF >> "$GITHUB_STEP_SUMMARY"
+          ## Mobile release artifact
+          - APK: ${apk_name}
+          - Channel: ${{ steps.meta.outputs.channel }}
+          - Short SHA: ${{ steps.meta.outputs.sha_short }}
+          - SHA256: ${checksum}
+          EOF
           ls -la release-assets
 
       - name: Upload mobile release artifact
@@ -139,14 +161,23 @@ jobs:
 
           Channel: ${{ steps.meta.outputs.channel }}
           Commit: ${GITHUB_SHA}
+          SHA256: ${{ steps.collect.outputs.apk_sha256 }}
 
           Included artifacts:
           - Flutter release APK
+          - APK checksum file
+          - Release manifest
           EOF
 
-          apk_path="release-assets/BusinessHub-Mobile-${tag}.apk"
+          apk_path="release-assets/${{ steps.collect.outputs.apk_name }}"
+          checksum_path="${apk_path}.sha256"
+          manifest_path="release-assets/BusinessHub-Mobile-${tag}.manifest.txt"
           if [ ! -f "$apk_path" ]; then
             echo "APK artifact not found"
+            exit 1
+          fi
+          if [ ! -f "$checksum_path" ] || [ ! -f "$manifest_path" ]; then
+            echo "Checksum or manifest artifact not found"
             exit 1
           fi
 
@@ -158,4 +189,6 @@ jobs:
             --repo "$repo" \
             --title "Business Hub Mobile $tag" \
             --notes-file "$notes_file" \
-            "$apk_path"
+            "$apk_path" \
+            "$checksum_path" \
+            "$manifest_path"
