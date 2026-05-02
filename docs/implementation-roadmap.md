@@ -368,6 +368,47 @@ Expand the platform beyond the initial launch footprint, control rollout waves s
 - scaling blindly without explicit tuning windows
 - letting rollout waves proceed without a durable pause or rollback trail
 
+## Phase 8: Steady-State Operations and Product Evolution
+
+### Goal
+
+Run Business Hub as a normal production platform, keep reliability and cost under control, and evolve the product without reopening migration-era chaos.
+
+### Primary scope
+
+- steady-state operations
+- reliability and SLO governance
+- cost and capacity control
+- planned product evolution
+- architecture review cadence
+
+### Deliverables
+
+- steady-state operations runbook
+- SLO / error-budget review cadence
+- incident and postmortem cadence
+- cost and capacity review cadence
+- dependency upgrade policy
+- quarterly architecture review checklist
+
+### Exit criteria
+
+Phase 8 does not really "end" in the same sense as migration phases.
+
+It becomes the normal operating mode once:
+
+- rollout is complete
+- steady-state ownership is accepted
+- reliability and cost review loops are active
+- product changes follow the new platform contracts instead of reintroducing legacy shortcuts
+
+### Key risks to control
+
+- treating rollout completion as the end of operational discipline
+- letting cost drift grow quietly after expansion
+- reintroducing Firebase-era shortcuts into new features
+- skipping postmortems and letting repeated incidents become normal
+
 ## Cross-phase non-negotiables
 
 - every write path must be idempotent
@@ -400,6 +441,7 @@ Before moving to the next phase, the team should explicitly approve:
 - legacy retirement gate
 - go-live handoff gate
 - rollout completion gate
+- steady-state governance gate
 
 ## Recommended timeboxing
 
@@ -412,6 +454,7 @@ The exact timeline depends on team size, but a reasonable planning shape is:
 - Phase 5: 2 to 4 weeks
 - Phase 6: 1 to 2 weeks
 - Phase 7: 2 to 4 weeks
+- Phase 8: ongoing
 
 This should be treated as a sequencing estimate, not a promise.
 
@@ -438,6 +481,7 @@ This is the approved execution path for Business Hub:
 - retire Firebase only after parity is proven
 - execute go-live under hypercare before declaring steady state
 - expand rollout waves only after steady-state launch is proven
+- treat Phase 8 as the permanent operating mode after rollout completion
 
 The architecture is only as good as the migration discipline behind it.
 

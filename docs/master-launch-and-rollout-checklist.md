@@ -10,6 +10,7 @@ instead executing:
 - Phase 5 retirement and hardening
 - Phase 6 go-live and hypercare
 - Phase 7 live rollout and scale optimization
+- Phase 8 steady-state operations
 
 If the team wants one file to run the platform from launch approval to rollout
 completion, use this file.
@@ -25,6 +26,7 @@ Primary supporting runbooks:
 - [Phase 5 Retirement Runbook](./phase-5-retirement-runbook.md)
 - [Phase 6 Go-Live Runbook](./phase-6-go-live-runbook.md)
 - [Phase 7 Live Rollout Runbook](./phase-7-live-rollout-runbook.md)
+- [Phase 8 Steady-State Operations Runbook](./phase-8-steady-state-operations-runbook.md)
 
 ## Final program flow
 
@@ -36,6 +38,7 @@ Primary supporting runbooks:
 6. Advance rollout waves.
 7. Tune scale if needed.
 8. Complete rollout.
+9. Enter steady-state operations.
 
 ## Operator roles
 
@@ -309,3 +312,12 @@ The Business Hub transition is only truly complete when:
 - hypercare is closed,
 - rollout waves are completed,
 - and the platform is operating normally at the target footprint.
+
+## Phase 8 handoff
+
+After rollout completion:
+
+1. move to the Phase 8 runbook
+2. start the weekly/monthly operating review cadence
+3. enforce the new-platform rules for all future features
+4. treat migration-era exceptions as incidents, not convenience shortcuts

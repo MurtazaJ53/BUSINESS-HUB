@@ -51,12 +51,13 @@ It is designed to support:
 27. [Phase 6 Go-Live Runbook](./phase-6-go-live-runbook.md)
 28. [Phase 7 Live Rollout Runbook](./phase-7-live-rollout-runbook.md)
 29. [Master Launch and Rollout Checklist](./master-launch-and-rollout-checklist.md)
+30. [Phase 8 Steady-State Operations Runbook](./phase-8-steady-state-operations-runbook.md)
 
 ### Existing strategy docs
 
-30. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
-31. [Global Scale Blueprint](./global-scale-blueprint.md)
-32. [Scale Certification Checklist](./scale-certification-checklist.md)
+31. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
+32. [Global Scale Blueprint](./global-scale-blueprint.md)
+33. [Scale Certification Checklist](./scale-certification-checklist.md)
 
 ## Current truth
 
@@ -67,7 +68,7 @@ As of April 29, 2026:
 - Firestore is the shared cloud backbone
 - local SQLite remains the speed layer on clients
 - PostgreSQL + Django is the recommended final backend direction
-- the migration control plane now includes Phase 7 rollout and scale-optimization signoff surfaces
+- the migration control plane now includes Phase 7 rollout and scale-optimization signoff surfaces, while Phase 8 defines steady-state operating posture
 
 ## Suggested use by audience
 
