@@ -7,16 +7,35 @@ import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/utils/formatters.dart';
 import '../../shell/presentation/mobile_surface.dart';
 
-class HistoryScreen extends ConsumerWidget {
+class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends ConsumerState<HistoryScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  String _search = '';
+  CommerceSyncState? _selectedSyncState;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final salesRepository = ref.watch(salesRepositoryProvider);
     final shopRepository = ref.watch(shopRepositoryProvider);
     final syncStatus = ref.watch(syncStatusProvider);
     final historyStream = salesRepository.watchHistoryOverview();
-    final recentSalesStream = salesRepository.watchRecentSales(limit: 24);
+    final recentSalesStream = salesRepository.watchRecentSales(
+      limit: 60,
+      search: _search,
+      syncState: _selectedSyncState,
+    );
     final domainStatesStream = shopRepository.watchTrackedDomainStates(
       const <String>['sales', 'payments'],
     );
@@ -33,7 +52,7 @@ class HistoryScreen extends ConsumerWidget {
               eyebrow: 'History feed',
               title: 'Receipt trail and replay health.',
               subtitle:
-                  'This feed shows what the mobile vault already knows locally, how much is queued, and whether the backend cutover is stable enough for trust.',
+                  'This feed now lets you inspect the actual receipt payload, not just the summary row, so operators can spot replay or payment problems without leaving the mobile desk.',
               accent: const Color(0xFFF59E0B),
               trailing: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -106,6 +125,72 @@ class HistoryScreen extends ConsumerWidget {
               },
             ),
             const SizedBox(height: 18),
+            MobilePanel(
+              title: 'Receipt controls',
+              action: MobileTag(
+                label: _selectedSyncState == null
+                    ? 'ALL STATES'
+                    : _syncLabel(_selectedSyncState!),
+                icon: Icons.tune_rounded,
+                accent: const Color(0xFFA78BFA),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  TextField(
+                    controller: _searchController,
+                    onChanged: (value) {
+                      setState(() {
+                        _search = value;
+                      });
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'Search customer, phone, or local receipt id',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: _search.isEmpty
+                          ? null
+                          : IconButton(
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {
+                                  _search = '';
+                                });
+                              },
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: <Widget>[
+                      _SyncFilterChip(
+                        label: 'All',
+                        active: _selectedSyncState == null,
+                        onTap: () {
+                          setState(() {
+                            _selectedSyncState = null;
+                          });
+                        },
+                      ),
+                      ...CommerceSyncState.values.map(
+                        (state) => _SyncFilterChip(
+                          label: _syncLabel(state),
+                          active: _selectedSyncState == state,
+                          onTap: () {
+                            setState(() {
+                              _selectedSyncState = state;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
             StreamBuilder<List<DomainControlState>>(
               stream: domainStatesStream,
               builder: (context, domainSnapshot) {
@@ -174,7 +259,14 @@ class HistoryScreen extends ConsumerWidget {
                         .map(
                           (sale) => Padding(
                             padding: const EdgeInsets.only(bottom: 12),
-                            child: _HistorySaleRow(sale: sale),
+                            child: _HistorySaleRow(
+                              sale: sale,
+                              onTap: () => _openSaleDetail(
+                                context,
+                                salesRepository,
+                                sale,
+                              ),
+                            ),
                           ),
                         )
                         .toList(growable: false),
@@ -185,6 +277,205 @@ class HistoryScreen extends ConsumerWidget {
           ],
         );
       },
+    );
+  }
+
+  Future<void> _openSaleDetail(
+    BuildContext context,
+    SalesRepository salesRepository,
+    RecentSaleSummary sale,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF070B13),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+            child: FutureBuilder<SaleRecordDetail?>(
+              future: salesRepository.getSaleDetail(sale.id),
+              builder: (context, snapshot) {
+                final theme = Theme.of(context);
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const MobileEmptyState(
+                    icon: Icons.sync_rounded,
+                    title: 'Loading receipt detail',
+                    body:
+                        'The mobile vault is unpacking the full receipt payload for this sale.',
+                  );
+                }
+
+                final detail = snapshot.data;
+                if (detail == null) {
+                  return const MobileEmptyState(
+                    icon: Icons.receipt_long_outlined,
+                    title: 'Receipt detail unavailable',
+                    body:
+                        'This receipt summary exists, but the full local payload could not be loaded.',
+                  );
+                }
+
+                return ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 680),
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: <Widget>[
+                      Text(
+                        formatCurrency(detail.total),
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${detail.customerName?.isNotEmpty == true ? detail.customerName : 'Walk-in customer'} | ${detail.date}',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.68),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: <Widget>[
+                          MobileTag(
+                            label: _syncLabel(detail.syncState),
+                            icon: Icons.cloud_done_rounded,
+                            accent: _syncTone(detail.syncState),
+                          ),
+                          MobileTag(
+                            label: detail.paymentMode,
+                            icon: Icons.payments_rounded,
+                            accent: const Color(0xFF38BDF8),
+                          ),
+                          MobileTag(
+                            label: '${detail.itemCount} items',
+                            icon: Icons.shopping_bag_rounded,
+                            accent: const Color(0xFFA78BFA),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      _SaleDetailSection(
+                        title: 'Items',
+                        child: Column(
+                          children: detail.items
+                              .map(
+                                (item) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: _SaleItemRow(item: item),
+                                ),
+                              )
+                              .toList(growable: false),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      _SaleDetailSection(
+                        title: 'Payments',
+                        child: Column(
+                          children: detail.payments
+                              .map(
+                                (payment) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: _SalePaymentRow(payment: payment),
+                                ),
+                              )
+                              .toList(growable: false),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      _SaleDetailSection(
+                        title: 'Summary',
+                        child: Column(
+                          children: <Widget>[
+                            _SaleSummaryRow(
+                              label: 'Subtotal',
+                              value: formatCurrency(detail.subtotal),
+                            ),
+                            _SaleSummaryRow(
+                              label: 'Discount',
+                              value: formatCurrency(detail.discount),
+                            ),
+                            _SaleSummaryRow(
+                              label: 'Total',
+                              value: formatCurrency(detail.total),
+                              emphasize: true,
+                            ),
+                            if ((detail.customerPhone ?? '').isNotEmpty)
+                              _SaleSummaryRow(
+                                label: 'Phone',
+                                value: detail.customerPhone!,
+                              ),
+                            if ((detail.footerNote ?? '').isNotEmpty)
+                              _SaleSummaryRow(
+                                label: 'Footer note',
+                                value: detail.footerNote!,
+                              ),
+                            if ((detail.commandId ?? '').isNotEmpty)
+                              _SaleSummaryRow(
+                                label: 'Command',
+                                value: detail.commandId!,
+                              ),
+                            if ((detail.lastSyncError ?? '').isNotEmpty)
+                              _SaleSummaryRow(
+                                label: 'Last sync error',
+                                value: detail.lastSyncError!,
+                                emphasize: true,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SyncFilterChip extends StatelessWidget {
+  const _SyncFilterChip({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeColor = const Color(0xFFA78BFA);
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: Material(
+        color: active
+            ? activeColor.withValues(alpha: 0.14)
+            : const Color(0xFF111827),
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: active ? activeColor : Colors.white70,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -262,27 +553,105 @@ class _DomainPostureRow extends StatelessWidget {
 }
 
 class _HistorySaleRow extends StatelessWidget {
-  const _HistorySaleRow({required this.sale});
+  const _HistorySaleRow({required this.sale, required this.onTap});
 
   final RecentSaleSummary sale;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final tone = switch (sale.syncState) {
-      CommerceSyncState.synced => const Color(0xFF22C55E),
-      CommerceSyncState.queued => const Color(0xFFF59E0B),
-      CommerceSyncState.syncing => const Color(0xFF38BDF8),
-      CommerceSyncState.failed => const Color(0xFFFB7185),
-      CommerceSyncState.localOnly => Colors.white70,
-    };
-    final stateLabel = switch (sale.syncState) {
-      CommerceSyncState.synced => 'SYNCED',
-      CommerceSyncState.queued => 'QUEUED',
-      CommerceSyncState.syncing => 'SYNCING',
-      CommerceSyncState.failed => 'FAILED',
-      CommerceSyncState.localOnly => 'LOCAL',
-    };
+    final tone = _syncTone(sale.syncState);
 
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A1220),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: tone.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(Icons.receipt_long_rounded, color: tone),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        formatCurrency(sale.total),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w900),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${sale.customerName?.isNotEmpty == true ? sale.customerName : 'Walk-in customer'} | ${sale.date}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.58),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: <Widget>[
+                          MobileTag(
+                            label: sale.paymentMode,
+                            icon: Icons.payments_rounded,
+                            accent: const Color(0xFF38BDF8),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Tap for detail',
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.56),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  _syncLabel(sale.syncState),
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: tone,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SaleDetailSection extends StatelessWidget {
+  const _SaleDetailSection({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: const Color(0xFF0A1220),
@@ -291,57 +660,160 @@ class _HistorySaleRow extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: tone.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(Icons.receipt_long_rounded, color: tone),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    formatCurrency(sale.total),
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${sale.customerName?.isNotEmpty == true ? sale.customerName : 'Walk-in customer'} | ${sale.date}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.58),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  MobileTag(
-                    label: sale.paymentMode,
-                    icon: Icons.payments_rounded,
-                    accent: const Color(0xFF38BDF8),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
             Text(
-              stateLabel,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: tone,
-                fontWeight: FontWeight.w900,
-              ),
+              title,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
             ),
+            const SizedBox(height: 12),
+            child,
           ],
         ),
       ),
     );
   }
+}
+
+class _SaleItemRow extends StatelessWidget {
+  const _SaleItemRow({required this.item});
+
+  final SaleDetailItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                item.name,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${item.quantity} x ${formatCurrency(item.unitPrice)}${item.size?.isNotEmpty == true ? ' | ${item.size}' : ''}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.58),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Text(
+          formatCurrency(item.lineTotal),
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: const Color(0xFF22C55E),
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SalePaymentRow extends StatelessWidget {
+  const _SalePaymentRow({required this.payment});
+
+  final SaleDetailPayment payment;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                payment.mode,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              if ((payment.referenceCode ?? '').isNotEmpty ||
+                  (payment.note ?? '').isNotEmpty) ...<Widget>[
+                const SizedBox(height: 4),
+                Text(
+                  payment.referenceCode ?? payment.note!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.58),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        Text(
+          formatCurrency(payment.amount),
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: const Color(0xFF38BDF8),
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SaleSummaryRow extends StatelessWidget {
+  const _SaleSummaryRow({
+    required this.label,
+    required this.value,
+    this.emphasize = false,
+  });
+
+  final String label;
+  final String value;
+  final bool emphasize;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodyMedium?.copyWith(
+      color: emphasize ? Colors.white : Colors.white.withValues(alpha: 0.72),
+      fontWeight: emphasize ? FontWeight.w900 : FontWeight.w600,
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Expanded(child: Text(label, style: style)),
+          const SizedBox(width: 16),
+          Flexible(
+            child: Text(value, textAlign: TextAlign.right, style: style),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _syncLabel(CommerceSyncState state) {
+  return switch (state) {
+    CommerceSyncState.localOnly => 'LOCAL',
+    CommerceSyncState.queued => 'QUEUED',
+    CommerceSyncState.syncing => 'SYNCING',
+    CommerceSyncState.synced => 'SYNCED',
+    CommerceSyncState.failed => 'FAILED',
+  };
+}
+
+Color _syncTone(CommerceSyncState state) {
+  return switch (state) {
+    CommerceSyncState.synced => const Color(0xFF22C55E),
+    CommerceSyncState.queued => const Color(0xFFF59E0B),
+    CommerceSyncState.syncing => const Color(0xFF38BDF8),
+    CommerceSyncState.failed => const Color(0xFFFB7185),
+    CommerceSyncState.localOnly => Colors.white70,
+  };
 }

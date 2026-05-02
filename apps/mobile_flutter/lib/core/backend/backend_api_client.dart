@@ -173,6 +173,29 @@ class BackendApiClient {
         .toList(growable: false);
   }
 
+  Future<CustomerLedgerPreviewEntry> createCustomerLedgerEntry({
+    required User user,
+    required String shopId,
+    required String customerId,
+    required CustomerLedgerMutationDraft draft,
+  }) async {
+    final decoded = await _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/customers/$customerId/ledger/',
+      body: draft.toJson(),
+    );
+
+    return CustomerLedgerPreviewEntry(
+      id: (decoded['id'] ?? '').toString(),
+      eventType: (decoded['event_type'] ?? draft.eventType).toString(),
+      amountDelta: _asDouble(decoded['amount_delta'] ?? draft.amountDelta),
+      occurredAt: _asDateTime(decoded['occurred_at'] ?? draft.occurredAt),
+      note: _nullableText(decoded['note'] ?? draft.note),
+      actorName: _nullableText(decoded['actor_name']),
+    );
+  }
+
   Future<Map<String, dynamic>> _request({
     required User user,
     required String method,

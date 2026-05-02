@@ -40,13 +40,26 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
       search: _search,
     );
     final historyStream = salesRepository.watchHistoryOverview();
-    final domainStateStream = shopRepository.watchDomainState('customers');
+    final domainStatesStream = shopRepository.watchTrackedDomainStates(
+      const <String>['customers', 'customer_ledger'],
+    );
 
-    return StreamBuilder<DomainControlState>(
-      stream: domainStateStream,
+    return StreamBuilder<List<DomainControlState>>(
+      stream: domainStatesStream,
       builder: (context, domainSnapshot) {
+        final states = domainSnapshot.data;
         final domainState =
-            domainSnapshot.data ?? DomainControlState.legacy('customers');
+            states?.firstWhere(
+              (state) => state.domain == 'customers',
+              orElse: () => DomainControlState.legacy('customers'),
+            ) ??
+            DomainControlState.legacy('customers');
+        final ledgerDomainState =
+            states?.firstWhere(
+              (state) => state.domain == 'customer_ledger',
+              orElse: () => DomainControlState.legacy('customer_ledger'),
+            ) ??
+            DomainControlState.legacy('customer_ledger');
 
         return StreamBuilder<HistoryOverview>(
           stream: historyStream,
@@ -122,13 +135,22 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                           accent: const Color(0xFF14B8A6),
                         ),
                         MobileMetricCard(
-                          label: 'Queued sales',
-                          value: '${history.queuedSales}',
-                          caption: history.queuedSales > 0
-                              ? 'Some customer recall may update after replay'
-                              : 'Replay queue is clear',
-                          icon: Icons.cloud_upload_rounded,
-                          accent: const Color(0xFFF59E0B),
+                          label: 'Ledger',
+                          value: ledgerDomainState.isPostgresPrimary
+                              ? 'Writable'
+                              : 'Read only',
+                          caption:
+                              ledgerDomainState.pilotSignoffStatus
+                                      ?.replaceAll('_', ' ')
+                                      .isNotEmpty ==
+                                  true
+                              ? ledgerDomainState.pilotSignoffStatus!
+                                    .replaceAll('_', ' ')
+                              : ledgerDomainState.postureLabel,
+                          icon: Icons.account_balance_wallet_rounded,
+                          accent: ledgerDomainState.isPostgresPrimary
+                              ? const Color(0xFF22C55E)
+                              : const Color(0xFFF59E0B),
                         ),
                         MobileMetricCard(
                           label: 'Sync',
@@ -232,12 +254,21 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                                   padding: const EdgeInsets.only(bottom: 12),
                                   child: _BackendCustomerRow(
                                     customer: customer,
-                                    onTap: () => _openLedgerSheet(
-                                      context,
-                                      backendApiClient: backendApiClient,
-                                      session: session,
-                                      customer: customer,
-                                    ),
+                                    onTap: () async {
+                                      final changed = await _openLedgerSheet(
+                                        context,
+                                        backendApiClient: backendApiClient,
+                                        session: session,
+                                        customer: customer,
+                                        ledgerDomainState: ledgerDomainState,
+                                      );
+                                      if (changed == true && mounted) {
+                                        setState(() {
+                                          _backendLookupFuture = null;
+                                          _backendLookupKey = null;
+                                        });
+                                      }
+                                    },
                                   ),
                                 ),
                               )
@@ -282,17 +313,18 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     return _backendLookupFuture;
   }
 
-  Future<void> _openLedgerSheet(
+  Future<bool?> _openLedgerSheet(
     BuildContext context, {
     required BackendApiClient backendApiClient,
     required MobileSession? session,
     required BackendCustomerSummary customer,
+    required DomainControlState ledgerDomainState,
   }) async {
     if (session == null || !session.hasShop) {
-      return;
+      return false;
     }
 
-    await showModalBottomSheet<void>(
+    return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: const Color(0xFF070B13),
@@ -364,6 +396,24 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                         ),
                       ],
                     ),
+                    if (ledgerDomainState.isPostgresPrimary) ...<Widget>[
+                      const SizedBox(height: 14),
+                      FilledButton.tonalIcon(
+                        onPressed: () async {
+                          final changed = await _showLedgerMutationDialog(
+                            context,
+                            backendApiClient: backendApiClient,
+                            session: session,
+                            customer: customer,
+                          );
+                          if (changed == true && context.mounted) {
+                            Navigator.of(context).pop(true);
+                          }
+                        },
+                        icon: const Icon(Icons.edit_note_rounded),
+                        label: const Text('Record payment or adjustment'),
+                      ),
+                    ],
                     const SizedBox(height: 18),
                     if (entries.isEmpty)
                       const MobileEmptyState(
@@ -461,6 +511,130 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         );
       },
     );
+  }
+
+  Future<bool> _showLedgerMutationDialog(
+    BuildContext context, {
+    required BackendApiClient backendApiClient,
+    required MobileSession session,
+    required BackendCustomerSummary customer,
+  }) async {
+    final amountController = TextEditingController();
+    final noteController = TextEditingController();
+    var eventType = 'payment';
+
+    try {
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return AlertDialog(
+                title: Text('Update ${customer.name}'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    DropdownButtonFormField<String>(
+                      initialValue: eventType,
+                      items: const <DropdownMenuItem<String>>[
+                        DropdownMenuItem(
+                          value: 'payment',
+                          child: Text('Record payment received'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'adjustment',
+                          child: Text('Manual balance adjustment'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setDialogState(() {
+                          eventType = value;
+                        });
+                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Entry type',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: amountController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        signed: true,
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: eventType == 'payment'
+                            ? 'Amount received'
+                            : 'Balance delta (+ add due, - reduce)',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: noteController,
+                      minLines: 2,
+                      maxLines: 3,
+                      decoration: const InputDecoration(labelText: 'Note'),
+                    ),
+                  ],
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: () async {
+                      final rawAmount =
+                          double.tryParse(amountController.text.trim()) ?? 0;
+                      if (rawAmount == 0) {
+                        return;
+                      }
+
+                      final draft = CustomerLedgerMutationDraft(
+                        eventType: eventType,
+                        amountDelta: eventType == 'payment'
+                            ? -rawAmount.abs()
+                            : rawAmount,
+                        note: noteController.text.trim(),
+                      );
+
+                      try {
+                        await backendApiClient.createCustomerLedgerEntry(
+                          user: session.user,
+                          shopId: session.shopId!,
+                          customerId: customer.id,
+                          draft: draft,
+                        );
+                        if (dialogContext.mounted) {
+                          Navigator.of(dialogContext).pop(true);
+                        }
+                      } catch (error) {
+                        if (dialogContext.mounted) {
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
+                            SnackBar(
+                              content: Text('Ledger update failed: $error'),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    child: const Text('Save'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+      return result == true;
+    } finally {
+      amountController.dispose();
+      noteController.dispose();
+    }
   }
 }
 

@@ -436,6 +436,81 @@ class RecentSaleSummary {
   final String? customerName;
 }
 
+class SaleDetailItem {
+  const SaleDetailItem({
+    required this.name,
+    required this.quantity,
+    required this.unitPrice,
+    this.size,
+    this.sku,
+    this.unitCost,
+  });
+
+  final String name;
+  final int quantity;
+  final double unitPrice;
+  final String? size;
+  final String? sku;
+  final double? unitCost;
+
+  double get lineTotal => unitPrice * quantity;
+}
+
+class SaleDetailPayment {
+  const SaleDetailPayment({
+    required this.mode,
+    required this.amount,
+    this.referenceCode,
+    this.note,
+  });
+
+  final String mode;
+  final double amount;
+  final String? referenceCode;
+  final String? note;
+}
+
+class SaleRecordDetail {
+  const SaleRecordDetail({
+    required this.id,
+    required this.total,
+    required this.discount,
+    required this.discountType,
+    required this.paymentMode,
+    required this.date,
+    required this.syncState,
+    required this.items,
+    required this.payments,
+    this.customerName,
+    this.customerPhone,
+    this.footerNote,
+    this.commandId,
+    this.backendSaleId,
+    this.lastSyncError,
+  });
+
+  final String id;
+  final double total;
+  final double discount;
+  final String discountType;
+  final String paymentMode;
+  final String date;
+  final CommerceSyncState syncState;
+  final List<SaleDetailItem> items;
+  final List<SaleDetailPayment> payments;
+  final String? customerName;
+  final String? customerPhone;
+  final String? footerNote;
+  final String? commandId;
+  final String? backendSaleId;
+  final String? lastSyncError;
+
+  int get itemCount => items.fold<int>(0, (sum, item) => sum + item.quantity);
+
+  double get subtotal =>
+      items.fold<double>(0, (sum, item) => sum + item.lineTotal);
+}
+
 class CommerceOutboxEntryModel {
   const CommerceOutboxEntryModel({
     required this.commandId,
@@ -559,5 +634,29 @@ class LocalSaleCommit {
     'createdAt': createdAt,
     'staffId': staffId ?? '',
     'updatedAt': DateTime.now().millisecondsSinceEpoch,
+  };
+}
+
+class CustomerLedgerMutationDraft {
+  CustomerLedgerMutationDraft({
+    required this.eventType,
+    required this.amountDelta,
+    this.totalSpentDelta = 0,
+    this.note,
+    DateTime? occurredAt,
+  }) : occurredAt = occurredAt ?? DateTime.now();
+
+  final String eventType;
+  final double amountDelta;
+  final double totalSpentDelta;
+  final String? note;
+  final DateTime occurredAt;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'event_type': eventType,
+    'amount_delta': amountDelta.toStringAsFixed(2),
+    'total_spent_delta': totalSpentDelta.toStringAsFixed(2),
+    'note': note ?? '',
+    'occurred_at': occurredAt.toIso8601String(),
   };
 }

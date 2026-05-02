@@ -393,7 +393,13 @@ class MobileSyncCoordinator {
     String shopId,
   ) async {
     final states = <String, DomainControlState>{};
-    final domains = <String>['inventory', 'customers', 'sales', 'payments'];
+    final domains = <String>[
+      'inventory',
+      'customers',
+      'customer_ledger',
+      'sales',
+      'payments',
+    ];
 
     for (final domain in domains) {
       try {

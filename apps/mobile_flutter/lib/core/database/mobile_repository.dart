@@ -548,26 +548,85 @@ class SalesRepository {
         );
   }
 
-  Stream<List<RecentSaleSummary>> watchRecentSales({int limit = 8}) {
-    return (_db.select(_db.salesEntries)
-          ..where((tbl) => tbl.tombstone.equals(false))
-          ..orderBy([(tbl) => OrderingTerm.desc(tbl.createdAt)])
-          ..limit(limit))
-        .watch()
-        .map(
-          (rows) => rows
-              .map(
-                (row) => RecentSaleSummary(
-                  id: row.id,
-                  total: row.total,
-                  date: row.date,
-                  paymentMode: row.paymentMode,
-                  customerName: row.customerName,
-                  syncState: _parseSyncState(row.syncStatus),
-                ),
-              )
-              .toList(growable: false),
-        );
+  Stream<List<RecentSaleSummary>> watchRecentSales({
+    int limit = 8,
+    String search = '',
+    String? paymentMode,
+    CommerceSyncState? syncState,
+  }) {
+    final normalized = search.trim().toLowerCase();
+    final query = _db.select(_db.salesEntries)
+      ..where((tbl) => tbl.tombstone.equals(false));
+
+    if (normalized.isNotEmpty) {
+      query.where(
+        (tbl) =>
+            tbl.customerName.lower().like('%$normalized%') |
+            tbl.customerPhone.lower().like('%$normalized%') |
+            tbl.id.lower().like('%$normalized%'),
+      );
+    }
+
+    if (paymentMode != null && paymentMode.isNotEmpty) {
+      query.where((tbl) => tbl.paymentMode.equals(paymentMode));
+    }
+
+    if (syncState != null) {
+      final statuses = switch (syncState) {
+        CommerceSyncState.localOnly => const ['local_only'],
+        CommerceSyncState.queued => const ['queued'],
+        CommerceSyncState.syncing => const ['syncing'],
+        CommerceSyncState.synced => const ['synced_backend', 'synced'],
+        CommerceSyncState.failed => const ['failed_backend', 'failed'],
+      };
+      query.where((tbl) => tbl.syncStatus.isIn(statuses));
+    }
+
+    query
+      ..orderBy([(tbl) => OrderingTerm.desc(tbl.createdAt)])
+      ..limit(limit);
+
+    return query.watch().map(
+      (rows) => rows
+          .map(
+            (row) => RecentSaleSummary(
+              id: row.id,
+              total: row.total,
+              date: row.date,
+              paymentMode: row.paymentMode,
+              customerName: row.customerName,
+              syncState: _parseSyncState(row.syncStatus),
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+
+  Future<SaleRecordDetail?> getSaleDetail(String saleId) async {
+    final row = await (_db.select(
+      _db.salesEntries,
+    )..where((tbl) => tbl.id.equals(saleId))).getSingleOrNull();
+    if (row == null) {
+      return null;
+    }
+
+    return SaleRecordDetail(
+      id: row.id,
+      total: row.total,
+      discount: row.discount,
+      discountType: row.discountType,
+      paymentMode: row.paymentMode,
+      date: row.date,
+      syncState: _parseSyncState(row.syncStatus),
+      items: _parseSaleItems(row.itemsJson),
+      payments: _parseSalePayments(row.paymentsJson),
+      customerName: row.customerName,
+      customerPhone: row.customerPhone,
+      footerNote: row.footerNote,
+      commandId: row.commandId,
+      backendSaleId: row.backendSaleId,
+      lastSyncError: row.lastSyncError,
+    );
   }
 
   Stream<List<CustomerPulseSummary>> watchCustomerPulse({
@@ -1158,5 +1217,54 @@ String? _encodeNullableJson(Object? value) {
     return jsonEncode(value);
   } catch (_) {
     return null;
+  }
+}
+
+List<SaleDetailItem> _parseSaleItems(String raw) {
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) {
+      return const <SaleDetailItem>[];
+    }
+    return decoded
+        .whereType<Map>()
+        .map(
+          (item) => SaleDetailItem(
+            name: (item['name'] ?? 'Unknown item').toString(),
+            quantity: _asInt(item['quantity']),
+            unitPrice: _asDouble(item['price'] ?? item['unit_price']),
+            size: _asStringOrNull(item['size']),
+            sku: _asStringOrNull(item['sku']),
+            unitCost: item['costPrice'] == null && item['unit_cost'] == null
+                ? null
+                : _asDouble(item['costPrice'] ?? item['unit_cost']),
+          ),
+        )
+        .toList(growable: false);
+  } catch (_) {
+    return const <SaleDetailItem>[];
+  }
+}
+
+List<SaleDetailPayment> _parseSalePayments(String raw) {
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) {
+      return const <SaleDetailPayment>[];
+    }
+    return decoded
+        .whereType<Map>()
+        .map(
+          (payment) => SaleDetailPayment(
+            mode: (payment['mode'] ?? payment['payment_method'] ?? 'CASH')
+                .toString(),
+            amount: _asDouble(payment['amount']),
+            referenceCode: _asStringOrNull(payment['reference_code']),
+            note: _asStringOrNull(payment['note']),
+          ),
+        )
+        .toList(growable: false);
+  } catch (_) {
+    return const <SaleDetailPayment>[];
   }
 }
