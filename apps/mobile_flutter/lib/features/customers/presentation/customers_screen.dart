@@ -21,6 +21,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _search = '';
   String _statusFilter = 'all';
+  String _sortMode = 'due_desc';
   Future<List<BackendCustomerSummary>>? _backendLookupFuture;
   String? _backendLookupKey;
 
@@ -224,6 +225,24 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                             )
                             .toList(growable: false),
                       ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _customerSortModes
+                            .map(
+                              (sort) => _CustomerFilterChip(
+                                label: sort.label,
+                                active: _sortMode == sort.value,
+                                onTap: () {
+                                  setState(() {
+                                    _sortMode = sort.value;
+                                  });
+                                },
+                              ),
+                            )
+                            .toList(growable: false),
+                      ),
                     ],
                   ),
                 ),
@@ -314,21 +333,24 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                         );
                       }
 
+                      final orderedCustomers = _sortBackendCustomers(
+                        filteredCustomers,
+                      );
                       final summary =
                           _BackendCustomerSummaryReport.fromCustomers(
-                            filteredCustomers,
+                            orderedCustomers,
                           );
                       return MobilePanel(
                         title: 'Customer ledger view',
                         action: MobileTag(
-                          label: '${filteredCustomers.length} live',
+                          label: '${orderedCustomers.length} live',
                           icon: Icons.verified_rounded,
                           accent: const Color(0xFF22C55E),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
-                            if (filteredCustomers.isEmpty)
+                            if (orderedCustomers.isEmpty)
                               const MobileEmptyState(
                                 icon: Icons.groups_outlined,
                                 title: 'No customers matched this view',
@@ -380,7 +402,25 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                                     ),
                               ),
                               const SizedBox(height: 14),
-                              ...filteredCustomers.map(
+                              if (summary.collectionsQueue.isNotEmpty)
+                                _CollectionsQueuePanel(
+                                  customers: summary.collectionsQueue,
+                                  onSelectCustomer: (customer) async {
+                                    final changed = await _openLedgerSheet(
+                                      context,
+                                      backendApiClient: backendApiClient,
+                                      session: session,
+                                      customer: customer,
+                                      ledgerDomainState: ledgerDomainState,
+                                    );
+                                    if (changed == true && mounted) {
+                                      _resetBackendLookup();
+                                    }
+                                  },
+                                ),
+                              if (summary.collectionsQueue.isNotEmpty)
+                                const SizedBox(height: 14),
+                              ...orderedCustomers.map(
                                 (customer) => Padding(
                                   padding: const EdgeInsets.only(bottom: 12),
                                   child: _BackendCustomerRow(
@@ -462,6 +502,22 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
           };
         })
         .toList(growable: false);
+  }
+
+  List<BackendCustomerSummary> _sortBackendCustomers(
+    List<BackendCustomerSummary> customers,
+  ) {
+    final next = List<BackendCustomerSummary>.from(customers);
+    next.sort((left, right) {
+      return switch (_sortMode) {
+        'spent_desc' => right.totalSpent.compareTo(left.totalSpent),
+        'name_asc' => left.name.toLowerCase().compareTo(
+          right.name.toLowerCase(),
+        ),
+        _ => right.balance.compareTo(left.balance),
+      };
+    });
+    return next;
   }
 
   Future<bool?> _openLedgerSheet(
@@ -779,6 +835,41 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                             ? 'Payments reduce the customer due balance.'
                             : 'Positive adds receivable, negative reduces it.',
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: <Widget>[
+                        if (eventType == 'payment' && customer.balance > 0.009)
+                          _LedgerAmountPresetChip(
+                            label: 'Full due',
+                            onTap: () {
+                              amountController.text = customer.balance
+                                  .toStringAsFixed(2);
+                            },
+                          ),
+                        if (eventType == 'payment' && customer.balance > 0.009)
+                          _LedgerAmountPresetChip(
+                            label: 'Half due',
+                            onTap: () {
+                              amountController.text = (customer.balance / 2)
+                                  .toStringAsFixed(2);
+                            },
+                          ),
+                        _LedgerAmountPresetChip(
+                          label: '₹500',
+                          onTap: () {
+                            amountController.text = '500';
+                          },
+                        ),
+                        _LedgerAmountPresetChip(
+                          label: '₹1000',
+                          onTap: () {
+                            amountController.text = '1000';
+                          },
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -1214,6 +1305,131 @@ class _CustomerSummaryTile extends StatelessWidget {
   }
 }
 
+class _CollectionsQueuePanel extends StatelessWidget {
+  const _CollectionsQueuePanel({
+    required this.customers,
+    required this.onSelectCustomer,
+  });
+
+  final List<BackendCustomerSummary> customers;
+  final Future<void> Function(BackendCustomerSummary customer) onSelectCustomer;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1220),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: const Color(0xFFF59E0B).withValues(alpha: 0.18),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              'Collections queue',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'These customers currently carry the highest visible due balances.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.62),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 14),
+            ...customers
+                .take(3)
+                .map(
+                  (customer) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(18),
+                        onTap: () async {
+                          await onSelectCustomer(customer);
+                        },
+                        child: Ink(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.03),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Row(
+                              children: <Widget>[
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: <Widget>[
+                                      Text(
+                                        customer.name,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleSmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        customer.phone ??
+                                            customer.email ??
+                                            'Tap to open ledger',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: Colors.white.withValues(
+                                                alpha: 0.58,
+                                              ),
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                MobileTag(
+                                  label: formatCurrency(customer.balance),
+                                  icon: Icons.account_balance_wallet_rounded,
+                                  accent: const Color(0xFFF59E0B),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LedgerAmountPresetChip extends StatelessWidget {
+  const _LedgerAmountPresetChip({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _CustomerFilterChip(label: label, active: false, onTap: onTap);
+  }
+}
+
 class _BackendCustomerRow extends StatelessWidget {
   const _BackendCustomerRow({required this.customer, required this.onTap});
 
@@ -1308,6 +1524,7 @@ class _BackendCustomerSummaryReport {
     required this.inactiveCount,
     required this.receivableBalance,
     required this.highestBalanceCustomer,
+    required this.collectionsQueue,
   });
 
   final int visibleCount;
@@ -1315,6 +1532,7 @@ class _BackendCustomerSummaryReport {
   final int inactiveCount;
   final double receivableBalance;
   final BackendCustomerSummary? highestBalanceCustomer;
+  final List<BackendCustomerSummary> collectionsQueue;
 
   factory _BackendCustomerSummaryReport.fromCustomers(
     List<BackendCustomerSummary> customers,
@@ -1323,11 +1541,13 @@ class _BackendCustomerSummaryReport {
     var inactiveCount = 0;
     var receivableBalance = 0.0;
     BackendCustomerSummary? highestBalanceCustomer;
+    final dueCustomers = <BackendCustomerSummary>[];
 
     for (final customer in customers) {
       if (customer.balance > 0.009) {
         dueCount += 1;
         receivableBalance += customer.balance;
+        dueCustomers.add(customer);
         if (highestBalanceCustomer == null ||
             customer.balance > highestBalanceCustomer.balance) {
           highestBalanceCustomer = customer;
@@ -1344,6 +1564,11 @@ class _BackendCustomerSummaryReport {
       inactiveCount: inactiveCount,
       receivableBalance: receivableBalance,
       highestBalanceCustomer: highestBalanceCustomer,
+      collectionsQueue:
+          (dueCustomers
+                ..sort((left, right) => right.balance.compareTo(left.balance)))
+              .take(3)
+              .toList(growable: false),
     );
   }
 }
@@ -1444,4 +1669,11 @@ const List<_CustomerStatusFilterOption> _customerStatusFilters =
       _CustomerStatusFilterOption(value: 'with_due', label: 'With due'),
       _CustomerStatusFilterOption(value: 'active_only', label: 'Active'),
       _CustomerStatusFilterOption(value: 'inactive_only', label: 'Inactive'),
+    ];
+
+const List<_CustomerStatusFilterOption> _customerSortModes =
+    <_CustomerStatusFilterOption>[
+      _CustomerStatusFilterOption(value: 'due_desc', label: 'Due high'),
+      _CustomerStatusFilterOption(value: 'spent_desc', label: 'Spent high'),
+      _CustomerStatusFilterOption(value: 'name_asc', label: 'A-Z'),
     ];

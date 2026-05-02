@@ -1287,6 +1287,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                       .trim();
                                   final amountDue =
                                       total - resolvedPayments.totalCollected;
+                                  final existingCustomerBalance =
+                                      _selectedCustomer?.balance ?? 0;
                                   if (amountDue > 0 &&
                                       _selectedCustomer == null &&
                                       customerName.isEmpty) {
@@ -1303,6 +1305,28 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                       ),
                                     );
                                     return;
+                                  }
+
+                                  if (_selectedCustomer != null &&
+                                      existingCustomerBalance > 0.009 &&
+                                      amountDue > 0) {
+                                    if (!mounted || !context.mounted) {
+                                      return;
+                                    }
+                                    final continueWithExposure =
+                                        await _showCreditExposureDialog(
+                                          context,
+                                          customer: _selectedCustomer!,
+                                          currentBalance:
+                                              existingCustomerBalance,
+                                          additionalDue: amountDue,
+                                        );
+                                    if (!mounted || !context.mounted) {
+                                      return;
+                                    }
+                                    if (!continueWithExposure) {
+                                      return;
+                                    }
                                   }
 
                                   setState(() {
@@ -1395,6 +1419,55 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         payment.dispose();
       }
     }
+  }
+
+  Future<bool> _showCreditExposureDialog(
+    BuildContext context, {
+    required BackendCustomerSummary customer,
+    required double currentBalance,
+    required double additionalDue,
+  }) async {
+    final projectedBalance = currentBalance + additionalDue;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Confirm credit exposure'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                '${customer.name} already carries ${formatCurrency(currentBalance)} due.',
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'This sale adds ${formatCurrency(additionalDue)} more and moves the projected balance to ${formatCurrency(projectedBalance)}.',
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Continue only if you want this customer ledger to hold the new due after backend replay.',
+                style: Theme.of(dialogContext).textTheme.bodySmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.68),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Review sale'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Continue'),
+            ),
+          ],
+        );
+      },
+    );
+    return result == true;
   }
 
   Future<BackendCustomerSummary?> _showCustomerPicker(

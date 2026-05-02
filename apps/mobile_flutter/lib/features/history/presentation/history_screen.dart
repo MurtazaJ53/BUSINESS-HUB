@@ -408,6 +408,21 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                                     fontWeight: FontWeight.w600,
                                   ),
                             ),
+                            if (report.paymentMix.isNotEmpty) ...<Widget>[
+                              const SizedBox(height: 14),
+                              Text(
+                                'Payment mix',
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.w900),
+                              ),
+                              const SizedBox(height: 10),
+                              ...report.paymentMix.map(
+                                (mix) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: _HistoryPaymentMixRow(mix: mix),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                 );
@@ -1048,6 +1063,59 @@ class _HistoryMetricTile extends StatelessWidget {
   }
 }
 
+class _HistoryPaymentMixRow extends StatelessWidget {
+  const _HistoryPaymentMixRow({required this.mix});
+
+  final _PaymentModeMixStats mix;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1220),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: <Widget>[
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    mix.mode,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${mix.count} receipt(s) · ${mix.shareLabel}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.58),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              formatCurrency(mix.grossAmount),
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: const Color(0xFF38BDF8),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SaleSummaryRow extends StatelessWidget {
   const _SaleSummaryRow({
     required this.label,
@@ -1095,6 +1163,7 @@ class _HistoryReportSnapshot {
     required this.queuedCount,
     required this.failedCount,
     required this.topPaymentMode,
+    required this.paymentMix,
   });
 
   final int receiptCount;
@@ -1109,6 +1178,7 @@ class _HistoryReportSnapshot {
   final int queuedCount;
   final int failedCount;
   final String? topPaymentMode;
+  final List<_PaymentModeMixStats> paymentMix;
 
   factory _HistoryReportSnapshot.fromSales(List<RecentSaleSummary> sales) {
     var grossTotal = 0.0;
@@ -1121,6 +1191,7 @@ class _HistoryReportSnapshot {
     var queuedCount = 0;
     var failedCount = 0;
     final paymentModeCounts = <String, int>{};
+    final paymentModeAmounts = <String, double>{};
 
     for (final sale in sales) {
       grossTotal += sale.total;
@@ -1153,6 +1224,11 @@ class _HistoryReportSnapshot {
         (value) => value + 1,
         ifAbsent: () => 1,
       );
+      paymentModeAmounts.update(
+        sale.paymentMode,
+        (value) => value + sale.total,
+        ifAbsent: () => sale.total,
+      );
     }
 
     String? topPaymentMode;
@@ -1162,6 +1238,19 @@ class _HistoryReportSnapshot {
         topPaymentMode = entry.key;
       }
     }
+
+    final paymentMix =
+        paymentModeCounts.entries
+            .map(
+              (entry) => _PaymentModeMixStats(
+                mode: entry.key,
+                count: entry.value,
+                grossAmount: paymentModeAmounts[entry.key] ?? 0,
+                totalReceipts: sales.length,
+              ),
+            )
+            .toList(growable: false)
+          ..sort((left, right) => right.count.compareTo(left.count));
 
     return _HistoryReportSnapshot(
       receiptCount: sales.length,
@@ -1176,7 +1265,30 @@ class _HistoryReportSnapshot {
       queuedCount: queuedCount,
       failedCount: failedCount,
       topPaymentMode: topPaymentMode,
+      paymentMix: paymentMix.take(4).toList(growable: false),
     );
+  }
+}
+
+class _PaymentModeMixStats {
+  const _PaymentModeMixStats({
+    required this.mode,
+    required this.count,
+    required this.grossAmount,
+    required this.totalReceipts,
+  });
+
+  final String mode;
+  final int count;
+  final double grossAmount;
+  final int totalReceipts;
+
+  String get shareLabel {
+    if (totalReceipts <= 0) {
+      return '0% share';
+    }
+    final share = (count / totalReceipts) * 100;
+    return '${share.toStringAsFixed(0)}% share';
   }
 }
 
