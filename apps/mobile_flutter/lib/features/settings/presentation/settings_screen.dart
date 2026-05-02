@@ -9,6 +9,7 @@ import '../../../core/models/mobile_session.dart';
 import '../../../core/runtime/app_runtime_info.dart';
 import '../../../core/runtime/pilot_diagnostics_snapshot.dart';
 import '../../../core/runtime/pilot_handoff_report.dart';
+import '../../../core/runtime/pilot_incident_escalation_report.dart';
 import '../../../core/runtime/pilot_readiness_report.dart';
 import '../../../core/runtime/pilot_recovery_report.dart';
 import '../../../core/runtime/pilot_rollout_evidence_report.dart';
@@ -1174,6 +1175,96 @@ class SettingsScreen extends ConsumerWidget {
                                           ],
                                         ),
                                 ),
+                                const SizedBox(height: 18),
+                                MobilePanel(
+                                  title: 'Incident escalation pack',
+                                  action: MobileTag(
+                                    label: diagnostics == null ||
+                                            readinessReport == null ||
+                                            recoveryReport == null
+                                        ? 'Loading'
+                                        : 'Escalation',
+                                    icon: diagnostics == null ||
+                                            readinessReport == null ||
+                                            recoveryReport == null
+                                        ? Icons.sync_rounded
+                                        : Icons.crisis_alert_rounded,
+                                    accent: diagnostics == null ||
+                                            readinessReport == null ||
+                                            recoveryReport == null
+                                        ? const Color(0xFFF59E0B)
+                                        : const Color(0xFFFB7185),
+                                  ),
+                                  child: diagnostics == null ||
+                                          readinessReport == null ||
+                                          recoveryReport == null
+                                      ? const MobileEmptyState(
+                                          icon: Icons.sync_rounded,
+                                          title: 'Preparing escalation pack',
+                                          body:
+                                              'The device is still collecting the reports needed for a structured incident export.',
+                                        )
+                                      : Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: <Widget>[
+                                            Text(
+                                              'Use this when the rollout lead, support, or engineering needs one structured incident record directly from the affected device. It turns the current readiness, snapshot, and recovery state into a support-ready escalation pack.',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color: Colors.white
+                                                        .withValues(
+                                                          alpha: 0.68,
+                                                        ),
+                                                    fontWeight: FontWeight.w600,
+                                                    height: 1.45,
+                                                  ),
+                                            ),
+                                            const SizedBox(height: 14),
+                                            _SettingsRow(
+                                              label: 'Failure posture',
+                                              value:
+                                                  '${recoveryReport.attentionEntries.length} recovery item(s) | ${diagnostics.historyOverview.failedSales} failed receipt(s)',
+                                              icon: Icons.error_outline_rounded,
+                                            ),
+                                            FilledButton.tonalIcon(
+                                              onPressed: () async {
+                                                final escalationReport =
+                                                    await _showPilotIncidentEscalationDialog(
+                                                      context,
+                                                      diagnosticsSnapshot:
+                                                          diagnostics,
+                                                      readinessReport:
+                                                          readinessReport,
+                                                      recoveryReport:
+                                                          recoveryReport,
+                                                    );
+                                                if (escalationReport == null ||
+                                                    !context.mounted) {
+                                                  return;
+                                                }
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      'Incident escalation pack copied with decision ${escalationReport.escalationDecisionLabel}.',
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              icon: const Icon(
+                                                Icons.copy_all_rounded,
+                                              ),
+                                              label: const Text(
+                                                'Build escalation pack',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                ),
                               ],
                             );
                           },
@@ -1834,6 +1925,249 @@ class SettingsScreen extends ConsumerWidget {
       smokeNotesController.dispose();
       closeoutNotesController.dispose();
       rolloutNotesController.dispose();
+    }
+  }
+
+  Future<PilotIncidentEscalationReport?> _showPilotIncidentEscalationDialog(
+    BuildContext context, {
+    required PilotDiagnosticsSnapshot diagnosticsSnapshot,
+    required PilotReadinessReport readinessReport,
+    required PilotRecoveryReport recoveryReport,
+  }) async {
+    final notesController = TextEditingController();
+    var severity = recoveryReport.attentionEntries.any((entry) => entry.isFailed)
+        ? 'sev2'
+        : 'sev3';
+    var impactScope = 'single_device';
+    var checkoutBlocked = diagnosticsSnapshot.historyOverview.failedSales > 0;
+    var moneyMovementRisk =
+        recoveryReport.attentionEntries.isNotEmpty &&
+        recoveryReport.attentionEntries.any((entry) => entry.isFailed);
+    var rollbackRequested = readinessReport.isBlocked;
+
+    PilotIncidentEscalationReport buildPreview() {
+      return PilotIncidentEscalationReport(
+        diagnosticsSnapshot: diagnosticsSnapshot,
+        readinessReport: readinessReport,
+        recoveryReport: recoveryReport,
+        answers: PilotIncidentEscalationAnswers(
+          severity: severity,
+          impactScope: impactScope,
+          checkoutBlocked: checkoutBlocked,
+          moneyMovementRisk: moneyMovementRisk,
+          rollbackRequested: rollbackRequested,
+          notes: notesController.text.trim(),
+        ),
+      );
+    }
+
+    try {
+      return await showDialog<PilotIncidentEscalationReport>(
+        context: context,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              final preview = buildPreview();
+              final tone = switch (preview.escalationDecision) {
+                'immediate_escalation' => const Color(0xFFFB7185),
+                'urgent_review' => const Color(0xFFF59E0B),
+                _ => const Color(0xFF38BDF8),
+              };
+
+              return AlertDialog(
+                title: const Text('Build incident escalation pack'),
+                content: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          'Use this when the device has crossed from normal pilot monitoring into a support or engineering incident. The copied pack is meant to be pasted directly into the escalation thread.',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.68),
+                                fontWeight: FontWeight.w600,
+                                height: 1.45,
+                              ),
+                        ),
+                        const SizedBox(height: 14),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: tone.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: tone.withValues(alpha: 0.28),
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  preview.escalationDecisionLabel,
+                                  style: Theme.of(context).textTheme.titleSmall
+                                      ?.copyWith(
+                                        color: tone,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  preview.summary,
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.76,
+                                        ),
+                                        fontWeight: FontWeight.w600,
+                                        height: 1.45,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<String>(
+                          value: severity,
+                          decoration: const InputDecoration(
+                            labelText: 'Severity',
+                          ),
+                          items: const <DropdownMenuItem<String>>[
+                            DropdownMenuItem(
+                              value: 'sev1',
+                              child: Text('SEV1'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'sev2',
+                              child: Text('SEV2'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'sev3',
+                              child: Text('SEV3'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value == null) {
+                              return;
+                            }
+                            setDialogState(() {
+                              severity = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: impactScope,
+                          decoration: const InputDecoration(
+                            labelText: 'Impact scope',
+                          ),
+                          items: const <DropdownMenuItem<String>>[
+                            DropdownMenuItem(
+                              value: 'single_device',
+                              child: Text('SINGLE DEVICE'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'single_shop',
+                              child: Text('SINGLE SHOP'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'wave',
+                              child: Text('ROLLOUT WAVE'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value == null) {
+                              return;
+                            }
+                            setDialogState(() {
+                              impactScope = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _CloseoutToggleCard(
+                          label: 'Checkout is blocked on this device',
+                          value: checkoutBlocked,
+                          trueLabel: 'BLOCKED',
+                          falseLabel: 'NOT BLOCKED',
+                          dangerWhenTrue: true,
+                          onChanged: (value) {
+                            setDialogState(() {
+                              checkoutBlocked = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _CloseoutToggleCard(
+                          label: 'Money movement or ledger accuracy is at risk',
+                          value: moneyMovementRisk,
+                          trueLabel: 'AT RISK',
+                          falseLabel: 'NOT AT RISK',
+                          dangerWhenTrue: true,
+                          onChanged: (value) {
+                            setDialogState(() {
+                              moneyMovementRisk = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _CloseoutToggleCard(
+                          label: 'Rollback is being requested',
+                          value: rollbackRequested,
+                          trueLabel: 'ROLLBACK',
+                          falseLabel: 'NO ROLLBACK',
+                          dangerWhenTrue: true,
+                          onChanged: (value) {
+                            setDialogState(() {
+                              rollbackRequested = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 14),
+                        TextField(
+                          controller: notesController,
+                          minLines: 2,
+                          maxLines: 4,
+                          onChanged: (_) => setDialogState(() {}),
+                          decoration: const InputDecoration(
+                            labelText: 'Incident notes',
+                            hintText:
+                                'Operator/support context, shop impact, or escalation instructions.',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: () async {
+                      final report = buildPreview();
+                      await Clipboard.setData(
+                        ClipboardData(text: report.toMultilineText()),
+                      );
+                      if (dialogContext.mounted) {
+                        Navigator.of(dialogContext).pop(report);
+                      }
+                    },
+                    child: const Text('Copy escalation pack'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      notesController.dispose();
     }
   }
 

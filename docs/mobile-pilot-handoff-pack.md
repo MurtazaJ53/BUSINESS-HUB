@@ -28,6 +28,7 @@ Workflow:
 - copied shift closeout report after the real pilot shift
 - copied rollout evidence pack for the final wave record when needed
 - copied recovery report if a replay issue appears
+- copied incident escalation pack when the device crosses into a support/engineering incident
 
 Surface:
 - [D:/business-hub/apps/mobile_flutter/lib/features/settings/presentation/settings_screen.dart](D:/business-hub/apps/mobile_flutter/lib/features/settings/presentation/settings_screen.dart)
@@ -47,6 +48,7 @@ Before a pilot device is approved, archive:
 9. copied full handoff pack
 10. copied shift closeout report after floor use
 11. copied rollout evidence pack when the rollout lead requests one combined operator record
+12. copied incident escalation pack if the device entered incident posture
 
 ## Why this matters
 
@@ -63,3 +65,4 @@ This makes the pilot traceable from both ends:
 - [D:/business-hub/docs/mobile-pilot-recovery-playbook.md](D:/business-hub/docs/mobile-pilot-recovery-playbook.md)
 - [D:/business-hub/docs/mobile-pilot-shift-closeout.md](D:/business-hub/docs/mobile-pilot-shift-closeout.md)
 - [D:/business-hub/docs/mobile-pilot-rollout-evidence-pack.md](D:/business-hub/docs/mobile-pilot-rollout-evidence-pack.md)
+- [D:/business-hub/docs/mobile-pilot-incident-escalation-pack.md](D:/business-hub/docs/mobile-pilot-incident-escalation-pack.md)

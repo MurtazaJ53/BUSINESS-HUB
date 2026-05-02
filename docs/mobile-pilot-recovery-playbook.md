@@ -37,6 +37,7 @@ The mobile Settings screen now includes a `Recovery desk` panel that shows:
    - paste it into the rollout/support thread
 7. Re-open `Pilot readiness signoff`.
 8. Record whether the issue blocks checkout or only delayed replay.
+9. If the device is beyond normal recovery, use `Incident escalation pack`.
 
 ## Escalation rule
 
@@ -60,6 +61,10 @@ Rollback the pilot device or stop rollout for that shop if:
 - copied pilot snapshot
 - copied full handoff pack
 - copied recovery report
+- copied incident escalation pack when recovery is no longer enough
 - release tag / version / short SHA
 - APK checksum
 - screenshot of the Recovery desk if needed
+
+Escalation reference:
+- [D:/business-hub/docs/mobile-pilot-incident-escalation-pack.md](D:/business-hub/docs/mobile-pilot-incident-escalation-pack.md)

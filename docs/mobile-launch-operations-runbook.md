@@ -20,6 +20,7 @@ Operators should verify those values on-device before pilot distribution.
 The Settings screen also now provides a copyable pilot launch snapshot for release tickets and rollout threads.
 It also supports an end-of-shift closeout report so the next operator or rollout lead can see how the device actually finished.
 It also supports a final rollout evidence pack so the rollout lead can archive one combined operator record for the wave.
+It also supports an incident escalation pack when rollout support needs a direct device-side failure export.
 
 ## Version source
 
@@ -88,6 +89,7 @@ Signing path:
 13. Distribute to pilot shops only after smoke pass.
 14. At the end of the pilot shift, run `Shift closeout` and archive the copied report.
 15. If the rollout lead needs a single combined pack, run `Build evidence pack` and archive that output too.
+16. If the device enters an incident posture, run `Build escalation pack` and attach it to the support thread.
 
 ## Pilot smoke focus
 
@@ -98,6 +100,7 @@ Reference sheet:
 - [D:/business-hub/docs/mobile-pilot-recovery-playbook.md](D:/business-hub/docs/mobile-pilot-recovery-playbook.md)
 - [D:/business-hub/docs/mobile-pilot-shift-closeout.md](D:/business-hub/docs/mobile-pilot-shift-closeout.md)
 - [D:/business-hub/docs/mobile-pilot-rollout-evidence-pack.md](D:/business-hub/docs/mobile-pilot-rollout-evidence-pack.md)
+- [D:/business-hub/docs/mobile-pilot-incident-escalation-pack.md](D:/business-hub/docs/mobile-pilot-incident-escalation-pack.md)
 
 1. login
 2. inventory lookup
