@@ -48,6 +48,8 @@ Phase 1 backend foundation for the Business Hub target platform.
 - `/api/v1/migration/launch-checkpoints/`
 - `/api/v1/migration/go-live-readiness/`
 - `/api/v1/migration/go-live-checkpoints/`
+- `/api/v1/migration/rollout-readiness/`
+- `/api/v1/migration/rollout-checkpoints/`
 - `/api/v1/migration/shadow-summaries/`
 - `/api/v1/migration/reconciliation/`
 - `/api/v1/health/`
@@ -141,3 +143,27 @@ The go-live checkpoint endpoint records durable launch-window decisions:
 - `remain_in_hypercare`
 - `handoff_to_steady_state`
 - `rollback_launch`
+
+## Phase 7 rollout and scale optimization
+
+Phase 7 adds the rollout-wave control plane:
+
+- `/api/v1/migration/rollout-readiness/`
+- `/api/v1/migration/rollout-checkpoints/`
+
+The rollout readiness endpoint answers whether the platform is:
+
+- `blocked`
+- `wave_ready`
+- `rollout_active`
+- `scale_tuning`
+- `completed`
+- `rollback_recommended`
+
+The rollout checkpoint endpoint records durable expansion decisions:
+
+- `advance_rollout_wave`
+- `hold_rollout_wave`
+- `scale_tuning_active`
+- `complete_rollout`
+- `rollback_shop_wave`

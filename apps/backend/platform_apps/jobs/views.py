@@ -15,6 +15,7 @@ from platform_apps.common.migration import (
     MigrationPhaseCheckpointDecision,
     MigrationJobStatus,
     MigrationJobType,
+    MigrationRolloutCheckpointDecision,
     MigrationShopCheckpointDecision,
     MigrationWriteMaster,
 )
@@ -27,6 +28,7 @@ from platform_apps.jobs.models import (
     MigrationLaunchCheckpointEvent,
     MigrationPhaseCheckpointEvent,
     MigrationJobRun,
+    MigrationRolloutCheckpointEvent,
     MigrationShopCheckpointEvent,
 )
 from platform_apps.jobs.readiness import (
@@ -35,6 +37,7 @@ from platform_apps.jobs.readiness import (
     build_phase6_go_live_readiness,
     build_phase5_retirement_readiness,
     build_phase3_program_readiness,
+    build_phase7_rollout_readiness,
     build_pilot_readiness,
     build_pilot_signoff,
     build_shop_pilot_scorecards,
@@ -55,6 +58,8 @@ from platform_apps.jobs.serializers import (
     MigrationPilotShopScorecardSerializer,
     MigrationPilotVerificationResultSerializer,
     MigrationRetirementReadinessSerializer,
+    MigrationRolloutCheckpointEventSerializer,
+    MigrationRolloutReadinessSerializer,
     MigrationShopCheckpointEventSerializer,
     MigrationShadowSummarySerializer,
 )
@@ -561,6 +566,120 @@ class MigrationGoLiveCheckpointEventListCreateView(generics.ListCreateAPIView):
         return Response(serializer.data, status=201)
 
 
+class MigrationRolloutCheckpointEventListCreateView(generics.ListCreateAPIView):
+    serializer_class = MigrationRolloutCheckpointEventSerializer
+    permission_classes = [IsPlatformAdminUser]
+    pagination_class = None
+
+    def get_queryset(self):
+        queryset = MigrationRolloutCheckpointEvent.objects.select_related("actor_user")
+        phase = self.request.query_params.get("phase", "").strip()
+        decision = self.request.query_params.get("decision", "").strip()
+
+        if phase:
+            queryset = queryset.filter(phase=phase)
+        if decision:
+            queryset = queryset.filter(decision=decision)
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        phase = str(request.data.get("phase") or "phase_7").strip() or "phase_7"
+        decision = str(request.data.get("decision") or "").strip()
+        note = str(request.data.get("note") or "").strip()
+
+        if not decision:
+            return Response({"detail": "decision is required."}, status=400)
+
+        if decision not in MigrationRolloutCheckpointDecision.values:
+            return Response({"detail": "Unknown rollout checkpoint decision."}, status=400)
+
+        controls = list(
+            MigrationDomainControl.objects.select_related("shop")
+            .filter(domain__in=tuple(PHASE5_REQUIRED_DOMAINS))
+            .order_by("shop__name", "domain")
+        )
+        launch_events = list(
+            MigrationLaunchCheckpointEvent.objects.select_related("actor_user").order_by(
+                "-occurred_at", "-created_at"
+            )
+        )
+        go_live_events = list(
+            MigrationGoLiveCheckpointEvent.objects.select_related("actor_user").order_by(
+                "-occurred_at", "-created_at"
+            )
+        )
+        rollout_events = list(
+            MigrationRolloutCheckpointEvent.objects.select_related("actor_user").order_by(
+                "-occurred_at", "-created_at"
+            )
+        )
+        rollout_readiness = build_phase7_rollout_readiness(
+            controls,
+            launch_events,
+            go_live_events,
+            rollout_events,
+        )
+
+        if (
+            decision == MigrationRolloutCheckpointDecision.ADVANCE_ROLLOUT_WAVE
+            and rollout_readiness["overall_status"] not in {"wave_ready", "rollout_active"}
+        ):
+            return Response(
+                {
+                    "detail": "Phase 7 is not ready to advance another rollout wave.",
+                    "overall_status": rollout_readiness["overall_status"],
+                    "recommended_action": rollout_readiness["recommended_action"],
+                },
+                status=409,
+            )
+
+        if (
+            decision == MigrationRolloutCheckpointDecision.COMPLETE_ROLLOUT
+            and rollout_readiness["overall_status"] not in {"rollout_active", "scale_tuning"}
+        ):
+            return Response(
+                {
+                    "detail": "Rollout completion requires an active rollout or scale-tuning posture first.",
+                    "overall_status": rollout_readiness["overall_status"],
+                    "recommended_action": rollout_readiness["recommended_action"],
+                },
+                status=409,
+            )
+
+        event = MigrationRolloutCheckpointEvent.objects.create(
+            phase=phase,
+            actor_user=request.user,
+            decision=decision,
+            overall_status_snapshot=rollout_readiness["overall_status"],
+            summary=rollout_readiness["summary"],
+            recommended_action_snapshot=rollout_readiness["recommended_action"],
+            metadata_json={
+                "note": note,
+                "shop_count": rollout_readiness["shop_count"],
+                "ready_for_launch_shop_count": rollout_readiness["ready_for_launch_shop_count"],
+                "monitoring_shop_count": rollout_readiness["monitoring_shop_count"],
+                "blocked_shop_count": rollout_readiness["blocked_shop_count"],
+                "rollback_recommended_shop_count": rollout_readiness["rollback_recommended_shop_count"],
+                "latest_go_live_decision": rollout_readiness["latest_go_live_decision"],
+                "shops": [
+                    {
+                        "shop": shop_snapshot["shop"],
+                        "shop_name": shop_snapshot["shop_name"],
+                        "overall_status": shop_snapshot["overall_status"],
+                        "missing_domains": shop_snapshot["missing_domains"],
+                        "firebase_primary_domains": shop_snapshot["firebase_primary_domains"],
+                        "active_bridge_domains": shop_snapshot["active_bridge_domains"],
+                        "open_critical_events": shop_snapshot["open_critical_events"],
+                    }
+                    for shop_snapshot in rollout_readiness["shops"]
+                ],
+            },
+            occurred_at=timezone.now(),
+        )
+        serializer = self.get_serializer(event)
+        return Response(serializer.data, status=201)
+
+
 class MigrationShadowSummaryListView(APIView):
     permission_classes = [IsPlatformAdminUser]
 
@@ -747,6 +866,45 @@ class MigrationGoLiveReadinessView(APIView):
 
         payload = build_phase6_go_live_readiness(controls, launch_events, go_live_events)
         serializer = MigrationGoLiveReadinessSerializer(payload)
+        return Response(serializer.data)
+
+
+class MigrationRolloutReadinessView(APIView):
+    permission_classes = [IsPlatformAdminUser]
+
+    def get(self, request):
+        controls = list(
+            MigrationDomainControl.objects.select_related("shop")
+            .filter(domain__in=tuple(PHASE5_REQUIRED_DOMAINS))
+            .order_by("shop__name", "domain")
+        )
+        shop_id = request.query_params.get("shop_id", "").strip()
+        if shop_id:
+            controls = [control for control in controls if str(control.shop_id) == shop_id]
+
+        launch_events = list(
+            MigrationLaunchCheckpointEvent.objects.select_related("actor_user").order_by(
+                "-occurred_at", "-created_at"
+            )
+        )
+        go_live_events = list(
+            MigrationGoLiveCheckpointEvent.objects.select_related("actor_user").order_by(
+                "-occurred_at", "-created_at"
+            )
+        )
+        rollout_events = list(
+            MigrationRolloutCheckpointEvent.objects.select_related("actor_user").order_by(
+                "-occurred_at", "-created_at"
+            )
+        )
+
+        payload = build_phase7_rollout_readiness(
+            controls,
+            launch_events,
+            go_live_events,
+            rollout_events,
+        )
+        serializer = MigrationRolloutReadinessSerializer(payload)
         return Response(serializer.data)
 
 

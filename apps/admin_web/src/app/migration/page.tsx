@@ -17,6 +17,8 @@ import { MigrationPilotReadinessTable } from "@/components/migration-pilot-readi
 import { MigrationPilotStageStrip } from "@/components/migration-pilot-stage-strip";
 import { MigrationPilotVerificationSummary } from "@/components/migration-pilot-verification-summary";
 import { MigrationRetirementReadinessPanel } from "@/components/migration-retirement-readiness-panel";
+import { MigrationRolloutCheckpointTable } from "@/components/migration-rollout-checkpoint-table";
+import { MigrationRolloutReadinessPanel } from "@/components/migration-rollout-readiness-panel";
 import { MigrationRunbookPanel } from "@/components/migration-runbook-panel";
 import { MigrationShopCheckpointTable } from "@/components/migration-shop-checkpoint-table";
 import { ReconciliationEventsTable } from "@/components/reconciliation-events-table";
@@ -37,6 +39,8 @@ import {
   getMigrationPilotShopScorecards,
   getMigrationReconciliationEvents,
   getMigrationRetirementReadiness,
+  getMigrationRolloutCheckpointEvents,
+  getMigrationRolloutReadiness,
   getMigrationShopCheckpointEvents,
   getMigrationShadowSummaries,
   getSession,
@@ -93,6 +97,10 @@ function buildActionBanner(searchParams: SearchParams) {
     searchParams,
     "goLiveCheckpointStatus",
   );
+  const rolloutCheckpointStatus = getSearchParamValue(
+    searchParams,
+    "rolloutCheckpointStatus",
+  );
   const reconciliationStatus = getSearchParamValue(
     searchParams,
     "reconciliationStatus",
@@ -117,6 +125,8 @@ function buildActionBanner(searchParams: SearchParams) {
         ? ` phase=${phase || "phase_5"}. decision=${checkpointDecision || "unknown"}. retirement=${launchCheckpointStatus || "unknown"}.`
         : action === "go-live-checkpoint"
         ? ` phase=${phase || "phase_6"}. decision=${checkpointDecision || "unknown"}. go_live=${goLiveCheckpointStatus || "unknown"}.`
+        : action === "rollout-checkpoint"
+        ? ` phase=${phase || "phase_7"}. decision=${checkpointDecision || "unknown"}. rollout=${rolloutCheckpointStatus || "unknown"}.`
         : action.startsWith("reconciliation-")
         ? ` Issue ${issue || "unknown"} is now ${reconciliationStatus || "updated"}.`
         : action.startsWith("run-") && jobStatus
@@ -187,7 +197,7 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
     );
   }
 
-  const [controls, jobs, activityEvents, shopCheckpointEvents, phaseCheckpointEvents, launchCheckpointEvents, goLiveCheckpointEvents, receipts, pilotReadiness, pilotSignoff, pilotShopScorecards, phaseReadiness, retirementReadiness, goLiveReadiness, shadowSummaries, events] =
+  const [controls, jobs, activityEvents, shopCheckpointEvents, phaseCheckpointEvents, launchCheckpointEvents, goLiveCheckpointEvents, rolloutCheckpointEvents, receipts, pilotReadiness, pilotSignoff, pilotShopScorecards, phaseReadiness, retirementReadiness, goLiveReadiness, rolloutReadiness, shadowSummaries, events] =
     await Promise.all([
       getMigrationControls(),
       getMigrationJobRuns(),
@@ -196,6 +206,7 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
       getMigrationPhaseCheckpointEvents(),
       getMigrationLaunchCheckpointEvents(),
       getMigrationGoLiveCheckpointEvents(),
+      getMigrationRolloutCheckpointEvents(),
       getMigrationBridgeReceipts(),
       getMigrationPilotReadiness(),
       getMigrationPilotSignoff(),
@@ -203,6 +214,7 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
       getMigrationPhaseReadiness(),
       getMigrationRetirementReadiness(),
       getMigrationGoLiveReadiness(),
+      getMigrationRolloutReadiness(),
       getMigrationShadowSummaries(),
       getMigrationReconciliationEvents(),
     ]);
@@ -216,7 +228,7 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
       activeShop={activeShop}
       activeRoute="migration"
       title="Migration Control"
-      subtitle="Unified migration control plane for pilot cutovers, commerce hardening, retirement readiness, go-live execution, and steady-state handoff."
+      subtitle="Unified migration control plane for pilot cutovers, commerce hardening, retirement readiness, go-live execution, steady-state handoff, and rollout scaling."
     >
       <div className="space-y-8">
         {actionBanner ? (
@@ -234,6 +246,8 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
         <MigrationRetirementReadinessPanel readiness={retirementReadiness} />
 
         <MigrationGoLiveReadinessPanel readiness={goLiveReadiness} />
+
+        <MigrationRolloutReadinessPanel readiness={rolloutReadiness} />
 
         <section className="panel-soft rounded-[28px] px-6 py-6">
           <p className="eyebrow">Launch checkpoint journal</p>
@@ -256,6 +270,18 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
           </p>
           <div className="mt-6">
             <MigrationGoLiveCheckpointTable events={goLiveCheckpointEvents} />
+          </div>
+        </section>
+
+        <section className="panel-soft rounded-[28px] px-6 py-6">
+          <p className="eyebrow">Rollout checkpoint journal</p>
+          <h2 className="mt-3 text-2xl font-bold">Recorded rollout-wave decisions</h2>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
+            This is the durable Phase 7 trail for expansion waves, hold decisions,
+            scale tuning windows, rollout completion, and wave rollback escalations.
+          </p>
+          <div className="mt-6">
+            <MigrationRolloutCheckpointTable events={rolloutCheckpointEvents} />
           </div>
         </section>
 

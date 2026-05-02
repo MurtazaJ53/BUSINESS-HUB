@@ -430,6 +430,32 @@ export type MigrationGoLiveCheckpointEvent = {
   updated_at: string;
 };
 
+export type MigrationRolloutCheckpointEvent = {
+  id: string;
+  phase: string;
+  actor_user: string | null;
+  actor_name: string | null;
+  decision:
+    | "advance_rollout_wave"
+    | "hold_rollout_wave"
+    | "scale_tuning_active"
+    | "complete_rollout"
+    | "rollback_shop_wave";
+  overall_status_snapshot:
+    | "blocked"
+    | "wave_ready"
+    | "rollout_active"
+    | "scale_tuning"
+    | "completed"
+    | "rollback_recommended";
+  summary: string;
+  recommended_action_snapshot: string;
+  metadata_json: Record<string, unknown>;
+  occurred_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type MigrationShadowSummary = {
   shop: string;
   shop_name: string;
@@ -659,6 +685,42 @@ export type MigrationGoLiveReadiness = {
     | null;
   latest_go_live_status_snapshot: string | null;
   latest_go_live_at: string | null;
+  recommended_action: string;
+  summary: string;
+  shops: MigrationRetirementShopScorecard[];
+};
+
+export type MigrationRolloutReadiness = {
+  phase: string;
+  overall_status:
+    | "blocked"
+    | "wave_ready"
+    | "rollout_active"
+    | "scale_tuning"
+    | "completed"
+    | "rollback_recommended";
+  shop_count: number;
+  ready_for_launch_shop_count: number;
+  monitoring_shop_count: number;
+  blocked_shop_count: number;
+  rollback_recommended_shop_count: number;
+  latest_go_live_decision:
+    | "execute_go_live"
+    | "remain_in_hypercare"
+    | "handoff_to_steady_state"
+    | "rollback_launch"
+    | null;
+  latest_go_live_status_snapshot: string | null;
+  latest_go_live_at: string | null;
+  latest_rollout_decision:
+    | "advance_rollout_wave"
+    | "hold_rollout_wave"
+    | "scale_tuning_active"
+    | "complete_rollout"
+    | "rollback_shop_wave"
+    | null;
+  latest_rollout_status_snapshot: string | null;
+  latest_rollout_at: string | null;
   recommended_action: string;
   summary: string;
   shops: MigrationRetirementShopScorecard[];

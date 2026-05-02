@@ -83,6 +83,14 @@ class MigrationGoLiveCheckpointDecision(models.TextChoices):
     ROLLBACK_LAUNCH = "rollback_launch", "Rollback launch"
 
 
+class MigrationRolloutCheckpointDecision(models.TextChoices):
+    ADVANCE_ROLLOUT_WAVE = "advance_rollout_wave", "Advance rollout wave"
+    HOLD_ROLLOUT_WAVE = "hold_rollout_wave", "Hold rollout wave"
+    SCALE_TUNING_ACTIVE = "scale_tuning_active", "Scale tuning active"
+    COMPLETE_ROLLOUT = "complete_rollout", "Complete rollout"
+    ROLLBACK_SHOP_WAVE = "rollback_shop_wave", "Rollback shop wave"
+
+
 class ReconciliationSeverity(models.TextChoices):
     INFO = "info", "Info"
     WARNING = "warning", "Warning"

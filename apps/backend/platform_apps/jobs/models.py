@@ -13,6 +13,7 @@ from platform_apps.common.migration import (
     MigrationPhaseCheckpointDecision,
     MigrationJobStatus,
     MigrationJobType,
+    MigrationRolloutCheckpointDecision,
     MigrationShopCheckpointDecision,
     MigrationWriteMaster,
 )
@@ -273,6 +274,34 @@ class MigrationGoLiveCheckpointEvent(UUIDStampedModel):
         null=True,
     )
     decision = models.CharField(max_length=32, choices=MigrationGoLiveCheckpointDecision.choices)
+    overall_status_snapshot = models.CharField(max_length=32, blank=True)
+    summary = models.TextField(blank=True)
+    recommended_action_snapshot = models.TextField(blank=True)
+    metadata_json = models.JSONField(default=dict, blank=True)
+    occurred_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["-occurred_at", "-created_at"]
+        indexes = [
+            models.Index(fields=["phase", "occurred_at"]),
+            models.Index(fields=["decision", "occurred_at"]),
+            models.Index(fields=["overall_status_snapshot", "occurred_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.phase}:{self.decision}"
+
+
+class MigrationRolloutCheckpointEvent(UUIDStampedModel):
+    phase = models.CharField(max_length=32, default="phase_7")
+    actor_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="migration_rollout_checkpoint_events",
+        blank=True,
+        null=True,
+    )
+    decision = models.CharField(max_length=32, choices=MigrationRolloutCheckpointDecision.choices)
     overall_status_snapshot = models.CharField(max_length=32, blank=True)
     summary = models.TextField(blank=True)
     recommended_action_snapshot = models.TextField(blank=True)

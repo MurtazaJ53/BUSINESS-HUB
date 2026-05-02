@@ -12,6 +12,7 @@ from platform_apps.common.migration import (
     MigrationJobStatus,
     MigrationJobType,
     MigrationLaunchCheckpointDecision,
+    MigrationRolloutCheckpointDecision,
     ReconciliationStatus,
 )
 from platform_apps.jobs.models import (
@@ -20,6 +21,7 @@ from platform_apps.jobs.models import (
     MigrationGoLiveCheckpointEvent,
     MigrationJobRun,
     MigrationLaunchCheckpointEvent,
+    MigrationRolloutCheckpointEvent,
     MigrationShopCheckpointEvent,
 )
 
@@ -773,4 +775,88 @@ def build_phase6_go_live_readiness(
         "recommended_action": recommended_action,
         "summary": summary,
         "shops": retirement_readiness["shops"],
+    }
+
+
+def build_phase7_rollout_readiness(
+    controls: list[MigrationDomainControl],
+    launch_events: list[MigrationLaunchCheckpointEvent],
+    go_live_events: list[MigrationGoLiveCheckpointEvent],
+    rollout_events: list[MigrationRolloutCheckpointEvent],
+) -> dict[str, Any]:
+    go_live_readiness = build_phase6_go_live_readiness(controls, launch_events, go_live_events)
+    latest_rollout_event = rollout_events[0] if rollout_events else None
+
+    if go_live_readiness["overall_status"] == "rollback_recommended" or (
+        latest_rollout_event
+        and latest_rollout_event.decision == MigrationRolloutCheckpointDecision.ROLLBACK_SHOP_WAVE
+    ):
+        overall_status = "rollback_recommended"
+        recommended_action = (
+            "Pause further rollout, stabilize the affected shop wave, and clear rollback pressure before expanding again."
+        )
+        summary = (
+            "Rollout expansion is under rollback pressure from either the go-live surface or the latest rollout wave decision."
+        )
+    elif go_live_readiness["overall_status"] != "steady_state":
+        overall_status = "blocked"
+        recommended_action = (
+            "Phase 7 cannot begin until Phase 6 has been handed off to steady-state operation."
+        )
+        summary = (
+            "The platform is not yet in steady state, so rollout-wave expansion and scale tuning cannot be treated as normal execution."
+        )
+    elif latest_rollout_event and latest_rollout_event.decision == MigrationRolloutCheckpointDecision.COMPLETE_ROLLOUT:
+        overall_status = "completed"
+        recommended_action = (
+            "Rollout is complete. Continue normal scale observation and optimization under steady-state operations."
+        )
+        summary = "All planned rollout waves have been completed and the expansion program has been closed."
+    elif latest_rollout_event and latest_rollout_event.decision == MigrationRolloutCheckpointDecision.SCALE_TUNING_ACTIVE:
+        overall_status = "scale_tuning"
+        recommended_action = (
+            "Keep traffic flowing, but focus on queue, cache, worker, and replica tuning until the platform returns to routine posture."
+        )
+        summary = (
+            "The rollout is live, but the platform is in an optimization window to improve scale headroom and operational efficiency."
+        )
+    elif latest_rollout_event and latest_rollout_event.decision in {
+        MigrationRolloutCheckpointDecision.ADVANCE_ROLLOUT_WAVE,
+        MigrationRolloutCheckpointDecision.HOLD_ROLLOUT_WAVE,
+    }:
+        overall_status = "rollout_active"
+        recommended_action = (
+            "Continue the current rollout wave carefully, monitor hypercare-like signals for each new shop batch, and avoid skipping rollback review."
+        )
+        summary = (
+            "The rollout program is active and the current wave is either advancing or intentionally being held for further observation."
+        )
+    else:
+        overall_status = "wave_ready"
+        recommended_action = (
+            "Select the next rollout wave, confirm shop readiness, and record the wave-advance decision when you open the expansion window."
+        )
+        summary = (
+            "The platform is in steady state after initial launch and is ready to expand to additional shops or client waves."
+        )
+
+    return {
+        "phase": "phase_7",
+        "overall_status": overall_status,
+        "shop_count": go_live_readiness["shop_count"],
+        "ready_for_launch_shop_count": go_live_readiness["ready_for_launch_shop_count"],
+        "monitoring_shop_count": go_live_readiness["monitoring_shop_count"],
+        "blocked_shop_count": go_live_readiness["blocked_shop_count"],
+        "rollback_recommended_shop_count": go_live_readiness["rollback_recommended_shop_count"],
+        "latest_go_live_decision": go_live_readiness["latest_go_live_decision"],
+        "latest_go_live_status_snapshot": go_live_readiness["latest_go_live_status_snapshot"],
+        "latest_go_live_at": go_live_readiness["latest_go_live_at"],
+        "latest_rollout_decision": latest_rollout_event.decision if latest_rollout_event else None,
+        "latest_rollout_status_snapshot": (
+            latest_rollout_event.overall_status_snapshot if latest_rollout_event else None
+        ),
+        "latest_rollout_at": latest_rollout_event.occurred_at if latest_rollout_event else None,
+        "recommended_action": recommended_action,
+        "summary": summary,
+        "shops": go_live_readiness["shops"],
     }

@@ -26,6 +26,8 @@ import type {
   MigrationPilotShopScorecard,
   MigrationReconciliationEvent,
   MigrationRetirementReadiness,
+  MigrationRolloutCheckpointEvent,
+  MigrationRolloutReadiness,
   MigrationShopCheckpointEvent,
   MigrationShadowSummary,
   MigrationStats,
@@ -248,6 +250,12 @@ export const getMigrationGoLiveCheckpointEvents = cache(
   },
 );
 
+export const getMigrationRolloutCheckpointEvents = cache(
+  async (): Promise<MigrationRolloutCheckpointEvent[]> => {
+    return apiFetch<MigrationRolloutCheckpointEvent[]>("/migration/rollout-checkpoints/");
+  },
+);
+
 export const getMigrationShadowSummaries = cache(async (): Promise<MigrationShadowSummary[]> => {
   return apiFetch<MigrationShadowSummary[]>("/migration/shadow-summaries/");
 });
@@ -279,6 +287,12 @@ export const getMigrationRetirementReadiness = cache(
 export const getMigrationGoLiveReadiness = cache(
   async (): Promise<MigrationGoLiveReadiness> => {
     return apiFetch<MigrationGoLiveReadiness>("/migration/go-live-readiness/");
+  },
+);
+
+export const getMigrationRolloutReadiness = cache(
+  async (): Promise<MigrationRolloutReadiness> => {
+    return apiFetch<MigrationRolloutReadiness>("/migration/rollout-readiness/");
   },
 );
 

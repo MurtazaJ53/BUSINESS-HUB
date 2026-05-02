@@ -11,6 +11,7 @@ import type {
   MigrationPhaseCheckpointEvent,
   MigrationPilotPreparationResult,
   MigrationPilotVerificationResult,
+  MigrationRolloutCheckpointEvent,
   MigrationShopCheckpointEvent,
 } from "@/lib/types";
 
@@ -533,6 +534,59 @@ export async function recordGoLiveCheckpointAction(formData: FormData) {
       buildRedirectUrl({
         status: "error",
         action: "go-live-checkpoint",
+        phase,
+        decision,
+        message,
+      }),
+    );
+  }
+}
+
+
+export async function recordRolloutCheckpointAction(formData: FormData) {
+  const phase = getOptionalField(formData, "phase") || "phase_7";
+  const decision = getOptionalField(formData, "decision");
+
+  if (!decision) {
+    redirect(
+      buildRedirectUrl({
+        status: "error",
+        action: "rollout-checkpoint",
+        message: "Missing rollout checkpoint decision.",
+      }),
+    );
+  }
+
+  try {
+    const result = await apiMutation<MigrationRolloutCheckpointEvent>(
+      "/migration/rollout-checkpoints/",
+      {
+        method: "POST",
+        body: {
+          phase,
+          decision,
+        },
+      },
+    );
+    revalidatePath("/migration");
+    redirect(
+      buildRedirectUrl({
+        status: "success",
+        action: "rollout-checkpoint",
+        phase: result.phase,
+        decision: result.decision,
+        rolloutCheckpointStatus: result.overall_status_snapshot,
+      }),
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message.replace(/\s+/g, " ").slice(0, 220)
+        : "Unknown rollout checkpoint failure.";
+    redirect(
+      buildRedirectUrl({
+        status: "error",
+        action: "rollout-checkpoint",
         phase,
         decision,
         message,

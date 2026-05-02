@@ -334,6 +334,40 @@ Execute the real launch window, keep the platform under controlled hypercare, an
 - ending hypercare before the reconciliation surface is quiet
 - letting the launch window close without a durable handoff decision
 
+## Phase 7: Live Rollout and Scale Optimization
+
+### Goal
+
+Expand the platform beyond the initial launch footprint, control rollout waves safely, and optimize scale without losing the operational discipline earned in Phases 5 and 6.
+
+### Primary scope
+
+- rollout-wave execution
+- hold and rollback decisions by wave
+- scale tuning and capacity optimization
+- final rollout completion
+
+### Deliverables
+
+- rollout readiness board
+- rollout checkpoint journal
+- live rollout runbook
+- scale tuning posture in the control plane
+- final rollout completion signoff
+
+### Exit criteria
+
+- the platform has completed at least one steady-state launch footprint
+- new rollout waves can be advanced or held with explicit operator decisions
+- scale tuning is visible and governable
+- rollout completion is recorded durably once expansion goals are met
+
+### Key risks to control
+
+- expanding to more shops before the first launch footprint is truly stable
+- scaling blindly without explicit tuning windows
+- letting rollout waves proceed without a durable pause or rollback trail
+
 ## Cross-phase non-negotiables
 
 - every write path must be idempotent
@@ -365,6 +399,7 @@ Before moving to the next phase, the team should explicitly approve:
 - financial reconciliation gate
 - legacy retirement gate
 - go-live handoff gate
+- rollout completion gate
 
 ## Recommended timeboxing
 
@@ -376,6 +411,7 @@ The exact timeline depends on team size, but a reasonable planning shape is:
 - Phase 4: 4 to 8 weeks
 - Phase 5: 2 to 4 weeks
 - Phase 6: 1 to 2 weeks
+- Phase 7: 2 to 4 weeks
 
 This should be treated as a sequencing estimate, not a promise.
 
@@ -401,6 +437,7 @@ This is the approved execution path for Business Hub:
 - move the financial core only after pilot trust is earned
 - retire Firebase only after parity is proven
 - execute go-live under hypercare before declaring steady state
+- expand rollout waves only after steady-state launch is proven
 
 The architecture is only as good as the migration discipline behind it.
 
