@@ -49,6 +49,11 @@ Build metadata injected:
 - `BUSINESS_HUB_RELEASE_CHANNEL`
 - `BUSINESS_HUB_RELEASE_SHA`
 
+Signing path:
+- GitHub workflow expects Android signing secrets
+- Flutter Android release now uses a real release signing config when keystore values are present
+- local template: [D:/business-hub/apps/mobile_flutter/android/key.properties.example](D:/business-hub/apps/mobile_flutter/android/key.properties.example)
+
 ## Recommended release sequence
 
 1. Bump version in `pubspec.yaml`.

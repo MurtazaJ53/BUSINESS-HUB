@@ -66,12 +66,45 @@ jobs:
         working-directory: apps/mobile_flutter
         run: flutter test
 
+      - name: Verify Android signing secrets
+        run: |
+          missing=0
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then echo "ANDROID_KEYSTORE_BASE64 is missing"; missing=1; fi
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ]; then echo "ANDROID_KEYSTORE_PASSWORD is missing"; missing=1; fi
+          if [ -z "${{ secrets.ANDROID_KEY_ALIAS }}" ]; then echo "ANDROID_KEY_ALIAS is missing"; missing=1; fi
+          if [ -z "${{ secrets.ANDROID_KEY_PASSWORD }}" ]; then echo "ANDROID_KEY_PASSWORD is missing"; missing=1; fi
+          if [ "$missing" -eq 1 ]; then exit 1; fi
+
+      - name: Decode mobile keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | tr -d '\r\n ' | base64 --decode > apps/mobile_flutter/android/app/business-hub-mobile.jks
+          if [ ! -s apps/mobile_flutter/android/app/business-hub-mobile.jks ]; then
+            echo "Keystore decoding failed"
+            exit 1
+          fi
+
+      - name: Keystore doctor
+        run: |
+          if ! keytool -list -keystore apps/mobile_flutter/android/app/business-hub-mobile.jks -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > /dev/null 2>&1; then
+            echo "ANDROID_KEYSTORE_PASSWORD is incorrect for apps/mobile_flutter/android/app/business-hub-mobile.jks"
+            exit 1
+          fi
+          if ! keytool -list -keystore apps/mobile_flutter/android/app/business-hub-mobile.jks -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" -alias "${{ secrets.ANDROID_KEY_ALIAS }}" > /dev/null 2>&1; then
+            echo "ANDROID_KEY_ALIAS was not found in apps/mobile_flutter/android/app/business-hub-mobile.jks"
+            exit 1
+          fi
+
       - name: Build release APK
         working-directory: apps/mobile_flutter
         run: >
           flutter build apk --release
           --dart-define=BUSINESS_HUB_RELEASE_CHANNEL=${{ steps.meta.outputs.channel }}
           --dart-define=BUSINESS_HUB_RELEASE_SHA=${{ steps.meta.outputs.sha_short }}
+        env:
+          ANDROID_KEYSTORE_PATH: app/business-hub-mobile.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
       - name: Collect mobile release artifact
         shell: bash

@@ -26,6 +26,9 @@ This checklist is the final gate before shipping a Flutter APK outside the inter
    - `.github/workflows/flutter_mobile_release.yml`
    - release channel is chosen correctly
    - tag matches the intended APK release
+5. Confirm release signing is available:
+   - GitHub secrets are present, or
+   - local `android/key.properties` is configured from [D:/business-hub/apps/mobile_flutter/android/key.properties.example](D:/business-hub/apps/mobile_flutter/android/key.properties.example)
 
 ## Mobile smoke gate
 
@@ -50,6 +53,7 @@ This checklist is the final gate before shipping a Flutter APK outside the inter
    - version + build number
    - release channel
    - release SHA when provided
+12. Installed APK is from the intended signed release lane.
 
 ## Sync and recovery gate
 
