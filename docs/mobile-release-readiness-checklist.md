@@ -56,6 +56,9 @@ This checklist is the final gate before shipping a Flutter APK outside the inter
    - `BusinessHub-Mobile-<release-tag>.handoff-summary.txt`
    - `BusinessHub-Mobile-<release-tag>.handoff-summary.json`
    - `BusinessHub-Mobile-<release-tag>.handoff-readme.md`
+12. If you want one final release-lane verdict, run the local pipeline runner and archive:
+   - `BusinessHub-Mobile-<release-tag>.pipeline-summary.txt`
+   - `BusinessHub-Mobile-<release-tag>.pipeline-summary.json`
 
 ## Mobile smoke gate
 
