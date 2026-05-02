@@ -19,6 +19,7 @@ import '../../../core/runtime/pilot_rollout_decision_summary.dart';
 import '../../../core/runtime/pilot_rollout_evidence_report.dart';
 import '../../../core/runtime/pilot_smoke_report.dart';
 import '../../../core/runtime/pilot_shift_closeout_report.dart';
+import '../../../core/runtime/pilot_wave_archive_pack.dart';
 import '../../../core/runtime/pilot_wave_closeout_readiness.dart';
 import '../../../core/runtime/pilot_wave_signoff_pack.dart';
 import '../../../core/session/mobile_session_controller.dart';
@@ -656,6 +657,13 @@ class SettingsScreen extends ConsumerWidget {
                                         rolloutDecisionSummary,
                                     waveCloseoutReadiness:
                                         waveCloseoutReadiness,
+                                    evidenceTracker: evidenceTracker,
+                                  );
+                            final waveArchivePack =
+                                waveSignoffPack == null
+                                ? null
+                                : PilotWaveArchivePack.evaluate(
+                                    waveSignoffPack: waveSignoffPack,
                                     evidenceTracker: evidenceTracker,
                                   );
 
@@ -2243,6 +2251,127 @@ class SettingsScreen extends ConsumerWidget {
                                               ),
                                               label: const Text(
                                                 'Copy wave signoff pack',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                                const SizedBox(height: 18),
+                                MobilePanel(
+                                  title: 'Wave archive pack',
+                                  action: MobileTag(
+                                    label: waveArchivePack == null
+                                        ? 'Loading'
+                                        : waveArchivePack.archiveStatusLabel,
+                                    icon: waveArchivePack == null
+                                        ? Icons.sync_rounded
+                                        : waveArchivePack.isArchiveBlocked
+                                        ? Icons.block_rounded
+                                        : waveArchivePack.isArchiveIncomplete
+                                        ? Icons.assignment_late_rounded
+                                        : waveArchivePack.isArchiveWithAttention
+                                        ? Icons.archive_rounded
+                                        : Icons.inventory_2_rounded,
+                                    accent: waveArchivePack == null
+                                        ? const Color(0xFFF59E0B)
+                                        : waveArchivePack.isArchiveBlocked
+                                        ? const Color(0xFFFB7185)
+                                        : waveArchivePack.isArchiveIncomplete
+                                        ? const Color(0xFFF59E0B)
+                                        : waveArchivePack.isArchiveWithAttention
+                                        ? const Color(0xFF38BDF8)
+                                        : const Color(0xFF22C55E),
+                                  ),
+                                  child: waveArchivePack == null
+                                      ? const MobileEmptyState(
+                                          icon: Icons.sync_rounded,
+                                          title: 'Preparing wave archive pack',
+                                          body:
+                                              'The device is still combining final signoff with the evidence archive for permanent rollout records.',
+                                        )
+                                      : Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: <Widget>[
+                                            Text(
+                                              waveArchivePack.summary,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color: Colors.white
+                                                        .withValues(
+                                                          alpha: 0.68,
+                                                        ),
+                                                    fontWeight: FontWeight.w600,
+                                                    height: 1.45,
+                                                  ),
+                                            ),
+                                            const SizedBox(height: 14),
+                                            _SettingsRow(
+                                              label: 'Archive status',
+                                              value: waveArchivePack
+                                                  .archiveStatusLabel,
+                                              icon: Icons.archive_rounded,
+                                            ),
+                                            _SettingsRow(
+                                              label: 'Signoff posture',
+                                              value: waveArchivePack
+                                                  .waveSignoffPack
+                                                  .signoffStatusLabel,
+                                              icon: Icons.verified_user_rounded,
+                                            ),
+                                            _SettingsRow(
+                                              label: 'Archived sessions',
+                                              value:
+                                                  '${evidenceTracker.archivedSessions.length} saved',
+                                              icon: Icons.history_edu_rounded,
+                                            ),
+                                            ...waveArchivePack.reasons.map(
+                                              (reason) => _ReadinessNoteRow(
+                                                message: reason,
+                                                tone: waveArchivePack
+                                                        .isArchiveBlocked
+                                                    ? const Color(0xFFFB7185)
+                                                    : waveArchivePack
+                                                              .isArchiveIncomplete
+                                                    ? const Color(0xFFF59E0B)
+                                                    : waveArchivePack
+                                                              .isArchiveWithAttention
+                                                    ? const Color(0xFF38BDF8)
+                                                    : const Color(0xFF22C55E),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 14),
+                                            FilledButton.tonalIcon(
+                                              onPressed: () async {
+                                                await Clipboard.setData(
+                                                  ClipboardData(
+                                                    text: waveArchivePack
+                                                        .toMultilineText(),
+                                                  ),
+                                                );
+                                                await markEvidenceCaptured(
+                                                  'wave_archive_pack',
+                                                );
+                                                if (!context.mounted) {
+                                                  return;
+                                                }
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      'Wave archive pack copied with status ${waveArchivePack.archiveStatusLabel}.',
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              icon: const Icon(
+                                                Icons.inventory_2_rounded,
+                                              ),
+                                              label: const Text(
+                                                'Copy wave archive pack',
                                               ),
                                             ),
                                           ],

@@ -77,12 +77,13 @@ It is designed to support:
 53. [Mobile Pilot Rollout Decision Summary](./mobile-pilot-rollout-decision-summary.md)
 54. [Mobile Pilot Wave Closeout Readiness](./mobile-pilot-wave-closeout-readiness.md)
 55. [Mobile Pilot Wave Signoff Pack](./mobile-pilot-wave-signoff-pack.md)
+56. [Mobile Pilot Wave Archive Pack](./mobile-pilot-wave-archive-pack.md)
 
 ### Existing strategy docs
 
-56. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
-57. [Global Scale Blueprint](./global-scale-blueprint.md)
-58. [Scale Certification Checklist](./scale-certification-checklist.md)
+57. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
+58. [Global Scale Blueprint](./global-scale-blueprint.md)
+59. [Scale Certification Checklist](./scale-certification-checklist.md)
 
 ## Current truth
 
@@ -144,6 +145,7 @@ As of April 29, 2026:
 - then Mobile Pilot Rollout Decision Summary
 - then Mobile Pilot Wave Closeout Readiness
 - then Mobile Pilot Wave Signoff Pack
+- then Mobile Pilot Wave Archive Pack
 
 ## Notes
 

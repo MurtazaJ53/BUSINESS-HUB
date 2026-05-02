@@ -31,6 +31,7 @@ It now also summarizes recent archive health so a rollout lead can see whether t
 It now also provides a rollout decision summary so the device can state whether the current posture supports expansion, monitoring, investigation, or rollback.
 It now also provides wave closeout readiness so the device can state whether the current wave record is actually complete enough to close.
 It now also provides a wave signoff pack so the final device-side handoff can be archived as one explicit closeout package.
+It now also provides a wave archive pack so final signoff and recent evidence-session history can be preserved together in the permanent rollout archive.
 
 ## Version source
 
@@ -105,6 +106,7 @@ Signing path:
 19. Use `Copy decision summary` when the rollout lead wants one short wave verdict that combines current readiness, next action, and archive trend.
 20. Use `Copy wave closeout readiness` before closing the wave record so the handoff explicitly states whether closeout is ready, monitor-only, evidence-incomplete, or blocked.
 21. Use `Copy wave signoff pack` as the final device-side closeout artifact when the rollout lead wants one last signed-off handoff package for the wave archive.
+22. Use `Copy wave archive pack` when you want the permanent rollout record to include both final signoff and recent evidence-session archive history in one export.
 
 ## Pilot smoke focus
 
@@ -126,6 +128,7 @@ Reference sheet:
 - [D:/business-hub/docs/mobile-pilot-rollout-decision-summary.md](D:/business-hub/docs/mobile-pilot-rollout-decision-summary.md)
 - [D:/business-hub/docs/mobile-pilot-wave-closeout-readiness.md](D:/business-hub/docs/mobile-pilot-wave-closeout-readiness.md)
 - [D:/business-hub/docs/mobile-pilot-wave-signoff-pack.md](D:/business-hub/docs/mobile-pilot-wave-signoff-pack.md)
+- [D:/business-hub/docs/mobile-pilot-wave-archive-pack.md](D:/business-hub/docs/mobile-pilot-wave-archive-pack.md)
 
 1. login
 2. inventory lookup
