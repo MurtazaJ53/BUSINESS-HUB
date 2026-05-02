@@ -48,6 +48,18 @@ It runs:
 
 This gives the mobile track its own CI confidence gate instead of relying only on the older web/Capacitor release automation.
 
+## Release readiness
+
+When preparing a real APK handoff, use:
+
+- [D:/business-hub/docs/mobile-release-readiness-checklist.md](D:/business-hub/docs/mobile-release-readiness-checklist.md)
+- [D:/business-hub/docs/mobile-release-notes-template.md](D:/business-hub/docs/mobile-release-notes-template.md)
+
+Versioning currently follows `pubspec.yaml`:
+
+- `version: marketing_version+build_number`
+- example: `1.3.8+8`
+
 ## Phase 4 commerce setup
 
 The mobile POS now queues commerce commands locally and replays them to Django when the shop domain is ready.

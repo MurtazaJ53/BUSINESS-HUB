@@ -57,12 +57,14 @@ It is designed to support:
 33. [Cost and Capacity Review Cadence](./cost-and-capacity-review-cadence.md)
 34. [Dependency Upgrade Policy](./dependency-upgrade-policy.md)
 35. [Phase 8 Quarterly Architecture Review Checklist](./phase-8-quarterly-architecture-review-checklist.md)
+36. [Mobile Release Readiness Checklist](./mobile-release-readiness-checklist.md)
+37. [Mobile Release Notes Template](./mobile-release-notes-template.md)
 
 ### Existing strategy docs
 
-36. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
-37. [Global Scale Blueprint](./global-scale-blueprint.md)
-38. [Scale Certification Checklist](./scale-certification-checklist.md)
+38. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
+39. [Global Scale Blueprint](./global-scale-blueprint.md)
+40. [Scale Certification Checklist](./scale-certification-checklist.md)
 
 ## Current truth
 
@@ -105,6 +107,7 @@ As of April 29, 2026:
 ### Release / operations
 - start with Deployment and Release Runbook
 - then Operations Runbook
+- then Mobile Release Readiness Checklist
 
 ## Notes
 

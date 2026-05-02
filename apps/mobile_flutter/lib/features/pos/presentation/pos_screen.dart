@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/checkout/checkout_policy.dart';
 import '../../../core/backend/backend_api_client.dart';
 import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
@@ -1308,8 +1309,10 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                   }
 
                                   if (_selectedCustomer != null &&
-                                      existingCustomerBalance > 0.009 &&
-                                      amountDue > 0) {
+                                      shouldConfirmCreditExposure(
+                                        currentBalance: existingCustomerBalance,
+                                        additionalDue: amountDue,
+                                      )) {
                                     if (!mounted || !context.mounted) {
                                       return;
                                     }
@@ -1760,33 +1763,25 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     required String collectedText,
     required List<_CheckoutPaymentDraft> splitPayments,
   }) {
-    if (paymentMode == 'SPLIT') {
-      final payments = <PosPayment>[];
-      var collected = 0.0;
-      for (final payment in splitPayments) {
-        final amount = payment.amount;
-        if (amount <= 0) {
-          return null;
-        }
-        payments.add(PosPayment(mode: payment.mode, amount: amount));
-        collected += amount;
-      }
-      if (payments.isEmpty || collected > total + 0.009) {
-        return null;
-      }
-      return _CheckoutPaymentResolution(
-        payments: payments,
-        totalCollected: collected,
-      );
-    }
-
-    final collected = _parseMoney(collectedText);
-    if (collected <= 0 || collected > total + 0.009) {
+    final resolution = resolveCheckoutPayments(
+      paymentMode: paymentMode,
+      total: total,
+      collectedAmount: _parseMoney(collectedText),
+      splitPayments: splitPayments
+          .map(
+            (payment) => CheckoutPaymentEntry(
+              mode: payment.mode,
+              amount: payment.amount,
+            ),
+          )
+          .toList(growable: false),
+    );
+    if (resolution == null) {
       return null;
     }
     return _CheckoutPaymentResolution(
-      payments: <PosPayment>[PosPayment(mode: paymentMode, amount: collected)],
-      totalCollected: collected,
+      payments: resolution.payments,
+      totalCollected: resolution.totalCollected,
     );
   }
 }

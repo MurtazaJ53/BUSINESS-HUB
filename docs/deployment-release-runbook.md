@@ -95,6 +95,9 @@ As of now:
    - sales creation
    - back navigation
    - multi-screen movement
+6. complete:
+   - [D:/business-hub/docs/mobile-release-readiness-checklist.md](D:/business-hub/docs/mobile-release-readiness-checklist.md)
+   - [D:/business-hub/docs/mobile-release-notes-template.md](D:/business-hub/docs/mobile-release-notes-template.md)
 
 ## Production blockers for Flutter mobile
 
@@ -124,3 +127,12 @@ Suggested release owners:
 - engineering approves technical readiness
 - QA approves test completion
 - operations approves deployment path
+
+## Mobile versioning note
+
+Flutter release versioning is driven by:
+- [D:/business-hub/apps/mobile_flutter/pubspec.yaml](D:/business-hub/apps/mobile_flutter/pubspec.yaml)
+
+Format:
+- `marketing_version+build_number`
+- example: `1.3.8+8`
