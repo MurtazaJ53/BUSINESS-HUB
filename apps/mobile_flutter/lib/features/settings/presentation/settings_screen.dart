@@ -1008,6 +1008,60 @@ class SettingsScreen extends ConsumerWidget {
                                               'Copy latest archived session',
                                             ),
                                           ),
+                                          const SizedBox(height: 10),
+                                          FilledButton.tonalIcon(
+                                            onPressed: () async {
+                                              await Clipboard.setData(
+                                                ClipboardData(
+                                                  text: evidenceTracker
+                                                      .toArchivePackText(),
+                                                ),
+                                              );
+                                              if (!context.mounted) {
+                                                return;
+                                              }
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Full evidence archive pack copied.',
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                            icon: const Icon(
+                                              Icons.inventory_2_rounded,
+                                            ),
+                                            label: const Text(
+                                              'Copy full archive pack',
+                                            ),
+                                          ),
+                                          const SizedBox(height: 10),
+                                          FilledButton.tonalIcon(
+                                            onPressed: () async {
+                                              await evidenceTrackerController
+                                                  .clearArchive();
+                                              if (!context.mounted) {
+                                                return;
+                                              }
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Archived evidence sessions cleared. Active session kept.',
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                            icon: const Icon(
+                                              Icons.auto_delete_rounded,
+                                            ),
+                                            label: const Text(
+                                              'Clear archived sessions',
+                                            ),
+                                          ),
                                           const SizedBox(height: 14),
                                         ],
                                       if (evidenceTracker.missingCoreArtifacts

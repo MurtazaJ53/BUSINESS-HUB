@@ -86,6 +86,16 @@ void main() {
     expect(decoded.sessionStartedAt, DateTime.utc(2026, 5, 2, 7, 30));
   });
 
+  test('fresh empty session still counts as storable state', () {
+    final tracker = const PilotEvidenceTrackerState().startFreshSession(
+      sessionLabel: 'Wave 3 shift A',
+      startedAt: DateTime.utc(2026, 5, 2, 13),
+    );
+
+    expect(tracker.capturedAtByArtifact, isEmpty);
+    expect(tracker.hasStoredState, isTrue);
+  });
+
   test('startFreshSession clears captures and stamps a new session window', () {
     final tracker = const PilotEvidenceTrackerState()
         .markCaptured('pilot_snapshot', capturedAt: DateTime.utc(2026, 5, 2, 8))
@@ -141,6 +151,44 @@ void main() {
     final report = tracker.toMultilineText();
 
     expect(report, contains('Archived sessions: 1'));
+    expect(report, contains('Wave 1 shift A'));
+  });
+
+  test('withoutArchivedSessions preserves active session and clears history', () {
+    final tracker = const PilotEvidenceTrackerState()
+        .ensureSession(
+          defaultLabel: 'Wave 1 shift A',
+          startedAt: DateTime.utc(2026, 5, 2, 7, 30),
+        )
+        .markCaptured('pilot_snapshot', capturedAt: DateTime.utc(2026, 5, 2, 8))
+        .startFreshSession(
+          sessionLabel: 'Wave 1 shift B',
+          startedAt: DateTime.utc(2026, 5, 2, 12),
+        )
+        .withoutArchivedSessions();
+
+    expect(tracker.archivedSessions, isEmpty);
+    expect(tracker.sessionLabel, 'Wave 1 shift B');
+    expect(tracker.hasStoredState, isTrue);
+  });
+
+  test('archive pack text includes active and archived sections', () {
+    final tracker = const PilotEvidenceTrackerState()
+        .ensureSession(
+          defaultLabel: 'Wave 1 shift A',
+          startedAt: DateTime.utc(2026, 5, 2, 7, 30),
+        )
+        .markCaptured('pilot_snapshot', capturedAt: DateTime.utc(2026, 5, 2, 8))
+        .startFreshSession(
+          sessionLabel: 'Wave 1 shift B',
+          startedAt: DateTime.utc(2026, 5, 2, 12),
+        );
+
+    final report = tracker.toArchivePackText();
+
+    expect(report, contains('Business Hub pilot evidence archive pack'));
+    expect(report, contains('=== ACTIVE TRACKER ==='));
+    expect(report, contains('=== ARCHIVED SESSIONS ==='));
     expect(report, contains('Wave 1 shift A'));
   });
 }

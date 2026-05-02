@@ -203,7 +203,7 @@ class ShopRepository {
   }
 
   Future<void> savePilotEvidenceTracker(PilotEvidenceTrackerState state) async {
-    if (state.capturedAtByArtifact.isEmpty) {
+    if (!state.hasStoredState) {
       await (_db.delete(
         _db.shopSettingsEntries,
       )..where((tbl) => tbl.key.equals(_pilotEvidenceTrackerKey))).go();
@@ -246,6 +246,12 @@ class ShopRepository {
 
   Future<void> resetPilotEvidenceTracker() async {
     await savePilotEvidenceTracker(const PilotEvidenceTrackerState());
+  }
+
+  Future<void> clearPilotEvidenceArchive() async {
+    final current = await getPilotEvidenceTracker();
+    final next = current.withoutArchivedSessions();
+    await savePilotEvidenceTracker(next);
   }
 
   Future<void> clearWorkspace() async {

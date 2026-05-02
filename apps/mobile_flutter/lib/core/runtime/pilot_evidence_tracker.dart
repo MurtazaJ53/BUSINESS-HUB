@@ -133,6 +133,11 @@ class PilotEvidenceTrackerState {
   bool get hasSessionContext =>
       sessionLabel?.trim().isNotEmpty == true && sessionStartedAt != null;
   bool get hasArchivedSessions => archivedSessions.isNotEmpty;
+  bool get hasStoredState =>
+      capturedAtByArtifact.isNotEmpty ||
+      hasSessionContext ||
+      lastResetAt != null ||
+      hasArchivedSessions;
 
   String get statusLabel => isCoreComplete ? 'CORE COMPLETE' : 'ACTION NEEDED';
 
@@ -224,6 +229,19 @@ class PilotEvidenceTrackerState {
     );
   }
 
+  PilotEvidenceTrackerState withoutArchivedSessions() {
+    if (archivedSessions.isEmpty) {
+      return this;
+    }
+    return PilotEvidenceTrackerState(
+      capturedAtByArtifact: capturedAtByArtifact,
+      sessionLabel: sessionLabel,
+      sessionStartedAt: sessionStartedAt,
+      lastResetAt: lastResetAt,
+      archivedSessions: const <PilotEvidenceSessionArchiveEntry>[],
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
       'session_label': sessionLabel,
@@ -288,6 +306,35 @@ class PilotEvidenceTrackerState {
       lines.addAll(
         archivedSessions.map((entry) => '- ${entry.summaryLine}'),
       );
+    }
+
+    return lines.join('\n');
+  }
+
+  String toArchivePackText() {
+    final lines = <String>[
+      'Business Hub pilot evidence archive pack',
+      'Active session label: ${sessionLabel ?? 'none'}',
+      'Active session started at (UTC): ${sessionStartedAt?.toUtc().toIso8601String() ?? 'none'}',
+      'Last reset at (UTC): ${lastResetAt?.toUtc().toIso8601String() ?? 'none'}',
+      'Archived session count: ${archivedSessions.length}',
+      '',
+      '=== ACTIVE TRACKER ===',
+      toMultilineText(),
+      '',
+      '=== ARCHIVED SESSIONS ===',
+    ];
+
+    if (archivedSessions.isEmpty) {
+      lines.add('none');
+    } else {
+      for (final entry in archivedSessions) {
+        lines.add(entry.toMultilineText());
+        lines.add('');
+      }
+      if (lines.last.isEmpty) {
+        lines.removeLast();
+      }
     }
 
     return lines.join('\n');

@@ -72,12 +72,13 @@ It is designed to support:
 48. [Mobile Pilot Evidence Persistence](./mobile-pilot-evidence-persistence.md)
 49. [Mobile Pilot Evidence Sessions](./mobile-pilot-evidence-sessions.md)
 50. [Mobile Pilot Evidence Session History](./mobile-pilot-evidence-session-history.md)
+51. [Mobile Pilot Evidence Archive Control](./mobile-pilot-evidence-archive-control.md)
 
 ### Existing strategy docs
 
-51. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
-52. [Global Scale Blueprint](./global-scale-blueprint.md)
-53. [Scale Certification Checklist](./scale-certification-checklist.md)
+52. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
+53. [Global Scale Blueprint](./global-scale-blueprint.md)
+54. [Scale Certification Checklist](./scale-certification-checklist.md)
 
 ## Current truth
 
@@ -134,6 +135,7 @@ As of April 29, 2026:
 - then Mobile Pilot Evidence Persistence
 - then Mobile Pilot Evidence Sessions
 - then Mobile Pilot Evidence Session History
+- then Mobile Pilot Evidence Archive Control
 
 ## Notes
 

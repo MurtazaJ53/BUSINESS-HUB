@@ -29,6 +29,8 @@ The Settings screen now shows:
 - archived session count
 - recent archived session summaries
 - a `Copy latest archived session` action
+- a `Copy full archive pack` action
+- a `Clear archived sessions` action
 
 This gives the rollout lead a fast way to recover the previous session summary even after the device has moved on to a new active session.
 
@@ -45,3 +47,7 @@ Use archived session history when:
 - the next shift wants to verify whether the prior shift finished cleanly
 - the rollout lead wants the last completed session summary
 - support needs context from the immediately previous rollout window
+
+## Related
+
+- [D:/business-hub/docs/mobile-pilot-evidence-archive-control.md](D:/business-hub/docs/mobile-pilot-evidence-archive-control.md)

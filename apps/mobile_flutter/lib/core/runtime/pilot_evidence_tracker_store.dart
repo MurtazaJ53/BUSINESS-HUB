@@ -36,4 +36,8 @@ class PilotEvidenceTrackerController {
   Future<void> reset() {
     return _shopRepository.resetPilotEvidenceTracker();
   }
+
+  Future<void> clearArchive() {
+    return _shopRepository.clearPilotEvidenceArchive();
+  }
 }

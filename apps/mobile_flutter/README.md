@@ -76,6 +76,7 @@ When preparing a real APK handoff, use:
 - [D:/business-hub/docs/mobile-pilot-evidence-persistence.md](D:/business-hub/docs/mobile-pilot-evidence-persistence.md)
 - [D:/business-hub/docs/mobile-pilot-evidence-sessions.md](D:/business-hub/docs/mobile-pilot-evidence-sessions.md)
 - [D:/business-hub/docs/mobile-pilot-evidence-session-history.md](D:/business-hub/docs/mobile-pilot-evidence-session-history.md)
+- [D:/business-hub/docs/mobile-pilot-evidence-archive-control.md](D:/business-hub/docs/mobile-pilot-evidence-archive-control.md)
 
 Versioning currently follows `pubspec.yaml`:
 
@@ -128,6 +129,7 @@ It now also includes an evidence tracker so operators can see which rollout expo
 That evidence tracker now survives app restarts on the same workspace because it is persisted in the local SQLite layer.
 It now also supports named evidence sessions so a shared device can clearly separate one shift or rollout wave from the next.
 It now also keeps a short archive of recent completed evidence sessions so the previous shift summary can still be copied after a fresh session starts.
+It now also supports full archive export and archive clearing so stale session history can be managed without deleting the active evidence session.
 
 ## Package strategy
 
