@@ -11,6 +11,7 @@ import '../../../core/runtime/pilot_diagnostics_snapshot.dart';
 import '../../../core/runtime/pilot_handoff_report.dart';
 import '../../../core/runtime/pilot_readiness_report.dart';
 import '../../../core/runtime/pilot_recovery_report.dart';
+import '../../../core/runtime/pilot_rollout_evidence_report.dart';
 import '../../../core/runtime/pilot_smoke_report.dart';
 import '../../../core/runtime/pilot_shift_closeout_report.dart';
 import '../../../core/session/mobile_session_controller.dart';
@@ -1077,6 +1078,102 @@ class SettingsScreen extends ConsumerWidget {
                                           ],
                                         ),
                                 ),
+                                const SizedBox(height: 18),
+                                MobilePanel(
+                                  title: 'Rollout evidence pack',
+                                  action: MobileTag(
+                                    label: diagnostics == null ||
+                                            readinessReport == null ||
+                                            recoveryReport == null
+                                        ? 'Loading'
+                                        : 'Wave record',
+                                    icon: diagnostics == null ||
+                                            readinessReport == null ||
+                                            recoveryReport == null
+                                        ? Icons.sync_rounded
+                                        : Icons.library_books_rounded,
+                                    accent: diagnostics == null ||
+                                            readinessReport == null ||
+                                            recoveryReport == null
+                                        ? const Color(0xFFF59E0B)
+                                        : const Color(0xFF38BDF8),
+                                  ),
+                                  child: diagnostics == null ||
+                                          readinessReport == null ||
+                                          recoveryReport == null
+                                      ? const MobileEmptyState(
+                                          icon: Icons.sync_rounded,
+                                          title: 'Preparing rollout evidence',
+                                          body:
+                                              'The device is still resolving the core reports needed for the consolidated rollout record.',
+                                        )
+                                      : Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: <Widget>[
+                                            Text(
+                                              'Use this when a rollout lead wants one final copied pack for the wave record. It consolidates the current readiness, snapshot, and recovery posture, then lets the operator summarize smoke and closeout outcomes in one export.',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color: Colors.white
+                                                        .withValues(
+                                                          alpha: 0.68,
+                                                        ),
+                                                    fontWeight: FontWeight.w600,
+                                                    height: 1.45,
+                                                  ),
+                                            ),
+                                            const SizedBox(height: 14),
+                                            _SettingsRow(
+                                              label: 'Release target',
+                                              value:
+                                                  '${diagnostics.runtimeInfo.releaseTag} | ${diagnostics.runtimeInfo.rolloutScopeLabel}',
+                                              icon: Icons.route_rounded,
+                                            ),
+                                            _SettingsRow(
+                                              label: 'Recovery posture',
+                                              value:
+                                                  '${recoveryReport.attentionEntries.length} open attention item(s)',
+                                              icon: Icons.health_and_safety_rounded,
+                                            ),
+                                            FilledButton.tonalIcon(
+                                              onPressed: () async {
+                                                final evidenceReport =
+                                                    await _showPilotRolloutEvidenceDialog(
+                                                      context,
+                                                      diagnosticsSnapshot:
+                                                          diagnostics,
+                                                      readinessReport:
+                                                          readinessReport,
+                                                      recoveryReport:
+                                                          recoveryReport,
+                                                    );
+                                                if (evidenceReport == null ||
+                                                    !context.mounted) {
+                                                  return;
+                                                }
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      'Rollout evidence pack copied with recommendation ${evidenceReport.recommendationLabel}.',
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              icon: const Icon(
+                                                Icons.assignment_rounded,
+                                              ),
+                                              label: const Text(
+                                                'Build evidence pack',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                ),
                               ],
                             );
                           },
@@ -1449,6 +1546,294 @@ class SettingsScreen extends ConsumerWidget {
       );
     } finally {
       notesController.dispose();
+    }
+  }
+
+  Future<PilotRolloutEvidenceReport?> _showPilotRolloutEvidenceDialog(
+    BuildContext context, {
+    required PilotDiagnosticsSnapshot diagnosticsSnapshot,
+    required PilotReadinessReport readinessReport,
+    required PilotRecoveryReport recoveryReport,
+  }) async {
+    final smokeNotesController = TextEditingController();
+    final closeoutNotesController = TextEditingController();
+    final rolloutNotesController = TextEditingController();
+    var smokeVerdict = readinessReport.isBlocked
+        ? 'BLOCKED'
+        : readinessReport.shouldMonitor
+        ? 'MONITOR'
+        : 'PASS';
+    var closeoutDecision =
+        recoveryReport.attentionEntries.any((entry) => entry.isFailed) ||
+            diagnosticsSnapshot.historyOverview.failedSales > 0
+        ? 'ESCALATE INCIDENT'
+        : diagnosticsSnapshot.pendingOutboxCount > 0
+        ? 'MONITOR NEXT SHIFT'
+        : 'HEALTHY HANDOFF';
+    var rolloutRecommendation =
+        closeoutDecision == 'ESCALATE INCIDENT' || smokeVerdict == 'BLOCKED'
+        ? 'rollback_wave'
+        : smokeVerdict == 'MONITOR' ||
+              closeoutDecision == 'MONITOR NEXT SHIFT'
+        ? 'hold_wave'
+        : 'advance_wave';
+
+    PilotRolloutEvidenceReport buildPreview() {
+      return PilotRolloutEvidenceReport(
+        diagnosticsSnapshot: diagnosticsSnapshot,
+        readinessReport: readinessReport,
+        recoveryReport: recoveryReport,
+        answers: PilotRolloutEvidenceAnswers(
+          smokeVerdict: smokeVerdict,
+          closeoutDecision: closeoutDecision,
+          rolloutRecommendation: rolloutRecommendation,
+          smokeNotes: smokeNotesController.text.trim(),
+          closeoutNotes: closeoutNotesController.text.trim(),
+          rolloutNotes: rolloutNotesController.text.trim(),
+        ),
+      );
+    }
+
+    try {
+      return await showDialog<PilotRolloutEvidenceReport>(
+        context: context,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              final preview = buildPreview();
+              final tone = switch (preview.answers.rolloutRecommendation) {
+                'advance_wave' => const Color(0xFF22C55E),
+                'hold_wave' => const Color(0xFFF59E0B),
+                'rollback_wave' => const Color(0xFFFB7185),
+                _ => const Color(0xFF38BDF8),
+              };
+
+              return AlertDialog(
+                title: const Text('Build rollout evidence pack'),
+                content: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          'This pack is meant for the rollout lead or wave record. Summarize the smoke result, the end-of-shift outcome, and the recommendation for the current rollout wave.',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.68),
+                                fontWeight: FontWeight.w600,
+                                height: 1.45,
+                              ),
+                        ),
+                        const SizedBox(height: 14),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: tone.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: tone.withValues(alpha: 0.28),
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  preview.recommendationLabel,
+                                  style: Theme.of(context).textTheme.titleSmall
+                                      ?.copyWith(
+                                        color: tone,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  preview.summary,
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.76,
+                                        ),
+                                        fontWeight: FontWeight.w600,
+                                        height: 1.45,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<String>(
+                          value: smokeVerdict,
+                          decoration: const InputDecoration(
+                            labelText: 'Smoke verdict',
+                          ),
+                          items: const <DropdownMenuItem<String>>[
+                            DropdownMenuItem(
+                              value: 'PASS',
+                              child: Text('PASS'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'MONITOR',
+                              child: Text('MONITOR'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'BLOCKED',
+                              child: Text('BLOCKED'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value == null) {
+                              return;
+                            }
+                            setDialogState(() {
+                              smokeVerdict = value;
+                              if (value == 'BLOCKED') {
+                                rolloutRecommendation = 'rollback_wave';
+                              } else if (value == 'MONITOR' &&
+                                  rolloutRecommendation == 'advance_wave') {
+                                rolloutRecommendation = 'hold_wave';
+                              }
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: smokeNotesController,
+                          minLines: 2,
+                          maxLines: 3,
+                          onChanged: (_) => setDialogState(() {}),
+                          decoration: const InputDecoration(
+                            labelText: 'Smoke notes',
+                            hintText:
+                                'Optional summary of the smoke result or any notable floor observation.',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<String>(
+                          value: closeoutDecision,
+                          decoration: const InputDecoration(
+                            labelText: 'Shift closeout decision',
+                          ),
+                          items: const <DropdownMenuItem<String>>[
+                            DropdownMenuItem(
+                              value: 'HEALTHY HANDOFF',
+                              child: Text('HEALTHY HANDOFF'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'MONITOR NEXT SHIFT',
+                              child: Text('MONITOR NEXT SHIFT'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'ESCALATE INCIDENT',
+                              child: Text('ESCALATE INCIDENT'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value == null) {
+                              return;
+                            }
+                            setDialogState(() {
+                              closeoutDecision = value;
+                              if (value == 'ESCALATE INCIDENT') {
+                                rolloutRecommendation = 'rollback_wave';
+                              } else if (value == 'MONITOR NEXT SHIFT' &&
+                                  rolloutRecommendation == 'advance_wave') {
+                                rolloutRecommendation = 'hold_wave';
+                              }
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: closeoutNotesController,
+                          minLines: 2,
+                          maxLines: 3,
+                          onChanged: (_) => setDialogState(() {}),
+                          decoration: const InputDecoration(
+                            labelText: 'Closeout notes',
+                            hintText:
+                                'Optional end-of-shift summary for the rollout lead.',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<String>(
+                          value: rolloutRecommendation,
+                          decoration: const InputDecoration(
+                            labelText: 'Rollout recommendation',
+                          ),
+                          items: const <DropdownMenuItem<String>>[
+                            DropdownMenuItem(
+                              value: 'advance_wave',
+                              child: Text('ADVANCE WAVE'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'hold_wave',
+                              child: Text('HOLD CURRENT WAVE'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'rollback_wave',
+                              child: Text('ROLLBACK CURRENT WAVE'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'manual_review',
+                              child: Text('MANUAL REVIEW'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value == null) {
+                              return;
+                            }
+                            setDialogState(() {
+                              rolloutRecommendation = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: rolloutNotesController,
+                          minLines: 2,
+                          maxLines: 4,
+                          onChanged: (_) => setDialogState(() {}),
+                          decoration: const InputDecoration(
+                            labelText: 'Rollout lead notes',
+                            hintText:
+                                'Optional recommendation context, ticket reference, or wave-specific note.',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: () async {
+                      final report = buildPreview();
+                      await Clipboard.setData(
+                        ClipboardData(text: report.toMultilineText()),
+                      );
+                      if (dialogContext.mounted) {
+                        Navigator.of(dialogContext).pop(report);
+                      }
+                    },
+                    child: const Text('Copy evidence pack'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      smokeNotesController.dispose();
+      closeoutNotesController.dispose();
+      rolloutNotesController.dispose();
     }
   }
 

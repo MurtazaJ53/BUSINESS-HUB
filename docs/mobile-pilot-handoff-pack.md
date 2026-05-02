@@ -26,6 +26,7 @@ Workflow:
 - copied readiness signoff
 - copied full handoff pack
 - copied shift closeout report after the real pilot shift
+- copied rollout evidence pack for the final wave record when needed
 - copied recovery report if a replay issue appears
 
 Surface:
@@ -45,6 +46,7 @@ Before a pilot device is approved, archive:
 8. copied readiness signoff
 9. copied full handoff pack
 10. copied shift closeout report after floor use
+11. copied rollout evidence pack when the rollout lead requests one combined operator record
 
 ## Why this matters
 
@@ -60,3 +62,4 @@ This makes the pilot traceable from both ends:
 - [D:/business-hub/docs/mobile-pilot-smoke-sheet.md](D:/business-hub/docs/mobile-pilot-smoke-sheet.md)
 - [D:/business-hub/docs/mobile-pilot-recovery-playbook.md](D:/business-hub/docs/mobile-pilot-recovery-playbook.md)
 - [D:/business-hub/docs/mobile-pilot-shift-closeout.md](D:/business-hub/docs/mobile-pilot-shift-closeout.md)
+- [D:/business-hub/docs/mobile-pilot-rollout-evidence-pack.md](D:/business-hub/docs/mobile-pilot-rollout-evidence-pack.md)
