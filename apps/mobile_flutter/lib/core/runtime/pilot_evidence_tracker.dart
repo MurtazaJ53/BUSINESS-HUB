@@ -98,6 +98,11 @@ class PilotEvidenceTrackerState {
       label: 'Operator action brief',
       isCore: false,
     ),
+    PilotEvidenceArtifact(
+      id: 'rollout_decision_summary',
+      label: 'Rollout decision summary',
+      isCore: false,
+    ),
   ];
 
   static final Map<String, PilotEvidenceArtifact> _artifactById =

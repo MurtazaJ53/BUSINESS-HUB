@@ -15,6 +15,7 @@ import '../../../core/runtime/pilot_incident_escalation_report.dart';
 import '../../../core/runtime/pilot_operator_action_plan.dart';
 import '../../../core/runtime/pilot_readiness_report.dart';
 import '../../../core/runtime/pilot_recovery_report.dart';
+import '../../../core/runtime/pilot_rollout_decision_summary.dart';
 import '../../../core/runtime/pilot_rollout_evidence_report.dart';
 import '../../../core/runtime/pilot_smoke_report.dart';
 import '../../../core/runtime/pilot_shift_closeout_report.dart';
@@ -606,6 +607,19 @@ class SettingsScreen extends ConsumerWidget {
                                     diagnosticsSnapshot: diagnostics,
                                     readinessReport: readinessReport,
                                     recoveryReport: recoveryReport,
+                                  );
+                            final rolloutDecisionSummary =
+                                diagnostics == null ||
+                                    readinessReport == null ||
+                                    recoveryReport == null ||
+                                    actionPlan == null
+                                ? null
+                                : PilotRolloutDecisionSummary.evaluate(
+                                    diagnosticsSnapshot: diagnostics,
+                                    readinessReport: readinessReport,
+                                    recoveryReport: recoveryReport,
+                                    actionPlan: actionPlan,
+                                    evidenceTracker: evidenceTracker,
                                   );
 
                             return Column(
@@ -1789,6 +1803,132 @@ class SettingsScreen extends ConsumerWidget {
                                               ),
                                               label: const Text(
                                                 'Run shift closeout',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                                const SizedBox(height: 18),
+                                MobilePanel(
+                                  title: 'Rollout decision summary',
+                                  action: MobileTag(
+                                    label: rolloutDecisionSummary == null
+                                        ? 'Loading'
+                                        : rolloutDecisionSummary.verdictLabel,
+                                    icon: rolloutDecisionSummary == null
+                                        ? Icons.sync_rounded
+                                        : rolloutDecisionSummary
+                                                  .shouldRollbackAndEscalate
+                                        ? Icons.crisis_alert_rounded
+                                        : rolloutDecisionSummary
+                                                  .shouldInvestigateBeforeExpand
+                                        ? Icons.troubleshoot_rounded
+                                        : rolloutDecisionSummary
+                                                  .shouldHoldAndMonitor
+                                        ? Icons.visibility_rounded
+                                        : Icons.trending_up_rounded,
+                                    accent: rolloutDecisionSummary == null
+                                        ? const Color(0xFFF59E0B)
+                                        : rolloutDecisionSummary
+                                                  .shouldRollbackAndEscalate
+                                        ? const Color(0xFFFB7185)
+                                        : rolloutDecisionSummary
+                                                  .shouldInvestigateBeforeExpand
+                                        ? const Color(0xFFF59E0B)
+                                        : rolloutDecisionSummary
+                                                  .shouldHoldAndMonitor
+                                        ? const Color(0xFF38BDF8)
+                                        : const Color(0xFF22C55E),
+                                  ),
+                                  child: rolloutDecisionSummary == null
+                                      ? const MobileEmptyState(
+                                          icon: Icons.sync_rounded,
+                                          title: 'Preparing rollout decision summary',
+                                          body:
+                                              'The device is still combining readiness, recovery, action, and archive posture into a rollout verdict.',
+                                        )
+                                      : Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: <Widget>[
+                                            Text(
+                                              rolloutDecisionSummary.summary,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color: Colors.white
+                                                        .withValues(
+                                                          alpha: 0.68,
+                                                        ),
+                                                    fontWeight: FontWeight.w600,
+                                                    height: 1.45,
+                                                  ),
+                                            ),
+                                            const SizedBox(height: 14),
+                                            _SettingsRow(
+                                              label: 'Verdict',
+                                              value: rolloutDecisionSummary
+                                                  .verdictLabel,
+                                              icon: Icons.gavel_rounded,
+                                            ),
+                                            _SettingsRow(
+                                              label: 'Recommended next action',
+                                              value: actionPlan.actionLabel,
+                                              icon: Icons.route_rounded,
+                                            ),
+                                            _SettingsRow(
+                                              label: 'Archive posture',
+                                              value: evidenceTracker
+                                                  .archiveTrendLabel,
+                                              icon: Icons.insights_rounded,
+                                            ),
+                                            ...rolloutDecisionSummary.reasons.map(
+                                              (reason) => _ReadinessNoteRow(
+                                                message: reason,
+                                                tone: rolloutDecisionSummary
+                                                        .shouldRollbackAndEscalate
+                                                    ? const Color(0xFFFB7185)
+                                                    : rolloutDecisionSummary
+                                                              .shouldInvestigateBeforeExpand
+                                                    ? const Color(0xFFF59E0B)
+                                                    : rolloutDecisionSummary
+                                                              .shouldHoldAndMonitor
+                                                    ? const Color(0xFF38BDF8)
+                                                    : const Color(0xFF22C55E),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 14),
+                                            FilledButton.tonalIcon(
+                                              onPressed: () async {
+                                                await Clipboard.setData(
+                                                  ClipboardData(
+                                                    text:
+                                                        rolloutDecisionSummary
+                                                            .toMultilineText(),
+                                                  ),
+                                                );
+                                                await markEvidenceCaptured(
+                                                  'rollout_decision_summary',
+                                                );
+                                                if (!context.mounted) {
+                                                  return;
+                                                }
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      'Rollout decision summary copied with verdict ${rolloutDecisionSummary.verdictLabel}.',
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              icon: const Icon(
+                                                Icons.assignment_turned_in_rounded,
+                                              ),
+                                              label: const Text(
+                                                'Copy decision summary',
                                               ),
                                             ),
                                           ],
