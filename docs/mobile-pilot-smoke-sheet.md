@@ -89,3 +89,14 @@ Accept the pilot device only if:
 4. Attach the recovery report to the rollout/support thread.
 5. Re-check [D:/business-hub/docs/mobile-pilot-readiness-signoff.md](D:/business-hub/docs/mobile-pilot-readiness-signoff.md) before allowing the device back into shift.
 6. Use [D:/business-hub/docs/mobile-pilot-recovery-playbook.md](D:/business-hub/docs/mobile-pilot-recovery-playbook.md) to decide whether the device can stay in pilot.
+
+## End-of-shift follow-through
+
+When the pilot shift ends, archive:
+
+1. `Shift closeout` report from Settings
+2. any recovery report used during the shift
+3. the final decision on whether the device is healthy, should be monitored, or needs incident escalation
+
+Reference:
+- [D:/business-hub/docs/mobile-pilot-shift-closeout.md](D:/business-hub/docs/mobile-pilot-shift-closeout.md)

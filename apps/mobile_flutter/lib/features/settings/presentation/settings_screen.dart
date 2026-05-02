@@ -12,6 +12,7 @@ import '../../../core/runtime/pilot_handoff_report.dart';
 import '../../../core/runtime/pilot_readiness_report.dart';
 import '../../../core/runtime/pilot_recovery_report.dart';
 import '../../../core/runtime/pilot_smoke_report.dart';
+import '../../../core/runtime/pilot_shift_closeout_report.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/utils/formatters.dart';
@@ -976,6 +977,106 @@ class SettingsScreen extends ConsumerWidget {
                                     ],
                                   ),
                                 ),
+                                const SizedBox(height: 18),
+                                MobilePanel(
+                                  title: 'Shift closeout',
+                                  action: MobileTag(
+                                    label: diagnostics == null ||
+                                            readinessReport == null ||
+                                            recoveryReport == null
+                                        ? 'Loading'
+                                        : 'End of shift',
+                                    icon: diagnostics == null ||
+                                            readinessReport == null ||
+                                            recoveryReport == null
+                                        ? Icons.sync_rounded
+                                        : Icons.assignment_late_rounded,
+                                    accent: diagnostics == null ||
+                                            readinessReport == null ||
+                                            recoveryReport == null
+                                        ? const Color(0xFFF59E0B)
+                                        : const Color(0xFFA78BFA),
+                                  ),
+                                  child: diagnostics == null ||
+                                          readinessReport == null ||
+                                          recoveryReport == null
+                                      ? const MobileEmptyState(
+                                          icon: Icons.sync_rounded,
+                                          title: 'Preparing shift closeout',
+                                          body:
+                                              'The device is still resolving readiness and recovery posture for this closeout report.',
+                                        )
+                                      : Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: <Widget>[
+                                            Text(
+                                              'Use this at the end of a real pilot shift. It captures whether checkout, replay, and customer-ledger behavior stayed healthy, and creates the final operator-side handoff note for the next shift or rollout lead.',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color: Colors.white
+                                                        .withValues(
+                                                          alpha: 0.68,
+                                                        ),
+                                                    fontWeight: FontWeight.w600,
+                                                    height: 1.45,
+                                                  ),
+                                            ),
+                                            const SizedBox(height: 14),
+                                            _SettingsRow(
+                                              label: 'Queue posture',
+                                              value: diagnostics
+                                                          .pendingOutboxCount >
+                                                      0
+                                                  ? '${diagnostics.pendingOutboxCount} command(s) still queued'
+                                                  : 'Queue clear',
+                                              icon: Icons.outbox_rounded,
+                                            ),
+                                            _SettingsRow(
+                                              label: 'Recovery attention',
+                                              value: attentionEntries.isEmpty
+                                                  ? 'No active recovery items'
+                                                  : '${attentionEntries.length} attention item(s)',
+                                              icon: Icons.health_and_safety_rounded,
+                                            ),
+                                            FilledButton.tonalIcon(
+                                              onPressed: () async {
+                                                final closeoutReport =
+                                                    await _showPilotShiftCloseoutDialog(
+                                                      context,
+                                                      diagnosticsSnapshot:
+                                                          diagnostics,
+                                                      readinessReport:
+                                                          readinessReport,
+                                                      recoveryReport:
+                                                          recoveryReport,
+                                                    );
+                                                if (closeoutReport == null ||
+                                                    !context.mounted) {
+                                                  return;
+                                                }
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      'Shift closeout copied with decision ${closeoutReport.decisionLabel}.',
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              icon: const Icon(
+                                                Icons.assignment_turned_in_rounded,
+                                              ),
+                                              label: const Text(
+                                                'Run shift closeout',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                ),
                               ],
                             );
                           },
@@ -1150,6 +1251,195 @@ class SettingsScreen extends ConsumerWidget {
                       }
                     },
                     child: const Text('Copy smoke report'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      notesController.dispose();
+    }
+  }
+
+  Future<PilotShiftCloseoutReport?> _showPilotShiftCloseoutDialog(
+    BuildContext context, {
+    required PilotDiagnosticsSnapshot diagnosticsSnapshot,
+    required PilotReadinessReport readinessReport,
+    required PilotRecoveryReport recoveryReport,
+  }) async {
+    final notesController = TextEditingController();
+    var checkoutStable = true;
+    var replayStable =
+        diagnosticsSnapshot.pendingOutboxCount == 0 &&
+        !recoveryReport.attentionEntries.any((entry) => entry.isFailed);
+    var customerLedgerStable = true;
+    var rollbackRequired = false;
+
+    PilotShiftCloseoutReport buildPreview() {
+      return PilotShiftCloseoutReport(
+        diagnosticsSnapshot: diagnosticsSnapshot,
+        readinessReport: readinessReport,
+        recoveryReport: recoveryReport,
+        answers: PilotShiftCloseoutAnswers(
+          checkoutStable: checkoutStable,
+          replayStable: replayStable,
+          customerLedgerStable: customerLedgerStable,
+          rollbackRequired: rollbackRequired,
+          notes: notesController.text.trim(),
+        ),
+      );
+    }
+
+    try {
+      return await showDialog<PilotShiftCloseoutReport>(
+        context: context,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              final preview = buildPreview();
+              final tone = switch (preview.decision) {
+                'healthy_handoff' => const Color(0xFF22C55E),
+                'monitor_next_shift' => const Color(0xFFF59E0B),
+                _ => const Color(0xFFFB7185),
+              };
+
+              return AlertDialog(
+                title: const Text('Run shift closeout'),
+                content: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          'Record how the pilot device actually finished the shift. This report is meant for the next operator, the rollout lead, or a support escalation thread.',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.68),
+                                fontWeight: FontWeight.w600,
+                                height: 1.45,
+                              ),
+                        ),
+                        const SizedBox(height: 14),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: tone.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: tone.withValues(alpha: 0.28),
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  preview.decisionLabel,
+                                  style: Theme.of(context).textTheme.titleSmall
+                                      ?.copyWith(
+                                        color: tone,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  preview.summary,
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.76,
+                                        ),
+                                        fontWeight: FontWeight.w600,
+                                        height: 1.45,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _CloseoutToggleCard(
+                          label: 'Checkout stayed stable through the shift',
+                          value: checkoutStable,
+                          onChanged: (value) {
+                            setDialogState(() {
+                              checkoutStable = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _CloseoutToggleCard(
+                          label:
+                              'Replay and outbox behavior stayed stable after reconnects',
+                          value: replayStable,
+                          onChanged: (value) {
+                            setDialogState(() {
+                              replayStable = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _CloseoutToggleCard(
+                          label:
+                              'Customer ledger and due-balance behavior stayed correct',
+                          value: customerLedgerStable,
+                          onChanged: (value) {
+                            setDialogState(() {
+                              customerLedgerStable = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _CloseoutToggleCard(
+                          label: 'Rollback is required before the next shift',
+                          value: rollbackRequired,
+                          trueLabel: 'YES',
+                          falseLabel: 'NO',
+                          dangerWhenTrue: true,
+                          onChanged: (value) {
+                            setDialogState(() {
+                              rollbackRequired = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 14),
+                        TextField(
+                          controller: notesController,
+                          minLines: 2,
+                          maxLines: 4,
+                          onChanged: (_) {
+                            setDialogState(() {});
+                          },
+                          decoration: const InputDecoration(
+                            labelText: 'Shift notes',
+                            hintText:
+                                'Optional closeout context, customer impact, or operator handoff notes.',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: () async {
+                      final report = buildPreview();
+                      await Clipboard.setData(
+                        ClipboardData(text: report.toMultilineText()),
+                      );
+                      if (dialogContext.mounted) {
+                        Navigator.of(dialogContext).pop(report);
+                      }
+                    },
+                    child: const Text('Copy closeout report'),
                   ),
                 ],
               );
@@ -1414,6 +1704,79 @@ class _PilotSmokeCheckCard extends StatelessWidget {
                   Icons.cancel_rounded,
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CloseoutToggleCard extends StatelessWidget {
+  const _CloseoutToggleCard({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    this.trueLabel = 'STABLE',
+    this.falseLabel = 'UNSTABLE',
+    this.dangerWhenTrue = false,
+  });
+
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final String trueLabel;
+  final String falseLabel;
+  final bool dangerWhenTrue;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = value
+        ? (dangerWhenTrue
+              ? const Color(0xFFFB7185)
+              : const Color(0xFF22C55E))
+        : (dangerWhenTrue
+              ? const Color(0xFF22C55E)
+              : const Color(0xFFF59E0B));
+
+    final labelText = value ? trueLabel : falseLabel;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1220),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: <Widget>[
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    label,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  MobileTag(
+                    label: labelText,
+                    icon: value
+                        ? Icons.check_circle_rounded
+                        : Icons.warning_amber_rounded,
+                    accent: tone,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Switch(
+              value: value,
+              onChanged: onChanged,
+              activeColor: tone,
             ),
           ],
         ),

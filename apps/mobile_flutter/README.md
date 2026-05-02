@@ -68,6 +68,7 @@ When preparing a real APK handoff, use:
 - [D:/business-hub/docs/mobile-pilot-readiness-signoff.md](D:/business-hub/docs/mobile-pilot-readiness-signoff.md)
 - [D:/business-hub/docs/mobile-pilot-smoke-sheet.md](D:/business-hub/docs/mobile-pilot-smoke-sheet.md)
 - [D:/business-hub/docs/mobile-pilot-recovery-playbook.md](D:/business-hub/docs/mobile-pilot-recovery-playbook.md)
+- [D:/business-hub/docs/mobile-pilot-shift-closeout.md](D:/business-hub/docs/mobile-pilot-shift-closeout.md)
 
 Versioning currently follows `pubspec.yaml`:
 
@@ -112,6 +113,7 @@ It also includes a recovery desk for queued or failed receipt replay during pilo
 It now also includes a readiness signoff verdict so a rollout lead can decide whether the device is safe to start a pilot shift.
 It also includes a full handoff pack copy action so release evidence can be archived from the device in one paste.
 It now also includes a guided smoke checklist runner that copies a structured floor-execution report from the device itself.
+It also now includes a shift closeout flow so the end-of-shift device state can be handed to the next operator or rollout lead with a clear decision.
 
 ## Package strategy
 

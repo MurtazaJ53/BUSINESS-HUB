@@ -12,10 +12,13 @@ The Flutter app now exposes build metadata inside Settings:
 - package name
 - version + build number
 - release channel
+- release tag
+- pilot scope
 - short release SHA when provided at build time
 
 Operators should verify those values on-device before pilot distribution.
 The Settings screen also now provides a copyable pilot launch snapshot for release tickets and rollout threads.
+It also supports an end-of-shift closeout report so the next operator or rollout lead can see how the device actually finished.
 
 ## Version source
 
@@ -81,7 +84,8 @@ Signing path:
 10. Use `Copy pilot snapshot` and archive the output in the rollout record.
 11. Run `Run smoke checklist` from the device and archive the copied smoke report.
 12. Run any remaining manual device smoke checks.
-12. Distribute to pilot shops only after smoke pass.
+13. Distribute to pilot shops only after smoke pass.
+14. At the end of the pilot shift, run `Shift closeout` and archive the copied report.
 
 ## Pilot smoke focus
 
