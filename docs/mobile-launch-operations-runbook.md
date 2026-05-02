@@ -58,6 +58,10 @@ Use for:
 Workflow:
 - [D:/business-hub/.github/workflows/flutter_mobile_release.yml](D:/business-hub/.github/workflows/flutter_mobile_release.yml)
 
+Local runner:
+- [D:/business-hub/scripts/mobile_flutter_release.ps1](D:/business-hub/scripts/mobile_flutter_release.ps1)
+- [D:/business-hub/docs/mobile-local-release-runner.md](D:/business-hub/docs/mobile-local-release-runner.md)
+
 Triggers:
 - push tag matching `mobile-v*`
 - manual `workflow_dispatch`
@@ -72,6 +76,9 @@ Release artifacts now include:
 - release manifest with tag, channel, SHA, and checksum
 - JSON manifest
 - generated pilot handoff markdown
+
+Local release packaging mirrors that artifact shape under:
+- `release-artifacts/mobile-local/<release-tag>/`
 
 Signing path:
 - GitHub workflow expects Android signing secrets
