@@ -40,6 +40,11 @@ Artifacts:
 3. release APK build passes
 4. owner login tested
 5. staff login tested
+
+Preferred local runner:
+
+- [D:/business-hub/scripts/mobile_flutter_validate.ps1](D:/business-hub/scripts/mobile_flutter_validate.ps1)
+- [D:/business-hub/docs/mobile-local-validation-runner.md](D:/business-hub/docs/mobile-local-validation-runner.md)
 6. dashboard/inventory/POS smoke tested
 7. mobile sync smoke tested
 

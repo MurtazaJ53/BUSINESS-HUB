@@ -34,6 +34,20 @@ flutter test
 flutter build apk --release
 ```
 
+Preferred repo-root runner:
+
+```powershell
+pwsh ./scripts/mobile_flutter_validate.ps1 -Doctor
+pwsh ./scripts/mobile_flutter_validate.ps1 -BuildMode Debug
+pwsh ./scripts/mobile_flutter_validate.ps1 -BuildMode Release
+```
+
+If Flutter is not on PATH:
+
+```powershell
+pwsh ./scripts/mobile_flutter_validate.ps1 -FlutterRoot C:\path\to\flutter -BuildMode Release
+```
+
 ## Validation gate
 
 Flutter mobile now has a dedicated GitHub Actions workflow:
@@ -48,6 +62,11 @@ It runs:
 - `flutter build apk --debug`
 
 This gives the mobile track its own CI confidence gate instead of relying only on the older web/Capacitor release automation.
+
+For local validation from the repo root, use:
+
+- [D:/business-hub/scripts/mobile_flutter_validate.ps1](D:/business-hub/scripts/mobile_flutter_validate.ps1)
+- [D:/business-hub/docs/mobile-local-validation-runner.md](D:/business-hub/docs/mobile-local-validation-runner.md)
 
 Release automation now also supports:
 
