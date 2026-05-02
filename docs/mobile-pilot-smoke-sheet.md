@@ -24,8 +24,9 @@ Use it after the signed APK is built and before a shop is allowed to treat the F
 1. Install the signed APK from the mobile release workflow output.
 2. Open:
    - [D:/business-hub/apps/mobile_flutter/lib/features/settings/presentation/settings_screen.dart](D:/business-hub/apps/mobile_flutter/lib/features/settings/presentation/settings_screen.dart)
-3. Use `Copy pilot snapshot`.
-4. Paste the snapshot into:
+3. Confirm `Pilot readiness signoff` is not `BLOCKED STARTUP`.
+4. Use `Copy pilot snapshot`.
+5. Paste the snapshot into:
    - the rollout thread, or
    - the release ticket, or
    - the QA signoff log
@@ -63,6 +64,7 @@ Accept the pilot device only if:
 
 - build identity matches the intended release
 - APK checksum matches release output
+- readiness signoff is not `BLOCKED STARTUP`
 - all critical smoke checks pass
 - copied pilot snapshot is archived with the release record
 
@@ -81,4 +83,5 @@ Accept the pilot device only if:
 2. Retry the affected receipt or all attention items.
 3. Copy the recovery report.
 4. Attach the recovery report to the rollout/support thread.
-5. Use [D:/business-hub/docs/mobile-pilot-recovery-playbook.md](D:/business-hub/docs/mobile-pilot-recovery-playbook.md) to decide whether the device can stay in pilot.
+5. Re-check [D:/business-hub/docs/mobile-pilot-readiness-signoff.md](D:/business-hub/docs/mobile-pilot-readiness-signoff.md) before allowing the device back into shift.
+6. Use [D:/business-hub/docs/mobile-pilot-recovery-playbook.md](D:/business-hub/docs/mobile-pilot-recovery-playbook.md) to decide whether the device can stay in pilot.

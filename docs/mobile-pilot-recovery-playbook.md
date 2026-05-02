@@ -35,7 +35,8 @@ The mobile Settings screen now includes a `Recovery desk` panel that shows:
 6. If failure remains:
    - use `Copy recovery report`
    - paste it into the rollout/support thread
-7. Record whether the issue blocks checkout or only delayed replay.
+7. Re-open `Pilot readiness signoff`.
+8. Record whether the issue blocks checkout or only delayed replay.
 
 ## Escalation rule
 

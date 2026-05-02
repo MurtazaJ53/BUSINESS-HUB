@@ -13,6 +13,10 @@ class PilotDiagnosticsSnapshot {
     required this.historyOverview,
     required this.pendingOutboxCount,
     required this.domainStates,
+    this.operatorEmailOverride,
+    this.operatorRoleOverride,
+    this.workspaceIdOverride,
+    this.costVisibilityOverride,
     DateTime? generatedAt,
   }) : generatedAt = generatedAt ?? DateTime.now();
 
@@ -24,18 +28,34 @@ class PilotDiagnosticsSnapshot {
   final HistoryOverview historyOverview;
   final int pendingOutboxCount;
   final List<DomainControlState> domainStates;
+  final String? operatorEmailOverride;
+  final String? operatorRoleOverride;
+  final String? workspaceIdOverride;
+  final bool? costVisibilityOverride;
   final DateTime generatedAt;
 
+  bool get hasSignedInOperator =>
+      (operatorEmailOverride?.trim().isNotEmpty == true) || session != null;
+
   String get operatorEmail {
+    if (operatorEmailOverride?.trim().isNotEmpty == true) {
+      return operatorEmailOverride!.trim();
+    }
     if (session == null) {
       return 'Not signed in';
     }
     return session!.email.isNotEmpty ? session!.email : 'Unknown operator';
   }
 
-  String get operatorRole => session?.role?.toUpperCase() ?? 'GUEST';
+  String get operatorRole =>
+      operatorRoleOverride?.trim().isNotEmpty == true
+      ? operatorRoleOverride!.trim().toUpperCase()
+      : session?.role?.toUpperCase() ?? 'GUEST';
 
-  String get workspaceId => session?.shopId ?? 'No workspace bound';
+  String get workspaceId =>
+      workspaceIdOverride?.trim().isNotEmpty == true
+      ? workspaceIdOverride!.trim()
+      : session?.shopId ?? 'No workspace bound';
 
   String get lastReceiptSyncLabel {
     final lastSyncedAt = historyOverview.lastSyncedAt;
@@ -65,7 +85,7 @@ class PilotDiagnosticsSnapshot {
       'Queued receipt value: ${historyOverview.queuedRevenue.toStringAsFixed(2)}',
       'Failed receipts: ${historyOverview.failedSales}',
       'Last receipt sync (UTC): $lastReceiptSyncLabel',
-      'Cost visibility: ${session?.canViewCost == true ? 'ENABLED' : 'RESTRICTED'}',
+      'Cost visibility: ${effectiveCostVisibility ? 'ENABLED' : 'RESTRICTED'}',
       'Domain posture: $primaryDomainCountLabel',
       'Domain states:',
     ];
@@ -86,4 +106,7 @@ class PilotDiagnosticsSnapshot {
 
     return lines.join('\n');
   }
+
+  bool get effectiveCostVisibility =>
+      costVisibilityOverride ?? (session?.canViewCost == true);
 }

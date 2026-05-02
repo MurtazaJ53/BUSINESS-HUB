@@ -8,6 +8,7 @@ import '../../../core/models/mobile_models.dart';
 import '../../../core/models/mobile_session.dart';
 import '../../../core/runtime/app_runtime_info.dart';
 import '../../../core/runtime/pilot_diagnostics_snapshot.dart';
+import '../../../core/runtime/pilot_readiness_report.dart';
 import '../../../core/runtime/pilot_recovery_report.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
@@ -529,164 +530,313 @@ class SettingsScreen extends ConsumerWidget {
                                     diagnosticsSnapshot: diagnostics,
                                     attentionEntries: attentionEntries,
                                   );
+                            final readinessReport = diagnostics == null
+                                ? null
+                                : PilotReadinessReport.evaluate(
+                                    diagnosticsSnapshot: diagnostics,
+                                    attentionEntries: attentionEntries,
+                                  );
 
-                            return MobilePanel(
-                              title: 'Recovery desk',
-                              action: MobileTag(
-                                label: attentionEntries.isEmpty
-                                    ? 'Stable'
-                                    : '${attentionEntries.length} attention',
-                                icon: attentionEntries.isEmpty
-                                    ? Icons.health_and_safety_rounded
-                                    : Icons.build_circle_rounded,
-                                accent: attentionEntries.isEmpty
-                                    ? const Color(0xFF22C55E)
-                                    : const Color(0xFFFB7185),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text(
-                                    'Use this when a pilot device has replay trouble. It shows the highest-risk queued or failed commerce commands, lets you retry one receipt at a time, and creates a recovery report you can hand to support or QA.',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall?.copyWith(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.68,
-                                      ),
-                                      fontWeight: FontWeight.w600,
-                                      height: 1.45,
-                                    ),
+                            return Column(
+                              children: <Widget>[
+                                MobilePanel(
+                                  title: 'Pilot readiness signoff',
+                                  action: MobileTag(
+                                    label: readinessReport == null
+                                        ? 'Loading'
+                                        : readinessReport.statusLabel,
+                                    icon: readinessReport == null
+                                        ? Icons.sync_rounded
+                                        : readinessReport.isReadyForShift
+                                        ? Icons.verified_rounded
+                                        : readinessReport.shouldMonitor
+                                        ? Icons.visibility_rounded
+                                        : Icons.block_rounded,
+                                    accent: readinessReport == null
+                                        ? const Color(0xFFF59E0B)
+                                        : readinessReport.isReadyForShift
+                                        ? const Color(0xFF22C55E)
+                                        : readinessReport.shouldMonitor
+                                        ? const Color(0xFFF59E0B)
+                                        : const Color(0xFFFB7185),
                                   ),
-                                  const SizedBox(height: 14),
-                                  if (attentionEntries.isEmpty)
-                                    const MobileEmptyState(
-                                      icon: Icons.health_and_safety_rounded,
-                                      title: 'No recovery work is waiting',
-                                      body:
-                                          'Queued and failed commerce commands are clear on this device right now.',
-                                    )
-                                  else
-                                    ...attentionEntries.map(
-                                      (entry) => Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 12,
-                                        ),
-                                        child: _OutboxAttentionRow(
-                                          entry: entry,
-                                          onRetry: () async {
-                                            final result = await syncCoordinator
-                                                .retryCommerceCommand(
-                                                  entry.commandId,
+                                  child: readinessReport == null
+                                      ? const MobileEmptyState(
+                                          icon: Icons.sync_rounded,
+                                          title: 'Building readiness verdict',
+                                          body:
+                                              'The mobile shell is collecting the launch snapshot and queue posture for signoff.',
+                                        )
+                                      : Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: <Widget>[
+                                            Text(
+                                              readinessReport.summary,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color: Colors.white
+                                                        .withValues(
+                                                          alpha: 0.68,
+                                                        ),
+                                                    fontWeight: FontWeight.w600,
+                                                    height: 1.45,
+                                                  ),
+                                            ),
+                                            if (readinessReport.blockers
+                                                .isNotEmpty) ...<Widget>[
+                                              const SizedBox(height: 14),
+                                              Text(
+                                                'Blockers',
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .titleSmall
+                                                    ?.copyWith(
+                                                      color: const Color(
+                                                        0xFFFB7185,
+                                                      ),
+                                                      fontWeight:
+                                                          FontWeight.w900,
+                                                    ),
+                                              ),
+                                              const SizedBox(height: 10),
+                                              ...readinessReport.blockers.map(
+                                                (item) =>
+                                                    _ReadinessNoteRow(
+                                                      message: item,
+                                                      tone: const Color(
+                                                        0xFFFB7185,
+                                                      ),
+                                                    ),
+                                              ),
+                                            ],
+                                            if (readinessReport.warnings
+                                                .isNotEmpty) ...<Widget>[
+                                              const SizedBox(height: 14),
+                                              Text(
+                                                'Warnings',
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .titleSmall
+                                                    ?.copyWith(
+                                                      color: const Color(
+                                                        0xFFF59E0B,
+                                                      ),
+                                                      fontWeight:
+                                                          FontWeight.w900,
+                                                    ),
+                                              ),
+                                              const SizedBox(height: 10),
+                                              ...readinessReport.warnings.map(
+                                                (item) =>
+                                                    _ReadinessNoteRow(
+                                                      message: item,
+                                                      tone: const Color(
+                                                        0xFFF59E0B,
+                                                      ),
+                                                    ),
+                                              ),
+                                            ],
+                                            const SizedBox(height: 14),
+                                            FilledButton.tonalIcon(
+                                              onPressed: () async {
+                                                await Clipboard.setData(
+                                                  ClipboardData(
+                                                    text: readinessReport
+                                                        .toMultilineText(),
+                                                  ),
                                                 );
-                                            if (!context.mounted) {
-                                              return;
-                                            }
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  result.message ??
-                                                      'Retry requested for ${entry.commandId}.',
+                                                if (!context.mounted) {
+                                                  return;
+                                                }
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      'Pilot readiness signoff copied for rollout approval.',
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              icon: const Icon(
+                                                Icons.copy_all_rounded,
+                                              ),
+                                              label: const Text(
+                                                'Copy readiness signoff',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                                const SizedBox(height: 18),
+                                MobilePanel(
+                                  title: 'Recovery desk',
+                                  action: MobileTag(
+                                    label: attentionEntries.isEmpty
+                                        ? 'Stable'
+                                        : '${attentionEntries.length} attention',
+                                    icon: attentionEntries.isEmpty
+                                        ? Icons.health_and_safety_rounded
+                                        : Icons.build_circle_rounded,
+                                    accent: attentionEntries.isEmpty
+                                        ? const Color(0xFF22C55E)
+                                        : const Color(0xFFFB7185),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: <Widget>[
+                                      Text(
+                                        'Use this when a pilot device has replay trouble. It shows the highest-risk queued or failed commerce commands, lets you retry one receipt at a time, and creates a recovery report you can hand to support or QA.',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall?.copyWith(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.68,
+                                          ),
+                                          fontWeight: FontWeight.w600,
+                                          height: 1.45,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 14),
+                                      if (attentionEntries.isEmpty)
+                                        const MobileEmptyState(
+                                          icon: Icons.health_and_safety_rounded,
+                                          title:
+                                              'No recovery work is waiting',
+                                          body:
+                                              'Queued and failed commerce commands are clear on this device right now.',
+                                        )
+                                      else
+                                        ...attentionEntries.map(
+                                          (entry) => Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 12,
+                                            ),
+                                            child: _OutboxAttentionRow(
+                                              entry: entry,
+                                              onRetry: () async {
+                                                final result =
+                                                    await syncCoordinator
+                                                        .retryCommerceCommand(
+                                                          entry.commandId,
+                                                        );
+                                                if (!context.mounted) {
+                                                  return;
+                                                }
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      result.message ??
+                                                          'Retry requested for ${entry.commandId}.',
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                        ),
+                                      const SizedBox(height: 6),
+                                      LayoutBuilder(
+                                        builder: (context, constraints) {
+                                          final stacked =
+                                              constraints.maxWidth < 430;
+                                          final buttons = <Widget>[
+                                            Expanded(
+                                              child: FilledButton.tonalIcon(
+                                                onPressed:
+                                                    attentionEntries.isEmpty
+                                                    ? null
+                                                    : () async {
+                                                        final result =
+                                                            await syncCoordinator
+                                                                .flushCommerceOutbox();
+                                                        if (!context.mounted) {
+                                                          return;
+                                                        }
+                                                        ScaffoldMessenger.of(
+                                                          context,
+                                                        ).showSnackBar(
+                                                          SnackBar(
+                                                            content: Text(
+                                                              result.message ??
+                                                                  'Recovery replay requested.',
+                                                            ),
+                                                          ),
+                                                        );
+                                                      },
+                                                icon: const Icon(
+                                                  Icons.cloud_sync_rounded,
+                                                ),
+                                                label: const Text(
+                                                  'Retry all attention items',
                                                 ),
                                               ),
+                                            ),
+                                            Expanded(
+                                              child: FilledButton.tonalIcon(
+                                                onPressed:
+                                                    recoveryReport == null
+                                                    ? null
+                                                    : () async {
+                                                        await Clipboard.setData(
+                                                          ClipboardData(
+                                                            text:
+                                                                recoveryReport
+                                                                    .toMultilineText(),
+                                                          ),
+                                                        );
+                                                        if (!context.mounted) {
+                                                          return;
+                                                        }
+                                                        ScaffoldMessenger.of(
+                                                          context,
+                                                        ).showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text(
+                                                              'Pilot recovery report copied for support handoff.',
+                                                            ),
+                                                          ),
+                                                        );
+                                                      },
+                                                icon: const Icon(
+                                                  Icons.copy_all_rounded,
+                                                ),
+                                                label: const Text(
+                                                  'Copy recovery report',
+                                                ),
+                                              ),
+                                            ),
+                                          ];
+
+                                          if (stacked) {
+                                            return Column(
+                                              children: <Widget>[
+                                                buttons[0],
+                                                const SizedBox(height: 10),
+                                                buttons[1],
+                                              ],
                                             );
-                                          },
-                                        ),
+                                          }
+
+                                          return Row(
+                                            children: <Widget>[
+                                              buttons[0],
+                                              const SizedBox(width: 10),
+                                              buttons[1],
+                                            ],
+                                          );
+                                        },
                                       ),
-                                    ),
-                                  const SizedBox(height: 6),
-                                  LayoutBuilder(
-                                    builder: (context, constraints) {
-                                      final stacked =
-                                          constraints.maxWidth < 430;
-                                      final buttons = <Widget>[
-                                        Expanded(
-                                          child: FilledButton.tonalIcon(
-                                            onPressed: attentionEntries.isEmpty
-                                                ? null
-                                                : () async {
-                                                    final result =
-                                                        await syncCoordinator
-                                                            .flushCommerceOutbox();
-                                                    if (!context.mounted) {
-                                                      return;
-                                                    }
-                                                    ScaffoldMessenger.of(
-                                                      context,
-                                                    ).showSnackBar(
-                                                      SnackBar(
-                                                        content: Text(
-                                                          result.message ??
-                                                              'Recovery replay requested.',
-                                                        ),
-                                                      ),
-                                                    );
-                                                  },
-                                            icon: const Icon(
-                                              Icons.cloud_sync_rounded,
-                                            ),
-                                            label: const Text(
-                                              'Retry all attention items',
-                                            ),
-                                          ),
-                                        ),
-                                        Expanded(
-                                          child: FilledButton.tonalIcon(
-                                            onPressed: recoveryReport == null
-                                                ? null
-                                                : () async {
-                                                    await Clipboard.setData(
-                                                      ClipboardData(
-                                                        text: recoveryReport
-                                                            .toMultilineText(),
-                                                      ),
-                                                    );
-                                                    if (!context.mounted) {
-                                                      return;
-                                                    }
-                                                    ScaffoldMessenger.of(
-                                                      context,
-                                                    ).showSnackBar(
-                                                      const SnackBar(
-                                                        content: Text(
-                                                          'Pilot recovery report copied for support handoff.',
-                                                        ),
-                                                      ),
-                                                    );
-                                                  },
-                                            icon: const Icon(
-                                              Icons.copy_all_rounded,
-                                            ),
-                                            label: const Text(
-                                              'Copy recovery report',
-                                            ),
-                                          ),
-                                        ),
-                                      ];
-
-                                      if (stacked) {
-                                        return Column(
-                                          children: <Widget>[
-                                            buttons[0],
-                                            const SizedBox(height: 10),
-                                            buttons[1],
-                                          ],
-                                        );
-                                      }
-
-                                      return Row(
-                                        children: <Widget>[
-                                          buttons[0],
-                                          const SizedBox(width: 10),
-                                          buttons[1],
-                                        ],
-                                      );
-                                    },
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             );
                           },
                         );
@@ -832,6 +982,40 @@ class SettingsScreen extends ConsumerWidget {
       footerController.dispose();
       phoneController.dispose();
     }
+  }
+}
+
+class _ReadinessNoteRow extends StatelessWidget {
+  const _ReadinessNoteRow({required this.message, required this.tone});
+
+  final String message;
+  final Color tone;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Icon(Icons.circle, size: 10, color: tone),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.72),
+                fontWeight: FontWeight.w600,
+                height: 1.45,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
