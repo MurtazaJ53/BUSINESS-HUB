@@ -49,6 +49,9 @@ This checklist is the final gate before shipping a Flutter APK outside the inter
 9. Regenerate the local release registry so the current tag appears in the shared mobile release index:
    - `release-artifacts/mobile-release-registry.json`
    - `release-artifacts/mobile-release-registry.md`
+10. Run the local release tag gate before creating the final `mobile-v*` tag:
+   - `BusinessHub-Mobile-<release-tag>.tag-summary.txt`
+   - `BusinessHub-Mobile-<release-tag>.tag-summary.json`
 
 ## Mobile smoke gate
 

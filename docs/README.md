@@ -65,30 +65,31 @@ It is designed to support:
 41. [Mobile Local Release Runner](./mobile-local-release-runner.md)
 42. [Mobile Local Release Bundle Runner](./mobile-local-release-bundle-runner.md)
 43. [Mobile Local Release Registry Runner](./mobile-local-release-registry-runner.md)
-44. [Mobile Pilot Handoff Pack](./mobile-pilot-handoff-pack.md)
-45. [Mobile Pilot Readiness Signoff](./mobile-pilot-readiness-signoff.md)
-46. [Mobile Pilot Smoke Sheet](./mobile-pilot-smoke-sheet.md)
-47. [Mobile Pilot Recovery Playbook](./mobile-pilot-recovery-playbook.md)
-48. [Mobile Pilot Shift Closeout](./mobile-pilot-shift-closeout.md)
-49. [Mobile Pilot Rollout Evidence Pack](./mobile-pilot-rollout-evidence-pack.md)
-50. [Mobile Pilot Incident Escalation Pack](./mobile-pilot-incident-escalation-pack.md)
-51. [Mobile Operator Action Center](./mobile-operator-action-center.md)
-52. [Mobile Pilot Evidence Tracker](./mobile-pilot-evidence-tracker.md)
-53. [Mobile Pilot Evidence Persistence](./mobile-pilot-evidence-persistence.md)
-54. [Mobile Pilot Evidence Sessions](./mobile-pilot-evidence-sessions.md)
-55. [Mobile Pilot Evidence Session History](./mobile-pilot-evidence-session-history.md)
-56. [Mobile Pilot Evidence Archive Control](./mobile-pilot-evidence-archive-control.md)
-57. [Mobile Pilot Evidence Archive Insights](./mobile-pilot-evidence-archive-insights.md)
-58. [Mobile Pilot Rollout Decision Summary](./mobile-pilot-rollout-decision-summary.md)
-59. [Mobile Pilot Wave Closeout Readiness](./mobile-pilot-wave-closeout-readiness.md)
-60. [Mobile Pilot Wave Signoff Pack](./mobile-pilot-wave-signoff-pack.md)
-61. [Mobile Pilot Wave Archive Pack](./mobile-pilot-wave-archive-pack.md)
+44. [Mobile Local Release Tag Runner](./mobile-local-release-tag-runner.md)
+45. [Mobile Pilot Handoff Pack](./mobile-pilot-handoff-pack.md)
+46. [Mobile Pilot Readiness Signoff](./mobile-pilot-readiness-signoff.md)
+47. [Mobile Pilot Smoke Sheet](./mobile-pilot-smoke-sheet.md)
+48. [Mobile Pilot Recovery Playbook](./mobile-pilot-recovery-playbook.md)
+49. [Mobile Pilot Shift Closeout](./mobile-pilot-shift-closeout.md)
+50. [Mobile Pilot Rollout Evidence Pack](./mobile-pilot-rollout-evidence-pack.md)
+51. [Mobile Pilot Incident Escalation Pack](./mobile-pilot-incident-escalation-pack.md)
+52. [Mobile Operator Action Center](./mobile-operator-action-center.md)
+53. [Mobile Pilot Evidence Tracker](./mobile-pilot-evidence-tracker.md)
+54. [Mobile Pilot Evidence Persistence](./mobile-pilot-evidence-persistence.md)
+55. [Mobile Pilot Evidence Sessions](./mobile-pilot-evidence-sessions.md)
+56. [Mobile Pilot Evidence Session History](./mobile-pilot-evidence-session-history.md)
+57. [Mobile Pilot Evidence Archive Control](./mobile-pilot-evidence-archive-control.md)
+58. [Mobile Pilot Evidence Archive Insights](./mobile-pilot-evidence-archive-insights.md)
+59. [Mobile Pilot Rollout Decision Summary](./mobile-pilot-rollout-decision-summary.md)
+60. [Mobile Pilot Wave Closeout Readiness](./mobile-pilot-wave-closeout-readiness.md)
+61. [Mobile Pilot Wave Signoff Pack](./mobile-pilot-wave-signoff-pack.md)
+62. [Mobile Pilot Wave Archive Pack](./mobile-pilot-wave-archive-pack.md)
 
 ### Existing strategy docs
 
-62. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
-63. [Global Scale Blueprint](./global-scale-blueprint.md)
-64. [Scale Certification Checklist](./scale-certification-checklist.md)
+63. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
+64. [Global Scale Blueprint](./global-scale-blueprint.md)
+65. [Scale Certification Checklist](./scale-certification-checklist.md)
 
 ## Current truth
 
@@ -135,6 +136,7 @@ As of April 29, 2026:
 - then Mobile Local Release Runner
 - then Mobile Local Release Bundle Runner
 - then Mobile Local Release Registry Runner
+- then Mobile Local Release Tag Runner
 - then Operations Runbook
 - then Mobile Release Readiness Checklist
 - then Mobile Launch Operations Runbook
