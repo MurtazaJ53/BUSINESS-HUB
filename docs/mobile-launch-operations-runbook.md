@@ -54,6 +54,8 @@ Release artifacts now include:
 - signed release APK
 - `.sha256` checksum file
 - release manifest with tag, channel, SHA, and checksum
+- JSON manifest
+- generated pilot handoff markdown
 
 Signing path:
 - GitHub workflow expects Android signing secrets
@@ -82,6 +84,7 @@ Signing path:
 ## Pilot smoke focus
 
 Reference sheet:
+- [D:/business-hub/docs/mobile-pilot-handoff-pack.md](D:/business-hub/docs/mobile-pilot-handoff-pack.md)
 - [D:/business-hub/docs/mobile-pilot-readiness-signoff.md](D:/business-hub/docs/mobile-pilot-readiness-signoff.md)
 - [D:/business-hub/docs/mobile-pilot-smoke-sheet.md](D:/business-hub/docs/mobile-pilot-smoke-sheet.md)
 - [D:/business-hub/docs/mobile-pilot-recovery-playbook.md](D:/business-hub/docs/mobile-pilot-recovery-playbook.md)

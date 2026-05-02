@@ -8,6 +8,7 @@ import '../../../core/models/mobile_models.dart';
 import '../../../core/models/mobile_session.dart';
 import '../../../core/runtime/app_runtime_info.dart';
 import '../../../core/runtime/pilot_diagnostics_snapshot.dart';
+import '../../../core/runtime/pilot_handoff_report.dart';
 import '../../../core/runtime/pilot_readiness_report.dart';
 import '../../../core/runtime/pilot_recovery_report.dart';
 import '../../../core/session/mobile_session_controller.dart';
@@ -536,6 +537,16 @@ class SettingsScreen extends ConsumerWidget {
                                     diagnosticsSnapshot: diagnostics,
                                     attentionEntries: attentionEntries,
                                   );
+                            final handoffReport =
+                                diagnostics == null ||
+                                    readinessReport == null ||
+                                    recoveryReport == null
+                                ? null
+                                : PilotHandoffReport(
+                                    diagnosticsSnapshot: diagnostics,
+                                    readinessReport: readinessReport,
+                                    recoveryReport: recoveryReport,
+                                  );
 
                             return Column(
                               children: <Widget>[
@@ -666,6 +677,37 @@ class SettingsScreen extends ConsumerWidget {
                                               ),
                                               label: const Text(
                                                 'Copy readiness signoff',
+                                              ),
+                                            ),
+                                            const SizedBox(height: 10),
+                                            FilledButton.tonalIcon(
+                                              onPressed: handoffReport == null
+                                                  ? null
+                                                  : () async {
+                                                      await Clipboard.setData(
+                                                        ClipboardData(
+                                                          text: handoffReport
+                                                              .toMultilineText(),
+                                                        ),
+                                                      );
+                                                      if (!context.mounted) {
+                                                        return;
+                                                      }
+                                                      ScaffoldMessenger.of(
+                                                        context,
+                                                      ).showSnackBar(
+                                                        const SnackBar(
+                                                          content: Text(
+                                                            'Full pilot handoff pack copied for release evidence.',
+                                                          ),
+                                                        ),
+                                                      );
+                                                    },
+                                              icon: const Icon(
+                                                Icons.assignment_rounded,
+                                              ),
+                                              label: const Text(
+                                                'Copy full handoff pack',
                                               ),
                                             ),
                                           ],

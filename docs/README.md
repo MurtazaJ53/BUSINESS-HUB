@@ -60,15 +60,16 @@ It is designed to support:
 36. [Mobile Release Readiness Checklist](./mobile-release-readiness-checklist.md)
 37. [Mobile Release Notes Template](./mobile-release-notes-template.md)
 38. [Mobile Launch Operations Runbook](./mobile-launch-operations-runbook.md)
-39. [Mobile Pilot Readiness Signoff](./mobile-pilot-readiness-signoff.md)
-40. [Mobile Pilot Smoke Sheet](./mobile-pilot-smoke-sheet.md)
-41. [Mobile Pilot Recovery Playbook](./mobile-pilot-recovery-playbook.md)
+39. [Mobile Pilot Handoff Pack](./mobile-pilot-handoff-pack.md)
+40. [Mobile Pilot Readiness Signoff](./mobile-pilot-readiness-signoff.md)
+41. [Mobile Pilot Smoke Sheet](./mobile-pilot-smoke-sheet.md)
+42. [Mobile Pilot Recovery Playbook](./mobile-pilot-recovery-playbook.md)
 
 ### Existing strategy docs
 
-42. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
-43. [Global Scale Blueprint](./global-scale-blueprint.md)
-44. [Scale Certification Checklist](./scale-certification-checklist.md)
+43. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
+44. [Global Scale Blueprint](./global-scale-blueprint.md)
+45. [Scale Certification Checklist](./scale-certification-checklist.md)
 
 ## Current truth
 
@@ -113,6 +114,7 @@ As of April 29, 2026:
 - then Operations Runbook
 - then Mobile Release Readiness Checklist
 - then Mobile Launch Operations Runbook
+- then Mobile Pilot Handoff Pack
 - then Mobile Pilot Readiness Signoff
 - then Mobile Pilot Smoke Sheet
 - then Mobile Pilot Recovery Playbook

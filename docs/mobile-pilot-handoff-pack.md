@@ -1,0 +1,53 @@
+# Mobile Pilot Handoff Pack
+
+## Purpose
+
+This document defines the complete evidence bundle for handing a signed mobile build to a pilot shop.
+
+## What the handoff pack now includes
+
+### From the release workflow
+
+- signed APK
+- `.sha256` checksum file
+- text manifest
+- JSON manifest
+- generated handoff markdown
+
+Workflow:
+- [D:/business-hub/.github/workflows/flutter_mobile_release.yml](D:/business-hub/.github/workflows/flutter_mobile_release.yml)
+
+### From the mobile app
+
+- copied pilot snapshot
+- copied readiness signoff
+- copied full handoff pack
+- copied recovery report if a replay issue appears
+
+Surface:
+- [D:/business-hub/apps/mobile_flutter/lib/features/settings/presentation/settings_screen.dart](D:/business-hub/apps/mobile_flutter/lib/features/settings/presentation/settings_screen.dart)
+
+## Minimum archive set
+
+Before a pilot device is approved, archive:
+
+1. release APK
+2. checksum file
+3. release manifest text
+4. release manifest JSON
+5. generated handoff markdown
+6. copied readiness signoff
+7. copied full handoff pack
+
+## Why this matters
+
+This makes the pilot traceable from both ends:
+
+- release pipeline evidence proves what was built
+- in-app evidence proves what the device was actually seeing at handoff time
+
+## Supporting documents
+
+- [D:/business-hub/docs/mobile-pilot-readiness-signoff.md](D:/business-hub/docs/mobile-pilot-readiness-signoff.md)
+- [D:/business-hub/docs/mobile-pilot-smoke-sheet.md](D:/business-hub/docs/mobile-pilot-smoke-sheet.md)
+- [D:/business-hub/docs/mobile-pilot-recovery-playbook.md](D:/business-hub/docs/mobile-pilot-recovery-playbook.md)

@@ -51,12 +51,14 @@ Use when:
 2. Open `Settings`.
 3. Check `Pilot readiness signoff`.
 4. If needed, use `Copy readiness signoff`.
-5. Archive the copied signoff in the rollout log.
-6. If the status is `BLOCKED STARTUP`, do not start the shift.
-7. If the status is `MONITOR BEFORE SHIFT`, inform the rollout lead and continue only with monitoring awareness.
+5. If the rollout lead needs one combined artifact, use `Copy full handoff pack`.
+6. Archive the copied signoff or handoff pack in the rollout log.
+7. If the status is `BLOCKED STARTUP`, do not start the shift.
+8. If the status is `MONITOR BEFORE SHIFT`, inform the rollout lead and continue only with monitoring awareness.
 
 ## Supporting documents
 
+- [D:/business-hub/docs/mobile-pilot-handoff-pack.md](D:/business-hub/docs/mobile-pilot-handoff-pack.md)
 - [D:/business-hub/docs/mobile-pilot-smoke-sheet.md](D:/business-hub/docs/mobile-pilot-smoke-sheet.md)
 - [D:/business-hub/docs/mobile-pilot-recovery-playbook.md](D:/business-hub/docs/mobile-pilot-recovery-playbook.md)
 - [D:/business-hub/docs/mobile-launch-operations-runbook.md](D:/business-hub/docs/mobile-launch-operations-runbook.md)

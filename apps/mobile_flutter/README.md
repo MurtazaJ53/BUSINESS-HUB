@@ -63,6 +63,7 @@ When preparing a real APK handoff, use:
 - [D:/business-hub/docs/mobile-release-readiness-checklist.md](D:/business-hub/docs/mobile-release-readiness-checklist.md)
 - [D:/business-hub/docs/mobile-release-notes-template.md](D:/business-hub/docs/mobile-release-notes-template.md)
 - [D:/business-hub/docs/mobile-launch-operations-runbook.md](D:/business-hub/docs/mobile-launch-operations-runbook.md)
+- [D:/business-hub/docs/mobile-pilot-handoff-pack.md](D:/business-hub/docs/mobile-pilot-handoff-pack.md)
 - [D:/business-hub/docs/mobile-pilot-readiness-signoff.md](D:/business-hub/docs/mobile-pilot-readiness-signoff.md)
 - [D:/business-hub/docs/mobile-pilot-smoke-sheet.md](D:/business-hub/docs/mobile-pilot-smoke-sheet.md)
 - [D:/business-hub/docs/mobile-pilot-recovery-playbook.md](D:/business-hub/docs/mobile-pilot-recovery-playbook.md)
@@ -108,6 +109,7 @@ The remaining work is mostly production polish and deeper analytics, not basic w
 The Settings screen also now includes a copyable pilot launch snapshot so operators can archive build, queue, and domain posture directly from a real device.
 It also includes a recovery desk for queued or failed receipt replay during pilot rollout.
 It now also includes a readiness signoff verdict so a rollout lead can decide whether the device is safe to start a pilot shift.
+It also includes a full handoff pack copy action so release evidence can be archived from the device in one paste.
 
 ## Package strategy
 

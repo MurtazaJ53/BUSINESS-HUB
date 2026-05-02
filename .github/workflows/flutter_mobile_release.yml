@@ -38,9 +38,14 @@ jobs:
             tag="${GITHUB_REF_NAME}"
             channel="production"
           fi
+          version_line="$(grep '^version:' apps/mobile_flutter/pubspec.yaml | head -n1 | awk '{print $2}')"
+          marketing_version="${version_line%%+*}"
+          build_number="${version_line#*+}"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "channel=${channel}" >> "$GITHUB_OUTPUT"
           echo "sha_short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "version=${marketing_version}" >> "$GITHUB_OUTPUT"
+          echo "build_number=${build_number}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -121,17 +126,57 @@ jobs:
           printf '%s  %s\n' "$checksum" "$apk_name" > "${apk_path}.sha256"
           cat <<EOF > "release-assets/BusinessHub-Mobile-${{ steps.meta.outputs.tag }}.manifest.txt"
           Tag: ${{ steps.meta.outputs.tag }}
+          Version: ${{ steps.meta.outputs.version }}
+          Build: ${{ steps.meta.outputs.build_number }}
           Channel: ${{ steps.meta.outputs.channel }}
           Commit: ${GITHUB_SHA}
           Short SHA: ${{ steps.meta.outputs.sha_short }}
           APK: ${apk_name}
           SHA256: ${checksum}
           EOF
+          cat <<EOF > "release-assets/BusinessHub-Mobile-${{ steps.meta.outputs.tag }}.manifest.json"
+          {
+            "tag": "${{ steps.meta.outputs.tag }}",
+            "version": "${{ steps.meta.outputs.version }}",
+            "build_number": "${{ steps.meta.outputs.build_number }}",
+            "channel": "${{ steps.meta.outputs.channel }}",
+            "commit": "${GITHUB_SHA}",
+            "short_sha": "${{ steps.meta.outputs.sha_short }}",
+            "apk_name": "${apk_name}",
+            "apk_sha256": "${checksum}"
+          }
+          EOF
+          cat <<EOF > "release-assets/BusinessHub-Mobile-${{ steps.meta.outputs.tag }}.handoff.md"
+          # Business Hub Mobile Pilot Handoff
+
+          - Release tag: ${{ steps.meta.outputs.tag }}
+          - Version: ${{ steps.meta.outputs.version }}
+          - Build number: ${{ steps.meta.outputs.build_number }}
+          - Channel: ${{ steps.meta.outputs.channel }}
+          - Commit: ${GITHUB_SHA}
+          - Short SHA: ${{ steps.meta.outputs.sha_short }}
+          - APK: ${apk_name}
+          - APK SHA256: ${checksum}
+
+          ## Operator evidence to attach
+
+          - copied pilot snapshot
+          - copied readiness signoff
+          - copied full handoff pack
+          - copied recovery report if any replay issue appears
+
+          ## Required runbooks
+
+          - docs/mobile-pilot-readiness-signoff.md
+          - docs/mobile-pilot-smoke-sheet.md
+          - docs/mobile-pilot-recovery-playbook.md
+          EOF
           echo "apk_name=${apk_name}" >> "$GITHUB_OUTPUT"
           echo "apk_sha256=${checksum}" >> "$GITHUB_OUTPUT"
           cat <<EOF >> "$GITHUB_STEP_SUMMARY"
           ## Mobile release artifact
           - APK: ${apk_name}
+          - Version: ${{ steps.meta.outputs.version }}+${{ steps.meta.outputs.build_number }}
           - Channel: ${{ steps.meta.outputs.channel }}
           - Short SHA: ${{ steps.meta.outputs.sha_short }}
           - SHA256: ${checksum}
@@ -160,24 +205,29 @@ jobs:
           Flutter mobile release build.
 
           Channel: ${{ steps.meta.outputs.channel }}
+          Version: ${{ steps.meta.outputs.version }}+${{ steps.meta.outputs.build_number }}
           Commit: ${GITHUB_SHA}
           SHA256: ${{ steps.collect.outputs.apk_sha256 }}
 
           Included artifacts:
           - Flutter release APK
           - APK checksum file
-          - Release manifest
+          - Release manifest text
+          - Release manifest JSON
+          - Pilot handoff markdown
           EOF
 
           apk_path="release-assets/${{ steps.collect.outputs.apk_name }}"
           checksum_path="${apk_path}.sha256"
           manifest_path="release-assets/BusinessHub-Mobile-${tag}.manifest.txt"
+          manifest_json_path="release-assets/BusinessHub-Mobile-${tag}.manifest.json"
+          handoff_path="release-assets/BusinessHub-Mobile-${tag}.handoff.md"
           if [ ! -f "$apk_path" ]; then
             echo "APK artifact not found"
             exit 1
           fi
-          if [ ! -f "$checksum_path" ] || [ ! -f "$manifest_path" ]; then
-            echo "Checksum or manifest artifact not found"
+          if [ ! -f "$checksum_path" ] || [ ! -f "$manifest_path" ] || [ ! -f "$manifest_json_path" ] || [ ! -f "$handoff_path" ]; then
+            echo "Checksum, manifest, or handoff artifact not found"
             exit 1
           fi
 
@@ -191,4 +241,6 @@ jobs:
             --notes-file "$notes_file" \
             "$apk_path" \
             "$checksum_path" \
-            "$manifest_path"
+            "$manifest_path" \
+            "$manifest_json_path" \
+            "$handoff_path"

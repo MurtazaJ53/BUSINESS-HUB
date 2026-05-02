@@ -5,6 +5,9 @@
 - Version:
 - Build number:
 - Commit:
+- Release channel:
+- Short SHA:
+- APK SHA256:
 - Release date:
 - Release type:
   - internal beta
@@ -41,6 +44,8 @@
 - `flutter build apk --debug`
 - `flutter build apk --release`
 - device smoke pass
+- readiness signoff archived
+- full handoff pack archived
 
 ## Rollback reference
 

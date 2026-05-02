@@ -58,6 +58,7 @@ Rollback the pilot device or stop rollout for that shop if:
 ## Evidence to capture
 
 - copied pilot snapshot
+- copied full handoff pack
 - copied recovery report
 - release tag / version / short SHA
 - APK checksum
