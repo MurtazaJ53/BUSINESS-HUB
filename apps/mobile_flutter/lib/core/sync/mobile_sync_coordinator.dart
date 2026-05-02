@@ -107,7 +107,7 @@ class MobileSyncCoordinator {
     await _ensureAdminBootstrap(session, shopId);
     final domainStates = await _refreshBackendDomainEpochs(session, shopId);
     final salesState = domainStates['sales'];
-    _salesReadsUseBackend = salesState?.writeMaster == 'postgres';
+    _salesReadsUseBackend = salesState?.isPostgresPrimary ?? false;
     await _primeWorkspaceSnapshot(
       shopId,
       includeCost: session.canViewCost,
@@ -388,43 +388,25 @@ class MobileSyncCoordinator {
     }
   }
 
-  Future<Map<String, BackendDomainState>> _refreshBackendDomainEpochs(
+  Future<Map<String, DomainControlState>> _refreshBackendDomainEpochs(
     MobileSession session,
     String shopId,
   ) async {
-    final states = <String, BackendDomainState>{};
-    try {
-      final salesState = await _backendApiClient.getDomainState(
-        user: session.user,
-        shopId: shopId,
-        domain: 'sales',
-      );
-      await _shopRepository.saveDomainState(
-        domain: 'sales',
-        currentEpoch: salesState.currentEpoch,
-        cutoverStatus: salesState.cutoverStatus,
-        writeMaster: salesState.writeMaster,
-      );
-      states['sales'] = salesState;
-    } catch (error) {
-      debugPrint('Sales domain state refresh skipped: $error');
-    }
+    final states = <String, DomainControlState>{};
+    final domains = <String>['inventory', 'customers', 'sales', 'payments'];
 
-    try {
-      final paymentsState = await _backendApiClient.getDomainState(
-        user: session.user,
-        shopId: shopId,
-        domain: 'payments',
-      );
-      await _shopRepository.saveDomainState(
-        domain: 'payments',
-        currentEpoch: paymentsState.currentEpoch,
-        cutoverStatus: paymentsState.cutoverStatus,
-        writeMaster: paymentsState.writeMaster,
-      );
-      states['payments'] = paymentsState;
-    } catch (error) {
-      debugPrint('Payments domain state refresh skipped: $error');
+    for (final domain in domains) {
+      try {
+        final state = await _backendApiClient.getDomainState(
+          user: session.user,
+          shopId: shopId,
+          domain: domain,
+        );
+        await _shopRepository.saveDomainState(state: state);
+        states[domain] = state;
+      } catch (error) {
+        debugPrint('$domain domain state refresh skipped: $error');
+      }
     }
 
     return states;

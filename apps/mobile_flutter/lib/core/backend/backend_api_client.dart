@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/mobile_models.dart';
+
 final backendApiClientProvider = Provider<BackendApiClient>((ref) {
   return BackendApiClient(
     baseUrl: const String.fromEnvironment(
@@ -21,18 +23,6 @@ class BackendApiException implements Exception {
 
   @override
   String toString() => message;
-}
-
-class BackendDomainState {
-  const BackendDomainState({
-    required this.currentEpoch,
-    required this.cutoverStatus,
-    required this.writeMaster,
-  });
-
-  final int currentEpoch;
-  final String cutoverStatus;
-  final String writeMaster;
 }
 
 class BackendCommandResponse {
@@ -56,7 +46,7 @@ class BackendApiClient {
 
   final String baseUrl;
 
-  Future<BackendDomainState> getDomainState({
+  Future<DomainControlState> getDomainState({
     required User user,
     required String shopId,
     required String domain,
@@ -67,16 +57,7 @@ class BackendApiClient {
       path: '/shops/$shopId/domain-state/$domain/',
     );
 
-    final epoch = decoded['current_epoch'];
-    return BackendDomainState(
-      currentEpoch: epoch is int
-          ? epoch
-          : epoch is num
-          ? epoch.toInt()
-          : int.tryParse('$epoch') ?? 1,
-      cutoverStatus: (decoded['cutover_status'] ?? 'legacy').toString(),
-      writeMaster: (decoded['write_master'] ?? 'firebase').toString(),
-    );
+    return DomainControlState.fromJson(decoded, fallbackDomain: domain);
   }
 
   Future<BackendCommandResponse> submitSaleCommand({
@@ -142,6 +123,56 @@ class BackendApiClient {
     return decoded.take(limit).toList(growable: false);
   }
 
+  Future<List<BackendCustomerSummary>> fetchCustomers({
+    required User user,
+    required String shopId,
+    String query = '',
+  }) async {
+    final normalized = query.trim();
+    final path = normalized.isEmpty
+        ? '/shops/$shopId/customers/'
+        : '/shops/$shopId/customers/?q=${Uri.encodeQueryComponent(normalized)}';
+    final decoded = await _requestList(user: user, method: 'GET', path: path);
+    return decoded
+        .map(
+          (row) => BackendCustomerSummary(
+            id: (row['id'] ?? '').toString(),
+            name: (row['name'] ?? 'Unnamed customer').toString(),
+            phone: _nullableText(row['phone']),
+            email: _nullableText(row['email']),
+            totalSpent: _asDouble(row['total_spent']),
+            balance: _asDouble(row['balance']),
+            status: (row['status'] ?? 'active').toString(),
+            notes: _nullableText(row['notes']),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Future<List<CustomerLedgerPreviewEntry>> fetchCustomerLedger({
+    required User user,
+    required String shopId,
+    required String customerId,
+  }) async {
+    final decoded = await _requestList(
+      user: user,
+      method: 'GET',
+      path: '/shops/$shopId/customers/$customerId/ledger/',
+    );
+    return decoded
+        .map(
+          (row) => CustomerLedgerPreviewEntry(
+            id: (row['id'] ?? '').toString(),
+            eventType: (row['event_type'] ?? 'adjustment').toString(),
+            amountDelta: _asDouble(row['amount_delta']),
+            occurredAt: _asDateTime(row['occurred_at']),
+            note: _nullableText(row['note']),
+            actorName: _nullableText(row['actor_name']),
+          ),
+        )
+        .toList(growable: false);
+  }
+
   Future<Map<String, dynamic>> _request({
     required User user,
     required String method,
@@ -150,7 +181,9 @@ class BackendApiClient {
   }) async {
     final token = await user.getIdToken();
     if (token == null || token.isEmpty) {
-      throw BackendApiException('Missing Firebase auth token for backend request.');
+      throw BackendApiException(
+        'Missing Firebase auth token for backend request.',
+      );
     }
 
     if (baseUrl.trim().isEmpty) {
@@ -197,7 +230,9 @@ class BackendApiClient {
   }) async {
     final token = await user.getIdToken();
     if (token == null || token.isEmpty) {
-      throw BackendApiException('Missing Firebase auth token for backend request.');
+      throw BackendApiException(
+        'Missing Firebase auth token for backend request.',
+      );
     }
 
     if (baseUrl.trim().isEmpty) {
@@ -228,7 +263,9 @@ class BackendApiClient {
 
       final decoded = jsonDecode(bodyText);
       if (decoded is! List) {
-        throw BackendApiException('Backend request for $path did not return a list payload.');
+        throw BackendApiException(
+          'Backend request for $path did not return a list payload.',
+        );
       }
       return decoded
           .whereType<Map>()
@@ -238,4 +275,32 @@ class BackendApiClient {
       client.close(force: true);
     }
   }
+}
+
+double _asDouble(Object? value) {
+  if (value is num) {
+    return value.toDouble();
+  }
+  if (value is String) {
+    return double.tryParse(value) ?? 0;
+  }
+  return 0;
+}
+
+DateTime _asDateTime(Object? value) {
+  if (value is DateTime) {
+    return value;
+  }
+  if (value is String) {
+    return DateTime.tryParse(value)?.toLocal() ?? DateTime.now();
+  }
+  return DateTime.now();
+}
+
+String? _nullableText(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  final text = value.toString().trim();
+  return text.isEmpty ? null : text;
 }

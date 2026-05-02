@@ -47,6 +47,24 @@ class DashboardScreen extends ConsumerWidget {
             accent: const Color(0xFF1D4ED8),
             onTap: () => context.go('/inventory'),
           ),
+          MobileActionCard(
+            kicker: 'CUSTOMERS',
+            title: 'Customer desk',
+            subtitle:
+                'Pick up known buyers, recent repeat visits, and ledger posture fast.',
+            icon: Icons.groups_rounded,
+            accent: const Color(0xFF14B8A6),
+            onTap: () => context.go('/customers'),
+          ),
+          MobileActionCard(
+            kicker: 'HISTORY',
+            title: 'Receipt feed',
+            subtitle:
+                'Check local queue health, synced receipts, and recent billing trails.',
+            icon: Icons.receipt_long_rounded,
+            accent: const Color(0xFFF59E0B),
+            onTap: () => context.go('/history'),
+          ),
         ];
 
         final metricCards = <Widget>[

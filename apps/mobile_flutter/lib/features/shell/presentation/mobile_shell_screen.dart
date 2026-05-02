@@ -10,7 +10,7 @@ import '../../../core/sync/mobile_sync_coordinator.dart';
 
 final List<GlobalKey<NavigatorState>> mobileShellBranchNavigatorKeys =
     List<GlobalKey<NavigatorState>>.generate(
-      3,
+      5,
       (_) => GlobalKey<NavigatorState>(),
     );
 
@@ -85,6 +85,10 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
     widget.navigationShell.goBranch(index);
   }
 
+  void _openSettings() {
+    context.go('/dashboard/settings');
+  }
+
   Future<void> _signOut(BuildContext context) async {
     await FirebaseAuth.instance.signOut();
     if (context.mounted) {
@@ -147,6 +151,7 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
                             syncStatus: syncStatus,
                             canGoBack: _hasBackPath,
                             onBackPressed: _handleBackNavigation,
+                            onSettingsPressed: _openSettings,
                             onRefreshPressed: syncCoordinator.refresh,
                             onSignOutPressed: () => _signOut(context),
                           ),
@@ -242,6 +247,7 @@ class _ShellHeader extends StatelessWidget {
     required this.syncStatus,
     required this.canGoBack,
     required this.onBackPressed,
+    required this.onSettingsPressed,
     required this.onRefreshPressed,
     required this.onSignOutPressed,
   });
@@ -253,6 +259,7 @@ class _ShellHeader extends StatelessWidget {
   final MobileSyncStatus syncStatus;
   final bool canGoBack;
   final VoidCallback onBackPressed;
+  final VoidCallback onSettingsPressed;
   final Future<void> Function() onRefreshPressed;
   final VoidCallback onSignOutPressed;
 
@@ -297,8 +304,8 @@ class _ShellHeader extends StatelessWidget {
                 _HeaderIconButton(
                   icon: canGoBack
                       ? Icons.arrow_back_rounded
-                      : Icons.grid_view_rounded,
-                  onPressed: canGoBack ? onBackPressed : null,
+                      : Icons.tune_rounded,
+                  onPressed: canGoBack ? onBackPressed : onSettingsPressed,
                 ),
                 const Spacer(),
                 _StatusSignalChip(
@@ -626,6 +633,18 @@ const List<_ShellNavItem> _navItems = <_ShellNavItem>[
     title: 'Inventory Command Deck',
     subtitle: 'Scroll-fast catalog, category filters, and stock watch.',
     icon: Icons.inventory_2_rounded,
+  ),
+  _ShellNavItem(
+    label: 'Clients',
+    title: 'Customer Desk',
+    subtitle: 'Known buyers, loyalty pulse, and ledger-aware recovery.',
+    icon: Icons.groups_rounded,
+  ),
+  _ShellNavItem(
+    label: 'History',
+    title: 'History Feed',
+    subtitle: 'Recent receipts, queue health, and replay confidence.',
+    icon: Icons.receipt_long_rounded,
   ),
   _ShellNavItem(
     label: 'POS',

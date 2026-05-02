@@ -24,6 +24,111 @@ class ShopInfo {
   }
 }
 
+class DomainControlState {
+  const DomainControlState({
+    required this.domain,
+    required this.currentEpoch,
+    required this.cutoverStatus,
+    required this.writeMaster,
+    required this.controlPresent,
+    required this.shadowReadsEnabled,
+    required this.isEnabled,
+    required this.canWriteOnPostgresSurface,
+    this.pilotSignoffStatus,
+    this.pilotSignoffSummary,
+    this.pilotRecommendedAction,
+    this.pilotLatestVerifyResult,
+  });
+
+  final String domain;
+  final int currentEpoch;
+  final String cutoverStatus;
+  final String writeMaster;
+  final bool controlPresent;
+  final bool shadowReadsEnabled;
+  final bool isEnabled;
+  final bool canWriteOnPostgresSurface;
+  final String? pilotSignoffStatus;
+  final String? pilotSignoffSummary;
+  final String? pilotRecommendedAction;
+  final String? pilotLatestVerifyResult;
+
+  bool get isPostgresPrimary =>
+      cutoverStatus == 'postgres_primary' || writeMaster == 'postgres';
+
+  bool get isPilotReady =>
+      pilotSignoffStatus == 'ready_for_cutover' ||
+      pilotSignoffStatus == 'production_safe';
+
+  String get postureLabel {
+    if (cutoverStatus == 'postgres_primary') {
+      return 'Postgres primary';
+    }
+    if (cutoverStatus == 'ready') {
+      return 'Pilot ready';
+    }
+    if (cutoverStatus == 'pilot') {
+      return 'Pilot active';
+    }
+    return 'Legacy bridge';
+  }
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'domain': domain,
+    'current_epoch': currentEpoch,
+    'cutover_status': cutoverStatus,
+    'write_master': writeMaster,
+    'control_present': controlPresent,
+    'shadow_reads_enabled': shadowReadsEnabled,
+    'is_enabled': isEnabled,
+    'can_write_on_postgres_surface': canWriteOnPostgresSurface,
+    'pilot_signoff_status': pilotSignoffStatus,
+    'pilot_signoff_summary': pilotSignoffSummary,
+    'pilot_recommended_action': pilotRecommendedAction,
+    'pilot_latest_verify_result': pilotLatestVerifyResult,
+  };
+
+  factory DomainControlState.fromJson(
+    Map<String, dynamic> json, {
+    String? fallbackDomain,
+  }) {
+    final epoch = json['current_epoch'];
+    return DomainControlState(
+      domain: (json['domain'] ?? fallbackDomain ?? 'unknown').toString(),
+      currentEpoch: epoch is int
+          ? epoch
+          : epoch is num
+          ? epoch.toInt()
+          : int.tryParse('$epoch') ?? 1,
+      cutoverStatus: (json['cutover_status'] ?? 'legacy').toString(),
+      writeMaster: (json['write_master'] ?? 'firebase').toString(),
+      controlPresent: json['control_present'] == true,
+      shadowReadsEnabled: json['shadow_reads_enabled'] == true,
+      isEnabled: json['is_enabled'] != false,
+      canWriteOnPostgresSurface: json['can_write_on_postgres_surface'] == true,
+      pilotSignoffStatus: _nullableText(json['pilot_signoff_status']),
+      pilotSignoffSummary: _nullableText(json['pilot_signoff_summary']),
+      pilotRecommendedAction: _nullableText(json['pilot_recommended_action']),
+      pilotLatestVerifyResult: _nullableText(
+        json['pilot_latest_verify_result'],
+      ),
+    );
+  }
+
+  factory DomainControlState.legacy(String domain) {
+    return DomainControlState(
+      domain: domain,
+      currentEpoch: 1,
+      cutoverStatus: 'legacy',
+      writeMaster: 'firebase',
+      controlPresent: false,
+      shadowReadsEnabled: false,
+      isEnabled: true,
+      canWriteOnPostgresSurface: false,
+    );
+  }
+}
+
 class InventoryMetrics {
   const InventoryMetrics({
     required this.totalItems,
@@ -66,6 +171,37 @@ class DashboardOverview {
       metrics: InventoryMetrics.empty(),
       todaySalesCount: 0,
       todayRevenue: 0,
+    );
+  }
+}
+
+class HistoryOverview {
+  const HistoryOverview({
+    required this.totalSales,
+    required this.syncedSales,
+    required this.queuedSales,
+    required this.failedSales,
+    required this.totalRevenue,
+    required this.queuedRevenue,
+    this.lastSyncedAt,
+  });
+
+  final int totalSales;
+  final int syncedSales;
+  final int queuedSales;
+  final int failedSales;
+  final double totalRevenue;
+  final double queuedRevenue;
+  final DateTime? lastSyncedAt;
+
+  factory HistoryOverview.empty() {
+    return const HistoryOverview(
+      totalSales: 0,
+      syncedSales: 0,
+      queuedSales: 0,
+      failedSales: 0,
+      totalRevenue: 0,
+      queuedRevenue: 0,
     );
   }
 }
@@ -126,6 +262,64 @@ class LowStockItem {
   final String category;
   final int stock;
   final String? size;
+}
+
+class CustomerPulseSummary {
+  const CustomerPulseSummary({
+    required this.name,
+    required this.visitCount,
+    required this.lifetimeSpend,
+    required this.lastSeenAt,
+    this.phone,
+    this.pendingSales = 0,
+  });
+
+  final String name;
+  final String? phone;
+  final int visitCount;
+  final double lifetimeSpend;
+  final DateTime lastSeenAt;
+  final int pendingSales;
+}
+
+class BackendCustomerSummary {
+  const BackendCustomerSummary({
+    required this.id,
+    required this.name,
+    required this.totalSpent,
+    required this.balance,
+    required this.status,
+    this.phone,
+    this.email,
+    this.notes,
+  });
+
+  final String id;
+  final String name;
+  final String? phone;
+  final String? email;
+  final double totalSpent;
+  final double balance;
+  final String status;
+  final String? notes;
+}
+
+class CustomerLedgerPreviewEntry {
+  const CustomerLedgerPreviewEntry({
+    required this.id,
+    required this.eventType,
+    required this.amountDelta,
+    required this.occurredAt,
+    this.note,
+    this.actorName,
+  });
+
+  final String id;
+  final String eventType;
+  final double amountDelta;
+  final DateTime occurredAt;
+  final String? note;
+  final String? actorName;
 }
 
 class PosPayment {
@@ -214,6 +408,14 @@ class PosCartItem {
     'size': size,
     'costPrice': costPrice,
   };
+}
+
+String? _nullableText(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  final text = value.toString().trim();
+  return text.isEmpty ? null : text;
 }
 
 class RecentSaleSummary {

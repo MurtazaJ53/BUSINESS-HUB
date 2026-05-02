@@ -78,31 +78,79 @@ class ShopRepository {
         );
   }
 
-  Future<void> saveDomainState({
-    required String domain,
-    required int currentEpoch,
-    required String cutoverStatus,
-    required String writeMaster,
-  }) async {
-    final payload = <String, dynamic>{
-      'current_epoch': currentEpoch,
-      'cutover_status': cutoverStatus,
-      'write_master': writeMaster,
-    };
+  Future<void> saveDomainState({required DomainControlState state}) async {
+    await _db
+        .into(_db.shopSettingsEntries)
+        .insertOnConflictUpdate(
+          ShopSettingsEntriesCompanion.insert(
+            key: 'domain_state_${state.domain}',
+            value: jsonEncode(state.toJson()),
+            updatedAt: DateTime.now().millisecondsSinceEpoch,
+          ),
+        );
+  }
 
-    await _db.into(_db.shopSettingsEntries).insertOnConflictUpdate(
-      ShopSettingsEntriesCompanion.insert(
-        key: 'domain_state_$domain',
-        value: jsonEncode(payload),
-        updatedAt: DateTime.now().millisecondsSinceEpoch,
-      ),
-    );
+  Stream<DomainControlState> watchDomainState(String domain) {
+    final query =
+        (_db.select(_db.shopSettingsEntries)
+              ..where((tbl) => tbl.key.equals('domain_state_$domain')))
+            .watchSingleOrNull();
+
+    return query.map((row) {
+      if (row == null) {
+        return DomainControlState.legacy(domain);
+      }
+
+      try {
+        final decoded = jsonDecode(row.value) as Map<String, dynamic>;
+        return DomainControlState.fromJson(decoded, fallbackDomain: domain);
+      } catch (_) {
+        return DomainControlState.legacy(domain);
+      }
+    });
+  }
+
+  Stream<List<DomainControlState>> watchTrackedDomainStates(
+    List<String> domains,
+  ) {
+    if (domains.isEmpty) {
+      return Stream.value(const <DomainControlState>[]);
+    }
+
+    final keys = domains.map((domain) => 'domain_state_$domain').toList();
+    return (_db.select(
+      _db.shopSettingsEntries,
+    )..where((tbl) => tbl.key.isIn(keys))).watch().map((rows) {
+      final decodedByDomain = <String, DomainControlState>{};
+      for (final row in rows) {
+        try {
+          final decoded = jsonDecode(row.value) as Map<String, dynamic>;
+          final domain =
+              (decoded['domain'] ?? row.key.replaceFirst('domain_state_', ''))
+                  .toString();
+          decodedByDomain[domain] = DomainControlState.fromJson(
+            decoded,
+            fallbackDomain: domain,
+          );
+        } catch (_) {
+          continue;
+        }
+      }
+
+      return domains
+          .map(
+            (domain) =>
+                decodedByDomain[domain] ?? DomainControlState.legacy(domain),
+          )
+          .toList(growable: false);
+    });
   }
 
   Future<int> getDomainEpoch(String domain) async {
-    final row = await (_db.select(
-      _db.shopSettingsEntries,
-    )..where((tbl) => tbl.key.equals('domain_state_$domain'))).getSingleOrNull();
+    final row =
+        await (_db.select(_db.shopSettingsEntries)
+              ..where((tbl) => tbl.key.equals('domain_state_$domain')))
+            .getSingleOrNull();
 
     if (row == null) {
       return 1;
@@ -465,6 +513,41 @@ class SalesRepository {
 
   final BusinessHubDatabase _db;
 
+  Stream<HistoryOverview> watchHistoryOverview() {
+    return _db
+        .customSelect(
+          '''
+            SELECT
+              COUNT(*) AS total_sales,
+              COALESCE(SUM(total), 0.0) AS total_revenue,
+              COALESCE(SUM(CASE WHEN sync_status IN ('synced_backend', 'synced') THEN 1 ELSE 0 END), 0) AS synced_sales,
+              COALESCE(SUM(CASE WHEN sync_status IN ('queued', 'syncing') THEN 1 ELSE 0 END), 0) AS queued_sales,
+              COALESCE(SUM(CASE WHEN sync_status IN ('queued', 'syncing') THEN total ELSE 0 END), 0.0) AS queued_revenue,
+              COALESCE(SUM(CASE WHEN sync_status IN ('failed_backend', 'failed') THEN 1 ELSE 0 END), 0) AS failed_sales,
+              MAX(last_synced_at) AS last_synced_at
+            FROM sales
+            WHERE tombstone = 0;
+          ''',
+          readsFrom: {_db.salesEntries},
+        )
+        .watchSingle()
+        .map(
+          (row) => HistoryOverview(
+            totalSales: row.read<int>('total_sales'),
+            syncedSales: row.read<int>('synced_sales'),
+            queuedSales: row.read<int>('queued_sales'),
+            failedSales: row.read<int>('failed_sales'),
+            totalRevenue: row.read<double>('total_revenue'),
+            queuedRevenue: row.read<double>('queued_revenue'),
+            lastSyncedAt: row.readNullable<int>('last_synced_at') == null
+                ? null
+                : DateTime.fromMillisecondsSinceEpoch(
+                    row.read<int>('last_synced_at'),
+                  ),
+          ),
+        );
+  }
+
   Stream<List<RecentSaleSummary>> watchRecentSales({int limit = 8}) {
     return (_db.select(_db.salesEntries)
           ..where((tbl) => tbl.tombstone.equals(false))
@@ -481,6 +564,67 @@ class SalesRepository {
                   paymentMode: row.paymentMode,
                   customerName: row.customerName,
                   syncState: _parseSyncState(row.syncStatus),
+                ),
+              )
+              .toList(growable: false),
+        );
+  }
+
+  Stream<List<CustomerPulseSummary>> watchCustomerPulse({
+    String search = '',
+    int limit = 18,
+  }) {
+    final normalized = search.trim().toLowerCase();
+    final variables = <Variable<Object>>[];
+    final where = <String>[
+      'tombstone = 0',
+      "(TRIM(COALESCE(customer_name, '')) <> '' OR TRIM(COALESCE(customer_phone, '')) <> '')",
+    ];
+
+    if (normalized.isNotEmpty) {
+      where.add(
+        "(LOWER(COALESCE(customer_name, '')) LIKE ? OR LOWER(COALESCE(customer_phone, '')) LIKE ?)",
+      );
+      final like = '%$normalized%';
+      variables
+        ..add(Variable<String>(like))
+        ..add(Variable<String>(like));
+    }
+
+    variables.add(Variable<int>(limit));
+
+    return _db
+        .customSelect(
+          '''
+            SELECT
+              COALESCE(NULLIF(TRIM(customer_name), ''), 'Walk-in customer') AS customer_name,
+              NULLIF(TRIM(customer_phone), '') AS customer_phone,
+              COUNT(*) AS visit_count,
+              COALESCE(SUM(total), 0.0) AS lifetime_spend,
+              COALESCE(SUM(CASE WHEN sync_status IN ('queued', 'syncing', 'failed_backend', 'failed') THEN 1 ELSE 0 END), 0) AS pending_sales,
+              MAX(created_at) AS last_seen_at
+            FROM sales
+            WHERE ${where.join(' AND ')}
+            GROUP BY customer_name, customer_phone
+            ORDER BY last_seen_at DESC, lifetime_spend DESC
+            LIMIT ?;
+          ''',
+          variables: variables,
+          readsFrom: {_db.salesEntries},
+        )
+        .watch()
+        .map(
+          (rows) => rows
+              .map(
+                (row) => CustomerPulseSummary(
+                  name: row.read<String>('customer_name'),
+                  phone: row.readNullable<String>('customer_phone'),
+                  visitCount: row.read<int>('visit_count'),
+                  lifetimeSpend: row.read<double>('lifetime_spend'),
+                  pendingSales: row.read<int>('pending_sales'),
+                  lastSeenAt: DateTime.fromMillisecondsSinceEpoch(
+                    row.read<int>('last_seen_at'),
+                  ),
                 ),
               )
               .toList(growable: false),
@@ -558,7 +702,9 @@ class SalesRepository {
       commandId: commandId,
     );
     final createdAt =
-        _asEpoch(data['occurred_at'] ?? data['created_at'] ?? data['createdAt']) ??
+        _asEpoch(
+          data['occurred_at'] ?? data['created_at'] ?? data['createdAt'],
+        ) ??
         updatedAt;
     final items = data['items'] is List
         ? jsonEncode(
@@ -592,34 +738,38 @@ class SalesRepository {
           )
         : jsonEncode(const []);
 
-    await _db.into(_db.salesEntries).insertOnConflictUpdate(
-      SalesEntriesCompanion.insert(
-        id: storageId,
-        total: _asDouble(data['total_amount'] ?? data['total']),
-        discount: Value(_asDouble(data['discount_amount'] ?? data['discount'])),
-        discountType: Value((data['discount_type'] ?? 'fixed').toString()),
-        paymentMode: Value((data['payment_mode'] ?? 'CASH').toString()),
-        date:
-            (data['sale_date'] ??
-                    data['date'] ??
-                    DateTime.now().toIso8601String().split('T').first)
-                .toString(),
-        createdAt: createdAt,
-        updatedAt: Value(updatedAt),
-        customerName: Value(_asStringOrNull(data['customer_name'])),
-        customerPhone: Value(_asStringOrNull(data['customer_phone'])),
-        customerId: Value(_asStringOrNull(data['customer_id'])),
-        footerNote: Value(_asStringOrNull(data['footer_note'])),
-        itemsJson: items,
-        paymentsJson: payments,
-        commandId: Value(commandId),
-        syncStatus: const Value('synced_backend'),
-        backendSaleId: Value(backendSaleId),
-        lastSyncError: const Value(null),
-        lastSyncedAt: Value(updatedAt),
-        tombstone: Value(data['tombstone'] == true),
-      ),
-    );
+    await _db
+        .into(_db.salesEntries)
+        .insertOnConflictUpdate(
+          SalesEntriesCompanion.insert(
+            id: storageId,
+            total: _asDouble(data['total_amount'] ?? data['total']),
+            discount: Value(
+              _asDouble(data['discount_amount'] ?? data['discount']),
+            ),
+            discountType: Value((data['discount_type'] ?? 'fixed').toString()),
+            paymentMode: Value((data['payment_mode'] ?? 'CASH').toString()),
+            date:
+                (data['sale_date'] ??
+                        data['date'] ??
+                        DateTime.now().toIso8601String().split('T').first)
+                    .toString(),
+            createdAt: createdAt,
+            updatedAt: Value(updatedAt),
+            customerName: Value(_asStringOrNull(data['customer_name'])),
+            customerPhone: Value(_asStringOrNull(data['customer_phone'])),
+            customerId: Value(_asStringOrNull(data['customer_id'])),
+            footerNote: Value(_asStringOrNull(data['footer_note'])),
+            itemsJson: items,
+            paymentsJson: payments,
+            commandId: Value(commandId),
+            syncStatus: const Value('synced_backend'),
+            backendSaleId: Value(backendSaleId),
+            lastSyncError: const Value(null),
+            lastSyncedAt: Value(updatedAt),
+            tombstone: Value(data['tombstone'] == true),
+          ),
+        );
   }
 
   Future<LocalSaleCommit> recordLocalSale({
@@ -684,37 +834,39 @@ class SalesRepository {
             ),
           );
 
-      await _db.into(_db.commerceOutboxEntries).insert(
-        CommerceOutboxEntriesCompanion.insert(
-          commandId: commandId,
-          shopId: shopId,
-          commandType: 'sale_create',
-          domain: 'sales',
-          baseDomainEpoch: Value(baseDomainEpoch),
-          payloadJson: jsonEncode(
-            LocalSaleCommit(
+      await _db
+          .into(_db.commerceOutboxEntries)
+          .insert(
+            CommerceOutboxEntriesCompanion.insert(
               commandId: commandId,
-              saleId: saleId,
               shopId: shopId,
-              baseDomainEpoch: baseDomainEpoch,
-              date: date,
-              createdAt: createdAt,
-              total: total,
-              discount: discount,
-              discountType: 'fixed',
-              paymentMode: paymentMode,
-              items: encodedItems,
-              payments: encodedPayments,
-              customerName: customerName,
-              customerPhone: customerPhone,
-              footerNote: footerNote,
-              inventoryDeltas: inventoryDeltas,
-            ).toBackendCommandPayload(),
-          ),
-          createdAt: now.millisecondsSinceEpoch,
-          updatedAt: Value(now.millisecondsSinceEpoch),
-        ),
-      );
+              commandType: 'sale_create',
+              domain: 'sales',
+              baseDomainEpoch: Value(baseDomainEpoch),
+              payloadJson: jsonEncode(
+                LocalSaleCommit(
+                  commandId: commandId,
+                  saleId: saleId,
+                  shopId: shopId,
+                  baseDomainEpoch: baseDomainEpoch,
+                  date: date,
+                  createdAt: createdAt,
+                  total: total,
+                  discount: discount,
+                  discountType: 'fixed',
+                  paymentMode: paymentMode,
+                  items: encodedItems,
+                  payments: encodedPayments,
+                  customerName: customerName,
+                  customerPhone: customerPhone,
+                  footerNote: footerNote,
+                  inventoryDeltas: inventoryDeltas,
+                ).toBackendCommandPayload(),
+              ),
+              createdAt: now.millisecondsSinceEpoch,
+              updatedAt: Value(now.millisecondsSinceEpoch),
+            ),
+          );
 
       for (final item in items) {
         await (_db.update(
@@ -749,12 +901,15 @@ class SalesRepository {
   }
 
   Future<List<CommerceOutboxEntryModel>> getPendingOutboxEntries() async {
-    final rows = await (_db.select(_db.commerceOutboxEntries)
-          ..where(
-            (tbl) => tbl.syncStatus.equals('pending') | tbl.syncStatus.equals('failed'),
-          )
-          ..orderBy([(tbl) => OrderingTerm.asc(tbl.createdAt)]))
-        .get();
+    final rows =
+        await (_db.select(_db.commerceOutboxEntries)
+              ..where(
+                (tbl) =>
+                    tbl.syncStatus.equals('pending') |
+                    tbl.syncStatus.equals('failed'),
+              )
+              ..orderBy([(tbl) => OrderingTerm.asc(tbl.createdAt)]))
+            .get();
 
     return rows
         .map(
@@ -778,26 +933,25 @@ class SalesRepository {
   }
 
   Future<void> markOutboxSyncing(String commandId) async {
-    await (_db.update(_db.commerceOutboxEntries)
-          ..where((tbl) => tbl.commandId.equals(commandId)))
-        .write(
-          CommerceOutboxEntriesCompanion(
-            syncStatus: const Value('syncing'),
-            attemptCount: const Value.absent(),
-            lastAttemptAt: Value(DateTime.now().millisecondsSinceEpoch),
-            updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-          ),
-        );
+    await (_db.update(
+      _db.commerceOutboxEntries,
+    )..where((tbl) => tbl.commandId.equals(commandId))).write(
+      CommerceOutboxEntriesCompanion(
+        syncStatus: const Value('syncing'),
+        attemptCount: const Value.absent(),
+        lastAttemptAt: Value(DateTime.now().millisecondsSinceEpoch),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
 
     await (_db.update(
-          _db.salesEntries,
-        )..where((tbl) => tbl.commandId.equals(commandId)))
-        .write(
-          SalesEntriesCompanion(
-            syncStatus: const Value('syncing'),
-            updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-          ),
-        );
+      _db.salesEntries,
+    )..where((tbl) => tbl.commandId.equals(commandId))).write(
+      SalesEntriesCompanion(
+        syncStatus: const Value('syncing'),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
   }
 
   Future<void> registerOutboxAttempt(String commandId) async {
@@ -806,15 +960,15 @@ class SalesRepository {
     )..where((tbl) => tbl.commandId.equals(commandId))).getSingleOrNull();
     final nextAttempts = (row?.attemptCount ?? 0) + 1;
     final now = DateTime.now().millisecondsSinceEpoch;
-    await (_db.update(_db.commerceOutboxEntries)
-          ..where((tbl) => tbl.commandId.equals(commandId)))
-        .write(
-          CommerceOutboxEntriesCompanion(
-            attemptCount: Value(nextAttempts),
-            lastAttemptAt: Value(now),
-            updatedAt: Value(now),
-          ),
-        );
+    await (_db.update(
+      _db.commerceOutboxEntries,
+    )..where((tbl) => tbl.commandId.equals(commandId))).write(
+      CommerceOutboxEntriesCompanion(
+        attemptCount: Value(nextAttempts),
+        lastAttemptAt: Value(now),
+        updatedAt: Value(now),
+      ),
+    );
   }
 
   Future<void> markCommandSynced({
@@ -824,30 +978,29 @@ class SalesRepository {
   }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     await _db.transaction(() async {
-      await (_db.update(_db.commerceOutboxEntries)
-            ..where((tbl) => tbl.commandId.equals(commandId)))
-          .write(
-            CommerceOutboxEntriesCompanion(
-              syncStatus: const Value('synced'),
-              lastError: const Value(null),
-              completedAt: Value(now),
-              updatedAt: Value(now),
-            ),
-          );
+      await (_db.update(
+        _db.commerceOutboxEntries,
+      )..where((tbl) => tbl.commandId.equals(commandId))).write(
+        CommerceOutboxEntriesCompanion(
+          syncStatus: const Value('synced'),
+          lastError: const Value(null),
+          completedAt: Value(now),
+          updatedAt: Value(now),
+        ),
+      );
 
       await (_db.update(
-            _db.salesEntries,
-          )..where((tbl) => tbl.commandId.equals(commandId)))
-          .write(
-            SalesEntriesCompanion(
-              syncStatus: const Value('synced_backend'),
-              backendReceiptId: Value(receiptId),
-              backendSaleId: Value(backendSaleId),
-              lastSyncError: const Value(null),
-              lastSyncedAt: Value(now),
-              updatedAt: Value(now),
-            ),
-          );
+        _db.salesEntries,
+      )..where((tbl) => tbl.commandId.equals(commandId))).write(
+        SalesEntriesCompanion(
+          syncStatus: const Value('synced_backend'),
+          backendReceiptId: Value(receiptId),
+          backendSaleId: Value(backendSaleId),
+          lastSyncError: const Value(null),
+          lastSyncedAt: Value(now),
+          updatedAt: Value(now),
+        ),
+      );
     });
   }
 
@@ -857,55 +1010,54 @@ class SalesRepository {
   }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     await _db.transaction(() async {
-      await (_db.update(_db.commerceOutboxEntries)
-            ..where((tbl) => tbl.commandId.equals(commandId)))
-          .write(
-            CommerceOutboxEntriesCompanion(
-              syncStatus: const Value('failed'),
-              lastError: Value(error),
-              updatedAt: Value(now),
-            ),
-          );
+      await (_db.update(
+        _db.commerceOutboxEntries,
+      )..where((tbl) => tbl.commandId.equals(commandId))).write(
+        CommerceOutboxEntriesCompanion(
+          syncStatus: const Value('failed'),
+          lastError: Value(error),
+          updatedAt: Value(now),
+        ),
+      );
 
       await (_db.update(
-            _db.salesEntries,
-          )..where((tbl) => tbl.commandId.equals(commandId)))
-          .write(
-            SalesEntriesCompanion(
-              syncStatus: const Value('failed_backend'),
-              lastSyncError: Value(error),
-              updatedAt: Value(now),
-            ),
-          );
+        _db.salesEntries,
+      )..where((tbl) => tbl.commandId.equals(commandId))).write(
+        SalesEntriesCompanion(
+          syncStatus: const Value('failed_backend'),
+          lastSyncError: Value(error),
+          updatedAt: Value(now),
+        ),
+      );
     });
   }
 
   Future<void> markCommandQueued(String commandId) async {
     final now = DateTime.now().millisecondsSinceEpoch;
-    await (_db.update(_db.commerceOutboxEntries)
-          ..where((tbl) => tbl.commandId.equals(commandId)))
-        .write(
-          CommerceOutboxEntriesCompanion(
-            syncStatus: const Value('pending'),
-            updatedAt: Value(now),
-          ),
-        );
+    await (_db.update(
+      _db.commerceOutboxEntries,
+    )..where((tbl) => tbl.commandId.equals(commandId))).write(
+      CommerceOutboxEntriesCompanion(
+        syncStatus: const Value('pending'),
+        updatedAt: Value(now),
+      ),
+    );
 
     await (_db.update(
-          _db.salesEntries,
-        )..where((tbl) => tbl.commandId.equals(commandId)))
-        .write(
-          SalesEntriesCompanion(
-            syncStatus: const Value('queued'),
-            updatedAt: Value(now),
-          ),
-        );
+      _db.salesEntries,
+    )..where((tbl) => tbl.commandId.equals(commandId))).write(
+      SalesEntriesCompanion(
+        syncStatus: const Value('queued'),
+        updatedAt: Value(now),
+      ),
+    );
   }
 
   Future<int> _readDomainEpoch(String domain) async {
-    final row = await (_db.select(
-      _db.shopSettingsEntries,
-    )..where((tbl) => tbl.key.equals('domain_state_$domain'))).getSingleOrNull();
+    final row =
+        await (_db.select(_db.shopSettingsEntries)
+              ..where((tbl) => tbl.key.equals('domain_state_$domain')))
+            .getSingleOrNull();
     if (row == null) {
       return 1;
     }
@@ -935,9 +1087,10 @@ class SalesRepository {
       }
     }
 
-    final existingByBackendId = await (_db.select(
-      _db.salesEntries,
-    )..where((tbl) => tbl.backendSaleId.equals(backendSaleId))).getSingleOrNull();
+    final existingByBackendId =
+        await (_db.select(_db.salesEntries)
+              ..where((tbl) => tbl.backendSaleId.equals(backendSaleId)))
+            .getSingleOrNull();
     if (existingByBackendId != null) {
       return existingByBackendId.id;
     }

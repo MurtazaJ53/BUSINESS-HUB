@@ -1,0 +1,321 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/backend/backend_api_client.dart';
+import '../../../core/database/mobile_repository.dart';
+import '../../../core/models/mobile_models.dart';
+import '../../../core/session/mobile_session_controller.dart';
+import '../../../core/sync/mobile_sync_coordinator.dart';
+import '../../shell/presentation/mobile_surface.dart';
+
+class SettingsScreen extends ConsumerWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(mobileSessionProvider).asData?.value;
+    final shopRepository = ref.watch(shopRepositoryProvider);
+    final salesRepository = ref.watch(salesRepositoryProvider);
+    final backendApiClient = ref.watch(backendApiClientProvider);
+    final syncStatus = ref.watch(syncStatusProvider);
+    final shopStream = shopRepository.watchShopInfo();
+    final domainStatesStream = shopRepository.watchTrackedDomainStates(
+      const <String>['inventory', 'customers', 'sales', 'payments'],
+    );
+    final pendingOutboxStream = salesRepository.watchPendingOutboxCount();
+
+    return StreamBuilder<ShopInfo>(
+      stream: shopStream,
+      builder: (context, shopSnapshot) {
+        final shop = shopSnapshot.data ?? ShopInfo.fallback();
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
+          children: <Widget>[
+            MobileHeroBanner(
+              eyebrow: 'System config',
+              title: 'Mobile operating posture.',
+              subtitle:
+                  'This screen shows which backend surface the mobile app trusts today, which operator is signed in, and how close the workspace is to the fully migrated platform.',
+              accent: const Color(0xFFA78BFA),
+              trailing: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: <Widget>[
+                  MobileTag(
+                    label: session?.role?.toUpperCase() ?? 'GUEST',
+                    icon: Icons.badge_rounded,
+                    accent: const Color(0xFFA78BFA),
+                  ),
+                  const SizedBox(height: 10),
+                  MobileTag(
+                    label: syncStatus == MobileSyncStatus.syncing
+                        ? 'Syncing config'
+                        : 'Config stable',
+                    icon: syncStatus == MobileSyncStatus.syncing
+                        ? Icons.sync_rounded
+                        : Icons.verified_rounded,
+                    accent: syncStatus == MobileSyncStatus.error
+                        ? const Color(0xFFFB7185)
+                        : const Color(0xFF22C55E),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            MobilePanel(
+              title: 'Workspace identity',
+              child: Column(
+                children: <Widget>[
+                  _SettingsRow(
+                    label: 'Workspace',
+                    value: shop.name,
+                    icon: Icons.storefront_rounded,
+                  ),
+                  _SettingsRow(
+                    label: 'Tagline',
+                    value: shop.tagline,
+                    icon: Icons.auto_awesome_rounded,
+                  ),
+                  _SettingsRow(
+                    label: 'Operator',
+                    value: session != null && session.email.isNotEmpty
+                        ? session.email
+                        : 'Not signed in',
+                    icon: Icons.person_rounded,
+                  ),
+                  _SettingsRow(
+                    label: 'Shop ID',
+                    value: session?.shopId ?? 'No workspace bound',
+                    icon: Icons.key_rounded,
+                  ),
+                  _SettingsRow(
+                    label: 'Backend API',
+                    value: backendApiClient.baseUrl,
+                    icon: Icons.cloud_outlined,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            StreamBuilder<int>(
+              stream: pendingOutboxStream,
+              builder: (context, outboxSnapshot) {
+                final pending = outboxSnapshot.data ?? 0;
+                return MobilePanel(
+                  title: 'Mobile runtime',
+                  action: MobileTag(
+                    label: pending > 0 ? '$pending queued' : 'Queue clear',
+                    icon: pending > 0
+                        ? Icons.cloud_upload_rounded
+                        : Icons.check_circle_rounded,
+                    accent: pending > 0
+                        ? const Color(0xFFF59E0B)
+                        : const Color(0xFF22C55E),
+                  ),
+                  child: Column(
+                    children: <Widget>[
+                      _SettingsRow(
+                        label: 'Sync posture',
+                        value: syncStatus.name.toUpperCase(),
+                        icon: Icons.sync_alt_rounded,
+                      ),
+                      _SettingsRow(
+                        label: 'Queued commerce commands',
+                        value: '$pending',
+                        icon: Icons.outbox_rounded,
+                      ),
+                      _SettingsRow(
+                        label: 'Operator role',
+                        value: session?.role?.toUpperCase() ?? 'UNKNOWN',
+                        icon: Icons.admin_panel_settings_rounded,
+                      ),
+                      _SettingsRow(
+                        label: 'Cost visibility',
+                        value: session?.canViewCost == true
+                            ? 'Enabled'
+                            : 'Restricted',
+                        icon: Icons.visibility_rounded,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 18),
+            StreamBuilder<List<DomainControlState>>(
+              stream: domainStatesStream,
+              builder: (context, snapshot) {
+                final states =
+                    snapshot.data ??
+                    <DomainControlState>[
+                      DomainControlState.legacy('inventory'),
+                      DomainControlState.legacy('customers'),
+                      DomainControlState.legacy('sales'),
+                      DomainControlState.legacy('payments'),
+                    ];
+
+                return MobilePanel(
+                  title: 'Domain cutover map',
+                  action: MobileTag(
+                    label:
+                        '${states.where((state) => state.isPostgresPrimary).length} primary',
+                    icon: Icons.schema_rounded,
+                    accent: const Color(0xFF38BDF8),
+                  ),
+                  child: Column(
+                    children: states
+                        .map(
+                          (state) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _DomainSettingsRow(state: state),
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _SettingsRow extends StatelessWidget {
+  const _SettingsRow({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xFF0A1220),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFA78BFA).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: const Color(0xFFA78BFA)),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      label.toUpperCase(),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      value,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DomainSettingsRow extends StatelessWidget {
+  const _DomainSettingsRow({required this.state});
+
+  final DomainControlState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = switch (state.pilotSignoffStatus) {
+      'production_safe' => const Color(0xFF22C55E),
+      'ready_for_cutover' => const Color(0xFF38BDF8),
+      'rollback_recommended' => const Color(0xFFFB7185),
+      _ =>
+        state.isPostgresPrimary
+            ? const Color(0xFF22C55E)
+            : const Color(0xFFF59E0B),
+    };
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1220),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    state.domain.toUpperCase(),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                MobileTag(
+                  label: state.postureLabel.toUpperCase(),
+                  icon: state.isPostgresPrimary
+                      ? Icons.verified_rounded
+                      : Icons.swap_horiz_rounded,
+                  accent: tone,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              state.pilotSignoffSummary ??
+                  'Write master: ${state.writeMaster} | epoch ${state.currentEpoch}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.62),
+                fontWeight: FontWeight.w600,
+                height: 1.45,
+              ),
+            ),
+            if (state.pilotRecommendedAction?.isNotEmpty == true) ...<Widget>[
+              const SizedBox(height: 10),
+              Text(
+                'Next action: ${state.pilotRecommendedAction}',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: tone,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
