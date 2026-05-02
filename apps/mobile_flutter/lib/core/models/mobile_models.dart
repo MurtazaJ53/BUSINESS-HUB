@@ -557,6 +557,7 @@ class LocalSaleCommit {
     required this.paymentMode,
     required this.items,
     required this.payments,
+    required this.customerId,
     required this.customerName,
     required this.customerPhone,
     required this.footerNote,
@@ -575,6 +576,7 @@ class LocalSaleCommit {
   final String paymentMode;
   final List<Map<String, dynamic>> items;
   final List<Map<String, dynamic>> payments;
+  final String? customerId;
   final String? customerName;
   final String? customerPhone;
   final String? footerNote;
@@ -585,6 +587,7 @@ class LocalSaleCommit {
     'base_domain_epoch': baseDomainEpoch,
     'source_surface': 'flutter_pos',
     'sale': {
+      'customer_id': customerId,
       'customer_name': customerName ?? '',
       'customer_phone': customerPhone ?? '',
       'discount_amount': discount.toStringAsFixed(2),
@@ -627,6 +630,7 @@ class LocalSaleCommit {
     'discountType': discountType,
     'paymentMode': paymentMode,
     'payments': payments,
+    'customerId': customerId,
     'customerName': customerName ?? '',
     'customerPhone': customerPhone ?? '',
     'footerNote': footerNote ?? '',

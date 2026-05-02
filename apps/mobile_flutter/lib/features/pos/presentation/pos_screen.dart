@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/backend/backend_api_client.dart';
 import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
+import '../../../core/models/mobile_session.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/utils/formatters.dart';
@@ -23,6 +25,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
   final List<PosCartItem> _cart = <PosCartItem>[];
 
+  BackendCustomerSummary? _selectedCustomer;
   String _search = '';
   String? _selectedCategory;
   String _paymentMode = 'CASH';
@@ -47,12 +50,17 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   Widget build(BuildContext context) {
     final session = ref.watch(mobileSessionProvider).asData?.value;
     final inventoryRepository = ref.watch(inventoryRepositoryProvider);
+    final shopRepository = ref.watch(shopRepositoryProvider);
     final salesRepository = ref.watch(salesRepositoryProvider);
     final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
+    final backendApiClient = ref.watch(backendApiClientProvider);
     final syncStatus = ref.watch(syncStatusProvider);
-    final shopStream = ref.watch(shopRepositoryProvider).watchShopInfo();
+    final shopStream = shopRepository.watchShopInfo();
     final categoriesStream = inventoryRepository.watchCategories();
     final pendingOutboxStream = salesRepository.watchPendingOutboxCount();
+    final customerDomainStateStream = shopRepository.watchDomainState(
+      'customers',
+    );
     final catalogStream = inventoryRepository.watchCatalogPage(
       search: _search,
       category: _selectedCategory,
@@ -72,9 +80,12 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           : FloatingActionButton.extended(
               onPressed: () => _openCartSheet(
                 context,
+                session: session,
+                backendApiClient: backendApiClient,
                 salesRepository: salesRepository,
                 syncCoordinator: syncCoordinator,
                 shopStream: shopStream,
+                customerDomainStateStream: customerDomainStateStream,
                 activeShopId: session?.shopId,
               ),
               backgroundColor: const Color(0xFF2563EB),
@@ -512,12 +523,16 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
   Future<void> _openCartSheet(
     BuildContext context, {
+    required MobileSession? session,
+    required BackendApiClient backendApiClient,
     required SalesRepository salesRepository,
     required MobileSyncCoordinator syncCoordinator,
     required Stream<ShopInfo> shopStream,
+    required Stream<DomainControlState> customerDomainStateStream,
     required String? activeShopId,
   }) async {
     final shop = await shopStream.first;
+    final customerDomainState = await customerDomainStateStream.first;
     if (!context.mounted) {
       return;
     }
@@ -667,8 +682,120 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
+                      if (customerDomainState.isPostgresPrimary) ...<Widget>[
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0B1622),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: const Color(
+                                0xFF14B8A6,
+                              ).withValues(alpha: 0.18),
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Row(
+                              children: <Widget>[
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: <Widget>[
+                                      Text(
+                                        _selectedCustomer == null
+                                            ? 'Attach known customer'
+                                            : _selectedCustomer!.name,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        _selectedCustomer == null
+                                            ? 'Use migrated customer records so the sale links directly to ledger history.'
+                                            : (_selectedCustomer!.phone ??
+                                                  _selectedCustomer!.email ??
+                                                  'Known customer attached'),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: Colors.white.withValues(
+                                                alpha: 0.62,
+                                              ),
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                FilledButton.tonal(
+                                  onPressed: () async {
+                                    final picked = await _showCustomerPicker(
+                                      context,
+                                      backendApiClient: backendApiClient,
+                                      session: session,
+                                      activeShopId: activeShopId,
+                                    );
+                                    if (picked == null) {
+                                      return;
+                                    }
+                                    setState(() {
+                                      _selectedCustomer = picked;
+                                      _customerController.text = picked.name;
+                                      _phoneController.text =
+                                          picked.phone ?? '';
+                                    });
+                                    setSheetState(() {});
+                                  },
+                                  child: Text(
+                                    _selectedCustomer == null
+                                        ? 'Pick'
+                                        : 'Change',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (_selectedCustomer != null) ...<Widget>[
+                          const SizedBox(height: 10),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _selectedCustomer = null;
+                                  _customerController.clear();
+                                  _phoneController.clear();
+                                });
+                                setSheetState(() {});
+                              },
+                              icon: const Icon(Icons.link_off_rounded),
+                              label: const Text(
+                                'Use walk-in or manual customer',
+                              ),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                      ],
                       TextField(
                         controller: _customerController,
+                        onChanged: (value) {
+                          if (_selectedCustomer != null &&
+                              value.trim() != _selectedCustomer!.name) {
+                            setState(() {
+                              _selectedCustomer = null;
+                            });
+                            setSheetState(() {});
+                          }
+                        },
                         decoration: const InputDecoration(
                           labelText: 'Customer name (optional)',
                         ),
@@ -676,6 +803,16 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: _phoneController,
+                        onChanged: (value) {
+                          if (_selectedCustomer != null &&
+                              value.trim() !=
+                                  (_selectedCustomer!.phone ?? '').trim()) {
+                            setState(() {
+                              _selectedCustomer = null;
+                            });
+                            setSheetState(() {});
+                          }
+                        },
                         keyboardType: TextInputType.phone,
                         decoration: const InputDecoration(
                           labelText: 'Customer phone (optional)',
@@ -761,10 +898,11 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                       ),
                       const SizedBox(height: 18),
                       FilledButton(
-                              onPressed: _saving
+                        onPressed: _saving
                             ? null
                             : () async {
-                                if (activeShopId == null || activeShopId.isEmpty) {
+                                if (activeShopId == null ||
+                                    activeShopId.isEmpty) {
                                   if (!mounted) {
                                     return;
                                   }
@@ -809,6 +947,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                           ),
                                         ],
                                         paymentMode: _paymentMode,
+                                        customerId: _selectedCustomer?.id,
                                         customerName:
                                             _customerController.text
                                                 .trim()
@@ -842,6 +981,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                   setState(() {
                                     _saving = false;
                                     _cart.clear();
+                                    _selectedCustomer = null;
                                     _customerController.clear();
                                     _phoneController.clear();
                                   });
@@ -884,6 +1024,242 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         );
       },
     );
+  }
+
+  Future<BackendCustomerSummary?> _showCustomerPicker(
+    BuildContext context, {
+    required BackendApiClient backendApiClient,
+    required MobileSession? session,
+    required String? activeShopId,
+  }) async {
+    if (session == null || activeShopId == null || activeShopId.isEmpty) {
+      return null;
+    }
+
+    final searchController = TextEditingController();
+    String query = '';
+
+    try {
+      return await showModalBottomSheet<BackendCustomerSummary>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: const Color(0xFF070B13),
+        builder: (context) {
+          return SafeArea(
+            child: StatefulBuilder(
+              builder: (context, setModalState) {
+                final future = backendApiClient.fetchCustomers(
+                  user: session.user,
+                  shopId: activeShopId,
+                  query: query,
+                );
+
+                return Padding(
+                  padding: EdgeInsets.only(
+                    left: 18,
+                    right: 18,
+                    top: 18,
+                    bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'Pick migrated customer',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w900),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: searchController,
+                        onChanged: (value) {
+                          setModalState(() {
+                            query = value.trim();
+                          });
+                        },
+                        decoration: const InputDecoration(
+                          prefixIcon: Icon(Icons.search_rounded),
+                          hintText: 'Search customer name or phone',
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      FutureBuilder<List<BackendCustomerSummary>>(
+                        future: future,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 28),
+                              child: Center(child: CircularProgressIndicator()),
+                            );
+                          }
+
+                          if (snapshot.hasError) {
+                            return MobileEmptyState(
+                              icon: Icons.error_outline_rounded,
+                              title: 'Customer lookup failed',
+                              body: snapshot.error.toString(),
+                            );
+                          }
+
+                          final customers =
+                              snapshot.data ?? const <BackendCustomerSummary>[];
+                          if (customers.isEmpty) {
+                            return const MobileEmptyState(
+                              icon: Icons.groups_outlined,
+                              title: 'No customers matched',
+                              body:
+                                  'Try a broader search term or use manual customer details for this sale.',
+                            );
+                          }
+
+                          return ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 380),
+                            child: ListView(
+                              shrinkWrap: true,
+                              children: customers
+                                  .map(
+                                    (customer) => Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 10,
+                                      ),
+                                      child: Material(
+                                        color: Colors.transparent,
+                                        child: InkWell(
+                                          onTap: () => Navigator.of(
+                                            context,
+                                          ).pop(customer),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                          child: Ink(
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF0A1220),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                              border: Border.all(
+                                                color: Colors.white.withValues(
+                                                  alpha: 0.05,
+                                                ),
+                                              ),
+                                            ),
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(14),
+                                              child: Row(
+                                                children: <Widget>[
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: <Widget>[
+                                                        Text(
+                                                          customer.name,
+                                                          style: Theme.of(context)
+                                                              .textTheme
+                                                              .titleMedium
+                                                              ?.copyWith(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w800,
+                                                              ),
+                                                        ),
+                                                        const SizedBox(
+                                                          height: 4,
+                                                        ),
+                                                        Text(
+                                                          customer.phone ??
+                                                              customer.email ??
+                                                              customer.status,
+                                                          style: Theme.of(context)
+                                                              .textTheme
+                                                              .bodySmall
+                                                              ?.copyWith(
+                                                                color: Colors
+                                                                    .white
+                                                                    .withValues(
+                                                                      alpha:
+                                                                          0.58,
+                                                                    ),
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                              ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                  Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment.end,
+                                                    children: <Widget>[
+                                                      Text(
+                                                        formatCurrency(
+                                                          customer.balance,
+                                                        ),
+                                                        style: Theme.of(context)
+                                                            .textTheme
+                                                            .labelLarge
+                                                            ?.copyWith(
+                                                              color:
+                                                                  customer.balance >
+                                                                      0
+                                                                  ? const Color(
+                                                                      0xFFFB7185,
+                                                                    )
+                                                                  : const Color(
+                                                                      0xFF22C55E,
+                                                                    ),
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w900,
+                                                            ),
+                                                      ),
+                                                      const SizedBox(height: 4),
+                                                      Text(
+                                                        'Spent ${formatCurrency(customer.totalSpent)}',
+                                                        style: Theme.of(context)
+                                                            .textTheme
+                                                            .bodySmall
+                                                            ?.copyWith(
+                                                              color: Colors
+                                                                  .white
+                                                                  .withValues(
+                                                                    alpha: 0.58,
+                                                                  ),
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                            ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(growable: false),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      );
+    } finally {
+      searchController.dispose();
+    }
   }
 
   Future<bool> _showForceSaleDialog(
