@@ -102,6 +102,9 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
     final syncStatus = ref.watch(syncStatusProvider);
     final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
     final navItem = _navItems[widget.navigationShell.currentIndex];
+    final mediaSize = MediaQuery.sizeOf(context);
+    final compactChrome = mediaSize.width < 390 || mediaSize.height < 780;
+    final horizontalInset = compactChrome ? 12.0 : 14.0;
 
     return PopScope<Object?>(
       canPop: false,
@@ -142,12 +145,18 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
                     child: Column(
                       children: <Widget>[
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+                          padding: EdgeInsets.fromLTRB(
+                            compactChrome ? 14 : 18,
+                            compactChrome ? 14 : 18,
+                            compactChrome ? 14 : 18,
+                            compactChrome ? 8 : 10,
+                          ),
                           child: _ShellHeader(
                             title: navItem.title,
                             subtitle: navItem.subtitle,
                             workspaceName: shop.name,
                             workspaceTagline: shop.tagline,
+                            compact: compactChrome,
                             syncStatus: syncStatus,
                             canGoBack: _hasBackPath,
                             onBackPressed: _handleBackNavigation,
@@ -158,7 +167,9 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
                         ),
                         Expanded(
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: horizontalInset,
+                            ),
                             child: DecoratedBox(
                               decoration: BoxDecoration(
                                 color: const Color(0xCC070B13),
@@ -182,19 +193,26 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
                           ),
                         ),
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
+                          padding: EdgeInsets.fromLTRB(
+                            horizontalInset,
+                            compactChrome ? 10 : 12,
+                            horizontalInset,
+                            compactChrome ? 12 : 16,
+                          ),
                           child: DecoratedBox(
                             decoration: BoxDecoration(
                               color: const Color(0xE6111826),
-                              borderRadius: BorderRadius.circular(28),
+                              borderRadius: BorderRadius.circular(
+                                compactChrome ? 24 : 28,
+                              ),
                               border: Border.all(
                                 color: Colors.white.withValues(alpha: 0.08),
                               ),
                             ),
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 8,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: compactChrome ? 4 : 8,
+                                vertical: compactChrome ? 6 : 8,
                               ),
                               child: Row(
                                 children: _navItems
@@ -209,6 +227,7 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
                                                   .navigationShell
                                                   .currentIndex ==
                                               entry.key,
+                                          compact: compactChrome,
                                           onTap: () => _goToBranch(entry.key),
                                         ),
                                       ),
@@ -244,6 +263,7 @@ class _ShellHeader extends StatelessWidget {
     required this.subtitle,
     required this.workspaceName,
     required this.workspaceTagline,
+    required this.compact,
     required this.syncStatus,
     required this.canGoBack,
     required this.onBackPressed,
@@ -256,6 +276,7 @@ class _ShellHeader extends StatelessWidget {
   final String subtitle;
   final String workspaceName;
   final String workspaceTagline;
+  final bool compact;
   final MobileSyncStatus syncStatus;
   final bool canGoBack;
   final VoidCallback onBackPressed;
@@ -279,10 +300,19 @@ class _ShellHeader extends StatelessWidget {
       MobileSyncStatus.offline => 'Offline',
       MobileSyncStatus.idle => 'Live',
     };
+    final brandCaption = workspaceTagline.isNotEmpty
+        ? 'Business Hub Pro | ${workspaceTagline.toUpperCase()}'
+        : 'Business Hub Pro';
+    final compactTitleStyle = theme.textTheme.headlineSmall?.copyWith(
+      fontSize: 20,
+      fontWeight: FontWeight.w900,
+      height: 1.0,
+      letterSpacing: -0.2,
+    );
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(compact ? 24 : 30),
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -295,13 +325,14 @@ class _ShellHeader extends StatelessWidget {
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.all(compact ? 14 : 18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Row(
               children: <Widget>[
                 _HeaderIconButton(
+                  compact: compact,
                   icon: canGoBack
                       ? Icons.arrow_back_rounded
                       : Icons.tune_rounded,
@@ -309,100 +340,158 @@ class _ShellHeader extends StatelessWidget {
                 ),
                 const Spacer(),
                 _StatusSignalChip(
+                  compact: compact,
                   tone: statusTone,
                   label: statusLabel.toUpperCase(),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: compact ? 8 : 10),
                 _HeaderIconButton(
+                  compact: compact,
                   icon: Icons.sync_rounded,
                   onPressed: () {
                     onRefreshPressed();
                   },
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: compact ? 8 : 10),
                 _HeaderIconButton(
+                  compact: compact,
                   icon: Icons.logout_rounded,
                   onPressed: onSignOutPressed,
                 ),
               ],
             ),
-            const SizedBox(height: 18),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(22),
-                    gradient: const LinearGradient(
-                      colors: <Color>[Color(0xFF60A5FA), Color(0xFF2563EB)],
+            SizedBox(height: compact ? 14 : 18),
+            if (compact)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      gradient: const LinearGradient(
+                        colors: <Color>[Color(0xFF60A5FA), Color(0xFF2563EB)],
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.storefront_rounded,
+                      color: Colors.white,
+                      size: 26,
                     ),
                   ),
-                  child: const Icon(
-                    Icons.storefront_rounded,
-                    color: Colors.white,
-                    size: 32,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          brandCaption,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.58),
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(title, style: compactTitleStyle),
+                        const SizedBox(height: 4),
+                        Text(
+                          subtitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontWeight: FontWeight.w600,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        'Business Hub Pro',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.3,
-                        ),
+                ],
+              )
+            else
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(22),
+                      gradient: const LinearGradient(
+                        colors: <Color>[Color(0xFF60A5FA), Color(0xFF2563EB)],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        workspaceTagline.isNotEmpty
-                            ? workspaceTagline.toUpperCase()
-                            : 'ZARRA ECOSYSTEM',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.52),
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.8,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        title,
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          height: 0.98,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        subtitle,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.68),
-                          fontWeight: FontWeight.w600,
-                          height: 1.45,
-                        ),
-                      ),
-                    ],
+                    ),
+                    child: const Icon(
+                      Icons.storefront_rounded,
+                      color: Colors.white,
+                      size: 32,
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          'Business Hub Pro',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          workspaceTagline.isNotEmpty
+                              ? workspaceTagline.toUpperCase()
+                              : 'ZARRA ECOSYSTEM',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.52),
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.8,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          title,
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            height: 0.98,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          subtitle,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.68),
+                            fontWeight: FontWeight.w600,
+                            height: 1.45,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            SizedBox(height: compact ? 12 : 16),
             Wrap(
-              spacing: 10,
-              runSpacing: 10,
+              spacing: compact ? 8 : 10,
+              runSpacing: compact ? 8 : 10,
               children: <Widget>[
                 _StatusStrip(
+                  compact: compact,
                   accent: const Color(0xFF22C55E),
                   title: 'DATA SECURE',
                   subtitle: 'Local vault mounted',
                 ),
                 _StatusStrip(
+                  compact: compact,
                   accent: statusTone,
                   title: statusLabel.toUpperCase(),
                   subtitle: workspaceName,
@@ -417,62 +506,76 @@ class _ShellHeader extends StatelessWidget {
 }
 
 class _HeaderIconButton extends StatelessWidget {
-  const _HeaderIconButton({required this.icon, this.onPressed});
+  const _HeaderIconButton({
+    required this.icon,
+    required this.compact,
+    this.onPressed,
+  });
 
   final IconData icon;
+  final bool compact;
   final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 50,
-      height: 50,
+      width: compact ? 44 : 50,
+      height: compact ? 44 : 50,
       decoration: BoxDecoration(
         color: const Color(0xFF111827),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(compact ? 15 : 18),
         border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
       child: IconButton(
         onPressed: onPressed,
-        icon: Icon(icon),
+        icon: Icon(icon, size: compact ? 20 : 24),
         color: Colors.white,
+        padding: EdgeInsets.zero,
       ),
     );
   }
 }
 
 class _StatusSignalChip extends StatelessWidget {
-  const _StatusSignalChip({required this.tone, required this.label});
+  const _StatusSignalChip({
+    required this.tone,
+    required this.label,
+    required this.compact,
+  });
 
   final Color tone;
   final String label;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: tone.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(compact ? 16 : 18),
         border: Border.all(color: tone.withValues(alpha: 0.2)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 12 : 14,
+          vertical: compact ? 8 : 10,
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Container(
-              width: 9,
-              height: 9,
+              width: compact ? 8 : 9,
+              height: compact ? 8 : 9,
               decoration: BoxDecoration(color: tone, shape: BoxShape.circle),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: compact ? 6 : 8),
             Text(
               label,
               style: TextStyle(
                 color: tone,
                 fontWeight: FontWeight.w900,
-                letterSpacing: 1.2,
-                fontSize: 11,
+                letterSpacing: compact ? 1.0 : 1.2,
+                fontSize: compact ? 10 : 11,
               ),
             ),
           ],
@@ -487,22 +590,27 @@ class _StatusStrip extends StatelessWidget {
     required this.accent,
     required this.title,
     required this.subtitle,
+    required this.compact,
   });
 
   final Color accent;
   final String title;
   final String subtitle;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: accent.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(compact ? 16 : 18),
         border: Border.all(color: accent.withValues(alpha: 0.18)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 12 : 14,
+          vertical: compact ? 8 : 10,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -511,17 +619,17 @@ class _StatusStrip extends StatelessWidget {
               style: TextStyle(
                 color: accent,
                 fontWeight: FontWeight.w900,
-                letterSpacing: 1.35,
-                fontSize: 10,
+                letterSpacing: compact ? 1.1 : 1.35,
+                fontSize: compact ? 9 : 10,
               ),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: compact ? 3 : 4),
             Text(
               subtitle,
-              style: const TextStyle(
+              style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w700,
-                fontSize: 11,
+                fontSize: compact ? 10 : 11,
               ),
             ),
           ],
@@ -535,18 +643,21 @@ class _NavButton extends StatelessWidget {
   const _NavButton({
     required this.item,
     required this.active,
+    required this.compact,
     required this.onTap,
   });
 
   final _ShellNavItem item;
   final bool active;
+  final bool compact;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final color = active ? const Color(0xFF38BDF8) : Colors.white70;
+    final label = compact ? item.compactLabel : item.label;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: EdgeInsets.symmetric(horizontal: compact ? 2 : 4),
       child: Material(
         color: active ? const Color(0xFF0F1F38) : Colors.transparent,
         borderRadius: BorderRadius.circular(22),
@@ -554,17 +665,24 @@ class _NavButton extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(22),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+            padding: EdgeInsets.symmetric(
+              horizontal: compact ? 4 : 8,
+              vertical: compact ? 10 : 12,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                Icon(item.icon, color: color, size: 22),
-                const SizedBox(height: 8),
+                Icon(item.icon, color: color, size: compact ? 20 : 22),
+                SizedBox(height: compact ? 6 : 8),
                 Text(
-                  item.label,
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: false,
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     color: color,
-                    fontSize: 11,
+                    fontSize: compact ? 10 : 11,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.3,
                   ),
@@ -610,12 +728,14 @@ class _AmbientGlow extends StatelessWidget {
 class _ShellNavItem {
   const _ShellNavItem({
     required this.label,
+    required this.compactLabel,
     required this.title,
     required this.subtitle,
     required this.icon,
   });
 
   final String label;
+  final String compactLabel;
   final String title;
   final String subtitle;
   final IconData icon;
@@ -624,30 +744,35 @@ class _ShellNavItem {
 const List<_ShellNavItem> _navItems = <_ShellNavItem>[
   _ShellNavItem(
     label: 'Overview',
+    compactLabel: 'Home',
     title: 'Shop Command Center',
     subtitle: 'Real-time metrics, live sync, and premium mobile control.',
     icon: Icons.grid_view_rounded,
   ),
   _ShellNavItem(
     label: 'Inventory',
+    compactLabel: 'Stock',
     title: 'Inventory Command Deck',
     subtitle: 'Scroll-fast catalog, category filters, and stock watch.',
     icon: Icons.inventory_2_rounded,
   ),
   _ShellNavItem(
     label: 'Clients',
+    compactLabel: 'Clients',
     title: 'Customer Desk',
     subtitle: 'Known buyers, loyalty pulse, and ledger-aware recovery.',
     icon: Icons.groups_rounded,
   ),
   _ShellNavItem(
     label: 'History',
+    compactLabel: 'History',
     title: 'History Feed',
     subtitle: 'Recent receipts, queue health, and replay confidence.',
     icon: Icons.receipt_long_rounded,
   ),
   _ShellNavItem(
     label: 'POS',
+    compactLabel: 'POS',
     title: 'Sales Hub',
     subtitle: 'Native checkout flow built for faster, smoother billing.',
     icon: Icons.point_of_sale_rounded,
