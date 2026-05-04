@@ -103,7 +103,7 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
     final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
     final navItem = _navItems[widget.navigationShell.currentIndex];
     final mediaSize = MediaQuery.sizeOf(context);
-    final compactChrome = mediaSize.width < 390 || mediaSize.height < 780;
+    final compactChrome = mediaSize.width < 430 || mediaSize.height < 780;
     final horizontalInset = compactChrome ? 12.0 : 14.0;
 
     return PopScope<Object?>(
@@ -153,9 +153,7 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
                           ),
                           child: _ShellHeader(
                             title: navItem.title,
-                            subtitle: navItem.subtitle,
                             workspaceName: shop.name,
-                            workspaceTagline: shop.tagline,
                             compact: compactChrome,
                             syncStatus: syncStatus,
                             canGoBack: _hasBackPath,
@@ -260,9 +258,7 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
 class _ShellHeader extends StatelessWidget {
   const _ShellHeader({
     required this.title,
-    required this.subtitle,
     required this.workspaceName,
-    required this.workspaceTagline,
     required this.compact,
     required this.syncStatus,
     required this.canGoBack,
@@ -273,9 +269,7 @@ class _ShellHeader extends StatelessWidget {
   });
 
   final String title;
-  final String subtitle;
   final String workspaceName;
-  final String workspaceTagline;
   final bool compact;
   final MobileSyncStatus syncStatus;
   final bool canGoBack;
@@ -300,203 +294,84 @@ class _ShellHeader extends StatelessWidget {
       MobileSyncStatus.offline => 'Offline',
       MobileSyncStatus.idle => 'Live',
     };
-    final brandCaption = workspaceTagline.isNotEmpty
-        ? 'Business Hub Pro | ${workspaceTagline.toUpperCase()}'
-        : 'Business Hub Pro';
-    final compactTitleStyle = theme.textTheme.headlineSmall?.copyWith(
-      fontSize: 20,
-      fontWeight: FontWeight.w900,
-      height: 1.0,
-      letterSpacing: -0.2,
-    );
+    final chipLabel = compact
+        ? switch (syncStatus) {
+            MobileSyncStatus.syncing => 'SYNC',
+            MobileSyncStatus.error => 'ALERT',
+            MobileSyncStatus.offline => 'OFFLINE',
+            MobileSyncStatus.idle => 'LIVE',
+          }
+        : statusLabel.toUpperCase();
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(compact ? 24 : 30),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[
-            Color(0xFF07101B),
-            Color(0xFF0C1524),
-            Color(0xFF101827),
-          ],
-        ),
+        color: const Color(0xE6111826),
+        borderRadius: BorderRadius.circular(compact ? 22 : 24),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Padding(
-        padding: EdgeInsets.all(compact ? 14 : 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 12 : 14,
+          vertical: compact ? 10 : 12,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
-            Row(
-              children: <Widget>[
-                _HeaderIconButton(
-                  compact: compact,
-                  icon: canGoBack
-                      ? Icons.arrow_back_rounded
-                      : Icons.tune_rounded,
-                  onPressed: canGoBack ? onBackPressed : onSettingsPressed,
-                ),
-                const Spacer(),
-                _StatusSignalChip(
-                  compact: compact,
-                  tone: statusTone,
-                  label: statusLabel.toUpperCase(),
-                ),
-                SizedBox(width: compact ? 8 : 10),
-                _HeaderIconButton(
-                  compact: compact,
-                  icon: Icons.sync_rounded,
-                  onPressed: () {
-                    onRefreshPressed();
-                  },
-                ),
-                SizedBox(width: compact ? 8 : 10),
-                _HeaderIconButton(
-                  compact: compact,
-                  icon: Icons.logout_rounded,
-                  onPressed: onSignOutPressed,
-                ),
-              ],
+            _HeaderIconButton(
+              compact: compact,
+              icon: canGoBack
+                  ? Icons.arrow_back_rounded
+                  : Icons.tune_rounded,
+              onPressed: canGoBack ? onBackPressed : onSettingsPressed,
             ),
-            SizedBox(height: compact ? 14 : 18),
-            if (compact)
-              Row(
+            SizedBox(width: compact ? 10 : 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
-                      gradient: const LinearGradient(
-                        colors: <Color>[Color(0xFF60A5FA), Color(0xFF2563EB)],
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.storefront_rounded,
-                      color: Colors.white,
-                      size: 26,
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.2,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          brandCaption,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.58),
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(title, style: compactTitleStyle),
-                        const SizedBox(height: 4),
-                        Text(
-                          subtitle,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontWeight: FontWeight.w600,
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              )
-            else
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(22),
-                      gradient: const LinearGradient(
-                        colors: <Color>[Color(0xFF60A5FA), Color(0xFF2563EB)],
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.storefront_rounded,
-                      color: Colors.white,
-                      size: 32,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          'Business Hub Pro',
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          workspaceTagline.isNotEmpty
-                              ? workspaceTagline.toUpperCase()
-                              : 'ZARRA ECOSYSTEM',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.52),
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.8,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          title,
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            height: 0.98,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          subtitle,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.68),
-                            fontWeight: FontWeight.w600,
-                            height: 1.45,
-                          ),
-                        ),
-                      ],
+                  const SizedBox(height: 2),
+                  Text(
+                    workspaceName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.58),
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ],
               ),
-            SizedBox(height: compact ? 12 : 16),
-            Wrap(
-              spacing: compact ? 8 : 10,
-              runSpacing: compact ? 8 : 10,
-              children: <Widget>[
-                _StatusStrip(
-                  compact: compact,
-                  accent: const Color(0xFF22C55E),
-                  title: 'DATA SECURE',
-                  subtitle: 'Local vault mounted',
-                ),
-                _StatusStrip(
-                  compact: compact,
-                  accent: statusTone,
-                  title: statusLabel.toUpperCase(),
-                  subtitle: workspaceName,
-                ),
-              ],
+            ),
+            SizedBox(width: compact ? 8 : 10),
+            _StatusSignalChip(
+              compact: compact,
+              tone: statusTone,
+              label: chipLabel,
+            ),
+            SizedBox(width: compact ? 8 : 10),
+            _HeaderIconButton(
+              compact: compact,
+              icon: Icons.sync_rounded,
+              onPressed: () {
+                onRefreshPressed();
+              },
+            ),
+            SizedBox(width: compact ? 6 : 8),
+            _HeaderIconButton(
+              compact: compact,
+              icon: Icons.logout_rounded,
+              onPressed: onSignOutPressed,
             ),
           ],
         ),
@@ -557,7 +432,7 @@ class _StatusSignalChip extends StatelessWidget {
       ),
       child: Padding(
         padding: EdgeInsets.symmetric(
-          horizontal: compact ? 12 : 14,
+          horizontal: compact ? 10 : 14,
           vertical: compact ? 8 : 10,
         ),
         child: Row(
@@ -574,61 +449,7 @@ class _StatusSignalChip extends StatelessWidget {
               style: TextStyle(
                 color: tone,
                 fontWeight: FontWeight.w900,
-                letterSpacing: compact ? 1.0 : 1.2,
-                fontSize: compact ? 10 : 11,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusStrip extends StatelessWidget {
-  const _StatusStrip({
-    required this.accent,
-    required this.title,
-    required this.subtitle,
-    required this.compact,
-  });
-
-  final Color accent;
-  final String title;
-  final String subtitle;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(compact ? 16 : 18),
-        border: Border.all(color: accent.withValues(alpha: 0.18)),
-      ),
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: compact ? 12 : 14,
-          vertical: compact ? 8 : 10,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              title,
-              style: TextStyle(
-                color: accent,
-                fontWeight: FontWeight.w900,
-                letterSpacing: compact ? 1.1 : 1.35,
-                fontSize: compact ? 9 : 10,
-              ),
-            ),
-            SizedBox(height: compact ? 3 : 4),
-            Text(
-              subtitle,
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
+                letterSpacing: compact ? 0.9 : 1.2,
                 fontSize: compact ? 10 : 11,
               ),
             ),
