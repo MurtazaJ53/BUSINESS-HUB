@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -66,13 +65,6 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
     context.push('/dashboard/settings');
   }
 
-  Future<void> _signOut(BuildContext context) async {
-    await FirebaseAuth.instance.signOut();
-    if (context.mounted) {
-      context.go('/');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final shopStream = ref.watch(shopRepositoryProvider).watchShopInfo();
@@ -137,7 +129,6 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
                             onBackPressed: _handleBackNavigation,
                             onSettingsPressed: _openSettings,
                             onRefreshPressed: syncCoordinator.refresh,
-                            onSignOutPressed: () => _signOut(context),
                           ),
                         ),
                         Expanded(
@@ -242,7 +233,6 @@ class _ShellHeader extends StatelessWidget {
     required this.onBackPressed,
     required this.onSettingsPressed,
     required this.onRefreshPressed,
-    required this.onSignOutPressed,
   });
 
   final String title;
@@ -253,7 +243,6 @@ class _ShellHeader extends StatelessWidget {
   final VoidCallback onBackPressed;
   final VoidCallback onSettingsPressed;
   final Future<void> Function() onRefreshPressed;
-  final VoidCallback onSignOutPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -343,12 +332,6 @@ class _ShellHeader extends StatelessWidget {
               onPressed: () {
                 onRefreshPressed();
               },
-            ),
-            SizedBox(width: compact ? 6 : 8),
-            _HeaderIconButton(
-              compact: compact,
-              icon: Icons.logout_rounded,
-              onPressed: onSignOutPressed,
             ),
           ],
         ),
@@ -543,35 +526,35 @@ const List<_ShellNavItem> _navItems = <_ShellNavItem>[
   _ShellNavItem(
     label: 'Overview',
     compactLabel: 'Home',
-    title: 'Shop Command Center',
+    title: 'Home',
     subtitle: 'Real-time metrics, live sync, and premium mobile control.',
     icon: Icons.grid_view_rounded,
   ),
   _ShellNavItem(
     label: 'Inventory',
     compactLabel: 'Stock',
-    title: 'Inventory Command Deck',
+    title: 'Inventory',
     subtitle: 'Scroll-fast catalog, category filters, and stock watch.',
     icon: Icons.inventory_2_rounded,
   ),
   _ShellNavItem(
     label: 'Clients',
     compactLabel: 'Clients',
-    title: 'Customer Desk',
+    title: 'Customers',
     subtitle: 'Known buyers, loyalty pulse, and ledger-aware recovery.',
     icon: Icons.groups_rounded,
   ),
   _ShellNavItem(
     label: 'History',
     compactLabel: 'History',
-    title: 'History Feed',
+    title: 'History',
     subtitle: 'Recent receipts, queue health, and replay confidence.',
     icon: Icons.receipt_long_rounded,
   ),
   _ShellNavItem(
     label: 'POS',
     compactLabel: 'POS',
-    title: 'Sales Hub',
+    title: 'POS',
     subtitle: 'Native checkout flow built for faster, smoother billing.',
     icon: Icons.point_of_sale_rounded,
   ),

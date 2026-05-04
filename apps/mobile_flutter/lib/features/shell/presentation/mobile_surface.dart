@@ -19,9 +19,10 @@ class MobileHeroBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final compact = MediaQuery.sizeOf(context).width < 420;
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(compact ? 24 : 30),
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -43,11 +44,11 @@ class MobileHeroBanner extends StatelessWidget {
       child: Stack(
         children: <Widget>[
           Positioned(
-            top: -32,
-            right: -18,
+            top: compact ? -24 : -32,
+            right: compact ? -12 : -18,
             child: Container(
-              width: 130,
-              height: 130,
+              width: compact ? 104 : 130,
+              height: compact ? 104 : 130,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: accent.withValues(alpha: 0.12),
@@ -55,11 +56,11 @@ class MobileHeroBanner extends StatelessWidget {
             ),
           ),
           Positioned(
-            bottom: -46,
-            left: -24,
+            bottom: compact ? -34 : -46,
+            left: compact ? -18 : -24,
             child: Container(
-              width: 150,
-              height: 150,
+              width: compact ? 118 : 150,
+              height: compact ? 118 : 150,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
                 color: Color(0x1406B6D4),
@@ -67,10 +68,11 @@ class MobileHeroBanner extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(22),
+            padding: EdgeInsets.all(compact ? 18 : 22),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final stacked = trailing != null && constraints.maxWidth < 470;
+                final stacked =
+                    trailing != null && constraints.maxWidth < (compact ? 520 : 470);
                 final content = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
@@ -79,24 +81,32 @@ class MobileHeroBanner extends StatelessWidget {
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: Colors.white.withValues(alpha: 0.52),
                         fontWeight: FontWeight.w900,
-                        letterSpacing: 1.8,
+                        letterSpacing: compact ? 1.4 : 1.8,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: compact ? 10 : 12),
                     Text(
                       title,
-                      style: theme.textTheme.headlineMedium?.copyWith(
+                      maxLines: compact ? 3 : null,
+                      overflow: compact ? TextOverflow.ellipsis : null,
+                      style:
+                          (compact
+                                  ? theme.textTheme.headlineSmall
+                                  : theme.textTheme.headlineMedium)
+                              ?.copyWith(
                         fontWeight: FontWeight.w900,
-                        height: 0.94,
-                        letterSpacing: -1.15,
+                        height: compact ? 0.98 : 0.94,
+                        letterSpacing: compact ? -0.8 : -1.15,
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    SizedBox(height: compact ? 10 : 14),
                     Text(
                       subtitle,
+                      maxLines: compact ? 3 : null,
+                      overflow: compact ? TextOverflow.ellipsis : null,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: Colors.white.withValues(alpha: 0.72),
-                        height: 1.5,
+                        height: compact ? 1.4 : 1.5,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -112,7 +122,7 @@ class MobileHeroBanner extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       content,
-                      const SizedBox(height: 18),
+                      SizedBox(height: compact ? 14 : 18),
                       trailing!,
                     ],
                   );
@@ -150,11 +160,14 @@ class MobilePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final compact = MediaQuery.sizeOf(context).width < 420;
     final headerChildren = <Widget>[
       Expanded(
         child: Text(
           title,
-          style: theme.textTheme.titleLarge?.copyWith(
+          style:
+              (compact ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)
+                  ?.copyWith(
             fontWeight: FontWeight.w900,
             letterSpacing: -0.45,
           ),
@@ -165,7 +178,7 @@ class MobilePanel extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: const Color(0xFF0B121F),
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(compact ? 22 : 28),
         border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
         boxShadow: const <BoxShadow>[
           BoxShadow(
@@ -176,12 +189,12 @@ class MobilePanel extends StatelessWidget {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(compact ? 16 : 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Row(children: headerChildren),
-            const SizedBox(height: 16),
+            SizedBox(height: compact ? 12 : 16),
             child,
           ],
         ),
@@ -211,32 +224,33 @@ class MobileMetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final compact = MediaQuery.sizeOf(context).width < 420;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(compact ? 20 : 24),
         child: Ink(
           decoration: BoxDecoration(
             color: const Color(0xFF0A1220),
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(compact ? 20 : 24),
             border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(18),
+            padding: EdgeInsets.all(compact ? 14 : 18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Container(
-                  width: 42,
-                  height: 42,
+                  width: compact ? 38 : 42,
+                  height: compact ? 38 : 42,
                   decoration: BoxDecoration(
                     color: accent.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(compact ? 12 : 14),
                   ),
-                  child: Icon(icon, color: accent),
+                  child: Icon(icon, color: accent, size: compact ? 18 : 22),
                 ),
-                const SizedBox(height: 18),
+                SizedBox(height: compact ? 14 : 18),
                 Text(
                   label.toUpperCase(),
                   style: theme.textTheme.labelSmall?.copyWith(
@@ -248,7 +262,11 @@ class MobileMetricCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   value,
-                  style: theme.textTheme.headlineSmall?.copyWith(
+                  style:
+                      (compact
+                              ? theme.textTheme.titleLarge
+                              : theme.textTheme.headlineSmall)
+                          ?.copyWith(
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.7,
                   ),
@@ -293,14 +311,15 @@ class MobileActionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final compact = MediaQuery.sizeOf(context).width < 420;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(compact ? 22 : 28),
         child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(compact ? 22 : 28),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -313,18 +332,18 @@ class MobileActionCard extends StatelessWidget {
             border: Border.all(color: accent.withValues(alpha: 0.18)),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(compact ? 16 : 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Container(
-                  width: 56,
-                  height: 56,
+                  width: compact ? 48 : 56,
+                  height: compact ? 48 : 56,
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(compact ? 14 : 18),
                   ),
-                  child: Icon(icon, color: Colors.white, size: 28),
+                  child: Icon(icon, color: Colors.white, size: compact ? 24 : 28),
                 ),
                 const Spacer(),
                 if (kicker != null) ...<Widget>[
@@ -333,14 +352,18 @@ class MobileActionCard extends StatelessWidget {
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: Colors.white.withValues(alpha: 0.72),
                       fontWeight: FontWeight.w900,
-                      letterSpacing: 1.4,
+                      letterSpacing: compact ? 1.1 : 1.4,
                     ),
                   ),
                   const SizedBox(height: 8),
                 ],
                 Text(
                   title,
-                  style: theme.textTheme.headlineSmall?.copyWith(
+                  style:
+                      (compact
+                              ? theme.textTheme.titleLarge
+                              : theme.textTheme.headlineSmall)
+                          ?.copyWith(
                     fontWeight: FontWeight.w900,
                     height: 0.98,
                   ),
@@ -348,6 +371,8 @@ class MobileActionCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   subtitle,
+                  maxLines: compact ? 3 : null,
+                  overflow: compact ? TextOverflow.ellipsis : null,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: Colors.white.withValues(alpha: 0.7),
                     fontWeight: FontWeight.w700,

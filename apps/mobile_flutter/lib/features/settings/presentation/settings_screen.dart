@@ -1,6 +1,8 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/backend/backend_api_client.dart';
 import '../../../core/database/mobile_repository.dart';
@@ -27,11 +29,18 @@ import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/utils/formatters.dart';
 import '../../shell/presentation/mobile_surface.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  bool _showAdvancedTools = false;
+
+  @override
+  Widget build(BuildContext context) {
     final session = ref.watch(mobileSessionProvider).asData?.value;
     final shopRepository = ref.watch(shopRepositoryProvider);
     final salesRepository = ref.watch(salesRepositoryProvider);
@@ -65,10 +74,10 @@ class SettingsScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
           children: <Widget>[
             MobileHeroBanner(
-              eyebrow: 'System config',
-              title: 'Mobile operating posture.',
+              eyebrow: 'Settings',
+              title: 'Keep the app simple and ready.',
               subtitle:
-                  'This screen shows which backend surface the mobile app trusts today, which operator is signed in, and how close the workspace is to the fully migrated platform.',
+                  'Workspace details and sync health stay up front. Advanced rollout and recovery tools stay hidden until you open them.',
               accent: const Color(0xFFA78BFA),
               trailing: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -169,62 +178,6 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                   ],
                 ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            MobilePanel(
-              title: 'Build identity',
-              action: MobileTag(
-                label: runtimeInfoAsync.isLoading ? 'Loading' : 'Runtime',
-                icon: Icons.verified_user_rounded,
-                accent: const Color(0xFF38BDF8),
-              ),
-              child: runtimeInfoAsync.when(
-                data: (runtime) => Column(
-                  children: <Widget>[
-                    _SettingsRow(
-                      label: 'App',
-                      value: runtime.appName,
-                      icon: Icons.android_rounded,
-                    ),
-                    _SettingsRow(
-                      label: 'Version',
-                      value: runtime.versionLabel,
-                      icon: Icons.new_releases_rounded,
-                    ),
-                    _SettingsRow(
-                      label: 'Release channel',
-                      value: runtime.releaseFingerprint,
-                      icon: Icons.flag_rounded,
-                    ),
-                    _SettingsRow(
-                      label: 'Release tag',
-                      value: runtime.releaseTag,
-                      icon: Icons.sell_rounded,
-                    ),
-                    _SettingsRow(
-                      label: 'Pilot scope',
-                      value: runtime.rolloutScopeLabel,
-                      icon: Icons.route_rounded,
-                    ),
-                    _SettingsRow(
-                      label: 'Package',
-                      value: runtime.packageName,
-                      icon: Icons.inventory_2_rounded,
-                    ),
-                  ],
-                ),
-                loading: () => const MobileEmptyState(
-                  icon: Icons.sync_rounded,
-                  title: 'Loading runtime metadata',
-                  body:
-                      'The mobile shell is resolving package version, build number, and release channel.',
-                ),
-                error: (error, _) => MobileEmptyState(
-                  icon: Icons.error_outline_rounded,
-                  title: 'Runtime metadata unavailable',
-                  body: error.toString(),
-                ),
               ),
             ),
             const SizedBox(height: 18),
@@ -371,41 +324,171 @@ class SettingsScreen extends ConsumerWidget {
               },
             ),
             const SizedBox(height: 18),
-            StreamBuilder<List<DomainControlState>>(
-              stream: domainStatesStream,
-              builder: (context, snapshot) {
-                final states =
-                    snapshot.data ??
-                    <DomainControlState>[
-                      DomainControlState.legacy('inventory'),
-                      DomainControlState.legacy('customers'),
-                      DomainControlState.legacy('sales'),
-                      DomainControlState.legacy('payments'),
-                    ];
-
-                return MobilePanel(
-                  title: 'Domain cutover map',
-                  action: MobileTag(
-                    label:
-                        '${states.where((state) => state.isPostgresPrimary).length} primary',
-                    icon: Icons.schema_rounded,
-                    accent: const Color(0xFF38BDF8),
+            MobilePanel(
+              title: 'App and account',
+              action: MobileTag(
+                label: _showAdvancedTools ? 'ADVANCED OPEN' : 'SIMPLE MODE',
+                icon: _showAdvancedTools
+                    ? Icons.admin_panel_settings_rounded
+                    : Icons.favorite_rounded,
+                accent: _showAdvancedTools
+                    ? const Color(0xFFA78BFA)
+                    : const Color(0xFF22C55E),
+              ),
+              child: Column(
+                children: <Widget>[
+                  _SettingsRow(
+                    label: 'Signed in as',
+                    value: session != null && session.email.isNotEmpty
+                        ? session.email
+                        : 'Unknown operator',
+                    icon: Icons.person_rounded,
                   ),
-                  child: Column(
-                    children: states
-                        .map(
-                          (state) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _DomainSettingsRow(state: state),
+                  _SettingsRow(
+                    label: 'Version',
+                    value: runtimeInfoAsync.asData?.value.versionLabel ??
+                        'Loading app info',
+                    icon: Icons.new_releases_rounded,
+                  ),
+                  _SettingsRow(
+                    label: 'Release channel',
+                    value: runtimeInfoAsync.asData?.value.releaseFingerprint ??
+                        'Resolving release data',
+                    icon: Icons.flag_rounded,
+                  ),
+                  _SettingsRow(
+                    label: 'Support mode',
+                    value: _showAdvancedTools
+                        ? 'Advanced tools visible'
+                        : 'Daily-use view only',
+                    icon: _showAdvancedTools
+                        ? Icons.construction_rounded
+                        : Icons.check_circle_rounded,
+                  ),
+                  const SizedBox(height: 6),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final stacked = constraints.maxWidth < 430;
+                      final buttons = <Widget>[
+                        Expanded(
+                          child: FilledButton.tonalIcon(
+                            onPressed: () {
+                              setState(() {
+                                _showAdvancedTools = !_showAdvancedTools;
+                              });
+                            },
+                            icon: Icon(
+                              _showAdvancedTools
+                                  ? Icons.visibility_off_rounded
+                                  : Icons.tune_rounded,
+                            ),
+                            label: Text(
+                              _showAdvancedTools
+                                  ? 'Hide advanced tools'
+                                  : 'Show advanced tools',
+                            ),
                           ),
-                        )
-                        .toList(growable: false),
+                        ),
+                        Expanded(
+                          child: FilledButton.tonalIcon(
+                            onPressed: () async {
+                              await FirebaseAuth.instance.signOut();
+                              if (!context.mounted) {
+                                return;
+                              }
+                              context.go('/');
+                            },
+                            icon: const Icon(Icons.logout_rounded),
+                            label: const Text('Sign out'),
+                          ),
+                        ),
+                      ];
+
+                      if (stacked) {
+                        return Column(
+                          children: <Widget>[
+                            buttons[0],
+                            const SizedBox(height: 10),
+                            buttons[1],
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        children: <Widget>[
+                          buttons[0],
+                          const SizedBox(width: 10),
+                          buttons[1],
+                        ],
+                      );
+                    },
                   ),
-                );
-              },
+                ],
+              ),
             ),
             const SizedBox(height: 18),
-            StreamBuilder<List<DomainControlState>>(
+            MobilePanel(
+              title: 'Advanced operator tools',
+              action: MobileTag(
+                label: _showAdvancedTools ? 'VISIBLE' : 'HIDDEN',
+                icon: _showAdvancedTools
+                    ? Icons.visibility_rounded
+                    : Icons.visibility_off_rounded,
+                accent: _showAdvancedTools
+                    ? const Color(0xFFA78BFA)
+                    : const Color(0xFF64748B),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    'These rollout, evidence, recovery, and migration tools are still here for admin work, but they stay hidden during normal shop use so the screen stays cleaner.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.68),
+                          fontWeight: FontWeight.w600,
+                          height: 1.45,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            if (_showAdvancedTools) ...<Widget>[
+              const SizedBox(height: 18),
+              StreamBuilder<List<DomainControlState>>(
+                stream: domainStatesStream,
+                builder: (context, snapshot) {
+                  final states =
+                      snapshot.data ??
+                      <DomainControlState>[
+                        DomainControlState.legacy('inventory'),
+                        DomainControlState.legacy('customers'),
+                        DomainControlState.legacy('sales'),
+                        DomainControlState.legacy('payments'),
+                      ];
+
+                  return MobilePanel(
+                    title: 'Domain cutover map',
+                    action: MobileTag(
+                      label:
+                          '${states.where((state) => state.isPostgresPrimary).length} primary',
+                      icon: Icons.schema_rounded,
+                      accent: const Color(0xFF38BDF8),
+                    ),
+                    child: Column(
+                      children: states
+                          .map(
+                            (state) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _DomainSettingsRow(state: state),
+                            ),
+                          )
+                          .toList(growable: false),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 18),
+              StreamBuilder<List<DomainControlState>>(
               stream: domainStatesStream,
               builder: (context, domainSnapshot) {
                 final domainStates =
@@ -2586,6 +2669,7 @@ class SettingsScreen extends ConsumerWidget {
                 );
               },
             ),
+            ],
           ],
         );
       },
