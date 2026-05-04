@@ -89,6 +89,27 @@ class SalesEntries extends Table {
   BoolColumn get tombstone => boolean().withDefault(const Constant(false))();
 }
 
+class CustomerEntries extends Table {
+  @override
+  String get tableName => 'customers';
+
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get phone => text().nullable()();
+  TextColumn get email => text().nullable()();
+  TextColumn get notes => text().nullable()();
+  TextColumn get status =>
+      text().withDefault(const Constant('active'))();
+  RealColumn get totalSpent =>
+      real().named('total_spent').withDefault(const Constant(0))();
+  RealColumn get balance => real().withDefault(const Constant(0))();
+  IntColumn get createdAt => integer().named('created_at')();
+  IntColumn get updatedAt =>
+      integer().named('updated_at').withDefault(const Constant(0))();
+  IntColumn get lastSeenAt => integer().named('last_seen_at').nullable()();
+  BoolColumn get tombstone => boolean().withDefault(const Constant(false))();
+}
+
 class CommerceOutboxEntries extends Table {
   @override
   String get tableName => 'commerce_outbox';
@@ -122,6 +143,7 @@ class CommerceOutboxEntries extends Table {
     InventoryEntries,
     InventoryPrivateEntries,
     SalesEntries,
+    CustomerEntries,
     CommerceOutboxEntries,
   ],
 )
@@ -135,7 +157,7 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       );
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -153,6 +175,9 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       }
       if (from < 3) {
         await m.addColumn(salesEntries, salesEntries.backendSaleId);
+      }
+      if (from < 4) {
+        await m.createTable(customerEntries);
       }
     },
   );

@@ -15,6 +15,10 @@ final inventoryRepositoryProvider = Provider<InventoryRepository>((ref) {
   return InventoryRepository(ref.watch(localDatabaseProvider));
 });
 
+final customerRepositoryProvider = Provider<CustomerRepository>((ref) {
+  return CustomerRepository(ref.watch(localDatabaseProvider));
+});
+
 final salesRepositoryProvider = Provider<SalesRepository>((ref) {
   return SalesRepository(ref.watch(localDatabaseProvider));
 });
@@ -594,6 +598,128 @@ class InventoryRepository {
       await _db.delete(_db.inventoryPrivateEntries).go();
       await _db.delete(_db.inventoryEntries).go();
     });
+  }
+}
+
+class CustomerRepository {
+  CustomerRepository(this._db);
+
+  final BusinessHubDatabase _db;
+
+  Stream<List<BackendCustomerSummary>> watchLegacyCustomers({
+    String search = '',
+  }) {
+    final normalized = search.trim().toLowerCase();
+    final where = <String>['tombstone = 0'];
+    final variables = <Variable<Object>>[];
+
+    if (normalized.isNotEmpty) {
+      where.add(
+        "(LOWER(name) LIKE ? OR LOWER(COALESCE(phone, '')) LIKE ? OR LOWER(COALESCE(email, '')) LIKE ?)",
+      );
+      final like = '%$normalized%';
+      variables
+        ..add(Variable<String>(like))
+        ..add(Variable<String>(like))
+        ..add(Variable<String>(like));
+    }
+
+    final sql =
+        '''
+      SELECT
+        id,
+        name,
+        phone,
+        email,
+        notes,
+        status,
+        total_spent,
+        balance
+      FROM customers
+      WHERE ${where.join(' AND ')}
+      ORDER BY
+        CASE WHEN balance > 0 THEN 0 ELSE 1 END,
+        balance DESC,
+        LOWER(name) ASC;
+    ''';
+
+    return _db
+        .customSelect(sql, variables: variables, readsFrom: {_db.customerEntries})
+        .watch()
+        .map(
+          (rows) => rows
+              .map(
+                (row) => BackendCustomerSummary(
+                  id: row.read<String>('id'),
+                  name: row.read<String>('name'),
+                  phone: _asStringOrNull(row.readNullable<String>('phone')),
+                  email: _asStringOrNull(row.readNullable<String>('email')),
+                  notes: _asStringOrNull(row.readNullable<String>('notes')),
+                  status: row.read<String>('status'),
+                  totalSpent: row.read<double>('total_spent'),
+                  balance: row.read<double>('balance'),
+                ),
+              )
+              .toList(growable: false),
+        );
+  }
+
+  Future<void> mergeRemoteCustomerDocument(
+    String id,
+    Map<String, dynamic> data, {
+    required int updatedAt,
+  }) async {
+    final createdAt = _asEpoch(data['createdAt'] ?? data['created_at']) ?? updatedAt;
+    final lastSeenAt =
+        _asEpoch(data['lastSeenAt'] ?? data['last_seen_at']) ??
+        _asEpoch(data['updatedAt'] ?? data['updated_at']) ??
+        updatedAt;
+
+    await _db.into(_db.customerEntries).insertOnConflictUpdate(
+      CustomerEntriesCompanion.insert(
+        id: id,
+        name: (data['name'] ?? data['customerName'] ?? 'Unnamed customer')
+            .toString(),
+        phone: Value(
+          _asStringOrNull(
+            data['phone'] ?? data['mobile'] ?? data['mobileNumber'],
+          ),
+        ),
+        email: Value(_asStringOrNull(data['email'])),
+        notes: Value(
+          _asStringOrNull(data['notes'] ?? data['note'] ?? data['remark']),
+        ),
+        status: Value(
+          _asStringOrNull(data['status']) ??
+              (data['tombstone'] == true ? 'archived' : 'active'),
+        ),
+        totalSpent: Value(
+          _asDouble(
+            data['totalSpent'] ??
+                data['total_spent'] ??
+                data['lifetimeSpend'] ??
+                data['lifetime_spend'],
+          ),
+        ),
+        balance: Value(
+          _asDouble(
+            data['balance'] ??
+                data['currentBalance'] ??
+                data['current_balance'] ??
+                data['dueAmount'] ??
+                data['due_amount'],
+          ),
+        ),
+        createdAt: createdAt,
+        updatedAt: Value(updatedAt),
+        lastSeenAt: Value(lastSeenAt),
+        tombstone: Value(data['tombstone'] == true),
+      ),
+    );
+  }
+
+  Future<void> clearWorkspace() async {
+    await _db.delete(_db.customerEntries).go();
   }
 }
 

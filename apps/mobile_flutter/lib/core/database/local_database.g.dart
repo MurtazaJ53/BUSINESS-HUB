@@ -2635,6 +2635,704 @@ class SalesEntriesCompanion extends UpdateCompanion<SalesEntry> {
   }
 }
 
+class $CustomerEntriesTable extends CustomerEntries
+    with TableInfo<$CustomerEntriesTable, CustomerEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CustomerEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _phoneMeta = const VerificationMeta('phone');
+  @override
+  late final GeneratedColumn<String> phone = GeneratedColumn<String>(
+    'phone',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _emailMeta = const VerificationMeta('email');
+  @override
+  late final GeneratedColumn<String> email = GeneratedColumn<String>(
+    'email',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('active'),
+  );
+  static const VerificationMeta _totalSpentMeta = const VerificationMeta(
+    'totalSpent',
+  );
+  @override
+  late final GeneratedColumn<double> totalSpent = GeneratedColumn<double>(
+    'total_spent',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _balanceMeta = const VerificationMeta(
+    'balance',
+  );
+  @override
+  late final GeneratedColumn<double> balance = GeneratedColumn<double>(
+    'balance',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _lastSeenAtMeta = const VerificationMeta(
+    'lastSeenAt',
+  );
+  @override
+  late final GeneratedColumn<int> lastSeenAt = GeneratedColumn<int>(
+    'last_seen_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _tombstoneMeta = const VerificationMeta(
+    'tombstone',
+  );
+  @override
+  late final GeneratedColumn<bool> tombstone = GeneratedColumn<bool>(
+    'tombstone',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("tombstone" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    phone,
+    email,
+    notes,
+    status,
+    totalSpent,
+    balance,
+    createdAt,
+    updatedAt,
+    lastSeenAt,
+    tombstone,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'customers';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CustomerEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('phone')) {
+      context.handle(
+        _phoneMeta,
+        phone.isAcceptableOrUnknown(data['phone']!, _phoneMeta),
+      );
+    }
+    if (data.containsKey('email')) {
+      context.handle(
+        _emailMeta,
+        email.isAcceptableOrUnknown(data['email']!, _emailMeta),
+      );
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('total_spent')) {
+      context.handle(
+        _totalSpentMeta,
+        totalSpent.isAcceptableOrUnknown(data['total_spent']!, _totalSpentMeta),
+      );
+    }
+    if (data.containsKey('balance')) {
+      context.handle(
+        _balanceMeta,
+        balance.isAcceptableOrUnknown(data['balance']!, _balanceMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('last_seen_at')) {
+      context.handle(
+        _lastSeenAtMeta,
+        lastSeenAt.isAcceptableOrUnknown(
+          data['last_seen_at']!,
+          _lastSeenAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('tombstone')) {
+      context.handle(
+        _tombstoneMeta,
+        tombstone.isAcceptableOrUnknown(data['tombstone']!, _tombstoneMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => const {};
+  @override
+  CustomerEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CustomerEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      phone: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}phone'],
+      ),
+      email: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}email'],
+      ),
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      totalSpent: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}total_spent'],
+      )!,
+      balance: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}balance'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      lastSeenAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_seen_at'],
+      ),
+      tombstone: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}tombstone'],
+      )!,
+    );
+  }
+
+  @override
+  $CustomerEntriesTable createAlias(String alias) {
+    return $CustomerEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class CustomerEntry extends DataClass implements Insertable<CustomerEntry> {
+  final String id;
+  final String name;
+  final String? phone;
+  final String? email;
+  final String? notes;
+  final String status;
+  final double totalSpent;
+  final double balance;
+  final int createdAt;
+  final int updatedAt;
+  final int? lastSeenAt;
+  final bool tombstone;
+  const CustomerEntry({
+    required this.id,
+    required this.name,
+    this.phone,
+    this.email,
+    this.notes,
+    required this.status,
+    required this.totalSpent,
+    required this.balance,
+    required this.createdAt,
+    required this.updatedAt,
+    this.lastSeenAt,
+    required this.tombstone,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || phone != null) {
+      map['phone'] = Variable<String>(phone);
+    }
+    if (!nullToAbsent || email != null) {
+      map['email'] = Variable<String>(email);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['status'] = Variable<String>(status);
+    map['total_spent'] = Variable<double>(totalSpent);
+    map['balance'] = Variable<double>(balance);
+    map['created_at'] = Variable<int>(createdAt);
+    map['updated_at'] = Variable<int>(updatedAt);
+    if (!nullToAbsent || lastSeenAt != null) {
+      map['last_seen_at'] = Variable<int>(lastSeenAt);
+    }
+    map['tombstone'] = Variable<bool>(tombstone);
+    return map;
+  }
+
+  CustomerEntriesCompanion toCompanion(bool nullToAbsent) {
+    return CustomerEntriesCompanion(
+      id: Value(id),
+      name: Value(name),
+      phone: phone == null && nullToAbsent
+          ? const Value.absent()
+          : Value(phone),
+      email: email == null && nullToAbsent
+          ? const Value.absent()
+          : Value(email),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      status: Value(status),
+      totalSpent: Value(totalSpent),
+      balance: Value(balance),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      lastSeenAt: lastSeenAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastSeenAt),
+      tombstone: Value(tombstone),
+    );
+  }
+
+  factory CustomerEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CustomerEntry(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      phone: serializer.fromJson<String?>(json['phone']),
+      email: serializer.fromJson<String?>(json['email']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      status: serializer.fromJson<String>(json['status']),
+      totalSpent: serializer.fromJson<double>(json['totalSpent']),
+      balance: serializer.fromJson<double>(json['balance']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+      lastSeenAt: serializer.fromJson<int?>(json['lastSeenAt']),
+      tombstone: serializer.fromJson<bool>(json['tombstone']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'phone': serializer.toJson<String?>(phone),
+      'email': serializer.toJson<String?>(email),
+      'notes': serializer.toJson<String?>(notes),
+      'status': serializer.toJson<String>(status),
+      'totalSpent': serializer.toJson<double>(totalSpent),
+      'balance': serializer.toJson<double>(balance),
+      'createdAt': serializer.toJson<int>(createdAt),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+      'lastSeenAt': serializer.toJson<int?>(lastSeenAt),
+      'tombstone': serializer.toJson<bool>(tombstone),
+    };
+  }
+
+  CustomerEntry copyWith({
+    String? id,
+    String? name,
+    Value<String?> phone = const Value.absent(),
+    Value<String?> email = const Value.absent(),
+    Value<String?> notes = const Value.absent(),
+    String? status,
+    double? totalSpent,
+    double? balance,
+    int? createdAt,
+    int? updatedAt,
+    Value<int?> lastSeenAt = const Value.absent(),
+    bool? tombstone,
+  }) => CustomerEntry(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    phone: phone.present ? phone.value : this.phone,
+    email: email.present ? email.value : this.email,
+    notes: notes.present ? notes.value : this.notes,
+    status: status ?? this.status,
+    totalSpent: totalSpent ?? this.totalSpent,
+    balance: balance ?? this.balance,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    lastSeenAt: lastSeenAt.present ? lastSeenAt.value : this.lastSeenAt,
+    tombstone: tombstone ?? this.tombstone,
+  );
+  CustomerEntry copyWithCompanion(CustomerEntriesCompanion data) {
+    return CustomerEntry(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      phone: data.phone.present ? data.phone.value : this.phone,
+      email: data.email.present ? data.email.value : this.email,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      status: data.status.present ? data.status.value : this.status,
+      totalSpent: data.totalSpent.present
+          ? data.totalSpent.value
+          : this.totalSpent,
+      balance: data.balance.present ? data.balance.value : this.balance,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      lastSeenAt: data.lastSeenAt.present
+          ? data.lastSeenAt.value
+          : this.lastSeenAt,
+      tombstone: data.tombstone.present ? data.tombstone.value : this.tombstone,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CustomerEntry(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('phone: $phone, ')
+          ..write('email: $email, ')
+          ..write('notes: $notes, ')
+          ..write('status: $status, ')
+          ..write('totalSpent: $totalSpent, ')
+          ..write('balance: $balance, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('lastSeenAt: $lastSeenAt, ')
+          ..write('tombstone: $tombstone')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    name,
+    phone,
+    email,
+    notes,
+    status,
+    totalSpent,
+    balance,
+    createdAt,
+    updatedAt,
+    lastSeenAt,
+    tombstone,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CustomerEntry &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.phone == this.phone &&
+          other.email == this.email &&
+          other.notes == this.notes &&
+          other.status == this.status &&
+          other.totalSpent == this.totalSpent &&
+          other.balance == this.balance &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.lastSeenAt == this.lastSeenAt &&
+          other.tombstone == this.tombstone);
+}
+
+class CustomerEntriesCompanion extends UpdateCompanion<CustomerEntry> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String?> phone;
+  final Value<String?> email;
+  final Value<String?> notes;
+  final Value<String> status;
+  final Value<double> totalSpent;
+  final Value<double> balance;
+  final Value<int> createdAt;
+  final Value<int> updatedAt;
+  final Value<int?> lastSeenAt;
+  final Value<bool> tombstone;
+  final Value<int> rowid;
+  const CustomerEntriesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.phone = const Value.absent(),
+    this.email = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.status = const Value.absent(),
+    this.totalSpent = const Value.absent(),
+    this.balance = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.lastSeenAt = const Value.absent(),
+    this.tombstone = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CustomerEntriesCompanion.insert({
+    required String id,
+    required String name,
+    this.phone = const Value.absent(),
+    this.email = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.status = const Value.absent(),
+    this.totalSpent = const Value.absent(),
+    this.balance = const Value.absent(),
+    required int createdAt,
+    this.updatedAt = const Value.absent(),
+    this.lastSeenAt = const Value.absent(),
+    this.tombstone = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       createdAt = Value(createdAt);
+  static Insertable<CustomerEntry> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? phone,
+    Expression<String>? email,
+    Expression<String>? notes,
+    Expression<String>? status,
+    Expression<double>? totalSpent,
+    Expression<double>? balance,
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<int>? lastSeenAt,
+    Expression<bool>? tombstone,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (phone != null) 'phone': phone,
+      if (email != null) 'email': email,
+      if (notes != null) 'notes': notes,
+      if (status != null) 'status': status,
+      if (totalSpent != null) 'total_spent': totalSpent,
+      if (balance != null) 'balance': balance,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (lastSeenAt != null) 'last_seen_at': lastSeenAt,
+      if (tombstone != null) 'tombstone': tombstone,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CustomerEntriesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String?>? phone,
+    Value<String?>? email,
+    Value<String?>? notes,
+    Value<String>? status,
+    Value<double>? totalSpent,
+    Value<double>? balance,
+    Value<int>? createdAt,
+    Value<int>? updatedAt,
+    Value<int?>? lastSeenAt,
+    Value<bool>? tombstone,
+    Value<int>? rowid,
+  }) {
+    return CustomerEntriesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      email: email ?? this.email,
+      notes: notes ?? this.notes,
+      status: status ?? this.status,
+      totalSpent: totalSpent ?? this.totalSpent,
+      balance: balance ?? this.balance,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+      tombstone: tombstone ?? this.tombstone,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (phone.present) {
+      map['phone'] = Variable<String>(phone.value);
+    }
+    if (email.present) {
+      map['email'] = Variable<String>(email.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (totalSpent.present) {
+      map['total_spent'] = Variable<double>(totalSpent.value);
+    }
+    if (balance.present) {
+      map['balance'] = Variable<double>(balance.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (lastSeenAt.present) {
+      map['last_seen_at'] = Variable<int>(lastSeenAt.value);
+    }
+    if (tombstone.present) {
+      map['tombstone'] = Variable<bool>(tombstone.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CustomerEntriesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('phone: $phone, ')
+          ..write('email: $email, ')
+          ..write('notes: $notes, ')
+          ..write('status: $status, ')
+          ..write('totalSpent: $totalSpent, ')
+          ..write('balance: $balance, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('lastSeenAt: $lastSeenAt, ')
+          ..write('tombstone: $tombstone, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $CommerceOutboxEntriesTable extends CommerceOutboxEntries
     with TableInfo<$CommerceOutboxEntriesTable, CommerceOutboxEntry> {
   @override
@@ -3430,6 +4128,9 @@ abstract class _$BusinessHubDatabase extends GeneratedDatabase {
   late final $InventoryPrivateEntriesTable inventoryPrivateEntries =
       $InventoryPrivateEntriesTable(this);
   late final $SalesEntriesTable salesEntries = $SalesEntriesTable(this);
+  late final $CustomerEntriesTable customerEntries = $CustomerEntriesTable(
+    this,
+  );
   late final $CommerceOutboxEntriesTable commerceOutboxEntries =
       $CommerceOutboxEntriesTable(this);
   @override
@@ -3441,6 +4142,7 @@ abstract class _$BusinessHubDatabase extends GeneratedDatabase {
     inventoryEntries,
     inventoryPrivateEntries,
     salesEntries,
+    customerEntries,
     commerceOutboxEntries,
   ];
 }
@@ -4767,6 +5469,353 @@ typedef $$SalesEntriesTableProcessedTableManager =
       SalesEntry,
       PrefetchHooks Function()
     >;
+typedef $$CustomerEntriesTableCreateCompanionBuilder =
+    CustomerEntriesCompanion Function({
+      required String id,
+      required String name,
+      Value<String?> phone,
+      Value<String?> email,
+      Value<String?> notes,
+      Value<String> status,
+      Value<double> totalSpent,
+      Value<double> balance,
+      required int createdAt,
+      Value<int> updatedAt,
+      Value<int?> lastSeenAt,
+      Value<bool> tombstone,
+      Value<int> rowid,
+    });
+typedef $$CustomerEntriesTableUpdateCompanionBuilder =
+    CustomerEntriesCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<String?> phone,
+      Value<String?> email,
+      Value<String?> notes,
+      Value<String> status,
+      Value<double> totalSpent,
+      Value<double> balance,
+      Value<int> createdAt,
+      Value<int> updatedAt,
+      Value<int?> lastSeenAt,
+      Value<bool> tombstone,
+      Value<int> rowid,
+    });
+
+class $$CustomerEntriesTableFilterComposer
+    extends Composer<_$BusinessHubDatabase, $CustomerEntriesTable> {
+  $$CustomerEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get phone => $composableBuilder(
+    column: $table.phone,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get email => $composableBuilder(
+    column: $table.email,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get totalSpent => $composableBuilder(
+    column: $table.totalSpent,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get balance => $composableBuilder(
+    column: $table.balance,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get tombstone => $composableBuilder(
+    column: $table.tombstone,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CustomerEntriesTableOrderingComposer
+    extends Composer<_$BusinessHubDatabase, $CustomerEntriesTable> {
+  $$CustomerEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get phone => $composableBuilder(
+    column: $table.phone,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get email => $composableBuilder(
+    column: $table.email,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get totalSpent => $composableBuilder(
+    column: $table.totalSpent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get balance => $composableBuilder(
+    column: $table.balance,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get tombstone => $composableBuilder(
+    column: $table.tombstone,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CustomerEntriesTableAnnotationComposer
+    extends Composer<_$BusinessHubDatabase, $CustomerEntriesTable> {
+  $$CustomerEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get phone =>
+      $composableBuilder(column: $table.phone, builder: (column) => column);
+
+  GeneratedColumn<String> get email =>
+      $composableBuilder(column: $table.email, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<double> get totalSpent => $composableBuilder(
+    column: $table.totalSpent,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get balance =>
+      $composableBuilder(column: $table.balance, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get tombstone =>
+      $composableBuilder(column: $table.tombstone, builder: (column) => column);
+}
+
+class $$CustomerEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$BusinessHubDatabase,
+          $CustomerEntriesTable,
+          CustomerEntry,
+          $$CustomerEntriesTableFilterComposer,
+          $$CustomerEntriesTableOrderingComposer,
+          $$CustomerEntriesTableAnnotationComposer,
+          $$CustomerEntriesTableCreateCompanionBuilder,
+          $$CustomerEntriesTableUpdateCompanionBuilder,
+          (
+            CustomerEntry,
+            BaseReferences<
+              _$BusinessHubDatabase,
+              $CustomerEntriesTable,
+              CustomerEntry
+            >,
+          ),
+          CustomerEntry,
+          PrefetchHooks Function()
+        > {
+  $$CustomerEntriesTableTableManager(
+    _$BusinessHubDatabase db,
+    $CustomerEntriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CustomerEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CustomerEntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CustomerEntriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String?> phone = const Value.absent(),
+                Value<String?> email = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<double> totalSpent = const Value.absent(),
+                Value<double> balance = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<int?> lastSeenAt = const Value.absent(),
+                Value<bool> tombstone = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CustomerEntriesCompanion(
+                id: id,
+                name: name,
+                phone: phone,
+                email: email,
+                notes: notes,
+                status: status,
+                totalSpent: totalSpent,
+                balance: balance,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                lastSeenAt: lastSeenAt,
+                tombstone: tombstone,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                Value<String?> phone = const Value.absent(),
+                Value<String?> email = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<double> totalSpent = const Value.absent(),
+                Value<double> balance = const Value.absent(),
+                required int createdAt,
+                Value<int> updatedAt = const Value.absent(),
+                Value<int?> lastSeenAt = const Value.absent(),
+                Value<bool> tombstone = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CustomerEntriesCompanion.insert(
+                id: id,
+                name: name,
+                phone: phone,
+                email: email,
+                notes: notes,
+                status: status,
+                totalSpent: totalSpent,
+                balance: balance,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                lastSeenAt: lastSeenAt,
+                tombstone: tombstone,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CustomerEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$BusinessHubDatabase,
+      $CustomerEntriesTable,
+      CustomerEntry,
+      $$CustomerEntriesTableFilterComposer,
+      $$CustomerEntriesTableOrderingComposer,
+      $$CustomerEntriesTableAnnotationComposer,
+      $$CustomerEntriesTableCreateCompanionBuilder,
+      $$CustomerEntriesTableUpdateCompanionBuilder,
+      (
+        CustomerEntry,
+        BaseReferences<
+          _$BusinessHubDatabase,
+          $CustomerEntriesTable,
+          CustomerEntry
+        >,
+      ),
+      CustomerEntry,
+      PrefetchHooks Function()
+    >;
 typedef $$CommerceOutboxEntriesTableCreateCompanionBuilder =
     CommerceOutboxEntriesCompanion Function({
       required String commandId,
@@ -5167,6 +6216,8 @@ class $BusinessHubDatabaseManager {
       );
   $$SalesEntriesTableTableManager get salesEntries =>
       $$SalesEntriesTableTableManager(_db, _db.salesEntries);
+  $$CustomerEntriesTableTableManager get customerEntries =>
+      $$CustomerEntriesTableTableManager(_db, _db.customerEntries);
   $$CommerceOutboxEntriesTableTableManager get commerceOutboxEntries =>
       $$CommerceOutboxEntriesTableTableManager(_db, _db.commerceOutboxEntries);
 }

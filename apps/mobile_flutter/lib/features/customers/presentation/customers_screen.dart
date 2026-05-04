@@ -37,9 +37,13 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     final session = ref.watch(mobileSessionProvider).asData?.value;
     final salesRepository = ref.watch(salesRepositoryProvider);
     final shopRepository = ref.watch(shopRepositoryProvider);
+    final customerRepository = ref.watch(customerRepositoryProvider);
     final backendApiClient = ref.watch(backendApiClientProvider);
     final syncStatus = ref.watch(syncStatusProvider);
     final customerPulseStream = salesRepository.watchCustomerPulse(
+      search: _search,
+    );
+    final legacyCustomersStream = customerRepository.watchLegacyCustomers(
       search: _search,
     );
     final historyStream = salesRepository.watchHistoryOverview();
@@ -287,7 +291,10 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
 
                       if (snapshot.hasError) {
                         return _LocalCustomersFallbackPanel(
+                          legacyCustomersStream: legacyCustomersStream,
                           customerPulseStream: customerPulseStream,
+                          statusFilter: _statusFilter,
+                          sortMode: _sortMode,
                           warning:
                               'Backend customer lookup is unavailable right now, so the mobile desk is falling back to local recall.',
                         );
@@ -450,7 +457,10 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                   )
                 else
                   _LocalCustomersFallbackPanel(
+                    legacyCustomersStream: legacyCustomersStream,
                     customerPulseStream: customerPulseStream,
+                    statusFilter: _statusFilter,
+                    sortMode: _sortMode,
                   ),
               ],
             );
@@ -1126,20 +1136,26 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
 
 class _LocalCustomersFallbackPanel extends StatelessWidget {
   const _LocalCustomersFallbackPanel({
+    required this.legacyCustomersStream,
     required this.customerPulseStream,
+    required this.statusFilter,
+    required this.sortMode,
     this.warning,
   });
 
+  final Stream<List<BackendCustomerSummary>> legacyCustomersStream;
   final Stream<List<CustomerPulseSummary>> customerPulseStream;
+  final String statusFilter;
+  final String sortMode;
   final String? warning;
 
   @override
   Widget build(BuildContext context) {
     return MobilePanel(
-      title: 'Customer recall from local history',
+      title: 'Legacy customer bridge',
       action: MobileTag(
-        label: 'LOCAL RECALL',
-        icon: Icons.offline_bolt_rounded,
+        label: 'FIRESTORE',
+        icon: Icons.cloud_done_rounded,
         accent: const Color(0xFF14B8A6),
       ),
       child: Column(
@@ -1167,34 +1183,132 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
             ),
             const SizedBox(height: 14),
           ],
-          StreamBuilder<List<CustomerPulseSummary>>(
-            stream: customerPulseStream,
+          StreamBuilder<List<BackendCustomerSummary>>(
+            stream: legacyCustomersStream,
             builder: (context, snapshot) {
-              final customers = snapshot.data ?? const <CustomerPulseSummary>[];
-              if (customers.isEmpty) {
-                return const MobileEmptyState(
-                  icon: Icons.groups_outlined,
-                  title: 'No known buyers matched',
-                  body:
-                      'The local mobile vault has not seen any named or phoned customer receipts for this lookup yet.',
+              final legacyCustomers =
+                  snapshot.data ?? const <BackendCustomerSummary>[];
+              final filteredLegacyCustomers =
+                  sortBackendCustomers(
+                    legacyCustomers.where(_matchesLegacyFilter).toList(
+                      growable: false,
+                    ),
+                    sortMode: sortMode,
+                  );
+
+              if (filteredLegacyCustomers.isNotEmpty) {
+                final summary = BackendCustomerOperationalReport.fromCustomers(
+                  filteredLegacyCustomers,
+                );
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Legacy customer records are loading from the old cloud collection for this shop.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.68),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: <Widget>[
+                        _CustomerSummaryTile(
+                          label: 'Visible',
+                          value: '${summary.visibleCount}',
+                          tone: const Color(0xFF14B8A6),
+                        ),
+                        _CustomerSummaryTile(
+                          label: 'Receivable',
+                          value: formatCurrency(summary.receivableBalance),
+                          tone: summary.receivableBalance > 0
+                              ? const Color(0xFFF59E0B)
+                              : const Color(0xFF22C55E),
+                        ),
+                        _CustomerSummaryTile(
+                          label: 'With due',
+                          value: '${summary.dueCount}',
+                          tone: const Color(0xFFFB7185),
+                        ),
+                        _CustomerSummaryTile(
+                          label: 'Inactive',
+                          value: '${summary.inactiveCount}',
+                          tone: const Color(0xFFA78BFA),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    if (summary.highestBalanceCustomer != null)
+                      Text(
+                        'Highest due: ${summary.highestBalanceCustomer!.name} | ${formatCurrency(summary.highestBalanceCustomer!.balance)}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.62),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    if (summary.highestBalanceCustomer != null)
+                      const SizedBox(height: 14),
+                    ...filteredLegacyCustomers.map(
+                      (customer) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _LegacyCloudCustomerRow(customer: customer),
+                      ),
+                    ),
+                  ],
                 );
               }
 
-              return Column(
-                children: customers
-                    .map(
-                      (customer) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _LocalCustomerRow(customer: customer),
+              return StreamBuilder<List<CustomerPulseSummary>>(
+                stream: customerPulseStream,
+                builder: (context, pulseSnapshot) {
+                  final customers =
+                      pulseSnapshot.data ?? const <CustomerPulseSummary>[];
+                  if (customers.isEmpty) {
+                    return const MobileEmptyState(
+                      icon: Icons.groups_outlined,
+                      title: 'No known buyers matched',
+                      body:
+                          'No Firestore customer records or named local receipts matched this lookup yet.',
+                    );
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'The legacy cloud customer master is empty for this view, so the app is reconstructing buyer recall from local sales history.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.68),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    )
-                    .toList(growable: false),
+                      const SizedBox(height: 14),
+                      ...customers.map(
+                        (customer) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _LocalCustomerRow(customer: customer),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               );
             },
           ),
         ],
       ),
     );
+  }
+
+  bool _matchesLegacyFilter(BackendCustomerSummary customer) {
+    return switch (statusFilter) {
+      'with_due' => customer.balance > 0.009,
+      'active_only' => customer.status.toLowerCase() == 'active',
+      'inactive_only' => customer.status.toLowerCase() != 'active',
+      _ => true,
+    };
   }
 }
 
@@ -1497,6 +1611,92 @@ class _BackendCustomerRow extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LegacyCloudCustomerRow extends StatelessWidget {
+  const _LegacyCloudCustomerRow({required this.customer});
+
+  final BackendCustomerSummary customer;
+
+  @override
+  Widget build(BuildContext context) {
+    final balanceTone = customer.balance > 0
+        ? const Color(0xFFFB7185)
+        : const Color(0xFF22C55E);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1220),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: const Color(0xFF14B8A6).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(
+                Icons.cloud_sync_rounded,
+                color: Color(0xFF14B8A6),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    customer.name,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    customer.phone ??
+                        customer.email ??
+                        customer.notes ??
+                        customer.status,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.58),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: <Widget>[
+                      MobileTag(
+                        label: 'Spent ${formatCurrency(customer.totalSpent)}',
+                        icon: Icons.trending_up_rounded,
+                        accent: const Color(0xFF38BDF8),
+                      ),
+                      MobileTag(
+                        label: 'Balance ${formatCurrency(customer.balance)}',
+                        icon: Icons.account_balance_wallet_rounded,
+                        accent: balanceTone,
+                      ),
+                      MobileTag(
+                        label: customer.status.toUpperCase(),
+                        icon: Icons.cloud_done_rounded,
+                        accent: const Color(0xFF14B8A6),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
