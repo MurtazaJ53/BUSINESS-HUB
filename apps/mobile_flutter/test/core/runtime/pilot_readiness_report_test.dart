@@ -40,7 +40,7 @@ void main() {
         lastSyncedAt: null,
       ),
       pendingOutboxCount: 1,
-      domainStates: const <DomainControlState>[
+      domainStates: <DomainControlState>[
         DomainControlState.legacy('sales'),
       ],
     );

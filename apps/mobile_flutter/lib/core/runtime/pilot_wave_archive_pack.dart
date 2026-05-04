@@ -2,7 +2,7 @@ import 'pilot_evidence_tracker.dart';
 import 'pilot_wave_signoff_pack.dart';
 
 class PilotWaveArchivePack {
-  const PilotWaveArchivePack({
+  PilotWaveArchivePack({
     required this.waveSignoffPack,
     required this.evidenceTracker,
     required this.archiveStatus,

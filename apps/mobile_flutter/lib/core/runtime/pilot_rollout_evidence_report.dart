@@ -21,7 +21,7 @@ class PilotRolloutEvidenceAnswers {
 }
 
 class PilotRolloutEvidenceReport {
-  const PilotRolloutEvidenceReport({
+  PilotRolloutEvidenceReport({
     required this.diagnosticsSnapshot,
     required this.readinessReport,
     required this.recoveryReport,

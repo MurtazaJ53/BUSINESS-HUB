@@ -21,7 +21,7 @@ class PilotIncidentEscalationAnswers {
 }
 
 class PilotIncidentEscalationReport {
-  const PilotIncidentEscalationReport({
+  PilotIncidentEscalationReport({
     required this.diagnosticsSnapshot,
     required this.readinessReport,
     required this.recoveryReport,

@@ -1277,6 +1277,9 @@ class SettingsScreen extends ConsumerWidget {
                                                             .startFreshSession(
                                                               sessionLabel,
                                                             );
+                                                        if (!context.mounted) {
+                                                          return;
+                                                        }
                                                         ScaffoldMessenger.of(
                                                           context,
                                                         ).showSnackBar(
@@ -1919,7 +1922,7 @@ class SettingsScreen extends ConsumerWidget {
                                             ),
                                             _SettingsRow(
                                               label: 'Recommended next action',
-                                              value: actionPlan.actionLabel,
+                                              value: actionPlan!.actionLabel,
                                               icon: Icons.route_rounded,
                                             ),
                                             _SettingsRow(
@@ -2049,7 +2052,7 @@ class SettingsScreen extends ConsumerWidget {
                                             ),
                                             _SettingsRow(
                                               label: 'Decision posture',
-                                              value: rolloutDecisionSummary
+                                              value: rolloutDecisionSummary!
                                                   .verdictLabel,
                                               icon: Icons.gavel_rounded,
                                             ),
@@ -2196,13 +2199,13 @@ class SettingsScreen extends ConsumerWidget {
                                             ),
                                             _SettingsRow(
                                               label: 'Closeout posture',
-                                              value: waveCloseoutReadiness
+                                              value: waveCloseoutReadiness!
                                                   .statusLabel,
                                               icon: Icons.playlist_add_check_rounded,
                                             ),
                                             _SettingsRow(
                                               label: 'Decision posture',
-                                              value: rolloutDecisionSummary
+                                              value: rolloutDecisionSummary!
                                                   .verdictLabel,
                                               icon: Icons.gavel_rounded,
                                             ),
@@ -3065,7 +3068,7 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
-                          value: smokeVerdict,
+                          initialValue: smokeVerdict,
                           decoration: const InputDecoration(
                             labelText: 'Smoke verdict',
                           ),
@@ -3112,7 +3115,7 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
-                          value: closeoutDecision,
+                          initialValue: closeoutDecision,
                           decoration: const InputDecoration(
                             labelText: 'Shift closeout decision',
                           ),
@@ -3159,7 +3162,7 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
-                          value: rolloutRecommendation,
+                          initialValue: rolloutRecommendation,
                           decoration: const InputDecoration(
                             labelText: 'Rollout recommendation',
                           ),
@@ -3340,7 +3343,7 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
-                          value: severity,
+                          initialValue: severity,
                           decoration: const InputDecoration(
                             labelText: 'Severity',
                           ),
@@ -3369,7 +3372,7 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
-                          value: impactScope,
+                          initialValue: impactScope,
                           decoration: const InputDecoration(
                             labelText: 'Impact scope',
                           ),
@@ -3894,7 +3897,7 @@ class _CloseoutToggleCard extends StatelessWidget {
             Switch(
               value: value,
               onChanged: onChanged,
-              activeColor: tone,
+              activeThumbColor: tone,
             ),
           ],
         ),

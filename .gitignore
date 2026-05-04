@@ -42,6 +42,7 @@ firebase-debug.log*
 # Local tool caches
 .gradle-home/
 .cache*/
+.tools/
 
 # Archives
 *.zip

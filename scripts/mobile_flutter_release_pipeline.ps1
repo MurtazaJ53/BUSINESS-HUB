@@ -139,11 +139,25 @@ function Invoke-ReleaseStep {
   Write-Host "==> $Name" -ForegroundColor Cyan
   Write-Host $commandText -ForegroundColor DarkGray
 
+  $stdoutPath = [System.IO.Path]::GetTempFileName()
+  $stderrPath = [System.IO.Path]::GetTempFileName()
+
   try {
-    $captured = & $childShell @childArgs 2>&1
-    $exitCode = $LASTEXITCODE
-    if ($null -ne $captured) {
-      foreach ($line in @($captured)) {
+    $process = Start-Process `
+      -FilePath $childShell `
+      -ArgumentList $childArgs `
+      -Wait `
+      -NoNewWindow `
+      -PassThru `
+      -RedirectStandardOutput $stdoutPath `
+      -RedirectStandardError $stderrPath
+
+    $exitCode = $process.ExitCode
+    foreach ($path in @($stdoutPath, $stderrPath)) {
+      if (-not (Test-Path $path)) {
+        continue
+      }
+      foreach ($line in Get-Content -Path $path) {
         $text = [string]$line
         $outputLines.Add($text)
         Write-Host $text
@@ -159,6 +173,8 @@ function Invoke-ReleaseStep {
     $failureMessage = $_.Exception.Message
     $outputLines.Add("ERROR: $failureMessage")
     Write-Host "ERROR: $failureMessage" -ForegroundColor Yellow
+  } finally {
+    Remove-Item -Force $stdoutPath, $stderrPath -ErrorAction SilentlyContinue
   }
 
   $stepEnd = [DateTime]::UtcNow

@@ -105,7 +105,7 @@ const List<PilotSmokeCheckDefinition> defaultPilotSmokeChecks =
     ];
 
 class PilotSmokeReport {
-  const PilotSmokeReport({
+  PilotSmokeReport({
     required this.diagnosticsSnapshot,
     required this.readinessReport,
     required this.results,

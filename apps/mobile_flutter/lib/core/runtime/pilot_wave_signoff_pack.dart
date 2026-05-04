@@ -7,7 +7,7 @@ import 'pilot_rollout_decision_summary.dart';
 import 'pilot_wave_closeout_readiness.dart';
 
 class PilotWaveSignoffPack {
-  const PilotWaveSignoffPack({
+  PilotWaveSignoffPack({
     required this.diagnosticsSnapshot,
     required this.readinessReport,
     required this.recoveryReport,

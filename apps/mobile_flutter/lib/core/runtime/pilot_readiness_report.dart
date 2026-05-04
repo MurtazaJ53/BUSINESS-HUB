@@ -3,7 +3,7 @@ import '../sync/mobile_sync_coordinator.dart';
 import 'pilot_diagnostics_snapshot.dart';
 
 class PilotReadinessReport {
-  const PilotReadinessReport({
+  PilotReadinessReport({
     required this.diagnosticsSnapshot,
     required this.attentionEntries,
     required this.status,

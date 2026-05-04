@@ -2,7 +2,7 @@ import '../models/mobile_models.dart';
 import 'pilot_diagnostics_snapshot.dart';
 
 class PilotRecoveryReport {
-  const PilotRecoveryReport({
+  PilotRecoveryReport({
     required this.diagnosticsSnapshot,
     required this.attentionEntries,
     DateTime? generatedAt,

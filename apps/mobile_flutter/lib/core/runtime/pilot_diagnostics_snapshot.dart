@@ -4,7 +4,7 @@ import '../sync/mobile_sync_coordinator.dart';
 import 'app_runtime_info.dart';
 
 class PilotDiagnosticsSnapshot {
-  const PilotDiagnosticsSnapshot({
+  PilotDiagnosticsSnapshot({
     required this.runtimeInfo,
     required this.shop,
     required this.session,

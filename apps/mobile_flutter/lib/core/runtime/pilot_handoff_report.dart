@@ -3,7 +3,7 @@ import 'pilot_readiness_report.dart';
 import 'pilot_recovery_report.dart';
 
 class PilotHandoffReport {
-  const PilotHandoffReport({
+  PilotHandoffReport({
     required this.diagnosticsSnapshot,
     required this.readinessReport,
     required this.recoveryReport,

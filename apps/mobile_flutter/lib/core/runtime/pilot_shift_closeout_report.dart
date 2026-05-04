@@ -19,7 +19,7 @@ class PilotShiftCloseoutAnswers {
 }
 
 class PilotShiftCloseoutReport {
-  const PilotShiftCloseoutReport({
+  PilotShiftCloseoutReport({
     required this.diagnosticsSnapshot,
     required this.readinessReport,
     required this.recoveryReport,

@@ -40,7 +40,7 @@ void main() {
         lastSyncedAt: null,
       ),
       pendingOutboxCount: 3,
-      domainStates: const <DomainControlState>[
+      domainStates: <DomainControlState>[
         DomainControlState.legacy('sales'),
       ],
       generatedAt: DateTime.utc(2026, 5, 2, 13),

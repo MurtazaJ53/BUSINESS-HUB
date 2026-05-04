@@ -5,7 +5,7 @@ import 'pilot_readiness_report.dart';
 import 'pilot_recovery_report.dart';
 
 class PilotRolloutDecisionSummary {
-  const PilotRolloutDecisionSummary({
+  PilotRolloutDecisionSummary({
     required this.diagnosticsSnapshot,
     required this.readinessReport,
     required this.recoveryReport,

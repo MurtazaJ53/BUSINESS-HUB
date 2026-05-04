@@ -6,7 +6,7 @@ import 'pilot_recovery_report.dart';
 import 'pilot_rollout_decision_summary.dart';
 
 class PilotWaveCloseoutReadiness {
-  const PilotWaveCloseoutReadiness({
+  PilotWaveCloseoutReadiness({
     required this.diagnosticsSnapshot,
     required this.readinessReport,
     required this.recoveryReport,
