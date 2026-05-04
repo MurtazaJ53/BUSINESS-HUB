@@ -24,8 +24,6 @@ class MobileShellScreen extends ConsumerStatefulWidget {
 }
 
 class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
-  final List<int> _branchHistory = <int>[];
-
   bool get _canPopCurrentBranch {
     final navigator =
         mobileShellBranchNavigatorKeys[widget.navigationShell.currentIndex]
@@ -34,9 +32,7 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
   }
 
   bool get _hasBackPath =>
-      _canPopCurrentBranch ||
-      _branchHistory.isNotEmpty ||
-      widget.navigationShell.currentIndex != 0;
+      _canPopCurrentBranch || widget.navigationShell.currentIndex != 0;
 
   Future<void> _handleBackNavigation() async {
     final navigator =
@@ -48,20 +44,8 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
       return;
     }
 
-    if (_branchHistory.isNotEmpty) {
-      final previousIndex = _branchHistory.removeLast();
-      if (mounted) {
-        setState(() {});
-      }
-      widget.navigationShell.goBranch(previousIndex);
-      return;
-    }
-
     if (widget.navigationShell.currentIndex != 0) {
       widget.navigationShell.goBranch(0);
-      if (mounted) {
-        setState(() {});
-      }
       return;
     }
 
@@ -75,18 +59,11 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
       return;
     }
 
-    setState(() {
-      _branchHistory.removeWhere((entry) => entry == index);
-      if (_branchHistory.isEmpty || _branchHistory.last != currentIndex) {
-        _branchHistory.add(currentIndex);
-      }
-    });
-
     widget.navigationShell.goBranch(index);
   }
 
   void _openSettings() {
-    context.go('/dashboard/settings');
+    context.push('/dashboard/settings');
   }
 
   Future<void> _signOut(BuildContext context) async {
