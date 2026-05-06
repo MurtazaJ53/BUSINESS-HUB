@@ -73,33 +73,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return ListView(
           padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
           children: <Widget>[
-            MobileHeroBanner(
-              eyebrow: 'Settings',
-              title: 'Keep the app simple and ready.',
+            MobileScreenLead(
+              title: 'Settings',
               subtitle:
-                  'Workspace details and sync health stay up front. Advanced rollout and recovery tools stay hidden until you open them.',
+                  'Workspace details and sync health stay upfront. Advanced rollout and recovery tools stay hidden until you need them.',
+              icon: Icons.settings_rounded,
               accent: const Color(0xFFA78BFA),
-              trailing: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: <Widget>[
-                  MobileTag(
-                    label: session?.role?.toUpperCase() ?? 'GUEST',
-                    icon: Icons.badge_rounded,
-                    accent: const Color(0xFFA78BFA),
-                  ),
-                  const SizedBox(height: 10),
-                  MobileTag(
-                    label: syncStatus == MobileSyncStatus.syncing
-                        ? 'Syncing config'
-                        : 'Config stable',
-                    icon: syncStatus == MobileSyncStatus.syncing
-                        ? Icons.sync_rounded
-                        : Icons.verified_rounded,
-                    accent: syncStatus == MobileSyncStatus.error
-                        ? const Color(0xFFFB7185)
-                        : const Color(0xFF22C55E),
-                  ),
-                ],
+              primaryTag: MobileTag(
+                label: session?.role?.toUpperCase() ?? 'GUEST',
+                icon: Icons.badge_rounded,
+                accent: const Color(0xFFA78BFA),
+              ),
+              secondaryTag: MobileTag(
+                label: syncStatus == MobileSyncStatus.syncing
+                    ? 'Syncing config'
+                    : 'Config stable',
+                icon: syncStatus == MobileSyncStatus.syncing
+                    ? Icons.sync_rounded
+                    : Icons.verified_rounded,
+                accent: syncStatus == MobileSyncStatus.error
+                    ? const Color(0xFFFB7185)
+                    : const Color(0xFF22C55E),
               ),
             ),
             const SizedBox(height: 18),

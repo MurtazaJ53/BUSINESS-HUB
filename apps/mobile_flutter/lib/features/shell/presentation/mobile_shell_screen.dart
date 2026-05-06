@@ -305,17 +305,19 @@ class _ShellHeader extends StatelessWidget {
                       letterSpacing: -0.2,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    workspaceName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.58),
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
+                  if (!compact) ...<Widget>[
+                    const SizedBox(height: 2),
+                    Text(
+                      workspaceName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.58),
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
