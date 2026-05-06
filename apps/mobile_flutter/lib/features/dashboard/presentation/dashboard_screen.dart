@@ -67,41 +67,36 @@ class DashboardScreen extends ConsumerWidget {
             return ListView(
               padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
               children: <Widget>[
-                MobileHeroBanner(
-                  eyebrow: 'Today',
+                MobileScreenLead(
                   title: overview.todaySalesCount > 0
-                      ? '${formatCurrency(overview.todayRevenue)} so far'
-                      : 'Ready for the first sale',
+                      ? '${formatCurrency(overview.todayRevenue)} today'
+                      : 'Ready to start today',
                   subtitle: overview.todaySalesCount > 0
-                      ? '${overview.todaySalesCount} sale${overview.todaySalesCount == 1 ? '' : 's'} recorded today. Keep checkout moving and watch low stock from one place.'
-                      : 'Start a sale, check stock, or follow queued receipts without digging through multiple screens.',
-                  trailing: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: <Widget>[
-                      MobileTag(
-                        label: history.queuedSales > 0
-                            ? '${history.queuedSales} queued'
-                            : 'Queue clear',
-                        icon: history.queuedSales > 0
-                            ? Icons.cloud_upload_rounded
-                            : Icons.check_circle_rounded,
-                        accent: history.queuedSales > 0
-                            ? const Color(0xFFF59E0B)
-                            : const Color(0xFF22C55E),
-                      ),
-                      const SizedBox(height: 10),
-                      MobileTag(
-                        label: syncStatus == MobileSyncStatus.syncing
-                            ? 'Syncing'
-                            : 'Live',
-                        icon: syncStatus == MobileSyncStatus.syncing
-                            ? Icons.sync_rounded
-                            : Icons.wifi_tethering_rounded,
-                        accent: syncStatus == MobileSyncStatus.error
-                            ? const Color(0xFFFB7185)
-                            : const Color(0xFF38BDF8),
-                      ),
-                    ],
+                      ? '${overview.todaySalesCount} sale${overview.todaySalesCount == 1 ? '' : 's'} recorded so far. Everything important is below in one short view.'
+                      : 'Start a sale, check stock, or follow queued receipts without moving through extra screens.',
+                  icon: Icons.storefront_rounded,
+                  accent: const Color(0xFF38BDF8),
+                  primaryTag: MobileTag(
+                    label: history.queuedSales > 0
+                        ? '${history.queuedSales} queued'
+                        : 'Queue clear',
+                    icon: history.queuedSales > 0
+                        ? Icons.cloud_upload_rounded
+                        : Icons.check_circle_rounded,
+                    accent: history.queuedSales > 0
+                        ? const Color(0xFFF59E0B)
+                        : const Color(0xFF22C55E),
+                  ),
+                  secondaryTag: MobileTag(
+                    label: syncStatus == MobileSyncStatus.syncing
+                        ? 'Syncing'
+                        : 'Live',
+                    icon: syncStatus == MobileSyncStatus.syncing
+                        ? Icons.sync_rounded
+                        : Icons.wifi_tethering_rounded,
+                    accent: syncStatus == MobileSyncStatus.error
+                        ? const Color(0xFFFB7185)
+                        : const Color(0xFF38BDF8),
                   ),
                 ),
                 const SizedBox(height: 18),

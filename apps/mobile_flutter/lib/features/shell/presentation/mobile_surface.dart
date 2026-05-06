@@ -203,6 +203,97 @@ class MobilePanel extends StatelessWidget {
   }
 }
 
+class MobileScreenLead extends StatelessWidget {
+  const MobileScreenLead({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    this.primaryTag,
+    this.secondaryTag,
+    this.accent = const Color(0xFF38BDF8),
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Widget? primaryTag;
+  final Widget? secondaryTag;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final compact = MediaQuery.sizeOf(context).width < 420;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B121F),
+        borderRadius: BorderRadius.circular(compact ? 22 : 26),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(compact ? 16 : 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Container(
+                  width: compact ? 42 : 48,
+                  height: compact ? 42 : 48,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(compact ? 14 : 16),
+                  ),
+                  child: Icon(icon, color: accent, size: compact ? 20 : 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        title,
+                        style: (compact
+                                ? theme.textTheme.titleLarge
+                                : theme.textTheme.headlineSmall)
+                            ?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.6,
+                            ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.66),
+                          fontWeight: FontWeight.w600,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (primaryTag != null || secondaryTag != null) ...<Widget>[
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  ...<Widget?>[primaryTag, secondaryTag].whereType<Widget>(),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class MobileMetricCard extends StatelessWidget {
   const MobileMetricCard({
     super.key,

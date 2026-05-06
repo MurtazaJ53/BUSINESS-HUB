@@ -62,25 +62,20 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             final metrics = snapshot.data?.metrics ?? InventoryMetrics.empty();
             return Column(
               children: <Widget>[
-                MobileHeroBanner(
-                  eyebrow: 'Inventory deck',
-                  title: 'Scroll-fast stock command',
+                MobileScreenLead(
+                  title: 'Inventory',
                   subtitle:
-                      'The catalog opens from local SQLite, then keeps absorbing Firestore updates without freezing the whole screen.',
-                  trailing: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: <Widget>[
-                      MobileTag(
-                        label: '${metrics.totalItems} products',
-                        icon: Icons.inventory_2_rounded,
-                      ),
-                      const SizedBox(height: 10),
-                      MobileTag(
-                        label: '${metrics.lowStock} critical',
-                        icon: Icons.warning_amber_rounded,
-                        accent: const Color(0xFFFB7185),
-                      ),
-                    ],
+                      'Search first, filter fast, and spot low stock without extra visual noise.',
+                  icon: Icons.inventory_2_rounded,
+                  accent: const Color(0xFF1D4ED8),
+                  primaryTag: MobileTag(
+                    label: '${metrics.totalItems} products',
+                    icon: Icons.apps_rounded,
+                  ),
+                  secondaryTag: MobileTag(
+                    label: '${metrics.lowStock} low',
+                    icon: Icons.warning_amber_rounded,
+                    accent: const Color(0xFFFB7185),
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -127,7 +122,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         ),
         const SizedBox(height: 18),
         MobilePanel(
-          title: 'Catalog controls',
+          title: 'Find products',
           action: MobileTag(
             label: _lowStockOnly ? 'LOW STOCK ONLY' : 'ALL CATALOG',
             icon: _lowStockOnly ? Icons.filter_alt_rounded : Icons.tune_rounded,

@@ -81,34 +81,28 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
             return ListView(
               padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
               children: <Widget>[
-                MobileHeroBanner(
-                  eyebrow: 'Customer desk',
-                  title: 'Known buyers, cleaner recall.',
+                MobileScreenLead(
+                  title: 'Customers',
                   subtitle: domainState.isPostgresPrimary
-                      ? 'Customers are now flowing from the PostgreSQL surface, so balances and ledger signals can travel with the mobile desk.'
-                      : 'Until customer cutover finishes, the mobile desk reconstructs buyer recall from local sales history so operators still get useful context.',
+                      ? 'Customer balances and ledger actions are live from the new backend.'
+                      : 'Legacy customer data and sales recall are available while migration finishes.',
+                  icon: Icons.groups_rounded,
                   accent: const Color(0xFF14B8A6),
-                  trailing: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: <Widget>[
-                      MobileTag(
-                        label: domainState.postureLabel,
-                        icon: domainState.isPostgresPrimary
-                            ? Icons.verified_rounded
-                            : Icons.swap_horiz_rounded,
-                        accent: domainState.isPostgresPrimary
-                            ? const Color(0xFF22C55E)
-                            : const Color(0xFF14B8A6),
-                      ),
-                      const SizedBox(height: 10),
-                      MobileTag(
-                        label: history.totalSales > 0
-                            ? '${history.totalSales} receipts known'
-                            : 'Awaiting local history',
-                        icon: Icons.receipt_long_rounded,
-                        accent: const Color(0xFF38BDF8),
-                      ),
-                    ],
+                  primaryTag: MobileTag(
+                    label: domainState.postureLabel,
+                    icon: domainState.isPostgresPrimary
+                        ? Icons.verified_rounded
+                        : Icons.swap_horiz_rounded,
+                    accent: domainState.isPostgresPrimary
+                        ? const Color(0xFF22C55E)
+                        : const Color(0xFF14B8A6),
+                  ),
+                  secondaryTag: MobileTag(
+                    label: history.totalSales > 0
+                        ? '${history.totalSales} receipts known'
+                        : 'Awaiting local history',
+                    icon: Icons.receipt_long_rounded,
+                    accent: const Color(0xFF38BDF8),
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -178,7 +172,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                 ),
                 const SizedBox(height: 18),
                 MobilePanel(
-                  title: 'Customer lookup',
+                  title: 'Find customer',
                   action: MobileTag(
                     label: _statusFilter == 'all'
                         ? (_search.isEmpty ? 'ALL KNOWN BUYERS' : 'FILTERED')

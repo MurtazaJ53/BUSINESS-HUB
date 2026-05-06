@@ -100,48 +100,39 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 140),
         children: <Widget>[
-          MobileHeroBanner(
-            eyebrow: 'Sales hub',
-            title: 'Premium checkout, native speed.',
-            subtitle:
-                'The cart opens from local SQLite first, then the commerce outbox pushes accepted sales into the new backend without blocking checkout speed.',
-            trailing: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: <Widget>[
-                StreamBuilder<int>(
-                  stream: pendingOutboxStream,
-                  builder: (context, snapshot) {
-                    final pending = snapshot.data ?? 0;
-                    return MobileTag(
-                      label: pending > 0
-                          ? '$pending queued'
-                          : '${_cart.length} in cart',
-                      icon: pending > 0
-                          ? Icons.cloud_upload_rounded
-                          : Icons.shopping_cart_checkout_rounded,
-                      accent: pending > 0
-                          ? const Color(0xFFF59E0B)
-                          : const Color(0xFF22C55E),
-                    );
-                  },
+          StreamBuilder<int>(
+            stream: pendingOutboxStream,
+            builder: (context, snapshot) {
+              final pending = snapshot.data ?? 0;
+              return MobileScreenLead(
+                title: 'POS',
+                subtitle:
+                    'Search, scan, add, and bill with the fewest taps possible.',
+                icon: Icons.point_of_sale_rounded,
+                accent: const Color(0xFF60A5FA),
+                primaryTag: MobileTag(
+                  label: pending > 0 ? '$pending queued' : '${_cart.length} in cart',
+                  icon: pending > 0
+                      ? Icons.cloud_upload_rounded
+                      : Icons.shopping_cart_checkout_rounded,
+                  accent: pending > 0
+                      ? const Color(0xFFF59E0B)
+                      : const Color(0xFF22C55E),
                 ),
-                const SizedBox(height: 10),
-                MobileTag(
-                  label: syncStatus == MobileSyncStatus.syncing
-                      ? 'Syncing'
-                      : 'Ready',
+                secondaryTag: MobileTag(
+                  label: syncStatus == MobileSyncStatus.syncing ? 'Syncing' : 'Ready',
                   icon: syncStatus == MobileSyncStatus.syncing
                       ? Icons.sync_rounded
                       : Icons.flash_on_rounded,
                 ),
-              ],
-            ),
+              );
+            },
           ),
           const SizedBox(height: 18),
           MobilePanel(
-            title: 'Cart pulse',
+            title: 'Cart',
             action: MobileTag(
-              label: _cart.isEmpty ? 'AWAITING ITEMS' : 'CHECKOUT READY',
+              label: _cart.isEmpty ? 'EMPTY' : 'READY',
               icon: _cart.isEmpty
                   ? Icons.hourglass_top_rounded
                   : Icons.shopping_bag_rounded,
@@ -152,9 +143,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             child: _cart.isEmpty
                 ? const MobileEmptyState(
                     icon: Icons.shopping_cart_outlined,
-                    title: 'Your cart is clear',
-                    body:
-                        'Search the local catalog below and tap products to begin billing.',
+                    title: 'Cart is empty',
+                    body: 'Search or scan a product below to begin billing.',
                   )
                 : Column(
                     children: <Widget>[
@@ -192,7 +182,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: <Widget>[
                                     Text(
-                                      'Current cart ready',
+                                      'Checkout ready',
                                       style: Theme.of(context)
                                           .textTheme
                                           .titleMedium
@@ -202,7 +192,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      '${_cart.length} lines staged for checkout',
+                                      '${_cart.length} line${_cart.length == 1 ? '' : 's'} in cart',
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodySmall
@@ -299,7 +289,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           ),
           const SizedBox(height: 18),
           MobilePanel(
-            title: 'Search and add',
+            title: 'Search products',
             action: MobileTag(
               label: _selectedCategory ?? 'All categories',
               icon: Icons.tune_rounded,
@@ -397,7 +387,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   ? 1
                   : (totalCount / _pageSize).ceil();
               return MobilePanel(
-                title: 'Ready-to-bill products',
+                title: 'Product results',
                 action: MobileTag(
                   label: '$totalCount results',
                   icon: Icons.inventory_rounded,

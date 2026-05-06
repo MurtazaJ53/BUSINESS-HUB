@@ -64,33 +64,27 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         return ListView(
           padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
           children: <Widget>[
-            MobileHeroBanner(
-              eyebrow: 'History feed',
-              title: 'Receipt trail and replay health.',
+            MobileScreenLead(
+              title: 'History',
               subtitle:
-                  'This feed now lets you inspect the actual receipt payload, not just the summary row, so operators can spot replay or payment problems without leaving the mobile desk.',
+                  'Search receipts, check sync state, and open exact sale details without extra steps.',
+              icon: Icons.receipt_long_rounded,
               accent: const Color(0xFFF59E0B),
-              trailing: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: <Widget>[
-                  MobileTag(
-                    label: '${overview.totalSales} receipts',
-                    icon: Icons.receipt_long_rounded,
-                    accent: const Color(0xFFF59E0B),
-                  ),
-                  const SizedBox(height: 10),
-                  MobileTag(
-                    label: overview.queuedSales > 0
-                        ? '${overview.queuedSales} queued'
-                        : 'Replay clear',
-                    icon: overview.queuedSales > 0
-                        ? Icons.cloud_upload_rounded
-                        : Icons.verified_rounded,
-                    accent: overview.queuedSales > 0
-                        ? const Color(0xFFF59E0B)
-                        : const Color(0xFF22C55E),
-                  ),
-                ],
+              primaryTag: MobileTag(
+                label: '${overview.totalSales} receipts',
+                icon: Icons.receipt_long_rounded,
+                accent: const Color(0xFFF59E0B),
+              ),
+              secondaryTag: MobileTag(
+                label: overview.queuedSales > 0
+                    ? '${overview.queuedSales} queued'
+                    : 'Replay clear',
+                icon: overview.queuedSales > 0
+                    ? Icons.cloud_upload_rounded
+                    : Icons.verified_rounded,
+                accent: overview.queuedSales > 0
+                    ? const Color(0xFFF59E0B)
+                    : const Color(0xFF22C55E),
               ),
             ),
             const SizedBox(height: 18),
@@ -142,7 +136,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             ),
             const SizedBox(height: 18),
             MobilePanel(
-              title: 'Receipt controls',
+              title: 'Find receipts',
               action: MobileTag(
                 label: _selectedSyncState == null
                     ? 'ALL STATES'
