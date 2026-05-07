@@ -75,12 +75,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         parentNavigatorKey: appRootNavigatorKey,
         path: '/settings',
-        builder: (context, state) => const SettingsScreen(),
+        pageBuilder: (context, state) =>
+            const NoTransitionPage<void>(child: SettingsScreen()),
         routes: [
           GoRoute(
             parentNavigatorKey: appRootNavigatorKey,
             path: 'advanced',
-            builder: (context, state) => const SettingsOpsScreen(),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage<void>(child: SettingsOpsScreen()),
           ),
         ],
       ),

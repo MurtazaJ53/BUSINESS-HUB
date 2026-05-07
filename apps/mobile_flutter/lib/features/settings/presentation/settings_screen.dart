@@ -40,9 +40,11 @@ class SettingsScreen extends ConsumerWidget {
               stream: pendingOutboxStream,
               builder: (context, outboxSnapshot) {
                 final pending = outboxSnapshot.data ?? 0;
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
-                  children: <Widget>[
+                return MobileStandaloneScaffold(
+                  title: 'Settings',
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
+                    children: <Widget>[
                     MobileScreenLead(
                       title: 'Settings',
                       subtitle:
@@ -328,7 +330,8 @@ class SettingsScreen extends ConsumerWidget {
                         },
                       ),
                     ),
-                  ],
+                    ],
+                  ),
                 );
               },
             );

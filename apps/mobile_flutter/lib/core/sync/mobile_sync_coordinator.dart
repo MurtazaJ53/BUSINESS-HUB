@@ -539,7 +539,7 @@ class MobileSyncCoordinator {
 
   void _startOutboxRetryLoop() {
     _outboxRetryTimer?.cancel();
-    _outboxRetryTimer = Timer.periodic(const Duration(seconds: 25), (_) {
+    _outboxRetryTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       final session = _session;
       if (session == null || !session.hasShop) {
         return;

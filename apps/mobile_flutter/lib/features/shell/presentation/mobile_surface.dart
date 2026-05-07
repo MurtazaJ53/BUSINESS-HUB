@@ -1,5 +1,112 @@
 import 'package:flutter/material.dart';
 
+class MobileStandaloneScaffold extends StatelessWidget {
+  const MobileStandaloneScaffold({
+    super.key,
+    required this.title,
+    required this.child,
+    this.trailing,
+  });
+
+  final String title;
+  final Widget child;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 420;
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: <Color>[
+              Color(0xFF05070B),
+              Color(0xFF0A1020),
+              Color(0xFF05070B),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: <Widget>[
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  compact ? 14 : 18,
+                  compact ? 14 : 18,
+                  compact ? 14 : 18,
+                  compact ? 8 : 10,
+                ),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xE6111826),
+                    borderRadius: BorderRadius.circular(compact ? 22 : 24),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.06),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: compact ? 12 : 14,
+                      vertical: compact ? 10 : 12,
+                    ),
+                    child: Row(
+                      children: <Widget>[
+                        Container(
+                          width: compact ? 44 : 48,
+                          height: compact ? 44 : 48,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF111827),
+                            borderRadius: BorderRadius.circular(
+                              compact ? 15 : 18,
+                            ),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.06),
+                            ),
+                          ),
+                          child: IconButton(
+                            onPressed: () => Navigator.of(context).maybePop(),
+                            icon: Icon(
+                              Icons.arrow_back_rounded,
+                              size: compact ? 20 : 24,
+                            ),
+                            color: Colors.white,
+                            padding: EdgeInsets.zero,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.2,
+                                ),
+                          ),
+                        ),
+                        if (trailing != null) ...<Widget>[
+                          const SizedBox(width: 10),
+                          trailing!,
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(child: child),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class MobileHeroBanner extends StatelessWidget {
   const MobileHeroBanner({
     super.key,
