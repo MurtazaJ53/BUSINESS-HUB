@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -11,8 +12,12 @@ import '../../features/settings/presentation/settings_ops_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/shell/presentation/mobile_shell_screen.dart';
 
+final GlobalKey<NavigatorState> appRootNavigatorKey =
+    GlobalKey<NavigatorState>();
+
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
+    navigatorKey: appRootNavigatorKey,
     initialLocation: '/',
     routes: [
       GoRoute(path: '/', builder: (context, state) => const AuthGateScreen()),
@@ -26,18 +31,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/dashboard',
                 builder: (context, state) => const DashboardScreen(),
-                routes: [
-                  GoRoute(
-                    path: 'settings',
-                    builder: (context, state) => const SettingsScreen(),
-                    routes: [
-                      GoRoute(
-                        path: 'advanced',
-                        builder: (context, state) => const SettingsOpsScreen(),
-                      ),
-                    ],
-                  ),
-                ],
               ),
             ],
           ),
@@ -76,6 +69,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 builder: (context, state) => const PosScreen(),
               ),
             ],
+          ),
+        ],
+      ),
+      GoRoute(
+        parentNavigatorKey: appRootNavigatorKey,
+        path: '/settings',
+        builder: (context, state) => const SettingsScreen(),
+        routes: [
+          GoRoute(
+            parentNavigatorKey: appRootNavigatorKey,
+            path: 'advanced',
+            builder: (context, state) => const SettingsOpsScreen(),
           ),
         ],
       ),

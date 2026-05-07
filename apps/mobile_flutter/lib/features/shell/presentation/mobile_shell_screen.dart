@@ -62,7 +62,7 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
   }
 
   void _openSettings() {
-    context.push('/dashboard/settings');
+    context.push('/settings');
   }
 
   @override
@@ -102,14 +102,16 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
               ),
               child: Stack(
                 children: <Widget>[
-                  const _AmbientGlow(
-                    alignment: Alignment.topLeft,
-                    color: Color(0xFF2563EB),
-                  ),
-                  const _AmbientGlow(
-                    alignment: Alignment.bottomRight,
-                    color: Color(0xFF06B6D4),
-                  ),
+                  if (!compactChrome) ...const <Widget>[
+                    _AmbientGlow(
+                      alignment: Alignment.topLeft,
+                      color: Color(0xFF2563EB),
+                    ),
+                    _AmbientGlow(
+                      alignment: Alignment.bottomRight,
+                      color: Color(0xFF06B6D4),
+                    ),
+                  ],
                   SafeArea(
                     child: Column(
                       children: <Widget>[
@@ -139,20 +141,28 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
                             child: DecoratedBox(
                               decoration: BoxDecoration(
                                 color: const Color(0xCC070B13),
-                                borderRadius: BorderRadius.circular(30),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(
+                                  compactChrome ? 24 : 30,
                                 ),
-                                boxShadow: const <BoxShadow>[
-                                  BoxShadow(
-                                    color: Color(0x55000000),
-                                    blurRadius: 36,
-                                    offset: Offset(0, 18),
+                                border: Border.all(
+                                  color: Colors.white.withValues(
+                                    alpha: compactChrome ? 0.05 : 0.08,
                                   ),
-                                ],
+                                ),
+                                boxShadow: compactChrome
+                                    ? const <BoxShadow>[]
+                                    : const <BoxShadow>[
+                                        BoxShadow(
+                                          color: Color(0x55000000),
+                                          blurRadius: 36,
+                                          offset: Offset(0, 18),
+                                        ),
+                                      ],
                               ),
                               child: ClipRRect(
-                                borderRadius: BorderRadius.circular(30),
+                                borderRadius: BorderRadius.circular(
+                                  compactChrome ? 24 : 30,
+                                ),
                                 child: widget.navigationShell,
                               ),
                             ),
@@ -172,7 +182,9 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
                                 compactChrome ? 24 : 28,
                               ),
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.08),
+                                color: Colors.white.withValues(
+                                  alpha: compactChrome ? 0.05 : 0.08,
+                                ),
                               ),
                             ),
                             child: Padding(

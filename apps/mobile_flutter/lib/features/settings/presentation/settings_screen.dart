@@ -287,7 +287,7 @@ class SettingsScreen extends ConsumerWidget {
                             Expanded(
                               child: FilledButton.tonalIcon(
                                 onPressed: () {
-                                  context.push('/dashboard/settings/advanced');
+                                  context.push('/settings/advanced');
                                 },
                                 icon: const Icon(Icons.tune_rounded),
                                 label: const Text('Advanced ops'),
