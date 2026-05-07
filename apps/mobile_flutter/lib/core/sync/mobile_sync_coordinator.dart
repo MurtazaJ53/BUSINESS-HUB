@@ -22,6 +22,9 @@ class SyncStatusNotifier extends Notifier<MobileSyncStatus> {
   MobileSyncStatus build() => MobileSyncStatus.idle;
 
   void setStatus(MobileSyncStatus next) {
+    if (state == next) {
+      return;
+    }
     state = next;
   }
 }
@@ -323,7 +326,10 @@ class MobileSyncCoordinator {
       );
     }
 
-    setStatus(MobileSyncStatus.syncing);
+    final foregroundSync = triggerCommandId != null;
+    if (foregroundSync) {
+      setStatus(MobileSyncStatus.syncing);
+    }
     CommerceSyncResult? targetResult;
     var hadFailure = false;
 
@@ -393,10 +399,16 @@ class MobileSyncCoordinator {
       }
 
       if (_salesReadsUseBackend) {
-        await _syncBackendSalesSnapshot(session, session.shopId!);
+        await _syncBackendSalesSnapshot(
+          session,
+          session.shopId!,
+          updateStatus: foregroundSync,
+        );
       }
 
-      setStatus(hadFailure ? MobileSyncStatus.error : MobileSyncStatus.idle);
+      if (foregroundSync) {
+        setStatus(hadFailure ? MobileSyncStatus.error : MobileSyncStatus.idle);
+      }
       return targetResult ??
           CommerceSyncResult(
             commandId: triggerCommandId ?? entries.first.commandId,
@@ -534,7 +546,13 @@ class MobileSyncCoordinator {
       }
       unawaited(flushCommerceOutbox());
       if (_salesReadsUseBackend) {
-        unawaited(_syncBackendSalesSnapshot(session, session.shopId!));
+        unawaited(
+          _syncBackendSalesSnapshot(
+            session,
+            session.shopId!,
+            updateStatus: false,
+          ),
+        );
       }
     });
   }
@@ -542,6 +560,7 @@ class MobileSyncCoordinator {
   Future<void> _syncBackendSalesSnapshot(
     MobileSession session,
     String shopId,
+    {bool updateStatus = true}
   ) async {
     try {
       final backendSales = await _backendApiClient.fetchRecentSales(
@@ -558,10 +577,14 @@ class MobileSyncCoordinator {
           updatedAt: updatedAt,
         );
       }
-      setStatus(MobileSyncStatus.idle);
+      if (updateStatus) {
+        setStatus(MobileSyncStatus.idle);
+      }
     } catch (error) {
       debugPrint('Backend sales snapshot sync failed: $error');
-      setStatus(MobileSyncStatus.error);
+      if (updateStatus) {
+        setStatus(MobileSyncStatus.error);
+      }
     }
   }
 
