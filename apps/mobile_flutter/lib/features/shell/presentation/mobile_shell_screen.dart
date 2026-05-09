@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
+import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 
 final List<GlobalKey<NavigatorState>> mobileShellBranchNavigatorKeys =
@@ -67,7 +67,8 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final shopStream = ref.watch(shopRepositoryProvider).watchShopInfo();
+    final shop =
+        ref.watch(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
     final syncStatus = ref.watch(syncStatusProvider);
     final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
     final navItem = _navItems[widget.navigationShell.currentIndex];
@@ -82,154 +83,146 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
           await _handleBackNavigation();
         }
       },
-      child: StreamBuilder<ShopInfo>(
-        stream: shopStream,
-        builder: (context, snapshot) {
-          final shop = snapshot.data ?? ShopInfo.fallback();
-          return Scaffold(
-            backgroundColor: Colors.transparent,
-            body: DecoratedBox(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: <Color>[
-                    Color(0xFF05070B),
-                    Color(0xFF0A1020),
-                    Color(0xFF05070B),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: <Color>[
+                Color(0xFF05070B),
+                Color(0xFF0A1020),
+                Color(0xFF05070B),
+              ],
+            ),
+          ),
+          child: Stack(
+            children: <Widget>[
+              if (!compactChrome) ...const <Widget>[
+                _AmbientGlow(
+                  alignment: Alignment.topLeft,
+                  color: Color(0xFF2563EB),
+                ),
+                _AmbientGlow(
+                  alignment: Alignment.bottomRight,
+                  color: Color(0xFF06B6D4),
+                ),
+              ],
+              SafeArea(
+                child: Column(
+                  children: <Widget>[
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        compactChrome ? 14 : 18,
+                        compactChrome ? 14 : 18,
+                        compactChrome ? 14 : 18,
+                        compactChrome ? 8 : 10,
+                      ),
+                      child: _ShellHeader(
+                        title: navItem.title,
+                        workspaceName: shop.name,
+                        compact: compactChrome,
+                        syncStatus: syncStatus,
+                        canGoBack: _hasBackPath,
+                        onBackPressed: _handleBackNavigation,
+                        onSettingsPressed: _openSettings,
+                        onRefreshPressed: syncCoordinator.refresh,
+                      ),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: horizontalInset,
+                        ),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: const Color(0xCC070B13),
+                            borderRadius: BorderRadius.circular(
+                              compactChrome ? 24 : 30,
+                            ),
+                            border: Border.all(
+                              color: Colors.white.withValues(
+                                alpha: compactChrome ? 0.05 : 0.08,
+                              ),
+                            ),
+                            boxShadow: compactChrome
+                                ? const <BoxShadow>[]
+                                : const <BoxShadow>[
+                                    BoxShadow(
+                                      color: Color(0x55000000),
+                                      blurRadius: 36,
+                                      offset: Offset(0, 18),
+                                    ),
+                                  ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(
+                              compactChrome ? 24 : 30,
+                            ),
+                            child: widget.navigationShell,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        horizontalInset,
+                        compactChrome ? 10 : 12,
+                        horizontalInset,
+                        compactChrome ? 12 : 16,
+                      ),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: const Color(0xE6111826),
+                          borderRadius: BorderRadius.circular(
+                            compactChrome ? 24 : 28,
+                          ),
+                          border: Border.all(
+                            color: Colors.white.withValues(
+                              alpha: compactChrome ? 0.05 : 0.08,
+                            ),
+                          ),
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: compactChrome ? 4 : 8,
+                            vertical: compactChrome ? 6 : 8,
+                          ),
+                          child: Row(
+                            children: _navItems
+                                .asMap()
+                                .entries
+                                .map(
+                                  (entry) => Expanded(
+                                    child: _NavButton(
+                                      item: entry.value,
+                                      active:
+                                          widget.navigationShell.currentIndex ==
+                                          entry.key,
+                                      compact: compactChrome,
+                                      onTap: () => _goToBranch(entry.key),
+                                    ),
+                                  ),
+                                )
+                                .toList(growable: false),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
-              child: Stack(
-                children: <Widget>[
-                  if (!compactChrome) ...const <Widget>[
-                    _AmbientGlow(
-                      alignment: Alignment.topLeft,
-                      color: Color(0xFF2563EB),
-                    ),
-                    _AmbientGlow(
-                      alignment: Alignment.bottomRight,
-                      color: Color(0xFF06B6D4),
-                    ),
-                  ],
-                  SafeArea(
-                    child: Column(
-                      children: <Widget>[
-                        Padding(
-                          padding: EdgeInsets.fromLTRB(
-                            compactChrome ? 14 : 18,
-                            compactChrome ? 14 : 18,
-                            compactChrome ? 14 : 18,
-                            compactChrome ? 8 : 10,
-                          ),
-                          child: _ShellHeader(
-                            title: navItem.title,
-                            workspaceName: shop.name,
-                            compact: compactChrome,
-                            syncStatus: syncStatus,
-                            canGoBack: _hasBackPath,
-                            onBackPressed: _handleBackNavigation,
-                            onSettingsPressed: _openSettings,
-                            onRefreshPressed: syncCoordinator.refresh,
-                          ),
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: horizontalInset,
-                            ),
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: const Color(0xCC070B13),
-                                borderRadius: BorderRadius.circular(
-                                  compactChrome ? 24 : 30,
-                                ),
-                                border: Border.all(
-                                  color: Colors.white.withValues(
-                                    alpha: compactChrome ? 0.05 : 0.08,
-                                  ),
-                                ),
-                                boxShadow: compactChrome
-                                    ? const <BoxShadow>[]
-                                    : const <BoxShadow>[
-                                        BoxShadow(
-                                          color: Color(0x55000000),
-                                          blurRadius: 36,
-                                          offset: Offset(0, 18),
-                                        ),
-                                      ],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(
-                                  compactChrome ? 24 : 30,
-                                ),
-                                child: widget.navigationShell,
-                              ),
-                            ),
-                          ),
-                        ),
-                        Padding(
-                          padding: EdgeInsets.fromLTRB(
-                            horizontalInset,
-                            compactChrome ? 10 : 12,
-                            horizontalInset,
-                            compactChrome ? 12 : 16,
-                          ),
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: const Color(0xE6111826),
-                              borderRadius: BorderRadius.circular(
-                                compactChrome ? 24 : 28,
-                              ),
-                              border: Border.all(
-                                color: Colors.white.withValues(
-                                  alpha: compactChrome ? 0.05 : 0.08,
-                                ),
-                              ),
-                            ),
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: compactChrome ? 4 : 8,
-                                vertical: compactChrome ? 6 : 8,
-                              ),
-                              child: Row(
-                                children: _navItems
-                                    .asMap()
-                                    .entries
-                                    .map(
-                                      (entry) => Expanded(
-                                        child: _NavButton(
-                                          item: entry.value,
-                                          active:
-                                              widget
-                                                  .navigationShell
-                                                  .currentIndex ==
-                                              entry.key,
-                                          compact: compactChrome,
-                                          onTap: () => _goToBranch(entry.key),
-                                        ),
-                                      ),
-                                    )
-                                    .toList(growable: false),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (syncStatus == MobileSyncStatus.syncing)
-                    const Positioned(
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      child: LinearProgressIndicator(minHeight: 2),
-                    ),
-                ],
-              ),
-            ),
-          );
-        },
+              if (syncStatus == MobileSyncStatus.syncing)
+                const Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: LinearProgressIndicator(minHeight: 2),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -297,9 +290,7 @@ class _ShellHeader extends StatelessWidget {
           children: <Widget>[
             _HeaderIconButton(
               compact: compact,
-              icon: canGoBack
-                  ? Icons.arrow_back_rounded
-                  : Icons.tune_rounded,
+              icon: canGoBack ? Icons.arrow_back_rounded : Icons.tune_rounded,
               onPressed: canGoBack ? onBackPressed : onSettingsPressed,
             ),
             SizedBox(width: compact ? 10 : 12),
