@@ -6,6 +6,7 @@ import '../../../core/backend/backend_api_client.dart';
 import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/models/mobile_session.dart';
+import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/utils/formatters.dart';
@@ -51,29 +52,32 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(mobileSessionProvider).asData?.value;
-    final inventoryRepository = ref.watch(inventoryRepositoryProvider);
-    final shopRepository = ref.watch(shopRepositoryProvider);
-    final salesRepository = ref.watch(salesRepositoryProvider);
+    final inventoryRepository = ref.read(inventoryRepositoryProvider);
+    final salesRepository = ref.read(salesRepositoryProvider);
     final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
     final backendApiClient = ref.watch(backendApiClientProvider);
     final syncStatus = ref.watch(syncStatusProvider);
-    final shopStream = shopRepository.watchShopInfo();
-    final categoriesStream = inventoryRepository.watchCategories();
-    final pendingOutboxStream = salesRepository.watchPendingOutboxCount();
-    final customerDomainStateStream = shopRepository.watchDomainState(
-      'customers',
-    );
-    final catalogStream = inventoryRepository.watchCatalogPage(
+    final shop =
+        ref.watch(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
+    final categories =
+        ref.watch(inventoryCategoriesProvider).asData?.value ??
+        const <InventoryCategorySummary>[];
+    final pending = ref.watch(pendingOutboxCountProvider).asData?.value ?? 0;
+    final customerDomainState =
+        ref.watch(domainStateProvider('customers')).asData?.value ??
+        DomainControlState.legacy('customers');
+    final catalogFilter = PosCatalogFilter(
       search: _search,
       category: _selectedCategory,
       page: _page,
       pageSize: _pageSize,
       includeCost: session?.canViewCost ?? false,
     );
-    final countStream = inventoryRepository.watchCatalogCount(
-      search: _search,
-      category: _selectedCategory,
-    );
+    final items =
+        ref.watch(posCatalogPageProvider(catalogFilter)).asData?.value ??
+        const <InventoryCatalogItem>[];
+    final totalCount =
+        ref.watch(posCatalogCountProvider(catalogFilter)).asData?.value ?? 0;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -86,8 +90,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 backendApiClient: backendApiClient,
                 salesRepository: salesRepository,
                 syncCoordinator: syncCoordinator,
-                shopStream: shopStream,
-                customerDomainStateStream: customerDomainStateStream,
+                shop: shop,
+                customerDomainState: customerDomainState,
                 activeShopId: session?.shopId,
               ),
               backgroundColor: const Color(0xFF2563EB),
@@ -100,33 +104,31 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 140),
         children: <Widget>[
-          StreamBuilder<int>(
-            stream: pendingOutboxStream,
-            builder: (context, snapshot) {
-              final pending = snapshot.data ?? 0;
-              return MobileScreenLead(
-                title: 'POS',
-                subtitle:
-                    'Search, scan, add, and bill with the fewest taps possible.',
-                icon: Icons.point_of_sale_rounded,
-                accent: const Color(0xFF60A5FA),
-                primaryTag: MobileTag(
-                  label: pending > 0 ? '$pending queued' : '${_cart.length} in cart',
-                  icon: pending > 0
-                      ? Icons.cloud_upload_rounded
-                      : Icons.shopping_cart_checkout_rounded,
-                  accent: pending > 0
-                      ? const Color(0xFFF59E0B)
-                      : const Color(0xFF22C55E),
-                ),
-                secondaryTag: MobileTag(
-                  label: syncStatus == MobileSyncStatus.syncing ? 'Syncing' : 'Ready',
-                  icon: syncStatus == MobileSyncStatus.syncing
-                      ? Icons.sync_rounded
-                      : Icons.flash_on_rounded,
-                ),
-              );
-            },
+          MobileScreenLead(
+            title: 'POS',
+            subtitle:
+                'Search, scan, add, and bill with the fewest taps possible.',
+            icon: Icons.point_of_sale_rounded,
+            accent: const Color(0xFF60A5FA),
+            primaryTag: MobileTag(
+              label: pending > 0
+                  ? '$pending queued'
+                  : '${_cart.length} in cart',
+              icon: pending > 0
+                  ? Icons.cloud_upload_rounded
+                  : Icons.shopping_cart_checkout_rounded,
+              accent: pending > 0
+                  ? const Color(0xFFF59E0B)
+                  : const Color(0xFF22C55E),
+            ),
+            secondaryTag: MobileTag(
+              label: syncStatus == MobileSyncStatus.syncing
+                  ? 'Syncing'
+                  : 'Ready',
+              icon: syncStatus == MobileSyncStatus.syncing
+                  ? Icons.sync_rounded
+                  : Icons.flash_on_rounded,
+            ),
           ),
           const SizedBox(height: 18),
           MobilePanel(
@@ -338,51 +340,42 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                StreamBuilder<List<InventoryCategorySummary>>(
-                  stream: categoriesStream,
-                  builder: (context, snapshot) {
-                    final categories =
-                        snapshot.data ?? const <InventoryCategorySummary>[];
-                    return SizedBox(
-                      height: 46,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: <Widget>[
-                          _PosCategoryChip(
-                            label: 'All',
-                            active: _selectedCategory == null,
-                            onTap: () {
-                              setState(() {
-                                _selectedCategory = null;
-                                _page = 1;
-                              });
-                            },
-                          ),
-                          ...categories.map(
-                            (category) => _PosCategoryChip(
-                              label: category.category,
-                              active: _selectedCategory == category.category,
-                              onTap: () {
-                                setState(() {
-                                  _selectedCategory = category.category;
-                                  _page = 1;
-                                });
-                              },
-                            ),
-                          ),
-                        ],
+                SizedBox(
+                  height: 46,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: <Widget>[
+                      _PosCategoryChip(
+                        label: 'All',
+                        active: _selectedCategory == null,
+                        onTap: () {
+                          setState(() {
+                            _selectedCategory = null;
+                            _page = 1;
+                          });
+                        },
                       ),
-                    );
-                  },
+                      ...categories.map(
+                        (category) => _PosCategoryChip(
+                          label: category.category,
+                          active: _selectedCategory == category.category,
+                          onTap: () {
+                            setState(() {
+                              _selectedCategory = category.category;
+                              _page = 1;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 18),
-          StreamBuilder<int>(
-            stream: countStream,
-            builder: (context, countSnapshot) {
-              final totalCount = countSnapshot.data ?? 0;
+          Builder(
+            builder: (context) {
               final totalPages = totalCount == 0
                   ? 1
                   : (totalCount / _pageSize).ceil();
@@ -393,13 +386,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   icon: Icons.inventory_rounded,
                   accent: const Color(0xFFA78BFA),
                 ),
-                child: StreamBuilder<List<InventoryCatalogItem>>(
-                  stream: catalogStream,
-                  builder: (context, snapshot) {
-                    final items =
-                        snapshot.data ?? const <InventoryCatalogItem>[];
-                    if (items.isEmpty) {
-                      return MobileEmptyState(
+                child: items.isEmpty
+                    ? MobileEmptyState(
                         icon: syncStatus == MobileSyncStatus.syncing
                             ? Icons.sync_rounded
                             : Icons.point_of_sale_outlined,
@@ -409,62 +397,58 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                         body: syncStatus == MobileSyncStatus.syncing
                             ? 'Wait a moment while inventory lands into the local mobile catalog.'
                             : 'Try a different search or category filter.',
-                      );
-                    }
-
-                    return Column(
-                      children: <Widget>[
-                        ...items.map(
-                          (item) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _PosCatalogRow(
-                              item: item,
-                              onAdd: () => _addToCart(item),
+                      )
+                    : Column(
+                        children: <Widget>[
+                          ...items.map(
+                            (item) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _PosCatalogRow(
+                                item: item,
+                                onAdd: () => _addToCart(item),
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: <Widget>[
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: _page > 1
-                                    ? () {
-                                        setState(() {
-                                          _page -= 1;
-                                        });
-                                      }
-                                    : null,
-                                child: const Text('Previous'),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: <Widget>[
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: _page > 1
+                                      ? () {
+                                          setState(() {
+                                            _page -= 1;
+                                          });
+                                        }
+                                      : null,
+                                  child: const Text('Previous'),
+                                ),
                               ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
+                                child: Text(
+                                  'Page $_page / $totalPages',
+                                  style: Theme.of(context).textTheme.labelLarge,
+                                ),
                               ),
-                              child: Text(
-                                'Page $_page / $totalPages',
-                                style: Theme.of(context).textTheme.labelLarge,
+                              Expanded(
+                                child: FilledButton.tonal(
+                                  onPressed: _page < totalPages
+                                      ? () {
+                                          setState(() {
+                                            _page += 1;
+                                          });
+                                        }
+                                      : null,
+                                  child: const Text('Next'),
+                                ),
                               ),
-                            ),
-                            Expanded(
-                              child: FilledButton.tonal(
-                                onPressed: _page < totalPages
-                                    ? () {
-                                        setState(() {
-                                          _page += 1;
-                                        });
-                                      }
-                                    : null,
-                                child: const Text('Next'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    );
-                  },
-                ),
+                            ],
+                          ),
+                        ],
+                      ),
               );
             },
           ),
@@ -635,12 +619,10 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     required BackendApiClient backendApiClient,
     required SalesRepository salesRepository,
     required MobileSyncCoordinator syncCoordinator,
-    required Stream<ShopInfo> shopStream,
-    required Stream<DomainControlState> customerDomainStateStream,
+    required ShopInfo shop,
+    required DomainControlState customerDomainState,
     required String? activeShopId,
   }) async {
-    final shop = await shopStream.first;
-    final customerDomainState = await customerDomainStateStream.first;
     if (!context.mounted) {
       return;
     }

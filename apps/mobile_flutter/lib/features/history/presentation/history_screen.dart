@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/mobile_repository.dart';
 import '../../../core/insights/mobile_operational_insights.dart';
 import '../../../core/models/mobile_models.dart';
+import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/utils/formatters.dart';
 import '../../shell/presentation/mobile_surface.dart';
@@ -17,11 +18,7 @@ class HistoryScreen extends ConsumerStatefulWidget {
 
 class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   final TextEditingController _searchController = TextEditingController();
-  String _search = '';
-  CommerceSyncState? _selectedSyncState;
-  String? _selectedPaymentMode;
-  _HistoryDateWindow _selectedDateWindow = _HistoryDateWindow.all;
-  bool _onlyDueSales = false;
+  HistoryFilter _filter = const HistoryFilter();
 
   @override
   void dispose() {
@@ -31,39 +28,26 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final salesRepository = ref.watch(salesRepositoryProvider);
-    final shopRepository = ref.watch(shopRepositoryProvider);
+    final salesRepository = ref.read(salesRepositoryProvider);
     final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
     final syncStatus = ref.watch(syncStatusProvider);
-    final historyStream = salesRepository.watchHistoryOverview();
-    final recentSalesStream = salesRepository
-        .watchRecentSales(
-          limit: 100,
-          search: _search,
-          syncState: _selectedSyncState,
-          paymentMode: _selectedPaymentMode,
-        )
-        .map(
-          (sales) => sales
-              .where(
-                (sale) =>
-                    _matchesDateWindow(sale.date) &&
-                    (!_onlyDueSales || sale.hasOutstandingDue),
-              )
-              .toList(growable: false),
-        );
-    final domainStatesStream = shopRepository.watchTrackedDomainStates(
-      const <String>['sales', 'payments'],
-    );
+    final overview =
+        ref.watch(historyOverviewProvider).asData?.value ??
+        HistoryOverview.empty();
+    final sales =
+        ref.watch(historySalesProvider(_filter)).asData?.value ??
+        const <RecentSaleSummary>[];
+    final states =
+        ref.watch(historyDomainStatesProvider).asData?.value ??
+        <DomainControlState>[
+          DomainControlState.legacy('sales'),
+          DomainControlState.legacy('payments'),
+        ];
+    final report = HistoryReportSnapshot.fromSales(sales);
 
-    return StreamBuilder<HistoryOverview>(
-      stream: historyStream,
-      builder: (context, historySnapshot) {
-        final overview = historySnapshot.data ?? HistoryOverview.empty();
-
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
-          children: <Widget>[
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
+      children: <Widget>[
             MobileScreenLead(
               title: 'History',
               subtitle:
@@ -138,9 +122,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             MobilePanel(
               title: 'Find receipts',
               action: MobileTag(
-                label: _selectedSyncState == null
+                label: _filter.syncState == null
                     ? 'ALL STATES'
-                    : _syncLabel(_selectedSyncState!),
+                    : _syncLabel(_filter.syncState!),
                 icon: Icons.tune_rounded,
                 accent: const Color(0xFFA78BFA),
               ),
@@ -151,19 +135,19 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     controller: _searchController,
                     onChanged: (value) {
                       setState(() {
-                        _search = value;
+                        _filter = _filter.copyWith(search: value);
                       });
                     },
                     decoration: InputDecoration(
                       hintText: 'Search customer, phone, or local receipt id',
                       prefixIcon: const Icon(Icons.search_rounded),
-                      suffixIcon: _search.isEmpty
+                      suffixIcon: _filter.search.isEmpty
                           ? null
                           : IconButton(
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() {
-                                  _search = '';
+                                  _filter = _filter.copyWith(search: '');
                                 });
                               },
                               icon: const Icon(Icons.close_rounded),
@@ -177,20 +161,20 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     children: <Widget>[
                       _SyncFilterChip(
                         label: 'All',
-                        active: _selectedSyncState == null,
+                        active: _filter.syncState == null,
                         onTap: () {
                           setState(() {
-                            _selectedSyncState = null;
+                            _filter = _filter.copyWith(clearSyncState: true);
                           });
                         },
                       ),
                       ...CommerceSyncState.values.map(
                         (state) => _SyncFilterChip(
                           label: _syncLabel(state),
-                          active: _selectedSyncState == state,
+                          active: _filter.syncState == state,
                           onTap: () {
                             setState(() {
-                              _selectedSyncState = state;
+                              _filter = _filter.copyWith(syncState: state);
                             });
                           },
                         ),
@@ -204,20 +188,20 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     children: <Widget>[
                       _SyncFilterChip(
                         label: 'Any pay',
-                        active: _selectedPaymentMode == null,
+                        active: _filter.paymentMode == null,
                         onTap: () {
                           setState(() {
-                            _selectedPaymentMode = null;
+                            _filter = _filter.copyWith(clearPaymentMode: true);
                           });
                         },
                       ),
                       ..._historyPaymentModes.map(
                         (mode) => _SyncFilterChip(
                           label: mode,
-                          active: _selectedPaymentMode == mode,
+                          active: _filter.paymentMode == mode,
                           onTap: () {
                             setState(() {
-                              _selectedPaymentMode = mode;
+                              _filter = _filter.copyWith(paymentMode: mode);
                             });
                           },
                         ),
@@ -228,14 +212,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: _HistoryDateWindow.values
+                    children: HistoryDateWindow.values
                         .map(
                           (window) => _SyncFilterChip(
                             label: window.label,
-                            active: _selectedDateWindow == window,
+                            active: _filter.dateWindow == window,
                             onTap: () {
                               setState(() {
-                                _selectedDateWindow = window;
+                                _filter = _filter.copyWith(dateWindow: window);
                               });
                             },
                           ),
@@ -248,11 +232,15 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     runSpacing: 8,
                     children: <Widget>[
                       _SyncFilterChip(
-                        label: _onlyDueSales ? 'Due only' : 'All balances',
-                        active: _onlyDueSales,
+                        label: _filter.onlyDueSales
+                            ? 'Due only'
+                            : 'All balances',
+                        active: _filter.onlyDueSales,
                         onTap: () {
                           setState(() {
-                            _onlyDueSales = !_onlyDueSales;
+                            _filter = _filter.copyWith(
+                              onlyDueSales: !_filter.onlyDueSales,
+                            );
                           });
                         },
                       ),
@@ -285,51 +273,35 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               ),
             ),
             const SizedBox(height: 18),
-            StreamBuilder<List<DomainControlState>>(
-              stream: domainStatesStream,
-              builder: (context, domainSnapshot) {
-                final states =
-                    domainSnapshot.data ??
-                    <DomainControlState>[
-                      DomainControlState.legacy('sales'),
-                      DomainControlState.legacy('payments'),
-                    ];
-                return MobilePanel(
-                  title: 'Commerce cutover posture',
-                  action: MobileTag(
-                    label: syncStatus == MobileSyncStatus.syncing
-                        ? 'Refreshing'
-                        : 'Live posture',
-                    icon: syncStatus == MobileSyncStatus.syncing
-                        ? Icons.sync_rounded
-                        : Icons.wifi_tethering_rounded,
-                    accent: syncStatus == MobileSyncStatus.error
-                        ? const Color(0xFFFB7185)
-                        : const Color(0xFF38BDF8),
-                  ),
-                  child: Column(
-                    children: states
-                        .map(
-                          (state) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _DomainPostureRow(state: state),
-                          ),
-                        )
-                        .toList(growable: false),
-                  ),
-                );
-              },
+            MobilePanel(
+              title: 'Commerce cutover posture',
+              action: MobileTag(
+                label: syncStatus == MobileSyncStatus.syncing
+                    ? 'Refreshing'
+                    : 'Live posture',
+                icon: syncStatus == MobileSyncStatus.syncing
+                    ? Icons.sync_rounded
+                    : Icons.wifi_tethering_rounded,
+                accent: syncStatus == MobileSyncStatus.error
+                    ? const Color(0xFFFB7185)
+                    : const Color(0xFF38BDF8),
+              ),
+              child: Column(
+                children: states
+                    .map(
+                      (state) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _DomainPostureRow(state: state),
+                      ),
+                    )
+                    .toList(growable: false),
+              ),
             ),
             const SizedBox(height: 18),
-            StreamBuilder<List<RecentSaleSummary>>(
-              stream: recentSalesStream,
-              builder: (context, snapshot) {
-                final sales = snapshot.data ?? const <RecentSaleSummary>[];
-                final report = HistoryReportSnapshot.fromSales(sales);
-                return MobilePanel(
+            MobilePanel(
                   title: 'Filtered report pulse',
                   action: MobileTag(
-                    label: _selectedDateWindow.label,
+                    label: _filter.dateWindow.label,
                     icon: Icons.insights_rounded,
                     accent: const Color(0xFF22C55E),
                   ),
@@ -420,8 +392,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                             ],
                           ],
                         ),
-                );
-              },
             ),
             const SizedBox(height: 18),
             MobilePanel(
@@ -433,12 +403,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 icon: Icons.schedule_rounded,
                 accent: const Color(0xFFA78BFA),
               ),
-              child: StreamBuilder<List<RecentSaleSummary>>(
-                stream: recentSalesStream,
-                builder: (context, snapshot) {
-                  final sales = snapshot.data ?? const <RecentSaleSummary>[];
-                  if (sales.isEmpty) {
-                    return MobileEmptyState(
+              child: sales.isEmpty
+                  ? MobileEmptyState(
                       icon: syncStatus == MobileSyncStatus.syncing
                           ? Icons.sync_rounded
                           : Icons.history_toggle_off_rounded,
@@ -448,61 +414,27 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                       body: syncStatus == MobileSyncStatus.syncing
                           ? 'Give the mobile vault a moment while it hydrates the recent commerce trail.'
                           : 'As soon as sales hit the local vault or backend replay, they will appear here.',
-                    );
-                  }
-
-                  return Column(
-                    children: sales
-                        .map(
-                          (sale) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _HistorySaleRow(
-                              sale: sale,
-                              onTap: () => _openSaleDetail(
-                                context,
-                                salesRepository,
-                                sale,
+                    )
+                  : Column(
+                      children: sales
+                          .map(
+                            (sale) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _HistorySaleRow(
+                                sale: sale,
+                                onTap: () => _openSaleDetail(
+                                  context,
+                                  salesRepository,
+                                  sale,
+                                ),
                               ),
                             ),
-                          ),
-                        )
-                        .toList(growable: false),
-                  );
-                },
-              ),
+                          )
+                          .toList(growable: false),
+                    ),
             ),
           ],
         );
-      },
-    );
-  }
-
-  bool _matchesDateWindow(String rawDate) {
-    if (_selectedDateWindow == _HistoryDateWindow.all) {
-      return true;
-    }
-
-    final parsed = DateTime.tryParse(rawDate);
-    if (parsed == null) {
-      return true;
-    }
-
-    final saleDate = DateTime(parsed.year, parsed.month, parsed.day);
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    return switch (_selectedDateWindow) {
-      _HistoryDateWindow.all => true,
-      _HistoryDateWindow.today => saleDate == today,
-      _HistoryDateWindow.sevenDays => !saleDate.isBefore(
-        today.subtract(const Duration(days: 6)),
-      ),
-      _HistoryDateWindow.thirtyDays => !saleDate.isBefore(
-        today.subtract(const Duration(days: 29)),
-      ),
-      _HistoryDateWindow.ninetyDays => !saleDate.isBefore(
-        today.subtract(const Duration(days: 89)),
-      ),
-    };
   }
 
   Future<void> _openSaleDetail(
@@ -1152,18 +1084,6 @@ String _syncLabel(CommerceSyncState state) {
     CommerceSyncState.synced => 'SYNCED',
     CommerceSyncState.failed => 'FAILED',
   };
-}
-
-enum _HistoryDateWindow {
-  all('All time'),
-  today('Today'),
-  sevenDays('7 days'),
-  thirtyDays('30 days'),
-  ninetyDays('90 days');
-
-  const _HistoryDateWindow(this.label);
-
-  final String label;
 }
 
 const List<String> _historyPaymentModes = <String>[

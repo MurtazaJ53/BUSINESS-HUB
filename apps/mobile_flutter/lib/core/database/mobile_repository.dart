@@ -214,13 +214,15 @@ class ShopRepository {
       return;
     }
 
-    await _db.into(_db.shopSettingsEntries).insertOnConflictUpdate(
-      ShopSettingsEntriesCompanion.insert(
-        key: _pilotEvidenceTrackerKey,
-        value: jsonEncode(state.toJson()),
-        updatedAt: DateTime.now().millisecondsSinceEpoch,
-      ),
-    );
+    await _db
+        .into(_db.shopSettingsEntries)
+        .insertOnConflictUpdate(
+          ShopSettingsEntriesCompanion.insert(
+            key: _pilotEvidenceTrackerKey,
+            value: jsonEncode(state.toJson()),
+            updatedAt: DateTime.now().millisecondsSinceEpoch,
+          ),
+        );
   }
 
   Future<void> markPilotEvidenceCaptured(
@@ -644,7 +646,11 @@ class CustomerRepository {
     ''';
 
     return _db
-        .customSelect(sql, variables: variables, readsFrom: {_db.customerEntries})
+        .customSelect(
+          sql,
+          variables: variables,
+          readsFrom: {_db.customerEntries},
+        )
         .watch()
         .map(
           (rows) => rows
@@ -669,53 +675,56 @@ class CustomerRepository {
     Map<String, dynamic> data, {
     required int updatedAt,
   }) async {
-    final createdAt = _asEpoch(data['createdAt'] ?? data['created_at']) ?? updatedAt;
+    final createdAt =
+        _asEpoch(data['createdAt'] ?? data['created_at']) ?? updatedAt;
     final lastSeenAt =
         _asEpoch(data['lastSeenAt'] ?? data['last_seen_at']) ??
         _asEpoch(data['updatedAt'] ?? data['updated_at']) ??
         updatedAt;
 
-    await _db.into(_db.customerEntries).insertOnConflictUpdate(
-      CustomerEntriesCompanion.insert(
-        id: id,
-        name: (data['name'] ?? data['customerName'] ?? 'Unnamed customer')
-            .toString(),
-        phone: Value(
-          _asStringOrNull(
-            data['phone'] ?? data['mobile'] ?? data['mobileNumber'],
+    await _db
+        .into(_db.customerEntries)
+        .insertOnConflictUpdate(
+          CustomerEntriesCompanion.insert(
+            id: id,
+            name: (data['name'] ?? data['customerName'] ?? 'Unnamed customer')
+                .toString(),
+            phone: Value(
+              _asStringOrNull(
+                data['phone'] ?? data['mobile'] ?? data['mobileNumber'],
+              ),
+            ),
+            email: Value(_asStringOrNull(data['email'])),
+            notes: Value(
+              _asStringOrNull(data['notes'] ?? data['note'] ?? data['remark']),
+            ),
+            status: Value(
+              _asStringOrNull(data['status']) ??
+                  (data['tombstone'] == true ? 'archived' : 'active'),
+            ),
+            totalSpent: Value(
+              _asDouble(
+                data['totalSpent'] ??
+                    data['total_spent'] ??
+                    data['lifetimeSpend'] ??
+                    data['lifetime_spend'],
+              ),
+            ),
+            balance: Value(
+              _asDouble(
+                data['balance'] ??
+                    data['currentBalance'] ??
+                    data['current_balance'] ??
+                    data['dueAmount'] ??
+                    data['due_amount'],
+              ),
+            ),
+            createdAt: createdAt,
+            updatedAt: Value(updatedAt),
+            lastSeenAt: Value(lastSeenAt),
+            tombstone: Value(data['tombstone'] == true),
           ),
-        ),
-        email: Value(_asStringOrNull(data['email'])),
-        notes: Value(
-          _asStringOrNull(data['notes'] ?? data['note'] ?? data['remark']),
-        ),
-        status: Value(
-          _asStringOrNull(data['status']) ??
-              (data['tombstone'] == true ? 'archived' : 'active'),
-        ),
-        totalSpent: Value(
-          _asDouble(
-            data['totalSpent'] ??
-                data['total_spent'] ??
-                data['lifetimeSpend'] ??
-                data['lifetime_spend'],
-          ),
-        ),
-        balance: Value(
-          _asDouble(
-            data['balance'] ??
-                data['currentBalance'] ??
-                data['current_balance'] ??
-                data['dueAmount'] ??
-                data['due_amount'],
-          ),
-        ),
-        createdAt: createdAt,
-        updatedAt: Value(updatedAt),
-        lastSeenAt: Value(lastSeenAt),
-        tombstone: Value(data['tombstone'] == true),
-      ),
-    );
+        );
   }
 
   Future<void> clearWorkspace() async {
@@ -768,8 +777,12 @@ class SalesRepository {
     String search = '',
     String? paymentMode,
     CommerceSyncState? syncState,
+    HistoryFilter? filter,
   }) {
-    final normalized = search.trim().toLowerCase();
+    final effectiveLimit = filter?.limit ?? limit;
+    final normalized = (filter?.search ?? search).trim().toLowerCase();
+    final effectivePaymentMode = filter?.paymentMode ?? paymentMode;
+    final effectiveSyncState = filter?.syncState ?? syncState;
     final query = _db.select(_db.salesEntries)
       ..where((tbl) => tbl.tombstone.equals(false));
 
@@ -782,12 +795,12 @@ class SalesRepository {
       );
     }
 
-    if (paymentMode != null && paymentMode.isNotEmpty) {
-      query.where((tbl) => tbl.paymentMode.equals(paymentMode));
+    if (effectivePaymentMode != null && effectivePaymentMode.isNotEmpty) {
+      query.where((tbl) => tbl.paymentMode.equals(effectivePaymentMode));
     }
 
-    if (syncState != null) {
-      final statuses = switch (syncState) {
+    if (effectiveSyncState != null) {
+      final statuses = switch (effectiveSyncState) {
         CommerceSyncState.localOnly => const ['local_only'],
         CommerceSyncState.queued => const ['queued'],
         CommerceSyncState.syncing => const ['syncing'],
@@ -797,9 +810,18 @@ class SalesRepository {
       query.where((tbl) => tbl.syncStatus.isIn(statuses));
     }
 
+    final dateWindow = filter?.dateWindow ?? HistoryDateWindow.all;
+    final exactDate = _historyExactDate(dateWindow);
+    final sinceDate = _historySinceDate(dateWindow);
+    if (exactDate != null) {
+      query.where((tbl) => tbl.date.equals(exactDate));
+    } else if (sinceDate != null) {
+      query.where((tbl) => tbl.date.isBiggerOrEqualValue(sinceDate));
+    }
+
     query
       ..orderBy([(tbl) => OrderingTerm.desc(tbl.createdAt)])
-      ..limit(limit);
+      ..limit(effectiveLimit);
 
     return query.watch().map(
       (rows) => rows
@@ -821,6 +843,10 @@ class SalesRepository {
               syncState: _parseSyncState(row.syncStatus),
             );
           })
+          .where(
+            (sale) =>
+                !(filter?.onlyDueSales ?? false) || sale.hasOutstandingDue,
+          )
           .toList(growable: false),
     );
   }
@@ -971,13 +997,17 @@ class SalesRepository {
                   attemptCount: row.read<int>('attempt_count'),
                   updatedAt: row.read<int>('updated_at'),
                   lastAttemptAt: row.readNullable<int>('last_attempt_at'),
-                  lastError: _asStringOrNull(row.readNullable<String>('last_error')),
+                  lastError: _asStringOrNull(
+                    row.readNullable<String>('last_error'),
+                  ),
                   saleId: _asStringOrNull(row.readNullable<String>('sale_id')),
                   customerName: _asStringOrNull(
                     row.readNullable<String>('customer_name'),
                   ),
                   total: row.read<double>('total'),
-                  saleDate: _asStringOrNull(row.readNullable<String>('sale_date')),
+                  saleDate: _asStringOrNull(
+                    row.readNullable<String>('sale_date'),
+                  ),
                 ),
               )
               .toList(growable: false),
@@ -1448,6 +1478,33 @@ class SalesRepository {
     });
   }
 }
+
+String? _historyExactDate(HistoryDateWindow window) {
+  if (window != HistoryDateWindow.today) {
+    return null;
+  }
+  return _historyDateOnly(DateTime.now());
+}
+
+String? _historySinceDate(HistoryDateWindow window) {
+  final today = DateTime.now();
+  return switch (window) {
+    HistoryDateWindow.all => null,
+    HistoryDateWindow.today => null,
+    HistoryDateWindow.sevenDays => _historyDateOnly(
+      today.subtract(const Duration(days: 6)),
+    ),
+    HistoryDateWindow.thirtyDays => _historyDateOnly(
+      today.subtract(const Duration(days: 29)),
+    ),
+    HistoryDateWindow.ninetyDays => _historyDateOnly(
+      today.subtract(const Duration(days: 89)),
+    ),
+  };
+}
+
+String _historyDateOnly(DateTime value) =>
+    value.toIso8601String().split('T').first;
 
 CommerceSyncState _parseSyncState(String raw) {
   switch (raw) {

@@ -206,6 +206,77 @@ class HistoryOverview {
   }
 }
 
+enum HistoryDateWindow {
+  all('All time'),
+  today('Today'),
+  sevenDays('7 days'),
+  thirtyDays('30 days'),
+  ninetyDays('90 days');
+
+  const HistoryDateWindow(this.label);
+
+  final String label;
+}
+
+class HistoryFilter {
+  const HistoryFilter({
+    this.search = '',
+    this.syncState,
+    this.paymentMode,
+    this.dateWindow = HistoryDateWindow.all,
+    this.onlyDueSales = false,
+    this.limit = 100,
+  });
+
+  final String search;
+  final CommerceSyncState? syncState;
+  final String? paymentMode;
+  final HistoryDateWindow dateWindow;
+  final bool onlyDueSales;
+  final int limit;
+
+  HistoryFilter copyWith({
+    String? search,
+    CommerceSyncState? syncState,
+    String? paymentMode,
+    HistoryDateWindow? dateWindow,
+    bool? onlyDueSales,
+    int? limit,
+    bool clearSyncState = false,
+    bool clearPaymentMode = false,
+  }) {
+    return HistoryFilter(
+      search: search ?? this.search,
+      syncState: clearSyncState ? null : (syncState ?? this.syncState),
+      paymentMode: clearPaymentMode ? null : (paymentMode ?? this.paymentMode),
+      dateWindow: dateWindow ?? this.dateWindow,
+      onlyDueSales: onlyDueSales ?? this.onlyDueSales,
+      limit: limit ?? this.limit,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is HistoryFilter &&
+        other.search == search &&
+        other.syncState == syncState &&
+        other.paymentMode == paymentMode &&
+        other.dateWindow == dateWindow &&
+        other.onlyDueSales == onlyDueSales &&
+        other.limit == limit;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    search,
+    syncState,
+    paymentMode,
+    dateWindow,
+    onlyDueSales,
+    limit,
+  );
+}
+
 class InventoryCategorySummary {
   const InventoryCategorySummary({
     required this.category,
@@ -246,6 +317,58 @@ class InventoryCatalogItem {
   final double? costPrice;
 
   double get marginPerUnit => price - (costPrice ?? 0);
+}
+
+class PosCatalogFilter {
+  const PosCatalogFilter({
+    this.search = '',
+    this.category,
+    this.page = 1,
+    this.pageSize = 40,
+    this.includeCost = false,
+    this.lowStockOnly = false,
+  });
+
+  final String search;
+  final String? category;
+  final int page;
+  final int pageSize;
+  final bool includeCost;
+  final bool lowStockOnly;
+
+  PosCatalogFilter copyWith({
+    String? search,
+    String? category,
+    int? page,
+    int? pageSize,
+    bool? includeCost,
+    bool? lowStockOnly,
+    bool clearCategory = false,
+  }) {
+    return PosCatalogFilter(
+      search: search ?? this.search,
+      category: clearCategory ? null : (category ?? this.category),
+      page: page ?? this.page,
+      pageSize: pageSize ?? this.pageSize,
+      includeCost: includeCost ?? this.includeCost,
+      lowStockOnly: lowStockOnly ?? this.lowStockOnly,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is PosCatalogFilter &&
+        other.search == search &&
+        other.category == category &&
+        other.page == page &&
+        other.pageSize == pageSize &&
+        other.includeCost == includeCost &&
+        other.lowStockOnly == lowStockOnly;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(search, category, page, pageSize, includeCost, lowStockOnly);
 }
 
 class LowStockItem {
