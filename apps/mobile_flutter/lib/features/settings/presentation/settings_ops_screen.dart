@@ -5,9 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/backend/backend_api_client.dart';
-import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/models/mobile_session.dart';
+import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/runtime/app_runtime_info.dart';
 import '../../../core/runtime/pilot_diagnostics_snapshot.dart';
 import '../../../core/runtime/pilot_evidence_tracker.dart';
@@ -38,15 +38,14 @@ class SettingsOpsScreen extends ConsumerStatefulWidget {
 
 class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
   bool _showAdvancedTools = true;
+  bool _queuedEvidenceSessionEnsure = false;
 
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(mobileSessionProvider).asData?.value;
-    final shopRepository = ref.watch(shopRepositoryProvider);
-    final salesRepository = ref.watch(salesRepositoryProvider);
     final backendApiClient = ref.watch(backendApiClientProvider);
     final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
-    final syncStatus = ref.watch(syncStatusProvider);
+    final syncStatus = ref.watch(syncStatusProvider.select((status) => status));
     final runtimeInfoAsync = ref.watch(appRuntimeInfoProvider);
     final evidenceTrackerAsync = ref.watch(pilotEvidenceTrackerProvider);
     final evidenceTracker = evidenceTrackerAsync.asData?.value ??
@@ -54,23 +53,136 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
     final evidenceTrackerController = ref.watch(
       pilotEvidenceTrackerControllerProvider,
     );
-    final shopStream = shopRepository.watchShopInfo();
-    final historyStream = salesRepository.watchHistoryOverview();
-    final domainStatesStream = shopRepository.watchTrackedDomainStates(
-      const <String>['inventory', 'customers', 'sales', 'payments'],
+    final shop = ref.watch(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
+    final history =
+        ref.watch(historyOverviewProvider).asData?.value ??
+        HistoryOverview.empty();
+    final domainStates =
+        ref.watch(settingsOpsDomainStatesProvider).asData?.value ??
+        <DomainControlState>[
+          DomainControlState.legacy('inventory'),
+          DomainControlState.legacy('customers'),
+          DomainControlState.legacy('sales'),
+          DomainControlState.legacy('payments'),
+        ];
+    final pending =
+        ref.watch(pendingOutboxCountProvider).asData?.value ?? 0;
+    final attentionEntries =
+        ref.watch(outboxAttentionEntriesProvider).asData?.value ??
+        const <CommerceOutboxAttentionEntry>[];
+    final runtimeInfo = runtimeInfoAsync.asData?.value;
+    final diagnostics = runtimeInfo == null
+        ? null
+        : PilotDiagnosticsSnapshot(
+            runtimeInfo: runtimeInfo,
+            shop: shop,
+            session: session,
+            backendBaseUrl: backendApiClient.baseUrl,
+            syncStatus: syncStatus,
+            historyOverview: history,
+            pendingOutboxCount: pending,
+            domainStates: domainStates,
+          );
+    final suggestedEvidenceSessionLabel = _buildEvidenceSessionLabel(
+      shop: shop,
+      runtimeInfo: runtimeInfo,
+      session: session,
     );
-    final pendingOutboxStream = salesRepository.watchPendingOutboxCount();
-    final outboxAttentionStream = salesRepository.watchOutboxAttentionEntries();
+    if (evidenceTrackerAsync.asData != null && !evidenceTracker.hasSessionContext) {
+      if (!_queuedEvidenceSessionEnsure) {
+        _queuedEvidenceSessionEnsure = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          evidenceTrackerController.ensureSession(suggestedEvidenceSessionLabel);
+        });
+      }
+    } else {
+      _queuedEvidenceSessionEnsure = false;
+    }
+    final recoveryReport = diagnostics == null
+        ? null
+        : PilotRecoveryReport(
+            diagnosticsSnapshot: diagnostics,
+            attentionEntries: attentionEntries,
+          );
+    final readinessReport = diagnostics == null
+        ? null
+        : PilotReadinessReport.evaluate(
+            diagnosticsSnapshot: diagnostics,
+            attentionEntries: attentionEntries,
+          );
+    final handoffReport =
+        diagnostics == null || readinessReport == null || recoveryReport == null
+        ? null
+        : PilotHandoffReport(
+            diagnosticsSnapshot: diagnostics,
+            readinessReport: readinessReport,
+            recoveryReport: recoveryReport,
+          );
+    final actionPlan =
+        diagnostics == null || readinessReport == null || recoveryReport == null
+        ? null
+        : PilotOperatorActionPlan.evaluate(
+            diagnosticsSnapshot: diagnostics,
+            readinessReport: readinessReport,
+            recoveryReport: recoveryReport,
+          );
+    final rolloutDecisionSummary =
+        diagnostics == null ||
+            readinessReport == null ||
+            recoveryReport == null ||
+            actionPlan == null
+        ? null
+        : PilotRolloutDecisionSummary.evaluate(
+            diagnosticsSnapshot: diagnostics,
+            readinessReport: readinessReport,
+            recoveryReport: recoveryReport,
+            actionPlan: actionPlan,
+            evidenceTracker: evidenceTracker,
+          );
+    final waveCloseoutReadiness =
+        diagnostics == null ||
+            readinessReport == null ||
+            recoveryReport == null ||
+            actionPlan == null ||
+            rolloutDecisionSummary == null
+        ? null
+        : PilotWaveCloseoutReadiness.evaluate(
+            diagnosticsSnapshot: diagnostics,
+            readinessReport: readinessReport,
+            recoveryReport: recoveryReport,
+            actionPlan: actionPlan,
+            rolloutDecisionSummary: rolloutDecisionSummary,
+            evidenceTracker: evidenceTracker,
+          );
+    final waveSignoffPack =
+        diagnostics == null ||
+            readinessReport == null ||
+            recoveryReport == null ||
+            actionPlan == null ||
+            rolloutDecisionSummary == null ||
+            waveCloseoutReadiness == null
+        ? null
+        : PilotWaveSignoffPack.evaluate(
+            diagnosticsSnapshot: diagnostics,
+            readinessReport: readinessReport,
+            recoveryReport: recoveryReport,
+            actionPlan: actionPlan,
+            rolloutDecisionSummary: rolloutDecisionSummary,
+            waveCloseoutReadiness: waveCloseoutReadiness,
+            evidenceTracker: evidenceTracker,
+          );
+    final waveArchivePack = waveSignoffPack == null
+        ? null
+        : PilotWaveArchivePack.evaluate(
+            waveSignoffPack: waveSignoffPack,
+            evidenceTracker: evidenceTracker,
+          );
 
     Future<void> markEvidenceCaptured(String artifactId) async {
       await evidenceTrackerController.markCaptured(artifactId);
     }
 
-    return StreamBuilder<ShopInfo>(
-      stream: shopStream,
-      builder: (context, shopSnapshot) {
-        final shop = shopSnapshot.data ?? ShopInfo.fallback();
-        return MobileStandaloneScaffold(
+    return MobileStandaloneScaffold(
           title: 'Advanced ops',
           child: ListView(
             padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
@@ -177,16 +289,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
               ),
             ),
             const SizedBox(height: 18),
-            StreamBuilder<int>(
-              stream: pendingOutboxStream,
-              builder: (context, outboxSnapshot) {
-                final pending = outboxSnapshot.data ?? 0;
-                return StreamBuilder<HistoryOverview>(
-                  stream: historyStream,
-                  builder: (context, historySnapshot) {
-                    final history =
-                        historySnapshot.data ?? HistoryOverview.empty();
-                    return MobilePanel(
+            MobilePanel(
                       title: 'Mobile runtime',
                       action: MobileTag(
                         label: pending > 0 ? '$pending queued' : 'Queue clear',
@@ -314,10 +417,6 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                           ),
                         ],
                       ),
-                    );
-                  },
-                );
-              },
             ),
             const SizedBox(height: 18),
             MobilePanel(
@@ -450,82 +549,34 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
             ),
             if (_showAdvancedTools) ...<Widget>[
               const SizedBox(height: 18),
-              StreamBuilder<List<DomainControlState>>(
-                stream: domainStatesStream,
-                builder: (context, snapshot) {
-                  final states =
-                      snapshot.data ??
-                      <DomainControlState>[
-                        DomainControlState.legacy('inventory'),
-                        DomainControlState.legacy('customers'),
-                        DomainControlState.legacy('sales'),
-                        DomainControlState.legacy('payments'),
-                      ];
-
-                  return MobilePanel(
-                    title: 'Domain cutover map',
-                    action: MobileTag(
-                      label:
-                          '${states.where((state) => state.isPostgresPrimary).length} primary',
-                      icon: Icons.schema_rounded,
-                      accent: const Color(0xFF38BDF8),
-                    ),
-                    child: Column(
-                      children: states
-                          .map(
-                            (state) => Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _DomainSettingsRow(state: state),
-                            ),
-                          )
-                          .toList(growable: false),
-                    ),
-                  );
-                },
+              MobilePanel(
+                title: 'Domain cutover map',
+                action: MobileTag(
+                  label:
+                      '${domainStates.where((state) => state.isPostgresPrimary).length} primary',
+                  icon: Icons.schema_rounded,
+                  accent: const Color(0xFF38BDF8),
+                ),
+                child: Column(
+                  children: domainStates
+                      .map(
+                        (state) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _DomainSettingsRow(state: state),
+                        ),
+                      )
+                      .toList(growable: false),
+                ),
               ),
               const SizedBox(height: 18),
-              StreamBuilder<List<DomainControlState>>(
-              stream: domainStatesStream,
-              builder: (context, domainSnapshot) {
-                final domainStates =
-                    domainSnapshot.data ??
-                    <DomainControlState>[
-                      DomainControlState.legacy('inventory'),
-                      DomainControlState.legacy('customers'),
-                      DomainControlState.legacy('sales'),
-                      DomainControlState.legacy('payments'),
-                    ];
-                return StreamBuilder<int>(
-                  stream: pendingOutboxStream,
-                  builder: (context, outboxSnapshot) {
-                    final pending = outboxSnapshot.data ?? 0;
-                    return StreamBuilder<HistoryOverview>(
-                      stream: historyStream,
-                      builder: (context, historySnapshot) {
-                        final history =
-                            historySnapshot.data ?? HistoryOverview.empty();
-                        final runtimeInfo = runtimeInfoAsync.asData?.value;
-                        final snapshot = runtimeInfo == null
-                            ? null
-                            : PilotDiagnosticsSnapshot(
-                                runtimeInfo: runtimeInfo,
-                                shop: shop,
-                                session: session,
-                                backendBaseUrl: backendApiClient.baseUrl,
-                                syncStatus: syncStatus,
-                                historyOverview: history,
-                                pendingOutboxCount: pending,
-                                domainStates: domainStates,
-                              );
-
-                        return MobilePanel(
+              MobilePanel(
                           title: 'Pilot handoff snapshot',
                           action: MobileTag(
-                            label: snapshot == null ? 'Loading' : 'Copy ready',
-                            icon: snapshot == null
+                            label: diagnostics == null ? 'Loading' : 'Copy ready',
+                            icon: diagnostics == null
                                 ? Icons.sync_rounded
                                 : Icons.assignment_turned_in_rounded,
-                            accent: snapshot == null
+                            accent: diagnostics == null
                                 ? const Color(0xFFF59E0B)
                                 : const Color(0xFF22C55E),
                           ),
@@ -551,23 +602,23 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                               ),
                               _SettingsRow(
                                 label: 'Pilot posture',
-                                value: snapshot?.primaryDomainCountLabel ??
+                                value: diagnostics?.primaryDomainCountLabel ??
                                     'Resolving domain states',
                                 icon: Icons.fact_check_rounded,
                               ),
                               _SettingsRow(
                                 label: 'Last receipt sync',
-                                value: snapshot?.lastReceiptSyncLabel ??
+                                value: diagnostics?.lastReceiptSyncLabel ??
                                     'Unknown',
                                 icon: Icons.history_toggle_off_rounded,
                               ),
                               FilledButton.tonalIcon(
-                                onPressed: snapshot == null
+                                onPressed: diagnostics == null
                                     ? null
                                     : () async {
                                         await Clipboard.setData(
                                           ClipboardData(
-                                            text: snapshot.toMultilineText(),
+                                            text: diagnostics.toMultilineText(),
                                           ),
                                         );
                                         await markEvidenceCaptured(
@@ -591,162 +642,9 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                               ),
                             ],
                           ),
-                        );
-                      },
-                    );
-                  },
-                );
-              },
-            ),
-            const SizedBox(height: 18),
-            StreamBuilder<List<CommerceOutboxAttentionEntry>>(
-              stream: outboxAttentionStream,
-              builder: (context, attentionSnapshot) {
-                final attentionEntries =
-                    attentionSnapshot.data ??
-                    const <CommerceOutboxAttentionEntry>[];
-                return StreamBuilder<List<DomainControlState>>(
-                  stream: domainStatesStream,
-                  builder: (context, domainSnapshot) {
-                    final domainStates =
-                        domainSnapshot.data ??
-                        <DomainControlState>[
-                          DomainControlState.legacy('inventory'),
-                          DomainControlState.legacy('customers'),
-                          DomainControlState.legacy('sales'),
-                          DomainControlState.legacy('payments'),
-                        ];
-                    return StreamBuilder<int>(
-                      stream: pendingOutboxStream,
-                      builder: (context, outboxSnapshot) {
-                        final pending = outboxSnapshot.data ?? 0;
-                        return StreamBuilder<HistoryOverview>(
-                          stream: historyStream,
-                          builder: (context, historySnapshot) {
-                            final history =
-                                historySnapshot.data ?? HistoryOverview.empty();
-                            final runtimeInfo = runtimeInfoAsync.asData?.value;
-                            final diagnostics = runtimeInfo == null
-                                ? null
-                                : PilotDiagnosticsSnapshot(
-                                    runtimeInfo: runtimeInfo,
-                                    shop: shop,
-                                    session: session,
-                                    backendBaseUrl: backendApiClient.baseUrl,
-                                    syncStatus: syncStatus,
-                                    historyOverview: history,
-                                    pendingOutboxCount: pending,
-                                    domainStates: domainStates,
-                                  );
-                            final suggestedEvidenceSessionLabel =
-                                runtimeInfo == null
-                                ? _buildEvidenceSessionLabel(
-                                    shop: shop,
-                                    runtimeInfo: null,
-                                    session: session,
-                                  )
-                                : _buildEvidenceSessionLabel(
-                                    shop: shop,
-                                    runtimeInfo: runtimeInfo,
-                                    session: session,
-                                  );
-                            if (evidenceTrackerAsync.asData != null &&
-                                !evidenceTracker.hasSessionContext) {
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                evidenceTrackerController.ensureSession(
-                                  suggestedEvidenceSessionLabel,
-                                );
-                              });
-                            }
-                            final recoveryReport = diagnostics == null
-                                ? null
-                                : PilotRecoveryReport(
-                                    diagnosticsSnapshot: diagnostics,
-                                    attentionEntries: attentionEntries,
-                                  );
-                            final readinessReport = diagnostics == null
-                                ? null
-                                : PilotReadinessReport.evaluate(
-                                    diagnosticsSnapshot: diagnostics,
-                                    attentionEntries: attentionEntries,
-                                  );
-                            final handoffReport =
-                                diagnostics == null ||
-                                    readinessReport == null ||
-                                    recoveryReport == null
-                                ? null
-                                : PilotHandoffReport(
-                                    diagnosticsSnapshot: diagnostics,
-                                    readinessReport: readinessReport,
-                                    recoveryReport: recoveryReport,
-                                  );
-                            final actionPlan =
-                                diagnostics == null ||
-                                    readinessReport == null ||
-                                    recoveryReport == null
-                                ? null
-                                : PilotOperatorActionPlan.evaluate(
-                                    diagnosticsSnapshot: diagnostics,
-                                    readinessReport: readinessReport,
-                                    recoveryReport: recoveryReport,
-                                  );
-                            final rolloutDecisionSummary =
-                                diagnostics == null ||
-                                    readinessReport == null ||
-                                    recoveryReport == null ||
-                                    actionPlan == null
-                                ? null
-                                : PilotRolloutDecisionSummary.evaluate(
-                                    diagnosticsSnapshot: diagnostics,
-                                    readinessReport: readinessReport,
-                                    recoveryReport: recoveryReport,
-                                    actionPlan: actionPlan,
-                                    evidenceTracker: evidenceTracker,
-                                  );
-                            final waveCloseoutReadiness =
-                                diagnostics == null ||
-                                    readinessReport == null ||
-                                    recoveryReport == null ||
-                                    actionPlan == null ||
-                                    rolloutDecisionSummary == null
-                                ? null
-                                : PilotWaveCloseoutReadiness.evaluate(
-                                    diagnosticsSnapshot: diagnostics,
-                                    readinessReport: readinessReport,
-                                    recoveryReport: recoveryReport,
-                                    actionPlan: actionPlan,
-                                    rolloutDecisionSummary:
-                                        rolloutDecisionSummary,
-                                    evidenceTracker: evidenceTracker,
-                                  );
-                            final waveSignoffPack =
-                                diagnostics == null ||
-                                    readinessReport == null ||
-                                    recoveryReport == null ||
-                                    actionPlan == null ||
-                                    rolloutDecisionSummary == null ||
-                                    waveCloseoutReadiness == null
-                                ? null
-                                : PilotWaveSignoffPack.evaluate(
-                                    diagnosticsSnapshot: diagnostics,
-                                    readinessReport: readinessReport,
-                                    recoveryReport: recoveryReport,
-                                    actionPlan: actionPlan,
-                                    rolloutDecisionSummary:
-                                        rolloutDecisionSummary,
-                                    waveCloseoutReadiness:
-                                        waveCloseoutReadiness,
-                                    evidenceTracker: evidenceTracker,
-                                  );
-                            final waveArchivePack =
-                                waveSignoffPack == null
-                                ? null
-                                : PilotWaveArchivePack.evaluate(
-                                    waveSignoffPack: waveSignoffPack,
-                                    evidenceTracker: evidenceTracker,
-                                  );
-
-                            return Column(
+                        ),
+              const SizedBox(height: 18),
+            Column(
                               children: <Widget>[
                                 MobilePanel(
                                   title: 'Operator action center',
@@ -2656,21 +2554,11 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                                         ),
                                 ),
                               ],
-                            );
-                          },
-                        );
-                      },
-                    );
-                  },
-                );
-              },
-            ),
+                            ),
             ],
             ],
           ),
         );
-      },
-    );
   }
 
   Future<PilotSmokeReport?> _showPilotSmokeChecklistDialog(
