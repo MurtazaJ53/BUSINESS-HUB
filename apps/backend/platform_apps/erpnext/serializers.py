@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from platform_apps.erpnext.models import ERPNextDocumentLink, ERPNextShopBinding, ERPNextSyncCursor
+from platform_apps.erpnext.models import (
+    ERPNextDocumentLink,
+    ERPNextPurchaseMirror,
+    ERPNextShopBinding,
+    ERPNextSupplierMirror,
+    ERPNextSyncCursor,
+)
 
 
 class ERPNextShopBindingSerializer(serializers.ModelSerializer):
@@ -104,5 +110,63 @@ class ERPNextCycleSerializer(ERPNextActionSerializer):
     verify_connection = serializers.BooleanField(required=False, default=True)
     sync_items = serializers.BooleanField(required=False, default=True)
     sync_customers = serializers.BooleanField(required=False, default=True)
+    sync_stock = serializers.BooleanField(required=False, default=True)
+    sync_suppliers = serializers.BooleanField(required=False, default=True)
+    sync_purchases = serializers.BooleanField(required=False, default=True)
     push_sales = serializers.BooleanField(required=False, default=True)
     push_payments = serializers.BooleanField(required=False, default=True)
+
+
+class ERPNextSupplierMirrorSerializer(serializers.ModelSerializer):
+    shop_id = serializers.UUIDField(source="shop.id", read_only=True)
+
+    class Meta:
+        model = ERPNextSupplierMirror
+        fields = [
+            "id",
+            "shop_id",
+            "remote_name",
+            "supplier_name",
+            "supplier_group",
+            "supplier_type",
+            "phone",
+            "email",
+            "status",
+            "last_remote_modified_at",
+            "last_synced_at",
+            "metadata_json",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+
+class ERPNextPurchaseMirrorSerializer(serializers.ModelSerializer):
+    shop_id = serializers.UUIDField(source="shop.id", read_only=True)
+    supplier_name = serializers.CharField(source="supplier.supplier_name", read_only=True)
+
+    class Meta:
+        model = ERPNextPurchaseMirror
+        fields = [
+            "id",
+            "shop_id",
+            "supplier_id",
+            "supplier_name",
+            "remote_doctype",
+            "remote_name",
+            "supplier_remote_name",
+            "posting_date",
+            "warehouse",
+            "currency_code",
+            "grand_total",
+            "status",
+            "docstatus",
+            "item_count",
+            "items_json",
+            "metadata_json",
+            "last_remote_modified_at",
+            "last_synced_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields

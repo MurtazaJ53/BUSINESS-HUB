@@ -11,10 +11,20 @@ from django.conf import settings
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from django.db.models import Sum
+from django.db.models.functions import Coalesce
+
 from platform_apps.customers.models import Customer
-from platform_apps.erpnext.models import ERPNextDocumentLink, ERPNextShopBinding, ERPNextSyncCursor
+from platform_apps.erpnext.models import (
+    ERPNextDocumentLink,
+    ERPNextPurchaseMirror,
+    ERPNextShopBinding,
+    ERPNextSupplierMirror,
+    ERPNextSyncCursor,
+)
 from platform_apps.inventory.models import InventoryItem
 from platform_apps.inventory.models import InventoryItemPrivate
+from platform_apps.inventory.models import InventoryStockLedger
 from platform_apps.payments.models import SalePayment
 from platform_apps.sales.models import SaleItem
 from platform_apps.sales.models import Sale
@@ -603,6 +613,355 @@ class ERPNextIntegrationService:
             )
             raise
 
+    def sync_suppliers(self, *, shop: Shop, limit: int = 100) -> dict[str, Any]:
+        binding = self._require_binding(shop=shop)
+        if not binding.purchase_sync_enabled:
+            raise ERPNextConfigurationError("Supplier sync is disabled because purchase sync is not enabled for this shop binding.")
+        cursor = self._get_cursor(shop=shop, domain=ERPNextSyncCursor.Domain.SUPPLIERS, direction=ERPNextSyncCursor.Direction.PULL)
+        client = self.build_client(binding=binding)
+        self._begin_cursor_run(cursor=cursor)
+
+        filters: list[list[Any]] = []
+        if binding.supplier_group:
+            filters.append(["Supplier", "supplier_group", "=", binding.supplier_group])
+        if cursor.last_remote_modified_at:
+            filters.append(["Supplier", "modified", ">", cursor.last_remote_modified_at.isoformat(sep=" ")])
+
+        try:
+            response = client.list_resource(
+                doctype="Supplier",
+                filters=filters or None,
+                fields=[
+                    "name",
+                    "supplier_name",
+                    "supplier_group",
+                    "supplier_type",
+                    "mobile_no",
+                    "email_id",
+                    "disabled",
+                    "modified",
+                ],
+                limit_page_length=limit,
+            )
+            rows = response.get("data", [])
+            imported = 0
+            latest_modified_at = cursor.last_remote_modified_at
+            latest_remote_name = cursor.last_remote_cursor
+
+            for row in rows:
+                remote_name = str(row.get("name", "")).strip()
+                if not remote_name:
+                    continue
+                modified_at = self._parse_remote_timestamp(row.get("modified"))
+                if modified_at and (latest_modified_at is None or modified_at > latest_modified_at):
+                    latest_modified_at = modified_at
+                    latest_remote_name = remote_name
+
+                supplier, created = ERPNextSupplierMirror.objects.get_or_create(
+                    shop=shop,
+                    remote_name=remote_name,
+                    defaults={
+                        "supplier_name": row.get("supplier_name") or remote_name,
+                        "supplier_group": row.get("supplier_group") or "",
+                        "supplier_type": row.get("supplier_type") or "",
+                        "phone": row.get("mobile_no") or "",
+                        "email": row.get("email_id") or "",
+                        "status": ERPNextSupplierMirror.Status.ARCHIVED if row.get("disabled") else ERPNextSupplierMirror.Status.ACTIVE,
+                        "last_remote_modified_at": modified_at,
+                        "last_synced_at": timezone.now(),
+                        "metadata_json": row,
+                    },
+                )
+                if not created:
+                    supplier.supplier_name = row.get("supplier_name") or remote_name
+                    supplier.supplier_group = row.get("supplier_group") or ""
+                    supplier.supplier_type = row.get("supplier_type") or ""
+                    supplier.phone = row.get("mobile_no") or ""
+                    supplier.email = row.get("email_id") or ""
+                    supplier.status = ERPNextSupplierMirror.Status.ARCHIVED if row.get("disabled") else ERPNextSupplierMirror.Status.ACTIVE
+                    supplier.last_remote_modified_at = modified_at
+                    supplier.last_synced_at = timezone.now()
+                    supplier.metadata_json = row
+                    supplier.save()
+
+                self._link_document(
+                    shop=shop,
+                    local_domain=ERPNextDocumentLink.LocalDomain.SUPPLIER,
+                    local_object_id=str(supplier.id),
+                    remote_doctype="Supplier",
+                    remote_name=remote_name,
+                    direction=ERPNextDocumentLink.Direction.PULL,
+                    metadata_json=row,
+                )
+                imported += 1
+
+            self._finish_cursor_run(
+                cursor=cursor,
+                status=ERPNextSyncCursor.Status.SUCCEEDED,
+                result_count=imported,
+                remote_modified_at=latest_modified_at,
+                remote_cursor=latest_remote_name or "",
+            )
+            return {
+                "domain": ERPNextSyncCursor.Domain.SUPPLIERS,
+                "direction": ERPNextSyncCursor.Direction.PULL,
+                "imported_count": imported,
+                "cursor": cursor.last_remote_cursor,
+            }
+        except Exception as exc:
+            self._finish_cursor_run(
+                cursor=cursor,
+                status=ERPNextSyncCursor.Status.FAILED,
+                result_count=0,
+                error_message=str(exc),
+            )
+            raise
+
+    def sync_stock(self, *, shop: Shop, limit: int = 200) -> dict[str, Any]:
+        binding = self._require_binding(shop=shop)
+        if not binding.stock_sync_enabled:
+            raise ERPNextConfigurationError("Stock sync is disabled for this shop binding.")
+        cursor = self._get_cursor(shop=shop, domain=ERPNextSyncCursor.Domain.STOCK, direction=ERPNextSyncCursor.Direction.PULL)
+        client = self.build_client(binding=binding)
+        self._begin_cursor_run(cursor=cursor)
+
+        filters: list[list[Any]] = []
+        if binding.warehouse:
+            filters.append(["Bin", "warehouse", "=", binding.warehouse])
+        if cursor.last_remote_modified_at:
+            filters.append(["Bin", "modified", ">", cursor.last_remote_modified_at.isoformat(sep=" ")])
+
+        try:
+            response = client.list_resource(
+                doctype="Bin",
+                filters=filters or None,
+                fields=["name", "item_code", "warehouse", "actual_qty", "modified"],
+                limit_page_length=limit,
+            )
+            rows = response.get("data", [])
+            reconciled = 0
+            skipped = 0
+            latest_modified_at = cursor.last_remote_modified_at
+            latest_remote_name = cursor.last_remote_cursor
+
+            for row in rows:
+                remote_name = str(row.get("name", "")).strip()
+                item_code = str(row.get("item_code", "")).strip()
+                if not item_code:
+                    continue
+                modified_at = self._parse_remote_timestamp(row.get("modified"))
+                if modified_at and (latest_modified_at is None or modified_at > latest_modified_at):
+                    latest_modified_at = modified_at
+                    latest_remote_name = remote_name
+
+                item = InventoryItem.objects.filter(
+                    shop=shop,
+                    source_system="erpnext",
+                    source_id=item_code,
+                    tombstone=False,
+                ).first()
+                if item is None:
+                    skipped += 1
+                    continue
+                local_stock = int(
+                    item.ledger_entries.aggregate(total=Coalesce(Sum("quantity_delta"), 0)).get("total") or 0
+                )
+                remote_stock = int(Decimal(str(row.get("actual_qty") or "0")))
+                quantity_delta = remote_stock - local_stock
+                if quantity_delta != 0:
+                    InventoryStockLedger.objects.create(
+                        shop=shop,
+                        item=item,
+                        actor_user=None,
+                        event_type=InventoryStockLedger.EventType.SYNC,
+                        quantity_delta=quantity_delta,
+                        unit_price=item.sell_price,
+                        note=f"ERPNext stock sync from {row.get('warehouse') or binding.warehouse or 'warehouse'}",
+                        occurred_at=timezone.now(),
+                        source_system="erpnext",
+                        source_id=remote_name or item_code,
+                        source_shop_id=binding.company,
+                        source_path=f"Bin/{remote_name or item_code}",
+                    )
+                item.source_meta_json = {**item.source_meta_json, "last_bin_sync": row}
+                item.save(update_fields=["source_meta_json", "updated_at"])
+                reconciled += 1
+
+            self._finish_cursor_run(
+                cursor=cursor,
+                status=ERPNextSyncCursor.Status.SUCCEEDED,
+                result_count=reconciled,
+                remote_modified_at=latest_modified_at,
+                remote_cursor=latest_remote_name or "",
+            )
+            return {
+                "domain": ERPNextSyncCursor.Domain.STOCK,
+                "direction": ERPNextSyncCursor.Direction.PULL,
+                "reconciled_count": reconciled,
+                "skipped_count": skipped,
+                "cursor": cursor.last_remote_cursor,
+            }
+        except Exception as exc:
+            self._finish_cursor_run(
+                cursor=cursor,
+                status=ERPNextSyncCursor.Status.FAILED,
+                result_count=0,
+                error_message=str(exc),
+            )
+            raise
+
+    def sync_purchases(self, *, shop: Shop, limit: int = 100) -> dict[str, Any]:
+        binding = self._require_binding(shop=shop)
+        if not binding.purchase_sync_enabled:
+            raise ERPNextConfigurationError("Purchase sync is disabled for this shop binding.")
+        cursor = self._get_cursor(shop=shop, domain=ERPNextSyncCursor.Domain.PURCHASES, direction=ERPNextSyncCursor.Direction.PULL)
+        client = self.build_client(binding=binding)
+        self._begin_cursor_run(cursor=cursor)
+
+        filters: list[list[Any]] = []
+        if cursor.last_remote_modified_at:
+            filters.append(["Purchase Receipt", "modified", ">", cursor.last_remote_modified_at.isoformat(sep=" ")])
+        if binding.warehouse:
+            filters.append(["Purchase Receipt", "set_warehouse", "=", binding.warehouse])
+
+        try:
+            response = client.list_resource(
+                doctype="Purchase Receipt",
+                filters=filters or None,
+                fields=[
+                    "name",
+                    "supplier",
+                    "posting_date",
+                    "grand_total",
+                    "status",
+                    "docstatus",
+                    "currency",
+                    "set_warehouse",
+                    "modified",
+                ],
+                limit_page_length=limit,
+            )
+            rows = response.get("data", [])
+            imported = 0
+            latest_modified_at = cursor.last_remote_modified_at
+            latest_remote_name = cursor.last_remote_cursor
+
+            for row in rows:
+                remote_name = str(row.get("name", "")).strip()
+                if not remote_name:
+                    continue
+                detail_response = client.get_resource(doctype="Purchase Receipt", name=remote_name)
+                detail = detail_response.get("data") or {}
+                modified_at = self._parse_remote_timestamp(row.get("modified") or detail.get("modified"))
+                if modified_at and (latest_modified_at is None or modified_at > latest_modified_at):
+                    latest_modified_at = modified_at
+                    latest_remote_name = remote_name
+
+                supplier_remote_name = str(detail.get("supplier") or row.get("supplier") or "").strip()
+                supplier = None
+                if supplier_remote_name:
+                    supplier = ERPNextSupplierMirror.objects.filter(shop=shop, remote_name=supplier_remote_name).first()
+
+                items = detail.get("items") or []
+                purchase, created = ERPNextPurchaseMirror.objects.get_or_create(
+                    shop=shop,
+                    remote_doctype="Purchase Receipt",
+                    remote_name=remote_name,
+                    defaults={
+                        "supplier": supplier,
+                        "supplier_remote_name": supplier_remote_name,
+                        "posting_date": detail.get("posting_date") or row.get("posting_date"),
+                        "warehouse": detail.get("set_warehouse") or row.get("set_warehouse") or "",
+                        "currency_code": detail.get("currency") or row.get("currency") or binding.currency_code,
+                        "grand_total": Decimal(str(detail.get("grand_total") or row.get("grand_total") or "0")),
+                        "status": self._map_purchase_status(detail.get("docstatus", row.get("docstatus")), detail.get("status") or row.get("status")),
+                        "docstatus": int(detail.get("docstatus") or row.get("docstatus") or 0),
+                        "item_count": len(items),
+                        "items_json": items,
+                        "metadata_json": detail,
+                        "last_remote_modified_at": modified_at,
+                        "last_synced_at": timezone.now(),
+                    },
+                )
+                if not created:
+                    purchase.supplier = supplier
+                    purchase.supplier_remote_name = supplier_remote_name
+                    purchase.posting_date = detail.get("posting_date") or row.get("posting_date")
+                    purchase.warehouse = detail.get("set_warehouse") or row.get("set_warehouse") or ""
+                    purchase.currency_code = detail.get("currency") or row.get("currency") or binding.currency_code
+                    purchase.grand_total = Decimal(str(detail.get("grand_total") or row.get("grand_total") or "0"))
+                    purchase.status = self._map_purchase_status(detail.get("docstatus", row.get("docstatus")), detail.get("status") or row.get("status"))
+                    purchase.docstatus = int(detail.get("docstatus") or row.get("docstatus") or 0)
+                    purchase.item_count = len(items)
+                    purchase.items_json = items
+                    purchase.metadata_json = detail
+                    purchase.last_remote_modified_at = modified_at
+                    purchase.last_synced_at = timezone.now()
+                    purchase.save()
+
+                for purchase_item in items:
+                    item_code = str(purchase_item.get("item_code", "")).strip()
+                    if not item_code:
+                        continue
+                    inventory_item = InventoryItem.objects.filter(
+                        shop=shop,
+                        source_system="erpnext",
+                        source_id=item_code,
+                        tombstone=False,
+                    ).select_related("private").first()
+                    if inventory_item is None:
+                        continue
+                    private, _ = InventoryItemPrivate.objects.get_or_create(item=inventory_item)
+                    if supplier_remote_name:
+                        private.supplier_id = supplier_remote_name
+                    if purchase.posting_date:
+                        private.last_purchase_date = purchase.posting_date
+                    if purchase_item.get("rate") is not None:
+                        private.cost_price = Decimal(str(purchase_item.get("rate") or "0"))
+                    private.save()
+
+                self._link_document(
+                    shop=shop,
+                    local_domain=ERPNextDocumentLink.LocalDomain.PURCHASE,
+                    local_object_id=str(purchase.id),
+                    remote_doctype="Purchase Receipt",
+                    remote_name=remote_name,
+                    direction=ERPNextDocumentLink.Direction.PULL,
+                    metadata_json={"posting_date": str(purchase.posting_date), "supplier": supplier_remote_name},
+                )
+                imported += 1
+
+            self._finish_cursor_run(
+                cursor=cursor,
+                status=ERPNextSyncCursor.Status.SUCCEEDED,
+                result_count=imported,
+                remote_modified_at=latest_modified_at,
+                remote_cursor=latest_remote_name or "",
+            )
+            return {
+                "domain": ERPNextSyncCursor.Domain.PURCHASES,
+                "direction": ERPNextSyncCursor.Direction.PULL,
+                "imported_count": imported,
+                "cursor": cursor.last_remote_cursor,
+            }
+        except Exception as exc:
+            self._finish_cursor_run(
+                cursor=cursor,
+                status=ERPNextSyncCursor.Status.FAILED,
+                result_count=0,
+                error_message=str(exc),
+            )
+            raise
+
+    def _map_purchase_status(self, docstatus: Any, status_value: Any) -> str:
+        if int(docstatus or 0) == 2:
+            return ERPNextPurchaseMirror.Status.CANCELLED
+        if int(docstatus or 0) == 1:
+            return ERPNextPurchaseMirror.Status.SUBMITTED
+        if int(docstatus or 0) == 0:
+            return ERPNextPurchaseMirror.Status.DRAFT
+        return ERPNextPurchaseMirror.Status.UNKNOWN
+
     def _resolve_sale_customer_remote_name(self, *, binding: ERPNextShopBinding, sale: Sale) -> str:
         if sale.customer_id and sale.customer and sale.customer.source_system == "erpnext" and sale.customer.source_id:
             return sale.customer.source_id
@@ -856,6 +1215,9 @@ class ERPNextIntegrationService:
         verify_connection: bool = True,
         sync_items: bool = True,
         sync_customers: bool = True,
+        sync_stock: bool = True,
+        sync_suppliers: bool = True,
+        sync_purchases: bool = True,
         push_sales: bool = True,
         push_payments: bool = True,
     ) -> dict[str, Any]:
@@ -884,6 +1246,9 @@ class ERPNextIntegrationService:
         action_plan = [
             ("sync_items", sync_items, self.sync_items),
             ("sync_customers", sync_customers, self.sync_customers),
+            ("sync_stock", sync_stock, self.sync_stock),
+            ("sync_suppliers", sync_suppliers, self.sync_suppliers),
+            ("sync_purchases", sync_purchases, self.sync_purchases),
             ("push_sales", push_sales, self.push_sales),
             ("push_payments", push_payments, self.push_payments),
         ]
@@ -930,6 +1295,8 @@ class ERPNextIntegrationService:
                 "customers": Customer.objects.filter(shop=shop, tombstone=False).count(),
                 "sales": Sale.objects.filter(shop=shop, tombstone=False).count(),
                 "payments": SalePayment.objects.filter(shop=shop, sale__tombstone=False).count(),
+                "erpnext_suppliers": ERPNextSupplierMirror.objects.filter(shop=shop).count(),
+                "erpnext_purchases": ERPNextPurchaseMirror.objects.filter(shop=shop).count(),
             },
             "cursor_status": {
                 "total": cursor_rows.count(),

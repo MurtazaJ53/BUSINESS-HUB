@@ -19,19 +19,23 @@ Business Hub can now:
 - verify ERPNext connectivity
 - import ERPNext `Item` records into local inventory
 - import ERPNext `Customer` records into local customers
+- reconcile local stock against ERPNext `Bin` quantities
+- import ERPNext `Supplier` records into local mirror tables
+- import ERPNext `Purchase Receipt` documents into local mirror tables
 - post local `Sale` records into ERPNext `Sales Invoice`
 - post local `SalePayment` records into ERPNext `Payment Entry`
 - track sync cursors and document links
 - run the whole cycle from HTTP or CLI
+- enqueue the cycle over Celery
 
 ## What is not implemented yet
 
 These still remain outside the current handover scope:
 
-- supplier sync
-- purchase flow sync/posting
-- stock/bin reconciliation back into Business Hub
-- recurring scheduled sync orchestration beyond the raw Celery task
+- supplier-side payment / return handling
+- purchase-order / purchase-invoice coverage
+- default recurring beat schedule policy
+- admin-web control plane for ERPNext operations
 
 ## Required backend env
 
@@ -53,6 +57,7 @@ Patch the binding endpoint:
 - `warehouse`
 - `selling_price_list`
 - `currency_code`
+- `supplier_group` when you want to narrow supplier import
 
 Recommended `metadata_json`:
 
@@ -86,9 +91,15 @@ Recommended `metadata_json`:
 - `GET /api/v1/shops/<shop_id>/erpnext/poc-summary/`
 - `POST /api/v1/shops/<shop_id>/erpnext/sync-items/`
 - `POST /api/v1/shops/<shop_id>/erpnext/sync-customers/`
+- `POST /api/v1/shops/<shop_id>/erpnext/sync-stock/`
+- `POST /api/v1/shops/<shop_id>/erpnext/sync-suppliers/`
+- `POST /api/v1/shops/<shop_id>/erpnext/sync-purchases/`
 - `POST /api/v1/shops/<shop_id>/erpnext/push-sales/`
 - `POST /api/v1/shops/<shop_id>/erpnext/push-payments/`
 - `POST /api/v1/shops/<shop_id>/erpnext/run-cycle/`
+- `POST /api/v1/shops/<shop_id>/erpnext/enqueue-cycle/`
+- `GET /api/v1/shops/<shop_id>/erpnext/suppliers/`
+- `GET /api/v1/shops/<shop_id>/erpnext/purchases/`
 - `GET /api/v1/shops/<shop_id>/erpnext/document-links/`
 
 ## Recommended first-run sequence
@@ -99,18 +110,24 @@ Recommended `metadata_json`:
    - `GET /api/v1/erpnext/health/`
 3. Fetch or create the shop binding:
    - `GET /api/v1/shops/<shop_id>/erpnext/binding/`
-4. Patch the binding with company/warehouse/payment-account mapping.
+4. Patch the binding with company, warehouse, and payment-account mapping.
 5. Verify the shop connection:
    - `POST /api/v1/shops/<shop_id>/erpnext/verify-connection/`
 6. Pull item masters:
    - `POST /api/v1/shops/<shop_id>/erpnext/sync-items/`
 7. Pull customer masters:
    - `POST /api/v1/shops/<shop_id>/erpnext/sync-customers/`
-8. Push sales:
+8. Reconcile stock:
+   - `POST /api/v1/shops/<shop_id>/erpnext/sync-stock/`
+9. Pull suppliers:
+   - `POST /api/v1/shops/<shop_id>/erpnext/sync-suppliers/`
+10. Pull purchase receipts:
+   - `POST /api/v1/shops/<shop_id>/erpnext/sync-purchases/`
+11. Push sales:
    - `POST /api/v1/shops/<shop_id>/erpnext/push-sales/`
-9. Push payments:
+12. Push payments:
    - `POST /api/v1/shops/<shop_id>/erpnext/push-payments/`
-10. Inspect cursor and link state:
+13. Inspect cursor and link state:
    - `GET /api/v1/shops/<shop_id>/erpnext/sync-state/`
    - `GET /api/v1/shops/<shop_id>/erpnext/document-links/`
 
@@ -125,6 +142,9 @@ POST /api/v1/shops/<shop_id>/erpnext/run-cycle/
   "verify_connection": true,
   "sync_items": true,
   "sync_customers": true,
+  "sync_stock": true,
+  "sync_suppliers": true,
+  "sync_purchases": true,
   "push_sales": true,
   "push_payments": true
 }
@@ -142,6 +162,25 @@ Useful variants:
 
 ```powershell
 D:\business-hub\apps\backend\.venv\Scripts\python.exe manage.py run_erpnext_cycle --shop-id <uuid> --skip-payments
+```
+
+### Queue
+
+Queue the same cycle over Celery:
+
+```json
+POST /api/v1/shops/<shop_id>/erpnext/enqueue-cycle/
+{
+  "limit": 100,
+  "verify_connection": true,
+  "sync_items": true,
+  "sync_customers": true,
+  "sync_stock": true,
+  "sync_suppliers": true,
+  "sync_purchases": true,
+  "push_sales": true,
+  "push_payments": true
+}
 ```
 
 ## Failure triage
@@ -177,6 +216,22 @@ Check:
 - `default_payment_account` or `payment_account_map` is set
 - the ERPNext mode/account names are valid in the target company
 
+### Stock sync looks wrong
+
+Check:
+
+- the binding `warehouse` matches the ERP warehouse you actually want
+- the items being reconciled already came from ERPNext and have `source_id`
+- ERPNext `Bin.actual_qty` reflects the intended warehouse, not all warehouses combined
+
+### Purchase sync looks incomplete
+
+Check:
+
+- purchase sync is enabled in the binding
+- purchase receipts exist in the ERPNext warehouse you filtered to
+- the supplier exists locally in the ERPNext supplier mirror first
+
 ## Handover acceptance checklist
 
 The handover is considered usable when all are true:
@@ -185,9 +240,12 @@ The handover is considered usable when all are true:
 - shop binding is configured
 - item sync imports at least one live item
 - customer sync imports at least one live customer
+- stock sync reconciles at least one mapped item
+- supplier sync imports at least one supplier
+- purchase sync imports at least one purchase receipt
 - at least one sale pushes to ERPNext Sales Invoice successfully
 - at least one payment pushes to ERPNext Payment Entry successfully
-- document links show `linked` results for item, customer, sale, and payment domains
+- document links show `linked` results for item, customer, supplier, purchase, sale, and payment domains
 
 ## Main files
 

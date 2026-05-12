@@ -5,15 +5,24 @@ from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from platform_apps.erpnext.models import ERPNextDocumentLink, ERPNextShopBinding, ERPNextSyncCursor
+from platform_apps.erpnext.models import (
+    ERPNextDocumentLink,
+    ERPNextPurchaseMirror,
+    ERPNextShopBinding,
+    ERPNextSupplierMirror,
+    ERPNextSyncCursor,
+)
 from platform_apps.erpnext.serializers import (
     ERPNextActionSerializer,
     ERPNextCycleSerializer,
     ERPNextDocumentLinkSerializer,
+    ERPNextPurchaseMirrorSerializer,
     ERPNextShopBindingSerializer,
+    ERPNextSupplierMirrorSerializer,
     ERPNextSyncCursorSerializer,
 )
 from platform_apps.erpnext.services import ERPNextConfigurationError, ERPNextIntegrationService
+from platform_apps.erpnext.tasks import run_erpnext_cycle_task
 from platform_apps.shops.models import ShopMembership
 from platform_apps.shops.permissions import get_membership_or_403
 
@@ -190,6 +199,42 @@ class ERPNextCustomerSyncView(ERPNextShopActionView):
         return Response({"action": self.action_name, "status": "ok", **payload})
 
 
+class ERPNextStockSyncView(ERPNextShopActionView):
+    action_name = "sync_stock"
+
+    def action_response(self, request, *args, **kwargs):
+        membership = self.get_membership()
+        payload = ERPNextIntegrationService().sync_stock(
+            shop=membership.shop,
+            limit=self.get_limit(request),
+        )
+        return Response({"action": self.action_name, "status": "ok", **payload})
+
+
+class ERPNextSupplierSyncView(ERPNextShopActionView):
+    action_name = "sync_suppliers"
+
+    def action_response(self, request, *args, **kwargs):
+        membership = self.get_membership()
+        payload = ERPNextIntegrationService().sync_suppliers(
+            shop=membership.shop,
+            limit=self.get_limit(request),
+        )
+        return Response({"action": self.action_name, "status": "ok", **payload})
+
+
+class ERPNextPurchaseSyncView(ERPNextShopActionView):
+    action_name = "sync_purchases"
+
+    def action_response(self, request, *args, **kwargs):
+        membership = self.get_membership()
+        payload = ERPNextIntegrationService().sync_purchases(
+            shop=membership.shop,
+            limit=self.get_limit(request),
+        )
+        return Response({"action": self.action_name, "status": "ok", **payload})
+
+
 class ERPNextSalesPushView(ERPNextShopActionView):
     action_name = "push_sales"
 
@@ -231,3 +276,74 @@ class ERPNextRunCycleView(ShopScopedMixin, generics.GenericAPIView):
         except ERPNextConfigurationError as exc:
             return Response({"overall_status": "blocked", "detail": str(exc)}, status=409)
         return Response(payload)
+
+
+class ERPNextEnqueueCycleView(ShopScopedMixin, generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    minimum_role = ShopMembership.Role.ADMIN
+    serializer_class = ERPNextCycleSerializer
+
+    def post(self, request, *args, **kwargs):
+        membership = self.get_membership()
+        serializer = self.get_serializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+        task = run_erpnext_cycle_task.delay(shop_id=str(membership.shop.id), **payload)
+        return Response(
+            {
+                "shop_id": str(membership.shop.id),
+                "task_id": task.id,
+                "queue": "erpnext-sync",
+                "status": "queued",
+                "payload": payload,
+            },
+            status=202,
+        )
+
+
+class ERPNextSupplierMirrorListView(ShopScopedMixin, generics.ListAPIView):
+    serializer_class = ERPNextSupplierMirrorSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    minimum_role = ShopMembership.Role.ADMIN
+    pagination_class = None
+
+    def get_queryset(self):
+        membership = self.get_membership()
+        queryset = ERPNextSupplierMirror.objects.filter(shop=membership.shop)
+        status_value = self.request.query_params.get("status", "").strip()
+        query = self.request.query_params.get("q", "").strip()
+        if status_value:
+            queryset = queryset.filter(status=status_value)
+        if query:
+            queryset = queryset.filter(
+                Q(remote_name__icontains=query)
+                | Q(supplier_name__icontains=query)
+                | Q(phone__icontains=query)
+                | Q(email__icontains=query)
+            )
+        return queryset
+
+
+class ERPNextPurchaseMirrorListView(ShopScopedMixin, generics.ListAPIView):
+    serializer_class = ERPNextPurchaseMirrorSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    minimum_role = ShopMembership.Role.ADMIN
+    pagination_class = None
+
+    def get_queryset(self):
+        membership = self.get_membership()
+        queryset = ERPNextPurchaseMirror.objects.select_related("supplier").filter(shop=membership.shop)
+        remote_doctype = self.request.query_params.get("remote_doctype", "").strip()
+        status_value = self.request.query_params.get("status", "").strip()
+        query = self.request.query_params.get("q", "").strip()
+        if remote_doctype:
+            queryset = queryset.filter(remote_doctype=remote_doctype)
+        if status_value:
+            queryset = queryset.filter(status=status_value)
+        if query:
+            queryset = queryset.filter(
+                Q(remote_name__icontains=query)
+                | Q(supplier_remote_name__icontains=query)
+                | Q(warehouse__icontains=query)
+            )
+        return queryset

@@ -18,12 +18,16 @@ from platform_apps.users.models import PlatformUser
 
 
 class FakeERPNextClient:
-    def __init__(self, *, resource_lists=None, create_responses=None):
+    def __init__(self, *, resource_lists=None, create_responses=None, resource_details=None):
         self.resource_lists = resource_lists or {}
         self.create_responses = create_responses or {}
+        self.resource_details = resource_details or {}
 
     def list_resource(self, *, doctype, filters=None, fields=None, limit_page_length=20):
         return {"data": self.resource_lists.get(doctype, [])[:limit_page_length]}
+
+    def get_resource(self, *, doctype, name):
+        return {"data": self.resource_details.get((doctype, name), {})}
 
     def create_resource(self, *, doctype, payload):
         response = self.create_responses.get(doctype)
@@ -289,6 +293,168 @@ class ERPNextApiTests(TestCase):
             ).exists()
         )
 
+    def test_sync_stock_reconciles_inventory_ledger(self):
+        item = InventoryItem.objects.create(
+            shop=self.shop,
+            name="Cotton Shirt",
+            sku="ITEM-0001",
+            sell_price=Decimal("599.00"),
+            source_system="erpnext",
+            source_id="ITEM-0001",
+        )
+        fake_client = FakeERPNextClient(
+            resource_lists={
+                "Bin": [
+                    {
+                        "name": "BIN-0001",
+                        "item_code": "ITEM-0001",
+                        "warehouse": self.binding.warehouse,
+                        "actual_qty": "8",
+                        "modified": "2026-05-12 14:45:00",
+                    }
+                ]
+            }
+        )
+
+        with patch(
+            "platform_apps.erpnext.services.ERPNextIntegrationService.build_client",
+            return_value=fake_client,
+        ):
+            response = self.client.post(
+                f"/api/v1/shops/{self.shop.id}/erpnext/sync-stock/",
+                {"limit": 10},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        total_stock = sum(item.ledger_entries.values_list("quantity_delta", flat=True))
+        self.assertEqual(total_stock, 8)
+
+    def test_sync_suppliers_imports_supplier_mirror(self):
+        self.binding.purchase_sync_enabled = True
+        self.binding.save(update_fields=["purchase_sync_enabled", "updated_at"])
+        fake_client = FakeERPNextClient(
+            resource_lists={
+                "Supplier": [
+                    {
+                        "name": "SUP-0001",
+                        "supplier_name": "Alpha Textiles",
+                        "supplier_group": "Default Supplier Group",
+                        "supplier_type": "Company",
+                        "mobile_no": "8888888888",
+                        "email_id": "alpha@example.com",
+                        "disabled": 0,
+                        "modified": "2026-05-12 14:50:00",
+                    }
+                ]
+            }
+        )
+
+        with patch(
+            "platform_apps.erpnext.services.ERPNextIntegrationService.build_client",
+            return_value=fake_client,
+        ):
+            response = self.client.post(
+                f"/api/v1/shops/{self.shop.id}/erpnext/sync-suppliers/",
+                {"limit": 10},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["imported_count"], 1)
+        self.assertTrue(
+            ERPNextDocumentLink.objects.filter(
+                shop=self.shop,
+                local_domain=ERPNextDocumentLink.LocalDomain.SUPPLIER,
+                remote_doctype="Supplier",
+                remote_name="SUP-0001",
+            ).exists()
+        )
+
+    def test_sync_purchases_imports_purchase_mirror(self):
+        self.binding.purchase_sync_enabled = True
+        self.binding.save(update_fields=["purchase_sync_enabled", "updated_at"])
+        supplier_client = FakeERPNextClient(
+            resource_lists={
+                "Supplier": [
+                    {
+                        "name": "SUP-0001",
+                        "supplier_name": "Alpha Textiles",
+                        "supplier_group": "Default Supplier Group",
+                        "supplier_type": "Company",
+                        "mobile_no": "8888888888",
+                        "email_id": "alpha@example.com",
+                        "disabled": 0,
+                        "modified": "2026-05-12 14:50:00",
+                    }
+                ],
+                "Purchase Receipt": [
+                    {
+                        "name": "PREC-0001",
+                        "supplier": "SUP-0001",
+                        "posting_date": "2026-05-12",
+                        "grand_total": "1200.00",
+                        "status": "Completed",
+                        "docstatus": 1,
+                        "currency": "INR",
+                        "set_warehouse": self.binding.warehouse,
+                        "modified": "2026-05-12 15:00:00",
+                    }
+                ],
+            },
+            resource_details={
+                ("Purchase Receipt", "PREC-0001"): {
+                    "name": "PREC-0001",
+                    "supplier": "SUP-0001",
+                    "posting_date": "2026-05-12",
+                    "grand_total": "1200.00",
+                    "status": "Completed",
+                    "docstatus": 1,
+                    "currency": "INR",
+                    "set_warehouse": self.binding.warehouse,
+                    "items": [
+                        {
+                            "item_code": "ITEM-0001",
+                            "item_name": "Cotton Shirt",
+                            "qty": 5,
+                            "rate": "240.00",
+                            "warehouse": self.binding.warehouse,
+                        }
+                    ],
+                    "modified": "2026-05-12 15:00:00",
+                }
+            },
+        )
+        item = InventoryItem.objects.create(
+            shop=self.shop,
+            name="Cotton Shirt",
+            sku="ITEM-0001",
+            sell_price=Decimal("599.00"),
+            source_system="erpnext",
+            source_id="ITEM-0001",
+        )
+
+        with patch(
+            "platform_apps.erpnext.services.ERPNextIntegrationService.build_client",
+            return_value=supplier_client,
+        ):
+            self.client.post(
+                f"/api/v1/shops/{self.shop.id}/erpnext/sync-suppliers/",
+                {"limit": 10},
+                format="json",
+            )
+            response = self.client.post(
+                f"/api/v1/shops/{self.shop.id}/erpnext/sync-purchases/",
+                {"limit": 10},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["imported_count"], 1)
+        item.refresh_from_db()
+        self.assertEqual(item.private.supplier_id, "SUP-0001")
+        self.assertEqual(item.private.cost_price, Decimal("240.00"))
+
     def test_push_sales_creates_sales_invoice_link(self):
         customer = Customer.objects.create(
             shop=self.shop,
@@ -447,6 +613,20 @@ class ERPNextApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["overall_status"], "ok")
+
+    def test_enqueue_cycle_returns_task_stub(self):
+        with patch(
+            "platform_apps.erpnext.views.run_erpnext_cycle_task.delay",
+        ) as mocked_delay:
+            mocked_delay.return_value.id = "task-001"
+            response = self.client.post(
+                f"/api/v1/shops/{self.shop.id}/erpnext/enqueue-cycle/",
+                {"limit": 25},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.json()["task_id"], "task-001")
 
     @override_settings(
         ERPNEXT_BASE_URL="https://erpnext.example.com",

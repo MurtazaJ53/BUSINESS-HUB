@@ -15,6 +15,9 @@ def run_erpnext_cycle_task(
     verify_connection: bool = True,
     sync_items: bool = True,
     sync_customers: bool = True,
+    sync_stock: bool = True,
+    sync_suppliers: bool = True,
+    sync_purchases: bool = True,
     push_sales: bool = True,
     push_payments: bool = True,
 ):
@@ -25,6 +28,9 @@ def run_erpnext_cycle_task(
         verify_connection=verify_connection,
         sync_items=sync_items,
         sync_customers=sync_customers,
+        sync_stock=sync_stock,
+        sync_suppliers=sync_suppliers,
+        sync_purchases=sync_purchases,
         push_sales=push_sales,
         push_payments=push_payments,
     )

@@ -98,6 +98,7 @@ class ERPNextDocumentLink(UUIDStampedModel):
     class LocalDomain(models.TextChoices):
         ITEM = "item", "Item"
         CUSTOMER = "customer", "Customer"
+        SUPPLIER = "supplier", "Supplier"
         SALE = "sale", "Sale"
         PAYMENT = "payment", "Payment"
         PURCHASE = "purchase", "Purchase"
@@ -134,3 +135,75 @@ class ERPNextDocumentLink(UUIDStampedModel):
     def __str__(self) -> str:
         return f"ERPNext link<{self.local_domain}:{self.local_object_id}->{self.remote_doctype}:{self.remote_name}>"
 
+
+class ERPNextSupplierMirror(UUIDStampedModel):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        ARCHIVED = "archived", "Archived"
+
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="erpnext_suppliers")
+    remote_name = models.CharField(max_length=255)
+    supplier_name = models.CharField(max_length=255)
+    supplier_group = models.CharField(max_length=255, blank=True)
+    supplier_type = models.CharField(max_length=64, blank=True)
+    phone = models.CharField(max_length=64, blank=True)
+    email = models.EmailField(blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
+    last_remote_modified_at = models.DateTimeField(blank=True, null=True)
+    last_synced_at = models.DateTimeField(blank=True, null=True)
+    metadata_json = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["shop", "remote_name"],
+                name="erpnext_unique_supplier_mirror_per_shop",
+            )
+        ]
+        ordering = ["supplier_name", "remote_name"]
+
+    def __str__(self) -> str:
+        return f"ERPNext supplier<{self.remote_name}>"
+
+
+class ERPNextPurchaseMirror(UUIDStampedModel):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        SUBMITTED = "submitted", "Submitted"
+        CANCELLED = "cancelled", "Cancelled"
+        UNKNOWN = "unknown", "Unknown"
+
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="erpnext_purchases")
+    supplier = models.ForeignKey(
+        ERPNextSupplierMirror,
+        on_delete=models.SET_NULL,
+        related_name="purchase_documents",
+        blank=True,
+        null=True,
+    )
+    remote_doctype = models.CharField(max_length=120, default="Purchase Receipt")
+    remote_name = models.CharField(max_length=255)
+    supplier_remote_name = models.CharField(max_length=255, blank=True)
+    posting_date = models.DateField(blank=True, null=True)
+    warehouse = models.CharField(max_length=255, blank=True)
+    currency_code = models.CharField(max_length=8, default="INR")
+    grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.UNKNOWN)
+    docstatus = models.IntegerField(default=0)
+    item_count = models.PositiveIntegerField(default=0)
+    items_json = models.JSONField(default=list, blank=True)
+    metadata_json = models.JSONField(default=dict, blank=True)
+    last_remote_modified_at = models.DateTimeField(blank=True, null=True)
+    last_synced_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["shop", "remote_doctype", "remote_name"],
+                name="erpnext_unique_purchase_mirror_per_shop",
+            )
+        ]
+        ordering = ["-posting_date", "-updated_at"]
+
+    def __str__(self) -> str:
+        return f"ERPNext purchase<{self.remote_doctype}:{self.remote_name}>"

@@ -46,9 +46,15 @@ Phase 1 backend foundation for the Business Hub target platform.
 - `/api/v1/shops/<shop_id>/erpnext/poc-summary/`
 - `/api/v1/shops/<shop_id>/erpnext/sync-items/`
 - `/api/v1/shops/<shop_id>/erpnext/sync-customers/`
+- `/api/v1/shops/<shop_id>/erpnext/sync-stock/`
+- `/api/v1/shops/<shop_id>/erpnext/sync-suppliers/`
+- `/api/v1/shops/<shop_id>/erpnext/sync-purchases/`
 - `/api/v1/shops/<shop_id>/erpnext/push-sales/`
 - `/api/v1/shops/<shop_id>/erpnext/push-payments/`
 - `/api/v1/shops/<shop_id>/erpnext/run-cycle/`
+- `/api/v1/shops/<shop_id>/erpnext/enqueue-cycle/`
+- `/api/v1/shops/<shop_id>/erpnext/suppliers/`
+- `/api/v1/shops/<shop_id>/erpnext/purchases/`
 - `/api/v1/shops/<shop_id>/erpnext/document-links/`
 - `/api/v1/migration/domains/`
 - `/api/v1/migration/jobs/`
@@ -192,9 +198,13 @@ The ERPNext execution scaffold is now available for one-shop proof-of-concept wo
 - `/api/v1/shops/<shop_id>/erpnext/poc-summary/` gives a shop-level readiness/count summary for the PoC
 - `/api/v1/shops/<shop_id>/erpnext/sync-items/` pulls ERPNext Item masters into Business Hub inventory
 - `/api/v1/shops/<shop_id>/erpnext/sync-customers/` pulls ERPNext Customer masters into Business Hub customers
+- `/api/v1/shops/<shop_id>/erpnext/sync-stock/` reconciles Business Hub stock ledger against ERPNext `Bin` quantities
+- `/api/v1/shops/<shop_id>/erpnext/sync-suppliers/` imports ERPNext Supplier masters into local mirror records
+- `/api/v1/shops/<shop_id>/erpnext/sync-purchases/` imports ERPNext Purchase Receipt documents into local mirror records
 - `/api/v1/shops/<shop_id>/erpnext/push-sales/` publishes local Business Hub sales into ERPNext Sales Invoice documents
 - `/api/v1/shops/<shop_id>/erpnext/push-payments/` publishes local Business Hub payments into ERPNext Payment Entry documents
 - `/api/v1/shops/<shop_id>/erpnext/run-cycle/` runs the verify/import/post cycle in one call for handover and operations
+- `/api/v1/shops/<shop_id>/erpnext/enqueue-cycle/` enqueues that cycle onto the `erpnext-sync` Celery queue
 
 Configure the PoC credentials through:
 
@@ -213,6 +223,15 @@ Additional per-shop PoC mapping lives in the ERPNext binding `metadata_json`, in
 - `mode_of_payment_map`
 - `receivable_account`
 
+Additional binding values now matter for the extended import path:
+
+- `warehouse`
+- `supplier_group`
+
 For local/operator execution, the backend also includes:
 
 - `manage.py run_erpnext_cycle --shop-slug <slug>`
+
+For queue-based execution, the backend also includes:
+
+- Celery task: `platform_apps.erpnext.tasks.run_erpnext_cycle_task`

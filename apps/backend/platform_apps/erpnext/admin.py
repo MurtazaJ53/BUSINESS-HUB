@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from platform_apps.erpnext.models import ERPNextDocumentLink, ERPNextShopBinding, ERPNextSyncCursor
+from platform_apps.erpnext.models import (
+    ERPNextDocumentLink,
+    ERPNextPurchaseMirror,
+    ERPNextShopBinding,
+    ERPNextSupplierMirror,
+    ERPNextSyncCursor,
+)
 
 
 @admin.register(ERPNextShopBinding)
@@ -23,3 +29,16 @@ class ERPNextDocumentLinkAdmin(admin.ModelAdmin):
     list_filter = ("local_domain", "direction", "sync_status")
     search_fields = ("shop__name", "shop__slug", "local_object_id", "remote_name", "remote_doctype")
 
+
+@admin.register(ERPNextSupplierMirror)
+class ERPNextSupplierMirrorAdmin(admin.ModelAdmin):
+    list_display = ("shop", "remote_name", "supplier_name", "supplier_group", "status", "last_synced_at")
+    list_filter = ("status", "supplier_group")
+    search_fields = ("shop__name", "shop__slug", "remote_name", "supplier_name", "phone", "email")
+
+
+@admin.register(ERPNextPurchaseMirror)
+class ERPNextPurchaseMirrorAdmin(admin.ModelAdmin):
+    list_display = ("shop", "remote_doctype", "remote_name", "supplier_remote_name", "posting_date", "grand_total", "status")
+    list_filter = ("remote_doctype", "status", "currency_code")
+    search_fields = ("shop__name", "shop__slug", "remote_name", "supplier_remote_name", "warehouse")

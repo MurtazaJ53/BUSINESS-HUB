@@ -1,17 +1,23 @@
 from django.urls import path
 
 from platform_apps.erpnext.views import (
+    ERPNextEnqueueCycleView,
     ERPNextDocumentLinkListView,
-    ERPNextHealthCheckView,
     ERPNextCustomerSyncView,
+    ERPNextHealthCheckView,
     ERPNextItemSyncView,
     ERPNextMetaView,
     ERPNextPaymentsPushView,
+    ERPNextPurchaseMirrorListView,
+    ERPNextPurchaseSyncView,
     ERPNextRunCycleView,
     ERPNextSalesPushView,
     ERPNextShopBindingDetailView,
     ERPNextShopPocSummaryView,
     ERPNextShopSyncStateView,
+    ERPNextStockSyncView,
+    ERPNextSupplierMirrorListView,
+    ERPNextSupplierSyncView,
     ERPNextShopVerifyConnectionView,
 )
 
@@ -45,6 +51,21 @@ urlpatterns = [
         name="erpnext-sync-customers",
     ),
     path(
+        "shops/<uuid:shop_id>/erpnext/sync-stock/",
+        ERPNextStockSyncView.as_view(),
+        name="erpnext-sync-stock",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/sync-suppliers/",
+        ERPNextSupplierSyncView.as_view(),
+        name="erpnext-sync-suppliers",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/sync-purchases/",
+        ERPNextPurchaseSyncView.as_view(),
+        name="erpnext-sync-purchases",
+    ),
+    path(
         "shops/<uuid:shop_id>/erpnext/push-sales/",
         ERPNextSalesPushView.as_view(),
         name="erpnext-push-sales",
@@ -58,6 +79,21 @@ urlpatterns = [
         "shops/<uuid:shop_id>/erpnext/run-cycle/",
         ERPNextRunCycleView.as_view(),
         name="erpnext-run-cycle",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/enqueue-cycle/",
+        ERPNextEnqueueCycleView.as_view(),
+        name="erpnext-enqueue-cycle",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/suppliers/",
+        ERPNextSupplierMirrorListView.as_view(),
+        name="erpnext-suppliers",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/purchases/",
+        ERPNextPurchaseMirrorListView.as_view(),
+        name="erpnext-purchases",
     ),
     path(
         "shops/<uuid:shop_id>/erpnext/document-links/",

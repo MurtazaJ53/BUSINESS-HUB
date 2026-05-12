@@ -2,31 +2,37 @@
 
 ## Purpose
 
-This document describes the first executable ERPNext integration layer added to the Business Hub backend.
+This document describes the executable ERPNext integration layer currently available in the Business Hub backend.
 
 It is not a full ERP migration.
 
-It is the **PoC control surface** for:
+It is the current **execution surface** for:
 
 - configuring a shop-to-ERPNext binding
 - verifying ERPNext connectivity
+- importing ERP masters and purchase-side data
+- reconciling inventory posture
+- posting sales and payments
 - tracking sync cursor posture
 - tracking local-to-ERP document links
-- measuring one-shop PoC readiness
 
 ## What now exists in the backend
 
-The backend now contains a dedicated ERPNext app:
+The backend contains a dedicated ERPNext app:
 
 - `platform_apps.erpnext`
 
-It adds:
+It now adds:
 
 - ERPNext environment meta + health endpoints
 - shop-level ERPNext bindings
 - default pull/push sync cursor tracking
 - local-to-ERP document-link tracking
-- PoC summary endpoint for one-shop readiness
+- supplier mirror storage
+- purchase mirror storage
+- stock reconciliation against ERPNext bins
+- one-call run-cycle orchestration
+- queueable Celery handoff for the cycle runner
 
 ## Required environment variables
 
@@ -39,7 +45,7 @@ Set these in `apps/backend/.env`:
 - `ERPNEXT_VERIFY_SSL`
 - `ERPNEXT_TIMEOUT_SECONDS`
 
-## New API endpoints
+## API endpoints
 
 ### Global
 
@@ -54,15 +60,22 @@ Set these in `apps/backend/.env`:
 - `GET /api/v1/shops/<shop_id>/erpnext/poc-summary/`
 - `POST /api/v1/shops/<shop_id>/erpnext/sync-items/`
 - `POST /api/v1/shops/<shop_id>/erpnext/sync-customers/`
+- `POST /api/v1/shops/<shop_id>/erpnext/sync-stock/`
+- `POST /api/v1/shops/<shop_id>/erpnext/sync-suppliers/`
+- `POST /api/v1/shops/<shop_id>/erpnext/sync-purchases/`
 - `POST /api/v1/shops/<shop_id>/erpnext/push-sales/`
 - `POST /api/v1/shops/<shop_id>/erpnext/push-payments/`
+- `POST /api/v1/shops/<shop_id>/erpnext/run-cycle/`
+- `POST /api/v1/shops/<shop_id>/erpnext/enqueue-cycle/`
+- `GET /api/v1/shops/<shop_id>/erpnext/suppliers/`
+- `GET /api/v1/shops/<shop_id>/erpnext/purchases/`
 - `GET /api/v1/shops/<shop_id>/erpnext/document-links/`
 
 ## Core models
 
 ### ERPNextShopBinding
 
-Stores the shop-specific ERP mapping and PoC posture:
+Stores the shop-specific ERP mapping and runtime posture:
 
 - environment
 - company
@@ -76,7 +89,7 @@ Stores the shop-specific ERP mapping and PoC posture:
 
 ### ERPNextSyncCursor
 
-Tracks pull/push state for the PoC domains:
+Tracks pull/push state for:
 
 - items
 - customers
@@ -92,38 +105,50 @@ Tracks local object to ERP document mapping status for:
 
 - items
 - customers
+- suppliers
 - sales
 - payments
 - purchases
 
-## Recommended PoC execution flow
+### ERPNextSupplierMirror
+
+Stores the current imported ERPNext supplier master set for a shop.
+
+### ERPNextPurchaseMirror
+
+Stores imported ERPNext purchase receipt documents for a shop.
+
+## Recommended execution flow
 
 1. Set ERPNext environment variables.
-2. Create or fetch the shop binding with:
+2. Create or fetch the shop binding:
    - `GET /api/v1/shops/<shop_id>/erpnext/binding/`
-3. Update the binding with real PoC values:
-   - company
-   - warehouse
-   - price list
-   - groups
+3. Update the binding with company, warehouse, price list, and metadata mappings.
 4. Verify the connection:
    - `POST /api/v1/shops/<shop_id>/erpnext/verify-connection/`
-5. Inspect sync cursor bootstrap:
+5. Inspect sync-state and PoC summary:
    - `GET /api/v1/shops/<shop_id>/erpnext/sync-state/`
-6. Inspect one-shop readiness:
    - `GET /api/v1/shops/<shop_id>/erpnext/poc-summary/`
-7. Pull item masters:
+6. Pull item masters:
    - `POST /api/v1/shops/<shop_id>/erpnext/sync-items/`
-8. Pull customer masters:
+7. Pull customer masters:
    - `POST /api/v1/shops/<shop_id>/erpnext/sync-customers/`
-9. Publish locally captured sales:
+8. Reconcile stock:
+   - `POST /api/v1/shops/<shop_id>/erpnext/sync-stock/`
+9. Pull suppliers:
+   - `POST /api/v1/shops/<shop_id>/erpnext/sync-suppliers/`
+10. Pull purchase receipts:
+   - `POST /api/v1/shops/<shop_id>/erpnext/sync-purchases/`
+11. Push sales:
    - `POST /api/v1/shops/<shop_id>/erpnext/push-sales/`
-10. Publish locally captured payments:
+12. Push payments:
    - `POST /api/v1/shops/<shop_id>/erpnext/push-payments/`
+13. Or run the whole thing:
+   - `POST /api/v1/shops/<shop_id>/erpnext/run-cycle/`
 
 ## Binding metadata_json conventions
 
-The first live execution path uses a few binding-level metadata keys:
+The live execution path uses these keys:
 
 - `walk_in_customer_name`
   Use this when a Business Hub sale has no explicit ERPNext customer mapping.
@@ -136,31 +161,42 @@ The first live execution path uses a few binding-level metadata keys:
 - `receivable_account`
   Optional override passed while creating Sales Invoice documents.
 
-## What this layer does not do yet
+The binding fields themselves now also matter for the expanded import path:
 
-This first live execution layer still does **not** yet:
+- `warehouse`
+  Used for stock-bin and purchase-receipt filtering.
+- `supplier_group`
+  Optional supplier import filter.
 
-- reconcile ERPNext stock deltas back into Business Hub stock projections
-- import suppliers and purchase documents
+## What this layer still does not do
+
+This live execution layer still does **not** yet:
+
+- import supplier-side payments or returns
+- import purchase orders or purchase invoices beyond the current receipt mirror
 - auto-submit ERPNext documents through a custom finalize step
-- run background sync jobs continuously without an explicit trigger
+- run periodic beat scheduling by default without an explicit trigger
+- expose ERPNext controls in the admin web UI
 
-## Why this still matters
+## Why this matters
 
-Without this layer, the ERPNext PoC is only a doc exercise.
+Without this layer, the ERPNext path is only a planning exercise.
 
 With this layer, the team can now:
 
 - prove connection posture
 - configure one shop cleanly
-- create a stable place for future sync/posting logic
-- track PoC execution state explicitly inside the backend
+- import ERP masters
+- reconcile stock
+- push sales and payments
+- track failures explicitly
+- operate the first cycle from HTTP, CLI, or Celery
 
 ## Recommended next code step
 
-After this scaffold, the next implementation target should be:
+After this execution layer, the next implementation targets should be:
 
-1. stock projection import from ERPNext warehouses / bins
-2. supplier master pull
-3. purchase document pull or posting
-4. background job scheduling for recurring ERPNext sync
+1. purchase invoice / supplier payment coverage
+2. purchase-order and return coverage
+3. recurring beat-level scheduling policy
+4. admin-web controls for ERPNext sync operations

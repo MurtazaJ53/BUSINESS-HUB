@@ -18,6 +18,9 @@ class Command(BaseCommand):
         parser.add_argument("--skip-verify", action="store_true")
         parser.add_argument("--skip-items", action="store_true")
         parser.add_argument("--skip-customers", action="store_true")
+        parser.add_argument("--skip-stock", action="store_true")
+        parser.add_argument("--skip-suppliers", action="store_true")
+        parser.add_argument("--skip-purchases", action="store_true")
         parser.add_argument("--skip-sales", action="store_true")
         parser.add_argument("--skip-payments", action="store_true")
 
@@ -31,6 +34,9 @@ class Command(BaseCommand):
                 verify_connection=not options["skip_verify"],
                 sync_items=not options["skip_items"],
                 sync_customers=not options["skip_customers"],
+                sync_stock=not options["skip_stock"],
+                sync_suppliers=not options["skip_suppliers"],
+                sync_purchases=not options["skip_purchases"],
                 push_sales=not options["skip_sales"],
                 push_payments=not options["skip_payments"],
             )
@@ -52,4 +58,3 @@ class Command(BaseCommand):
         if shop is None:
             raise CommandError(f"Shop {shop_slug} was not found.")
         return shop
-
