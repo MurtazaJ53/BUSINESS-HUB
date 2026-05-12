@@ -92,16 +92,20 @@ It is designed to support:
 65. [Flutter Mobile Migration Plan](./flutter-mobile-migration.md)
 66. [Global Scale Blueprint](./global-scale-blueprint.md)
 67. [Scale Certification Checklist](./scale-certification-checklist.md)
+68. [ERPNext Fit-Gap Analysis](./erpnext-fit-gap-analysis.md)
+69. [ERPNext Target Architecture](./erpnext-target-architecture.md)
+70. [ERPNext Proof-of-Concept Runbook](./erpnext-proof-of-concept-runbook.md)
 
 ## Current truth
 
-As of April 29, 2026:
+As of May 12, 2026:
 - the web/admin app is still the most complete Business Hub surface
 - the Flutter mobile app is the new performance-focused mobile path
 - Flutter mobile is not yet at full feature parity with the old app
 - Firestore is the shared cloud backbone
 - local SQLite remains the speed layer on clients
 - PostgreSQL + Django is the recommended final backend direction
+- ERPNext is now documented as an evaluation path for back-office acceleration, not as an automatic full UI replacement
 - the migration control plane now includes Phase 7 rollout and scale-optimization signoff surfaces, while Phase 8 defines steady-state operating posture
 
 ## Suggested use by audience
