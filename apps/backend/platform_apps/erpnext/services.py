@@ -848,6 +848,65 @@ class ERPNextIntegrationService:
             "failures": failures,
         }
 
+    def run_cycle(
+        self,
+        *,
+        shop: Shop,
+        limit: int = 100,
+        verify_connection: bool = True,
+        sync_items: bool = True,
+        sync_customers: bool = True,
+        push_sales: bool = True,
+        push_payments: bool = True,
+    ) -> dict[str, Any]:
+        binding = self._require_binding(shop=shop)
+        steps: list[dict[str, Any]] = []
+        overall_status = "ok"
+
+        if verify_connection:
+            health_payload = self.health_check(binding=binding)
+            self.apply_health_payload(binding=binding, payload=health_payload)
+            step_payload = {
+                "step": "verify_connection",
+                "status": health_payload.get("status"),
+                "reachable": health_payload.get("reachable", False),
+                "authenticated": health_payload.get("authenticated", False),
+            }
+            steps.append(step_payload)
+            if health_payload.get("status") != ERPNextShopBinding.HealthStatus.OK:
+                return {
+                    "shop_id": str(shop.id),
+                    "overall_status": "blocked",
+                    "steps": steps,
+                    "detail": health_payload.get("error", "ERPNext health verification failed."),
+                }
+
+        action_plan = [
+            ("sync_items", sync_items, self.sync_items),
+            ("sync_customers", sync_customers, self.sync_customers),
+            ("push_sales", push_sales, self.push_sales),
+            ("push_payments", push_payments, self.push_payments),
+        ]
+
+        for step_name, enabled, handler in action_plan:
+            if not enabled:
+                steps.append({"step": step_name, "status": "skipped"})
+                continue
+            try:
+                result = handler(shop=shop, limit=limit)
+                steps.append({"step": step_name, "status": "ok", "result": result})
+            except Exception as exc:
+                overall_status = "partial" if any(step["status"] == "ok" for step in steps) else "failed"
+                steps.append({"step": step_name, "status": "failed", "detail": str(exc)})
+                break
+
+        return {
+            "shop_id": str(shop.id),
+            "overall_status": overall_status,
+            "steps": steps,
+            "poc_summary": self.build_poc_summary(shop=shop),
+        }
+
     def build_poc_summary(self, *, shop: Shop) -> dict[str, Any]:
         self.ensure_default_cursors(shop=shop)
         binding = ERPNextShopBinding.objects.filter(shop=shop).first()

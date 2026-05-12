@@ -427,6 +427,27 @@ class ERPNextApiTests(TestCase):
             ).exists()
         )
 
+    def test_run_cycle_endpoint_returns_aggregated_status(self):
+        with patch(
+            "platform_apps.erpnext.views.ERPNextIntegrationService.run_cycle",
+            return_value={
+                "shop_id": str(self.shop.id),
+                "overall_status": "ok",
+                "steps": [
+                    {"step": "verify_connection", "status": "ok"},
+                    {"step": "sync_items", "status": "ok"},
+                ],
+            },
+        ):
+            response = self.client.post(
+                f"/api/v1/shops/{self.shop.id}/erpnext/run-cycle/",
+                {"limit": 25},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["overall_status"], "ok")
+
     @override_settings(
         ERPNEXT_BASE_URL="https://erpnext.example.com",
         ERPNEXT_API_KEY="key-123",

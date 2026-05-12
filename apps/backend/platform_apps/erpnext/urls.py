@@ -7,6 +7,7 @@ from platform_apps.erpnext.views import (
     ERPNextItemSyncView,
     ERPNextMetaView,
     ERPNextPaymentsPushView,
+    ERPNextRunCycleView,
     ERPNextSalesPushView,
     ERPNextShopBindingDetailView,
     ERPNextShopPocSummaryView,
@@ -52,6 +53,11 @@ urlpatterns = [
         "shops/<uuid:shop_id>/erpnext/push-payments/",
         ERPNextPaymentsPushView.as_view(),
         name="erpnext-push-payments",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/run-cycle/",
+        ERPNextRunCycleView.as_view(),
+        name="erpnext-run-cycle",
     ),
     path(
         "shops/<uuid:shop_id>/erpnext/document-links/",

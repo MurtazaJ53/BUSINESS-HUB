@@ -98,3 +98,11 @@ class ERPNextDocumentLinkSerializer(serializers.ModelSerializer):
 
 class ERPNextActionSerializer(serializers.Serializer):
     limit = serializers.IntegerField(min_value=1, max_value=500, required=False, default=100)
+
+
+class ERPNextCycleSerializer(ERPNextActionSerializer):
+    verify_connection = serializers.BooleanField(required=False, default=True)
+    sync_items = serializers.BooleanField(required=False, default=True)
+    sync_customers = serializers.BooleanField(required=False, default=True)
+    push_sales = serializers.BooleanField(required=False, default=True)
+    push_payments = serializers.BooleanField(required=False, default=True)

@@ -16,5 +16,6 @@ celery_app.conf.task_routes = {
     "platform_apps.projections.tasks.refresh_dashboard_projection_task": {
         "queue": "projection-refresh"
     },
+    "platform_apps.erpnext.tasks.run_erpnext_cycle_task": {"queue": "erpnext-sync"},
 }
 celery_app.autodiscover_tasks()

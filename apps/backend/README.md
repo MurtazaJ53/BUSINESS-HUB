@@ -48,6 +48,7 @@ Phase 1 backend foundation for the Business Hub target platform.
 - `/api/v1/shops/<shop_id>/erpnext/sync-customers/`
 - `/api/v1/shops/<shop_id>/erpnext/push-sales/`
 - `/api/v1/shops/<shop_id>/erpnext/push-payments/`
+- `/api/v1/shops/<shop_id>/erpnext/run-cycle/`
 - `/api/v1/shops/<shop_id>/erpnext/document-links/`
 - `/api/v1/migration/domains/`
 - `/api/v1/migration/jobs/`
@@ -193,6 +194,7 @@ The ERPNext execution scaffold is now available for one-shop proof-of-concept wo
 - `/api/v1/shops/<shop_id>/erpnext/sync-customers/` pulls ERPNext Customer masters into Business Hub customers
 - `/api/v1/shops/<shop_id>/erpnext/push-sales/` publishes local Business Hub sales into ERPNext Sales Invoice documents
 - `/api/v1/shops/<shop_id>/erpnext/push-payments/` publishes local Business Hub payments into ERPNext Payment Entry documents
+- `/api/v1/shops/<shop_id>/erpnext/run-cycle/` runs the verify/import/post cycle in one call for handover and operations
 
 Configure the PoC credentials through:
 
@@ -210,3 +212,7 @@ Additional per-shop PoC mapping lives in the ERPNext binding `metadata_json`, in
 - `payment_account_map`
 - `mode_of_payment_map`
 - `receivable_account`
+
+For local/operator execution, the backend also includes:
+
+- `manage.py run_erpnext_cycle --shop-slug <slug>`

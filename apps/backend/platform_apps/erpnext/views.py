@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from platform_apps.erpnext.models import ERPNextDocumentLink, ERPNextShopBinding, ERPNextSyncCursor
 from platform_apps.erpnext.serializers import (
     ERPNextActionSerializer,
+    ERPNextCycleSerializer,
     ERPNextDocumentLinkSerializer,
     ERPNextShopBindingSerializer,
     ERPNextSyncCursorSerializer,
@@ -211,3 +212,22 @@ class ERPNextPaymentsPushView(ERPNextShopActionView):
             limit=self.get_limit(request),
         )
         return Response({"action": self.action_name, "status": "ok", **payload})
+
+
+class ERPNextRunCycleView(ShopScopedMixin, generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    minimum_role = ShopMembership.Role.ADMIN
+    serializer_class = ERPNextCycleSerializer
+
+    def post(self, request, *args, **kwargs):
+        membership = self.get_membership()
+        serializer = self.get_serializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        try:
+            payload = ERPNextIntegrationService().run_cycle(
+                shop=membership.shop,
+                **serializer.validated_data,
+            )
+        except ERPNextConfigurationError as exc:
+            return Response({"overall_status": "blocked", "detail": str(exc)}, status=409)
+        return Response(payload)

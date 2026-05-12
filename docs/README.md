@@ -96,6 +96,7 @@ It is designed to support:
 69. [ERPNext Target Architecture](./erpnext-target-architecture.md)
 70. [ERPNext Proof-of-Concept Runbook](./erpnext-proof-of-concept-runbook.md)
 71. [ERPNext Execution Layer](./erpnext-execution-layer.md)
+72. [ERPNext Handover Runbook](./erpnext-handover-runbook.md)
 
 ## Current truth
 
