@@ -214,6 +214,8 @@ Configure the PoC credentials through:
 - `ERPNEXT_SITE_NAME`
 - `ERPNEXT_VERIFY_SSL`
 - `ERPNEXT_TIMEOUT_SECONDS`
+- `ERPNEXT_MOCK_MODE`
+- `ERPNEXT_MOCK_STATE_PATH`
 
 Additional per-shop PoC mapping lives in the ERPNext binding `metadata_json`, including:
 
@@ -231,6 +233,13 @@ Additional binding values now matter for the extended import path:
 For local/operator execution, the backend also includes:
 
 - `manage.py run_erpnext_cycle --shop-slug <slug>`
+- `manage.py bootstrap_erpnext_demo --shop-slug demo-shop --reset-mock-state`
+
+If you want a fully local ERPNext test without live credentials, set:
+
+- `ERPNEXT_BASE_URL=mock://erpnext`
+- `ERPNEXT_SITE_NAME=business-hub-mock`
+- `ERPNEXT_MOCK_MODE=true`
 
 For queue-based execution, the backend also includes:
 

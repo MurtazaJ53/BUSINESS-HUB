@@ -4,6 +4,7 @@ import json
 import ssl
 from dataclasses import dataclass
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 from urllib import error, parse, request
 
@@ -14,6 +15,7 @@ from django.utils.dateparse import parse_datetime
 from django.db.models import Sum
 from django.db.models.functions import Coalesce
 
+from platform_apps.erpnext.mock_client import MockERPNextClient, MockERPNextClientSettings
 from platform_apps.customers.models import Customer
 from platform_apps.erpnext.models import (
     ERPNextDocumentLink,
@@ -179,22 +181,35 @@ class ERPNextIntegrationService:
     @staticmethod
     def environment_meta(*, binding: ERPNextShopBinding | None = None) -> dict[str, Any]:
         base_url = (binding.site_url_override if binding and binding.site_url_override else settings.ERPNEXT_BASE_URL).strip()
-        has_token = bool(settings.ERPNEXT_API_KEY and settings.ERPNEXT_API_SECRET)
+        is_mock_mode = settings.ERPNEXT_MOCK_MODE or base_url.startswith("mock://")
+        if is_mock_mode and not base_url:
+            base_url = "mock://erpnext"
+        has_token = bool(settings.ERPNEXT_API_KEY and settings.ERPNEXT_API_SECRET) or is_mock_mode
         return {
-            "configured": bool(base_url and has_token),
+            "configured": bool((base_url and has_token) or is_mock_mode),
             "base_url": base_url,
             "site_name": settings.ERPNEXT_SITE_NAME,
             "verify_ssl": settings.ERPNEXT_VERIFY_SSL,
             "timeout_seconds": settings.ERPNEXT_TIMEOUT_SECONDS,
             "has_api_key": bool(settings.ERPNEXT_API_KEY),
             "has_api_secret": bool(settings.ERPNEXT_API_SECRET),
+            "is_mock_mode": is_mock_mode,
+            "mock_state_path": settings.ERPNEXT_MOCK_STATE_PATH,
         }
 
-    def build_client(self, *, binding: ERPNextShopBinding | None = None) -> ERPNextClient:
+    def build_client(self, *, binding: ERPNextShopBinding | None = None) -> ERPNextClient | MockERPNextClient:
         meta = self.environment_meta(binding=binding)
         if not meta["configured"]:
             raise ERPNextConfigurationError(
                 "ERPNext is not fully configured. Set ERPNEXT_BASE_URL, ERPNEXT_API_KEY, and ERPNEXT_API_SECRET."
+            )
+        if meta["is_mock_mode"]:
+            return MockERPNextClient(
+                MockERPNextClientSettings(
+                    base_url=meta["base_url"] or "mock://erpnext",
+                    site_name=meta["site_name"] or "business-hub-mock",
+                    state_path=Path(settings.ERPNEXT_MOCK_STATE_PATH),
+                )
             )
         return ERPNextClient(
             ERPNextClientSettings(

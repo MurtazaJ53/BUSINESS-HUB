@@ -97,6 +97,7 @@ It is designed to support:
 70. [ERPNext Proof-of-Concept Runbook](./erpnext-proof-of-concept-runbook.md)
 71. [ERPNext Execution Layer](./erpnext-execution-layer.md)
 72. [ERPNext Handover Runbook](./erpnext-handover-runbook.md)
+73. [ERPNext Local Demo Runbook](./erpnext-local-demo-runbook.md)
 
 ## Current truth
 

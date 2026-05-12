@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from django.test import TestCase, override_settings
@@ -8,7 +10,9 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from platform_apps.customers.models import Customer
+from platform_apps.erpnext.mock_client import build_demo_mock_state, write_mock_state
 from platform_apps.erpnext.models import ERPNextDocumentLink, ERPNextShopBinding, ERPNextSyncCursor
+from platform_apps.erpnext.services import ERPNextIntegrationService
 from platform_apps.inventory.models import InventoryItem
 from platform_apps.payments.models import SalePayment
 from platform_apps.sales.models import Sale, SaleItem
@@ -653,3 +657,101 @@ class ERPNextApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], ERPNextShopBinding.HealthStatus.OK)
+
+    def test_mock_mode_health_check_succeeds(self):
+        with TemporaryDirectory() as tempdir:
+            state_path = Path(tempdir) / "mock-state.json"
+            write_mock_state(state_path, build_demo_mock_state())
+            with override_settings(
+                ERPNEXT_MOCK_MODE=True,
+                ERPNEXT_BASE_URL="mock://erpnext",
+                ERPNEXT_API_KEY="",
+                ERPNEXT_API_SECRET="",
+                ERPNEXT_SITE_NAME="business-hub-mock",
+                ERPNEXT_MOCK_STATE_PATH=str(state_path),
+            ):
+                payload = ERPNextIntegrationService().health_check(binding=self.binding)
+
+        self.assertEqual(payload["status"], ERPNextShopBinding.HealthStatus.OK)
+        self.assertTrue(payload["configured"])
+        self.assertTrue(payload["authenticated"])
+        self.assertTrue(payload["reachable"])
+
+    def test_mock_mode_run_cycle_syncs_and_pushes(self):
+        self.binding.purchase_sync_enabled = True
+        self.binding.save(update_fields=["purchase_sync_enabled", "updated_at"])
+
+        with TemporaryDirectory() as tempdir:
+            state_path = Path(tempdir) / "mock-state.json"
+            write_mock_state(state_path, build_demo_mock_state())
+            with override_settings(
+                ERPNEXT_MOCK_MODE=True,
+                ERPNEXT_BASE_URL="mock://erpnext",
+                ERPNEXT_API_KEY="",
+                ERPNEXT_API_SECRET="",
+                ERPNEXT_SITE_NAME="business-hub-mock",
+                ERPNEXT_MOCK_STATE_PATH=str(state_path),
+            ):
+                service = ERPNextIntegrationService()
+                service.sync_items(shop=self.shop, limit=10)
+                service.sync_customers(shop=self.shop, limit=10)
+                item = InventoryItem.objects.filter(shop=self.shop, source_system="erpnext").first()
+                customer = Customer.objects.filter(shop=self.shop, source_system="erpnext").first()
+                self.assertIsNotNone(item)
+                self.assertIsNotNone(customer)
+
+                sale = Sale.objects.create(
+                    shop=self.shop,
+                    actor_user=self.user,
+                    customer=customer,
+                    receipt_number="ERPDEMO0001",
+                    subtotal_amount=Decimal("749.00"),
+                    total_amount=Decimal("749.00"),
+                    amount_received=Decimal("749.00"),
+                    amount_due=Decimal("0.00"),
+                    payment_mode=Sale.PaymentMode.UPI,
+                    customer_name_snapshot=customer.name,
+                    customer_phone_snapshot=customer.phone,
+                    sale_date=timezone.localdate(),
+                    occurred_at=timezone.now(),
+                )
+                SaleItem.objects.create(
+                    sale=sale,
+                    inventory_item=item,
+                    name_snapshot=item.name,
+                    sku_snapshot=item.sku,
+                    quantity=1,
+                    unit_price=Decimal("749.00"),
+                    line_total=Decimal("749.00"),
+                )
+                payment = SalePayment.objects.create(
+                    sale=sale,
+                    shop=self.shop,
+                    actor_user=self.user,
+                    payment_method=SalePayment.PaymentMethod.UPI,
+                    amount=Decimal("749.00"),
+                    reference_code="upimock001",
+                    occurred_at=timezone.now(),
+                )
+
+                payload = service.run_cycle(shop=self.shop, limit=25)
+
+        self.assertEqual(payload["overall_status"], "ok")
+        self.assertTrue(
+            ERPNextDocumentLink.objects.filter(
+                shop=self.shop,
+                local_domain=ERPNextDocumentLink.LocalDomain.SALE,
+                local_object_id=str(sale.id),
+                remote_doctype="Sales Invoice",
+                sync_status=ERPNextDocumentLink.SyncStatus.LINKED,
+            ).exists()
+        )
+        self.assertTrue(
+            ERPNextDocumentLink.objects.filter(
+                shop=self.shop,
+                local_domain=ERPNextDocumentLink.LocalDomain.PAYMENT,
+                local_object_id=str(payment.id),
+                remote_doctype="Payment Entry",
+                sync_status=ERPNextDocumentLink.SyncStatus.LINKED,
+            ).exists()
+        )

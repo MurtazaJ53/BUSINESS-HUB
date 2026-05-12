@@ -48,6 +48,13 @@ Set these in [D:/business-hub/apps/backend/.env.example](D:/business-hub/apps/ba
 - `ERPNEXT_VERIFY_SSL`
 - `ERPNEXT_TIMEOUT_SECONDS`
 
+For a fully local demo without live credentials, use:
+
+- `ERPNEXT_BASE_URL=mock://erpnext`
+- `ERPNEXT_SITE_NAME=business-hub-mock`
+- `ERPNEXT_MOCK_MODE=true`
+- `ERPNEXT_MOCK_STATE_PATH=D:/business-hub/apps/backend/.erpnext-mock-state.json`
+
 ## Required shop binding fields
 
 Patch the binding endpoint:
@@ -163,6 +170,16 @@ Useful variants:
 ```powershell
 D:\business-hub\apps\backend\.venv\Scripts\python.exe manage.py run_erpnext_cycle --shop-id <uuid> --skip-payments
 ```
+
+### Local mock bootstrap
+
+For a zero-credential local ERPNext demo:
+
+```powershell
+D:\business-hub\apps\backend\.venv\Scripts\python.exe manage.py bootstrap_erpnext_demo --shop-slug demo-shop --limit 100 --reset-mock-state
+```
+
+See [D:/business-hub/docs/erpnext-local-demo-runbook.md](D:/business-hub/docs/erpnext-local-demo-runbook.md).
 
 ### Queue
 
