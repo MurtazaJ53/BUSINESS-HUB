@@ -95,6 +95,7 @@ It is designed to support:
 68. [ERPNext Fit-Gap Analysis](./erpnext-fit-gap-analysis.md)
 69. [ERPNext Target Architecture](./erpnext-target-architecture.md)
 70. [ERPNext Proof-of-Concept Runbook](./erpnext-proof-of-concept-runbook.md)
+71. [ERPNext Execution Layer](./erpnext-execution-layer.md)
 
 ## Current truth
 

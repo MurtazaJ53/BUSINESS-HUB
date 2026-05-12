@@ -38,6 +38,13 @@ Phase 1 backend foundation for the Business Hub target platform.
 - `/api/v1/shops/<shop_id>/payments/`
 - `/api/v1/shops/<shop_id>/payments/commands/`
 - `/api/v1/shops/<shop_id>/projections/dashboard/`
+- `/api/v1/erpnext/meta/`
+- `/api/v1/erpnext/health/`
+- `/api/v1/shops/<shop_id>/erpnext/binding/`
+- `/api/v1/shops/<shop_id>/erpnext/verify-connection/`
+- `/api/v1/shops/<shop_id>/erpnext/sync-state/`
+- `/api/v1/shops/<shop_id>/erpnext/poc-summary/`
+- `/api/v1/shops/<shop_id>/erpnext/document-links/`
 - `/api/v1/migration/domains/`
 - `/api/v1/migration/jobs/`
 - `/api/v1/migration/bridge-receipts/`
@@ -167,3 +174,23 @@ The rollout checkpoint endpoint records durable expansion decisions:
 - `scale_tuning_active`
 - `complete_rollout`
 - `rollback_shop_wave`
+
+## ERPNext PoC execution layer
+
+The ERPNext execution scaffold is now available for one-shop proof-of-concept work:
+
+- `/api/v1/erpnext/meta/` exposes whether ERPNext environment variables are configured
+- `/api/v1/erpnext/health/` checks whether the configured ERPNext site is reachable
+- `/api/v1/shops/<shop_id>/erpnext/binding/` stores the shop-to-ERPNext mapping
+- `/api/v1/shops/<shop_id>/erpnext/verify-connection/` verifies credentials and bootstraps default sync cursors
+- `/api/v1/shops/<shop_id>/erpnext/sync-state/` returns the current ERPNext cursor + document-link state
+- `/api/v1/shops/<shop_id>/erpnext/poc-summary/` gives a shop-level readiness/count summary for the PoC
+
+Configure the PoC credentials through:
+
+- `ERPNEXT_BASE_URL`
+- `ERPNEXT_API_KEY`
+- `ERPNEXT_API_SECRET`
+- `ERPNEXT_SITE_NAME`
+- `ERPNEXT_VERIFY_SSL`
+- `ERPNEXT_TIMEOUT_SECONDS`

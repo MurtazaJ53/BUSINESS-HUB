@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "platform_apps.projections.apps.ProjectionsConfig",
     "platform_apps.jobs.apps.JobsConfig",
     "platform_apps.audit.apps.AuditConfig",
+    "platform_apps.erpnext.apps.ERPNextConfig",
 ]
 
 MIDDLEWARE = [
@@ -155,3 +156,10 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = int(os.getenv("CELERY_TASK_TIME_LIMIT", "300"))
 
 OTEL_SERVICE_NAME = os.getenv("OTEL_SERVICE_NAME", "business-hub-backend")
+
+ERPNEXT_BASE_URL = os.getenv("ERPNEXT_BASE_URL", "").rstrip("/")
+ERPNEXT_API_KEY = os.getenv("ERPNEXT_API_KEY", "")
+ERPNEXT_API_SECRET = os.getenv("ERPNEXT_API_SECRET", "")
+ERPNEXT_SITE_NAME = os.getenv("ERPNEXT_SITE_NAME", "")
+ERPNEXT_VERIFY_SSL = env_bool("ERPNEXT_VERIFY_SSL", True)
+ERPNEXT_TIMEOUT_SECONDS = int(os.getenv("ERPNEXT_TIMEOUT_SECONDS", "15"))
