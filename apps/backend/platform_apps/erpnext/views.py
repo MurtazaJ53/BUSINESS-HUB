@@ -7,11 +7,12 @@ from rest_framework.views import APIView
 
 from platform_apps.erpnext.models import ERPNextDocumentLink, ERPNextShopBinding, ERPNextSyncCursor
 from platform_apps.erpnext.serializers import (
+    ERPNextActionSerializer,
     ERPNextDocumentLinkSerializer,
     ERPNextShopBindingSerializer,
     ERPNextSyncCursorSerializer,
 )
-from platform_apps.erpnext.services import ERPNextIntegrationService
+from platform_apps.erpnext.services import ERPNextConfigurationError, ERPNextIntegrationService
 from platform_apps.shops.models import ShopMembership
 from platform_apps.shops.permissions import get_membership_or_403
 
@@ -138,3 +139,75 @@ class ERPNextDocumentLinkListView(ShopScopedMixin, generics.ListAPIView):
             )
         return queryset
 
+
+class ERPNextShopActionView(ShopScopedMixin, generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    minimum_role = ShopMembership.Role.ADMIN
+    serializer_class = ERPNextActionSerializer
+
+    action_name = ""
+
+    def get_limit(self, request):
+        serializer = self.get_serializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        return serializer.validated_data["limit"]
+
+    def action_response(self, request, *args, **kwargs):  # pragma: no cover - overridden
+        raise NotImplementedError
+
+    def post(self, request, *args, **kwargs):
+        try:
+            return self.action_response(request, *args, **kwargs)
+        except ERPNextConfigurationError as exc:
+            return Response(
+                {"action": self.action_name, "status": "blocked", "detail": str(exc)},
+                status=409,
+            )
+
+
+class ERPNextItemSyncView(ERPNextShopActionView):
+    action_name = "sync_items"
+
+    def action_response(self, request, *args, **kwargs):
+        membership = self.get_membership()
+        payload = ERPNextIntegrationService().sync_items(
+            shop=membership.shop,
+            limit=self.get_limit(request),
+        )
+        return Response({"action": self.action_name, "status": "ok", **payload})
+
+
+class ERPNextCustomerSyncView(ERPNextShopActionView):
+    action_name = "sync_customers"
+
+    def action_response(self, request, *args, **kwargs):
+        membership = self.get_membership()
+        payload = ERPNextIntegrationService().sync_customers(
+            shop=membership.shop,
+            limit=self.get_limit(request),
+        )
+        return Response({"action": self.action_name, "status": "ok", **payload})
+
+
+class ERPNextSalesPushView(ERPNextShopActionView):
+    action_name = "push_sales"
+
+    def action_response(self, request, *args, **kwargs):
+        membership = self.get_membership()
+        payload = ERPNextIntegrationService().push_sales(
+            shop=membership.shop,
+            limit=self.get_limit(request),
+        )
+        return Response({"action": self.action_name, "status": "ok", **payload})
+
+
+class ERPNextPaymentsPushView(ERPNextShopActionView):
+    action_name = "push_payments"
+
+    def action_response(self, request, *args, **kwargs):
+        membership = self.get_membership()
+        payload = ERPNextIntegrationService().push_payments(
+            shop=membership.shop,
+            limit=self.get_limit(request),
+        )
+        return Response({"action": self.action_name, "status": "ok", **payload})

@@ -3,7 +3,11 @@ from django.urls import path
 from platform_apps.erpnext.views import (
     ERPNextDocumentLinkListView,
     ERPNextHealthCheckView,
+    ERPNextCustomerSyncView,
+    ERPNextItemSyncView,
     ERPNextMetaView,
+    ERPNextPaymentsPushView,
+    ERPNextSalesPushView,
     ERPNextShopBindingDetailView,
     ERPNextShopPocSummaryView,
     ERPNextShopSyncStateView,
@@ -30,9 +34,28 @@ urlpatterns = [
         name="erpnext-poc-summary",
     ),
     path(
+        "shops/<uuid:shop_id>/erpnext/sync-items/",
+        ERPNextItemSyncView.as_view(),
+        name="erpnext-sync-items",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/sync-customers/",
+        ERPNextCustomerSyncView.as_view(),
+        name="erpnext-sync-customers",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/push-sales/",
+        ERPNextSalesPushView.as_view(),
+        name="erpnext-push-sales",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/push-payments/",
+        ERPNextPaymentsPushView.as_view(),
+        name="erpnext-push-payments",
+    ),
+    path(
         "shops/<uuid:shop_id>/erpnext/document-links/",
         ERPNextDocumentLinkListView.as_view(),
         name="erpnext-document-links",
     ),
 ]
-

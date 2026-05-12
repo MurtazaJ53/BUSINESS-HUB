@@ -52,6 +52,10 @@ Set these in `apps/backend/.env`:
 - `POST /api/v1/shops/<shop_id>/erpnext/verify-connection/`
 - `GET /api/v1/shops/<shop_id>/erpnext/sync-state/`
 - `GET /api/v1/shops/<shop_id>/erpnext/poc-summary/`
+- `POST /api/v1/shops/<shop_id>/erpnext/sync-items/`
+- `POST /api/v1/shops/<shop_id>/erpnext/sync-customers/`
+- `POST /api/v1/shops/<shop_id>/erpnext/push-sales/`
+- `POST /api/v1/shops/<shop_id>/erpnext/push-payments/`
 - `GET /api/v1/shops/<shop_id>/erpnext/document-links/`
 
 ## Core models
@@ -108,18 +112,38 @@ Tracks local object to ERP document mapping status for:
    - `GET /api/v1/shops/<shop_id>/erpnext/sync-state/`
 6. Inspect one-shop readiness:
    - `GET /api/v1/shops/<shop_id>/erpnext/poc-summary/`
-7. Then begin the actual item/customer sync work.
+7. Pull item masters:
+   - `POST /api/v1/shops/<shop_id>/erpnext/sync-items/`
+8. Pull customer masters:
+   - `POST /api/v1/shops/<shop_id>/erpnext/sync-customers/`
+9. Publish locally captured sales:
+   - `POST /api/v1/shops/<shop_id>/erpnext/push-sales/`
+10. Publish locally captured payments:
+   - `POST /api/v1/shops/<shop_id>/erpnext/push-payments/`
+
+## Binding metadata_json conventions
+
+The first live execution path uses a few binding-level metadata keys:
+
+- `walk_in_customer_name`
+  Use this when a Business Hub sale has no explicit ERPNext customer mapping.
+- `default_payment_account`
+  Fallback `paid_to` account for ERPNext Payment Entry creation.
+- `payment_account_map`
+  Per-method account mapping, for example `CASH`, `UPI`, `CARD`, `BANK`.
+- `mode_of_payment_map`
+  Optional override when ERPNext Mode of Payment names differ from Business Hub payment methods.
+- `receivable_account`
+  Optional override passed while creating Sales Invoice documents.
 
 ## What this layer does not do yet
 
-This first execution layer does **not** yet:
+This first live execution layer still does **not** yet:
 
-- import ERPNext items into Business Hub automatically
-- import ERPNext customers automatically
-- push POS sales into ERPNext sales documents automatically
-- push payment events into ERPNext accounting automatically
-
-That is the next implementation slice.
+- reconcile ERPNext stock deltas back into Business Hub stock projections
+- import suppliers and purchase documents
+- auto-submit ERPNext documents through a custom finalize step
+- run background sync jobs continuously without an explicit trigger
 
 ## Why this still matters
 
@@ -136,8 +160,7 @@ With this layer, the team can now:
 
 After this scaffold, the next implementation target should be:
 
-1. item master pull from ERPNext
-2. customer master pull from ERPNext
-3. document-link creation on successful import
-4. then sales/payment posting from Business Hub into ERPNext
-
+1. stock projection import from ERPNext warehouses / bins
+2. supplier master pull
+3. purchase document pull or posting
+4. background job scheduling for recurring ERPNext sync

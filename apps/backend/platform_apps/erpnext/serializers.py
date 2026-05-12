@@ -95,3 +95,6 @@ class ERPNextDocumentLinkSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
+
+class ERPNextActionSerializer(serializers.Serializer):
+    limit = serializers.IntegerField(min_value=1, max_value=500, required=False, default=100)

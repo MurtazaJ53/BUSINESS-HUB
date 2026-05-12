@@ -3,16 +3,20 @@ from __future__ import annotations
 import json
 import ssl
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 from urllib import error, parse, request
 
 from django.conf import settings
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from platform_apps.customers.models import Customer
 from platform_apps.erpnext.models import ERPNextDocumentLink, ERPNextShopBinding, ERPNextSyncCursor
 from platform_apps.inventory.models import InventoryItem
+from platform_apps.inventory.models import InventoryItemPrivate
 from platform_apps.payments.models import SalePayment
+from platform_apps.sales.models import SaleItem
 from platform_apps.sales.models import Sale
 from platform_apps.shops.models import Shop
 
@@ -132,6 +136,15 @@ class ERPNextClient:
         encoded_doctype = parse.quote(doctype, safe="")
         return self._request(method="GET", path=f"/api/resource/{encoded_doctype}", query=query)
 
+    def get_resource(self, *, doctype: str, name: str) -> dict[str, Any]:
+        encoded_doctype = parse.quote(doctype, safe="")
+        encoded_name = parse.quote(name, safe="")
+        return self._request(method="GET", path=f"/api/resource/{encoded_doctype}/{encoded_name}")
+
+    def create_resource(self, *, doctype: str, payload: dict[str, Any]) -> dict[str, Any]:
+        encoded_doctype = parse.quote(doctype, safe="")
+        return self._request(method="POST", path=f"/api/resource/{encoded_doctype}", payload=payload)
+
 
 class ERPNextIntegrationService:
     DEFAULT_CURSOR_BLUEPRINT: tuple[tuple[str, str], ...] = (
@@ -143,6 +156,15 @@ class ERPNextIntegrationService:
         (ERPNextSyncCursor.Domain.SALES, ERPNextSyncCursor.Direction.PUSH),
         (ERPNextSyncCursor.Domain.PAYMENTS, ERPNextSyncCursor.Direction.PUSH),
     )
+
+    DEFAULT_MODE_OF_PAYMENT_MAP = {
+        SalePayment.PaymentMethod.CASH: "Cash",
+        SalePayment.PaymentMethod.UPI: "UPI",
+        SalePayment.PaymentMethod.BANK: "Bank",
+        SalePayment.PaymentMethod.CARD: "Card",
+        SalePayment.PaymentMethod.CREDIT: "Credit",
+        SalePayment.PaymentMethod.OTHER: "Other",
+    }
 
     @staticmethod
     def environment_meta(*, binding: ERPNextShopBinding | None = None) -> dict[str, Any]:
@@ -243,6 +265,588 @@ class ERPNextIntegrationService:
             )
             cursors.append(cursor)
         return cursors
+
+    def _require_binding(self, *, shop: Shop) -> ERPNextShopBinding:
+        binding = ERPNextShopBinding.objects.filter(shop=shop).first()
+        if binding is None:
+            raise ERPNextConfigurationError("No ERPNext binding exists for this shop yet.")
+        if not binding.is_enabled:
+            raise ERPNextConfigurationError("ERPNext binding exists but is disabled for this shop.")
+        return binding
+
+    def _begin_cursor_run(self, *, cursor: ERPNextSyncCursor):
+        cursor.status = ERPNextSyncCursor.Status.RUNNING
+        cursor.last_started_at = timezone.now()
+        cursor.last_error_message = ""
+        cursor.save(update_fields=["status", "last_started_at", "last_error_message", "updated_at"])
+
+    def _finish_cursor_run(
+        self,
+        *,
+        cursor: ERPNextSyncCursor,
+        status: str,
+        result_count: int,
+        error_message: str = "",
+        remote_modified_at=None,
+        remote_cursor: str = "",
+    ):
+        cursor.status = status
+        cursor.last_finished_at = timezone.now()
+        cursor.last_result_count = result_count
+        cursor.last_error_message = error_message
+        if remote_modified_at is not None:
+            cursor.last_remote_modified_at = remote_modified_at
+        if remote_cursor:
+            cursor.last_remote_cursor = remote_cursor
+        cursor.save(
+            update_fields=[
+                "status",
+                "last_finished_at",
+                "last_result_count",
+                "last_error_message",
+                "last_remote_modified_at",
+                "last_remote_cursor",
+                "updated_at",
+            ]
+        )
+
+    def _get_cursor(self, *, shop: Shop, domain: str, direction: str) -> ERPNextSyncCursor:
+        self.ensure_default_cursors(shop=shop)
+        return ERPNextSyncCursor.objects.get(shop=shop, domain=domain, direction=direction)
+
+    def _parse_remote_timestamp(self, value: str | None):
+        if not value:
+            return None
+        parsed = parse_datetime(value)
+        if parsed is None:
+            return None
+        if timezone.is_naive(parsed):
+            parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
+        return parsed
+
+    def _link_document(
+        self,
+        *,
+        shop: Shop,
+        local_domain: str,
+        local_object_id: str,
+        remote_doctype: str,
+        remote_name: str,
+        direction: str,
+        metadata_json: dict[str, Any] | None = None,
+    ) -> ERPNextDocumentLink:
+        link, _ = ERPNextDocumentLink.objects.update_or_create(
+            shop=shop,
+            local_domain=local_domain,
+            local_object_id=local_object_id,
+            remote_doctype=remote_doctype,
+            defaults={
+                "remote_name": remote_name,
+                "direction": direction,
+                "sync_status": ERPNextDocumentLink.SyncStatus.LINKED,
+                "last_synced_at": timezone.now(),
+                "last_error_message": "",
+                "metadata_json": metadata_json or {},
+            },
+        )
+        return link
+
+    def _mark_failed_link(
+        self,
+        *,
+        shop: Shop,
+        local_domain: str,
+        local_object_id: str,
+        remote_doctype: str,
+        direction: str,
+        remote_name: str,
+        error_message: str,
+        metadata_json: dict[str, Any] | None = None,
+    ) -> ERPNextDocumentLink:
+        link, _ = ERPNextDocumentLink.objects.update_or_create(
+            shop=shop,
+            local_domain=local_domain,
+            local_object_id=local_object_id,
+            remote_doctype=remote_doctype,
+            defaults={
+                "remote_name": remote_name,
+                "direction": direction,
+                "sync_status": ERPNextDocumentLink.SyncStatus.FAILED,
+                "last_synced_at": timezone.now(),
+                "last_error_message": error_message,
+                "metadata_json": metadata_json or {},
+            },
+        )
+        return link
+
+    def _erpnext_walk_in_customer(self, *, binding: ERPNextShopBinding) -> str:
+        return str(binding.metadata_json.get("walk_in_customer_name", "")).strip()
+
+    def _payment_account_for_method(self, *, binding: ERPNextShopBinding, payment_method: str) -> str:
+        payment_account_map = binding.metadata_json.get("payment_account_map") or {}
+        if isinstance(payment_account_map, dict):
+            mapped = str(payment_account_map.get(payment_method, "")).strip()
+            if mapped:
+                return mapped
+        return str(binding.metadata_json.get("default_payment_account", "")).strip()
+
+    def _mode_of_payment_for_method(self, *, binding: ERPNextShopBinding, payment_method: str) -> str:
+        mode_map = binding.metadata_json.get("mode_of_payment_map") or {}
+        if isinstance(mode_map, dict):
+            mapped = str(mode_map.get(payment_method, "")).strip()
+            if mapped:
+                return mapped
+        return self.DEFAULT_MODE_OF_PAYMENT_MAP.get(payment_method, payment_method.title())
+
+    def sync_items(self, *, shop: Shop, limit: int = 100) -> dict[str, Any]:
+        binding = self._require_binding(shop=shop)
+        if not binding.item_sync_enabled:
+            raise ERPNextConfigurationError("Item sync is disabled for this shop binding.")
+        cursor = self._get_cursor(shop=shop, domain=ERPNextSyncCursor.Domain.ITEMS, direction=ERPNextSyncCursor.Direction.PULL)
+        client = self.build_client(binding=binding)
+        self._begin_cursor_run(cursor=cursor)
+
+        filters: list[list[Any]] = []
+        if cursor.last_remote_modified_at:
+            filters.append(["Item", "modified", ">", cursor.last_remote_modified_at.isoformat(sep=" ")])
+
+        try:
+            response = client.list_resource(
+                doctype="Item",
+                filters=filters or None,
+                fields=[
+                    "name",
+                    "item_code",
+                    "item_name",
+                    "item_group",
+                    "description",
+                    "standard_rate",
+                    "disabled",
+                    "stock_uom",
+                    "default_warehouse",
+                    "modified",
+                ],
+                limit_page_length=limit,
+            )
+            rows = response.get("data", [])
+            imported = 0
+            latest_modified_at = cursor.last_remote_modified_at
+            latest_remote_name = cursor.last_remote_cursor
+
+            for row in rows:
+                remote_name = str(row.get("name", "")).strip()
+                if not remote_name:
+                    continue
+                modified_at = self._parse_remote_timestamp(row.get("modified"))
+                if modified_at and (latest_modified_at is None or modified_at > latest_modified_at):
+                    latest_modified_at = modified_at
+                    latest_remote_name = remote_name
+
+                defaults = {
+                    "name": row.get("item_name") or remote_name,
+                    "sku": row.get("item_code") or remote_name,
+                    "barcode": "",
+                    "category": row.get("item_group") or "",
+                    "description": row.get("description") or "",
+                    "sell_price": Decimal(str(row.get("standard_rate") or "0")),
+                    "status": InventoryItem.Status.ARCHIVED if row.get("disabled") else InventoryItem.Status.ACTIVE,
+                    "tombstone": False,
+                    "source_meta_json": row,
+                    "source_system": "erpnext",
+                    "source_id": remote_name,
+                    "source_shop_id": binding.company,
+                    "source_path": f"Item/{remote_name}",
+                    "migrated_at": timezone.now(),
+                }
+                item, created = InventoryItem.objects.get_or_create(
+                    shop=shop,
+                    source_system="erpnext",
+                    source_id=remote_name,
+                    defaults=defaults,
+                )
+                if not created:
+                    for field, value in defaults.items():
+                        setattr(item, field, value)
+                    item.save()
+
+                InventoryItemPrivate.objects.get_or_create(item=item)
+                self._link_document(
+                    shop=shop,
+                    local_domain=ERPNextDocumentLink.LocalDomain.ITEM,
+                    local_object_id=str(item.id),
+                    remote_doctype="Item",
+                    remote_name=remote_name,
+                    direction=ERPNextDocumentLink.Direction.PULL,
+                    metadata_json=row,
+                )
+                imported += 1
+
+            self._finish_cursor_run(
+                cursor=cursor,
+                status=ERPNextSyncCursor.Status.SUCCEEDED,
+                result_count=imported,
+                remote_modified_at=latest_modified_at,
+                remote_cursor=latest_remote_name or "",
+            )
+            return {
+                "domain": ERPNextSyncCursor.Domain.ITEMS,
+                "direction": ERPNextSyncCursor.Direction.PULL,
+                "imported_count": imported,
+                "cursor": cursor.last_remote_cursor,
+            }
+        except Exception as exc:
+            self._finish_cursor_run(
+                cursor=cursor,
+                status=ERPNextSyncCursor.Status.FAILED,
+                result_count=0,
+                error_message=str(exc),
+            )
+            raise
+
+    def sync_customers(self, *, shop: Shop, limit: int = 100) -> dict[str, Any]:
+        binding = self._require_binding(shop=shop)
+        if not binding.customer_sync_enabled:
+            raise ERPNextConfigurationError("Customer sync is disabled for this shop binding.")
+        cursor = self._get_cursor(shop=shop, domain=ERPNextSyncCursor.Domain.CUSTOMERS, direction=ERPNextSyncCursor.Direction.PULL)
+        client = self.build_client(binding=binding)
+        self._begin_cursor_run(cursor=cursor)
+
+        filters: list[list[Any]] = []
+        if cursor.last_remote_modified_at:
+            filters.append(["Customer", "modified", ">", cursor.last_remote_modified_at.isoformat(sep=" ")])
+
+        try:
+            response = client.list_resource(
+                doctype="Customer",
+                filters=filters or None,
+                fields=[
+                    "name",
+                    "customer_name",
+                    "mobile_no",
+                    "email_id",
+                    "customer_group",
+                    "customer_type",
+                    "disabled",
+                    "modified",
+                ],
+                limit_page_length=limit,
+            )
+            rows = response.get("data", [])
+            imported = 0
+            latest_modified_at = cursor.last_remote_modified_at
+            latest_remote_name = cursor.last_remote_cursor
+
+            for row in rows:
+                remote_name = str(row.get("name", "")).strip()
+                if not remote_name:
+                    continue
+                modified_at = self._parse_remote_timestamp(row.get("modified"))
+                if modified_at and (latest_modified_at is None or modified_at > latest_modified_at):
+                    latest_modified_at = modified_at
+                    latest_remote_name = remote_name
+
+                defaults = {
+                    "name": row.get("customer_name") or remote_name,
+                    "phone": row.get("mobile_no") or "-",
+                    "email": row.get("email_id") or "",
+                    "notes": "",
+                    "status": Customer.Status.ARCHIVED if row.get("disabled") else Customer.Status.ACTIVE,
+                    "tombstone": False,
+                    "source_meta_json": row,
+                    "source_system": "erpnext",
+                    "source_id": remote_name,
+                    "source_shop_id": binding.company,
+                    "source_path": f"Customer/{remote_name}",
+                    "migrated_at": timezone.now(),
+                }
+                customer, created = Customer.objects.get_or_create(
+                    shop=shop,
+                    source_system="erpnext",
+                    source_id=remote_name,
+                    defaults=defaults,
+                )
+                if not created:
+                    for field, value in defaults.items():
+                        setattr(customer, field, value)
+                    customer.save()
+
+                self._link_document(
+                    shop=shop,
+                    local_domain=ERPNextDocumentLink.LocalDomain.CUSTOMER,
+                    local_object_id=str(customer.id),
+                    remote_doctype="Customer",
+                    remote_name=remote_name,
+                    direction=ERPNextDocumentLink.Direction.PULL,
+                    metadata_json=row,
+                )
+                imported += 1
+
+            self._finish_cursor_run(
+                cursor=cursor,
+                status=ERPNextSyncCursor.Status.SUCCEEDED,
+                result_count=imported,
+                remote_modified_at=latest_modified_at,
+                remote_cursor=latest_remote_name or "",
+            )
+            return {
+                "domain": ERPNextSyncCursor.Domain.CUSTOMERS,
+                "direction": ERPNextSyncCursor.Direction.PULL,
+                "imported_count": imported,
+                "cursor": cursor.last_remote_cursor,
+            }
+        except Exception as exc:
+            self._finish_cursor_run(
+                cursor=cursor,
+                status=ERPNextSyncCursor.Status.FAILED,
+                result_count=0,
+                error_message=str(exc),
+            )
+            raise
+
+    def _resolve_sale_customer_remote_name(self, *, binding: ERPNextShopBinding, sale: Sale) -> str:
+        if sale.customer_id and sale.customer and sale.customer.source_system == "erpnext" and sale.customer.source_id:
+            return sale.customer.source_id
+        walk_in_customer = self._erpnext_walk_in_customer(binding=binding)
+        if walk_in_customer:
+            return walk_in_customer
+        raise ERPNextConfigurationError(
+            f"Sale {sale.receipt_number or sale.id} has no ERPNext customer mapping and no walk-in customer configured."
+        )
+
+    def _resolve_sale_item_payloads(self, *, binding: ERPNextShopBinding, sale: Sale) -> list[dict[str, Any]]:
+        payloads: list[dict[str, Any]] = []
+        sale_items = SaleItem.objects.select_related("inventory_item").filter(sale=sale).order_by("created_at")
+        for item in sale_items:
+            if item.inventory_item_id is None or item.inventory_item.source_system != "erpnext" or not item.inventory_item.source_id:
+                raise ERPNextConfigurationError(
+                    f"Sale {sale.receipt_number or sale.id} contains item {item.name_snapshot} without an ERPNext item mapping."
+                )
+            payloads.append(
+                {
+                    "item_code": item.inventory_item.source_id,
+                    "item_name": item.name_snapshot,
+                    "qty": item.quantity,
+                    "rate": str(item.unit_price),
+                    "warehouse": binding.warehouse or item.inventory_item.source_meta_json.get("default_warehouse") or "",
+                }
+            )
+        return payloads
+
+    def push_sales(self, *, shop: Shop, limit: int = 25) -> dict[str, Any]:
+        binding = self._require_binding(shop=shop)
+        if not binding.sales_posting_enabled:
+            raise ERPNextConfigurationError("Sales posting is disabled for this shop binding.")
+        cursor = self._get_cursor(shop=shop, domain=ERPNextSyncCursor.Domain.SALES, direction=ERPNextSyncCursor.Direction.PUSH)
+        client = self.build_client(binding=binding)
+        self._begin_cursor_run(cursor=cursor)
+
+        sales = (
+            Sale.objects.filter(shop=shop, tombstone=False, status=Sale.Status.COMPLETED)
+            .exclude(source_system="erpnext")
+            .select_related("customer", "actor_user")
+            .order_by("sale_date", "created_at")[:limit]
+        )
+
+        created_count = 0
+        failures: list[dict[str, Any]] = []
+        latest_remote_name = cursor.last_remote_cursor
+
+        for sale in sales:
+            if ERPNextDocumentLink.objects.filter(
+                shop=shop,
+                local_domain=ERPNextDocumentLink.LocalDomain.SALE,
+                local_object_id=str(sale.id),
+                remote_doctype="Sales Invoice",
+                sync_status=ERPNextDocumentLink.SyncStatus.LINKED,
+            ).exists():
+                continue
+
+            try:
+                payload = {
+                    "customer": self._resolve_sale_customer_remote_name(binding=binding, sale=sale),
+                    "company": binding.company,
+                    "currency": binding.currency_code,
+                    "posting_date": sale.sale_date.isoformat(),
+                    "due_date": sale.sale_date.isoformat(),
+                    "selling_price_list": binding.selling_price_list,
+                    "set_warehouse": binding.warehouse,
+                    "update_stock": 1 if binding.stock_sync_enabled else 0,
+                    "is_pos": 1,
+                    "items": self._resolve_sale_item_payloads(binding=binding, sale=sale),
+                    "remarks": sale.note or sale.footer_note or f"Business Hub sale {sale.receipt_number}",
+                }
+                optional_receivable = str(binding.metadata_json.get("receivable_account", "")).strip()
+                if optional_receivable:
+                    payload["debit_to"] = optional_receivable
+                remote_response = client.create_resource(doctype="Sales Invoice", payload=payload)
+                remote_doc = remote_response.get("data") or {}
+                remote_name = str(remote_doc.get("name", "")).strip()
+                if not remote_name:
+                    raise ERPNextApiError(message="ERPNext did not return a Sales Invoice name.", payload=remote_response)
+
+                self._link_document(
+                    shop=shop,
+                    local_domain=ERPNextDocumentLink.LocalDomain.SALE,
+                    local_object_id=str(sale.id),
+                    remote_doctype="Sales Invoice",
+                    remote_name=remote_name,
+                    direction=ERPNextDocumentLink.Direction.PUSH,
+                    metadata_json={"request": payload, "response": remote_doc},
+                )
+                latest_remote_name = remote_name
+                created_count += 1
+            except Exception as exc:
+                failures.append(
+                    {
+                        "sale_id": str(sale.id),
+                        "receipt_number": sale.receipt_number,
+                        "error": str(exc),
+                    }
+                )
+                self._mark_failed_link(
+                    shop=shop,
+                    local_domain=ERPNextDocumentLink.LocalDomain.SALE,
+                    local_object_id=str(sale.id),
+                    remote_doctype="Sales Invoice",
+                    direction=ERPNextDocumentLink.Direction.PUSH,
+                    remote_name=sale.receipt_number or str(sale.id),
+                    error_message=str(exc),
+                    metadata_json={"receipt_number": sale.receipt_number},
+                )
+
+        self._finish_cursor_run(
+            cursor=cursor,
+            status=ERPNextSyncCursor.Status.FAILED if failures else ERPNextSyncCursor.Status.SUCCEEDED,
+            result_count=created_count,
+            error_message=failures[0]["error"] if failures else "",
+            remote_cursor=latest_remote_name or "",
+        )
+        return {
+            "domain": ERPNextSyncCursor.Domain.SALES,
+            "direction": ERPNextSyncCursor.Direction.PUSH,
+            "pushed_count": created_count,
+            "failed_count": len(failures),
+            "failures": failures,
+        }
+
+    def push_payments(self, *, shop: Shop, limit: int = 25) -> dict[str, Any]:
+        binding = self._require_binding(shop=shop)
+        if not binding.payment_posting_enabled:
+            raise ERPNextConfigurationError("Payment posting is disabled for this shop binding.")
+        cursor = self._get_cursor(shop=shop, domain=ERPNextSyncCursor.Domain.PAYMENTS, direction=ERPNextSyncCursor.Direction.PUSH)
+        client = self.build_client(binding=binding)
+        self._begin_cursor_run(cursor=cursor)
+
+        payments = (
+            SalePayment.objects.filter(shop=shop, sale__tombstone=False)
+            .exclude(source_system="erpnext")
+            .select_related("sale__customer", "actor_user")
+            .order_by("occurred_at", "created_at")[:limit]
+        )
+
+        pushed_count = 0
+        failures: list[dict[str, Any]] = []
+        latest_remote_name = cursor.last_remote_cursor
+
+        for payment in payments:
+            if ERPNextDocumentLink.objects.filter(
+                shop=shop,
+                local_domain=ERPNextDocumentLink.LocalDomain.PAYMENT,
+                local_object_id=str(payment.id),
+                remote_doctype="Payment Entry",
+                sync_status=ERPNextDocumentLink.SyncStatus.LINKED,
+            ).exists():
+                continue
+
+            invoice_link = ERPNextDocumentLink.objects.filter(
+                shop=shop,
+                local_domain=ERPNextDocumentLink.LocalDomain.SALE,
+                local_object_id=str(payment.sale_id),
+                remote_doctype="Sales Invoice",
+                sync_status=ERPNextDocumentLink.SyncStatus.LINKED,
+            ).first()
+
+            try:
+                if invoice_link is None:
+                    raise ERPNextConfigurationError(
+                        f"Payment {payment.id} cannot be pushed before its sale is linked to an ERPNext Sales Invoice."
+                    )
+                paid_to = self._payment_account_for_method(binding=binding, payment_method=payment.payment_method)
+                if not paid_to:
+                    raise ERPNextConfigurationError(
+                        f"No ERPNext payment account is configured for payment method {payment.payment_method}."
+                    )
+                payload = {
+                    "payment_type": "Receive",
+                    "party_type": "Customer",
+                    "party": self._resolve_sale_customer_remote_name(binding=binding, sale=payment.sale),
+                    "company": binding.company,
+                    "posting_date": payment.occurred_at.date().isoformat(),
+                    "mode_of_payment": self._mode_of_payment_for_method(binding=binding, payment_method=payment.payment_method),
+                    "paid_to": paid_to,
+                    "paid_amount": str(payment.amount),
+                    "received_amount": str(payment.amount),
+                    "reference_no": payment.reference_code or payment.sale.receipt_number,
+                    "reference_date": payment.occurred_at.date().isoformat(),
+                    "remarks": payment.note or f"Business Hub payment for {payment.sale.receipt_number}",
+                    "references": [
+                        {
+                            "reference_doctype": "Sales Invoice",
+                            "reference_name": invoice_link.remote_name,
+                            "allocated_amount": str(payment.amount),
+                        }
+                    ],
+                }
+                remote_response = client.create_resource(doctype="Payment Entry", payload=payload)
+                remote_doc = remote_response.get("data") or {}
+                remote_name = str(remote_doc.get("name", "")).strip()
+                if not remote_name:
+                    raise ERPNextApiError(message="ERPNext did not return a Payment Entry name.", payload=remote_response)
+
+                self._link_document(
+                    shop=shop,
+                    local_domain=ERPNextDocumentLink.LocalDomain.PAYMENT,
+                    local_object_id=str(payment.id),
+                    remote_doctype="Payment Entry",
+                    remote_name=remote_name,
+                    direction=ERPNextDocumentLink.Direction.PUSH,
+                    metadata_json={"request": payload, "response": remote_doc},
+                )
+                latest_remote_name = remote_name
+                pushed_count += 1
+            except Exception as exc:
+                failures.append(
+                    {
+                        "payment_id": str(payment.id),
+                        "sale_id": str(payment.sale_id),
+                        "error": str(exc),
+                    }
+                )
+                self._mark_failed_link(
+                    shop=shop,
+                    local_domain=ERPNextDocumentLink.LocalDomain.PAYMENT,
+                    local_object_id=str(payment.id),
+                    remote_doctype="Payment Entry",
+                    direction=ERPNextDocumentLink.Direction.PUSH,
+                    remote_name=payment.reference_code or payment.sale.receipt_number,
+                    error_message=str(exc),
+                    metadata_json={"sale_id": str(payment.sale_id)},
+                )
+
+        self._finish_cursor_run(
+            cursor=cursor,
+            status=ERPNextSyncCursor.Status.FAILED if failures else ERPNextSyncCursor.Status.SUCCEEDED,
+            result_count=pushed_count,
+            error_message=failures[0]["error"] if failures else "",
+            remote_cursor=latest_remote_name or "",
+        )
+        return {
+            "domain": ERPNextSyncCursor.Domain.PAYMENTS,
+            "direction": ERPNextSyncCursor.Direction.PUSH,
+            "pushed_count": pushed_count,
+            "failed_count": len(failures),
+            "failures": failures,
+        }
 
     def build_poc_summary(self, *, shop: Shop) -> dict[str, Any]:
         self.ensure_default_cursors(shop=shop)

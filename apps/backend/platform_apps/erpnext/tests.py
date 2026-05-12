@@ -11,9 +11,27 @@ from platform_apps.customers.models import Customer
 from platform_apps.erpnext.models import ERPNextDocumentLink, ERPNextShopBinding, ERPNextSyncCursor
 from platform_apps.inventory.models import InventoryItem
 from platform_apps.payments.models import SalePayment
-from platform_apps.sales.models import Sale
+from platform_apps.sales.models import Sale, SaleItem
+from platform_apps.inventory.models import InventoryItemPrivate
 from platform_apps.shops.models import Shop, ShopMembership
 from platform_apps.users.models import PlatformUser
+
+
+class FakeERPNextClient:
+    def __init__(self, *, resource_lists=None, create_responses=None):
+        self.resource_lists = resource_lists or {}
+        self.create_responses = create_responses or {}
+
+    def list_resource(self, *, doctype, filters=None, fields=None, limit_page_length=20):
+        return {"data": self.resource_lists.get(doctype, [])[:limit_page_length]}
+
+    def create_resource(self, *, doctype, payload):
+        response = self.create_responses.get(doctype)
+        if callable(response):
+            return response(payload)
+        if response is not None:
+            return response
+        return {"data": {"name": f"{doctype}-AUTO-0001"}}
 
 
 class ERPNextApiTests(TestCase):
@@ -43,6 +61,21 @@ class ERPNextApiTests(TestCase):
         )
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
+        self.binding = ERPNextShopBinding.objects.create(
+            shop=self.shop,
+            is_enabled=True,
+            company="Zarra Retail Private Limited",
+            warehouse="Limbdi Warehouse - ZR",
+            selling_price_list="Retail Price",
+            metadata_json={
+                "walk_in_customer_name": "Walk In Customer",
+                "default_payment_account": "Cash - ZR",
+                "payment_account_map": {
+                    "CASH": "Cash - ZR",
+                    "UPI": "UPI Clearing - ZR",
+                },
+            },
+        )
 
     def test_meta_reports_configuration_state(self):
         response = self.client.get("/api/v1/erpnext/meta/")
@@ -89,7 +122,6 @@ class ERPNextApiTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_verify_connection_updates_binding_and_bootstraps_cursors(self):
-        binding = ERPNextShopBinding.objects.create(shop=self.shop, is_enabled=True)
         with patch(
             "platform_apps.erpnext.views.ERPNextIntegrationService.health_check",
             return_value={
@@ -105,13 +137,12 @@ class ERPNextApiTests(TestCase):
             response = self.client.post(f"/api/v1/shops/{self.shop.id}/erpnext/verify-connection/")
 
         self.assertEqual(response.status_code, 200)
-        binding.refresh_from_db()
-        self.assertEqual(binding.last_health_status, ERPNextShopBinding.HealthStatus.OK)
-        self.assertIsNotNone(binding.last_verified_at)
+        self.binding.refresh_from_db()
+        self.assertEqual(self.binding.last_health_status, ERPNextShopBinding.HealthStatus.OK)
+        self.assertIsNotNone(self.binding.last_verified_at)
         self.assertGreaterEqual(ERPNextSyncCursor.objects.filter(shop=self.shop).count(), 7)
 
     def test_sync_state_returns_binding_cursor_and_link_counts(self):
-        ERPNextShopBinding.objects.create(shop=self.shop, is_enabled=True)
         ERPNextSyncCursor.objects.create(
             shop=self.shop,
             domain=ERPNextSyncCursor.Domain.ITEMS,
@@ -172,6 +203,230 @@ class ERPNextApiTests(TestCase):
         self.assertEqual(payload["local_counts"]["sales"], 1)
         self.assertEqual(payload["local_counts"]["payments"], 1)
 
+    def test_sync_items_imports_inventory_and_links(self):
+        fake_client = FakeERPNextClient(
+            resource_lists={
+                "Item": [
+                    {
+                        "name": "ITEM-0001",
+                        "item_code": "ITEM-0001",
+                        "item_name": "Cotton Shirt",
+                        "item_group": "Shirts",
+                        "description": "Combed cotton shirt",
+                        "standard_rate": "599.00",
+                        "disabled": 0,
+                        "modified": "2026-05-12 14:30:00",
+                    }
+                ]
+            }
+        )
+
+        with patch(
+            "platform_apps.erpnext.services.ERPNextIntegrationService.build_client",
+            return_value=fake_client,
+        ):
+            response = self.client.post(
+                f"/api/v1/shops/{self.shop.id}/erpnext/sync-items/",
+                {"limit": 10},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        item = InventoryItem.objects.get(shop=self.shop, source_system="erpnext", source_id="ITEM-0001")
+        self.assertEqual(item.name, "Cotton Shirt")
+        self.assertEqual(item.sell_price, Decimal("599.00"))
+        self.assertTrue(
+            ERPNextDocumentLink.objects.filter(
+                shop=self.shop,
+                local_domain=ERPNextDocumentLink.LocalDomain.ITEM,
+                local_object_id=str(item.id),
+                remote_doctype="Item",
+                remote_name="ITEM-0001",
+                sync_status=ERPNextDocumentLink.SyncStatus.LINKED,
+            ).exists()
+        )
+
+    def test_sync_customers_imports_customer_and_links(self):
+        fake_client = FakeERPNextClient(
+            resource_lists={
+                "Customer": [
+                    {
+                        "name": "CUST-0001",
+                        "customer_name": "Ayaan Retail",
+                        "mobile_no": "9999999999",
+                        "email_id": "ayaan@example.com",
+                        "customer_group": "Retail",
+                        "customer_type": "Company",
+                        "disabled": 0,
+                        "modified": "2026-05-12 14:35:00",
+                    }
+                ]
+            }
+        )
+
+        with patch(
+            "platform_apps.erpnext.services.ERPNextIntegrationService.build_client",
+            return_value=fake_client,
+        ):
+            response = self.client.post(
+                f"/api/v1/shops/{self.shop.id}/erpnext/sync-customers/",
+                {"limit": 10},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        customer = Customer.objects.get(shop=self.shop, source_system="erpnext", source_id="CUST-0001")
+        self.assertEqual(customer.name, "Ayaan Retail")
+        self.assertEqual(customer.phone, "9999999999")
+        self.assertTrue(
+            ERPNextDocumentLink.objects.filter(
+                shop=self.shop,
+                local_domain=ERPNextDocumentLink.LocalDomain.CUSTOMER,
+                local_object_id=str(customer.id),
+                remote_doctype="Customer",
+                remote_name="CUST-0001",
+                sync_status=ERPNextDocumentLink.SyncStatus.LINKED,
+            ).exists()
+        )
+
+    def test_push_sales_creates_sales_invoice_link(self):
+        customer = Customer.objects.create(
+            shop=self.shop,
+            name="Ayaan Retail",
+            phone="9999999999",
+            source_system="erpnext",
+            source_id="CUST-0001",
+        )
+        item = InventoryItem.objects.create(
+            shop=self.shop,
+            name="Cotton Shirt",
+            sku="ITEM-0001",
+            sell_price=Decimal("599.00"),
+            source_system="erpnext",
+            source_id="ITEM-0001",
+        )
+        InventoryItemPrivate.objects.create(item=item)
+        sale = Sale.objects.create(
+            shop=self.shop,
+            actor_user=self.user,
+            customer=customer,
+            receipt_number="S-DEMO0001",
+            subtotal_amount=Decimal("599.00"),
+            total_amount=Decimal("599.00"),
+            amount_received=Decimal("599.00"),
+            amount_due=Decimal("0.00"),
+            payment_mode=Sale.PaymentMode.CASH,
+            customer_name_snapshot=customer.name,
+            customer_phone_snapshot=customer.phone,
+            sale_date=timezone.localdate(),
+            occurred_at=timezone.now(),
+        )
+        SaleItem.objects.create(
+            sale=sale,
+            inventory_item=item,
+            name_snapshot=item.name,
+            sku_snapshot=item.sku,
+            quantity=1,
+            unit_price=Decimal("599.00"),
+            line_total=Decimal("599.00"),
+        )
+
+        fake_client = FakeERPNextClient(
+            create_responses={"Sales Invoice": {"data": {"name": "SINV-0001"}}}
+        )
+
+        with patch(
+            "platform_apps.erpnext.services.ERPNextIntegrationService.build_client",
+            return_value=fake_client,
+        ):
+            response = self.client.post(
+                f"/api/v1/shops/{self.shop.id}/erpnext/push-sales/",
+                {"limit": 10},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["pushed_count"], 1)
+        self.assertTrue(
+            ERPNextDocumentLink.objects.filter(
+                shop=self.shop,
+                local_domain=ERPNextDocumentLink.LocalDomain.SALE,
+                local_object_id=str(sale.id),
+                remote_doctype="Sales Invoice",
+                remote_name="SINV-0001",
+                sync_status=ERPNextDocumentLink.SyncStatus.LINKED,
+            ).exists()
+        )
+
+    def test_push_payments_creates_payment_entry_link(self):
+        customer = Customer.objects.create(
+            shop=self.shop,
+            name="Ayaan Retail",
+            phone="9999999999",
+            source_system="erpnext",
+            source_id="CUST-0001",
+        )
+        sale = Sale.objects.create(
+            shop=self.shop,
+            actor_user=self.user,
+            customer=customer,
+            receipt_number="S-DEMO0002",
+            subtotal_amount=Decimal("599.00"),
+            total_amount=Decimal("599.00"),
+            amount_received=Decimal("599.00"),
+            amount_due=Decimal("0.00"),
+            payment_mode=Sale.PaymentMode.CASH,
+            customer_name_snapshot=customer.name,
+            customer_phone_snapshot=customer.phone,
+            sale_date=timezone.localdate(),
+            occurred_at=timezone.now(),
+        )
+        payment = SalePayment.objects.create(
+            sale=sale,
+            shop=self.shop,
+            actor_user=self.user,
+            payment_method=SalePayment.PaymentMethod.CASH,
+            amount=Decimal("599.00"),
+            reference_code="txn-001",
+            occurred_at=timezone.now(),
+        )
+        ERPNextDocumentLink.objects.create(
+            shop=self.shop,
+            local_domain=ERPNextDocumentLink.LocalDomain.SALE,
+            local_object_id=str(sale.id),
+            remote_doctype="Sales Invoice",
+            remote_name="SINV-0002",
+            direction=ERPNextDocumentLink.Direction.PUSH,
+            sync_status=ERPNextDocumentLink.SyncStatus.LINKED,
+        )
+
+        fake_client = FakeERPNextClient(
+            create_responses={"Payment Entry": {"data": {"name": "ACC-PAY-0001"}}}
+        )
+
+        with patch(
+            "platform_apps.erpnext.services.ERPNextIntegrationService.build_client",
+            return_value=fake_client,
+        ):
+            response = self.client.post(
+                f"/api/v1/shops/{self.shop.id}/erpnext/push-payments/",
+                {"limit": 10},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["pushed_count"], 1)
+        self.assertTrue(
+            ERPNextDocumentLink.objects.filter(
+                shop=self.shop,
+                local_domain=ERPNextDocumentLink.LocalDomain.PAYMENT,
+                local_object_id=str(payment.id),
+                remote_doctype="Payment Entry",
+                remote_name="ACC-PAY-0001",
+                sync_status=ERPNextDocumentLink.SyncStatus.LINKED,
+            ).exists()
+        )
+
     @override_settings(
         ERPNEXT_BASE_URL="https://erpnext.example.com",
         ERPNEXT_API_KEY="key-123",
@@ -197,4 +452,3 @@ class ERPNextApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], ERPNextShopBinding.HealthStatus.OK)
-
