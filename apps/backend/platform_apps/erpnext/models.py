@@ -58,6 +58,7 @@ class ERPNextSyncCursor(UUIDStampedModel):
         PAYMENTS = "payments", "Payments"
         SUPPLIERS = "suppliers", "Suppliers"
         PURCHASES = "purchases", "Purchases"
+        SUPPLIER_PAYMENTS = "supplier_payments", "Supplier payments"
 
     class Direction(models.TextChoices):
         PULL = "pull", "Pull"
@@ -191,6 +192,8 @@ class ERPNextPurchaseMirror(UUIDStampedModel):
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.UNKNOWN)
     docstatus = models.IntegerField(default=0)
     item_count = models.PositiveIntegerField(default=0)
+    is_return = models.BooleanField(default=False)
+    return_against_remote_name = models.CharField(max_length=255, blank=True)
     items_json = models.JSONField(default=list, blank=True)
     metadata_json = models.JSONField(default=dict, blank=True)
     last_remote_modified_at = models.DateTimeField(blank=True, null=True)
@@ -207,3 +210,47 @@ class ERPNextPurchaseMirror(UUIDStampedModel):
 
     def __str__(self) -> str:
         return f"ERPNext purchase<{self.remote_doctype}:{self.remote_name}>"
+
+
+class ERPNextSupplierPaymentMirror(UUIDStampedModel):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        SUBMITTED = "submitted", "Submitted"
+        CANCELLED = "cancelled", "Cancelled"
+        UNKNOWN = "unknown", "Unknown"
+
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="erpnext_supplier_payments")
+    supplier = models.ForeignKey(
+        ERPNextSupplierMirror,
+        on_delete=models.SET_NULL,
+        related_name="payment_documents",
+        blank=True,
+        null=True,
+    )
+    remote_doctype = models.CharField(max_length=120, default="Payment Entry")
+    remote_name = models.CharField(max_length=255)
+    supplier_remote_name = models.CharField(max_length=255, blank=True)
+    posting_date = models.DateField(blank=True, null=True)
+    payment_type = models.CharField(max_length=64, blank=True)
+    mode_of_payment = models.CharField(max_length=120, blank=True)
+    reference_no = models.CharField(max_length=255, blank=True)
+    currency_code = models.CharField(max_length=8, default="INR")
+    paid_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    received_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    docstatus = models.IntegerField(default=0)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.UNKNOWN)
+    metadata_json = models.JSONField(default=dict, blank=True)
+    last_remote_modified_at = models.DateTimeField(blank=True, null=True)
+    last_synced_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["shop", "remote_doctype", "remote_name"],
+                name="erpnext_unique_supplier_payment_mirror_per_shop",
+            )
+        ]
+        ordering = ["-posting_date", "-updated_at"]
+
+    def __str__(self) -> str:
+        return f"ERPNext supplier payment<{self.remote_doctype}:{self.remote_name}>"

@@ -858,3 +858,212 @@ export type MigrationStats = {
   openStaleEpochEvents: number;
   runningJobs: number;
 };
+
+export type ERPNextMetaPayload = {
+  configured: boolean;
+  base_url: string;
+  site_name: string;
+  verify_ssl: boolean;
+  timeout_seconds: number;
+  has_api_key: boolean;
+  has_api_secret: boolean;
+  is_mock_mode: boolean;
+  mock_state_path: string;
+  cycle_beat_enabled: boolean;
+  cycle_beat_minutes: number;
+  cycle_beat_limit: number;
+  recommendation?: string;
+};
+
+export type ERPNextHealthPayload = {
+  status: string;
+  configured: boolean;
+  base_url: string;
+  site_name: string;
+  reachable: boolean;
+  authenticated: boolean;
+  error?: string;
+  status_code?: number | null;
+  payload?: Record<string, unknown> | null;
+  logged_user?: string;
+  ping?: string;
+};
+
+export type ERPNextShopBinding = {
+  id: string;
+  shop_id: string;
+  is_enabled: boolean;
+  environment: "sandbox" | "live";
+  site_url_override: string;
+  company: string;
+  warehouse: string;
+  selling_price_list: string;
+  cost_center: string;
+  customer_group: string;
+  supplier_group: string;
+  currency_code: string;
+  item_sync_enabled: boolean;
+  customer_sync_enabled: boolean;
+  stock_sync_enabled: boolean;
+  sales_posting_enabled: boolean;
+  payment_posting_enabled: boolean;
+  purchase_sync_enabled: boolean;
+  metadata_json: Record<string, unknown>;
+  last_verified_at: string | null;
+  last_health_status: string;
+  last_error_message: string;
+  last_health_payload_json: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ERPNextSyncCursor = {
+  id: string;
+  shop_id: string;
+  domain: string;
+  direction: "pull" | "push";
+  status: string;
+  last_remote_modified_at: string | null;
+  last_remote_cursor: string;
+  last_started_at: string | null;
+  last_finished_at: string | null;
+  last_result_count: number;
+  last_error_message: string;
+  metadata_json: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ERPNextDocumentLink = {
+  id: string;
+  shop_id: string;
+  local_domain: string;
+  local_object_id: string;
+  remote_doctype: string;
+  remote_name: string;
+  direction: "pull" | "push";
+  sync_status: string;
+  last_synced_at: string | null;
+  last_error_message: string;
+  metadata_json: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ERPNextSyncState = {
+  binding: ERPNextShopBinding | null;
+  cursors: ERPNextSyncCursor[];
+  document_link_counts: {
+    total: number;
+    linked: number;
+    pending: number;
+    failed: number;
+  };
+};
+
+export type ERPNextPocSummary = {
+  shop_id: string;
+  shop_slug: string;
+  binding: {
+    present: boolean;
+    enabled: boolean;
+    environment: string;
+    company: string;
+    warehouse: string;
+    health_status: string;
+    last_verified_at: string | null;
+  };
+  local_counts: {
+    inventory_items: number;
+    customers: number;
+    sales: number;
+    payments: number;
+    erpnext_suppliers: number;
+    erpnext_purchases: number;
+    erpnext_purchase_orders: number;
+    erpnext_purchase_receipts: number;
+    erpnext_purchase_invoices: number;
+    erpnext_purchase_returns: number;
+    erpnext_supplier_payments: number;
+  };
+  cursor_status: {
+    total: number;
+    idle: number;
+    running: number;
+    failed: number;
+    succeeded: number;
+  };
+  document_links: {
+    total: number;
+    linked: number;
+    pending: number;
+    failed: number;
+  };
+  recommendation: string;
+};
+
+export type ERPNextSupplierMirror = {
+  id: string;
+  shop_id: string;
+  remote_name: string;
+  supplier_name: string;
+  supplier_group: string;
+  supplier_type: string;
+  phone: string;
+  email: string;
+  status: string;
+  last_remote_modified_at: string | null;
+  last_synced_at: string | null;
+  metadata_json: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ERPNextPurchaseMirror = {
+  id: string;
+  shop_id: string;
+  supplier_id: string | null;
+  supplier_name: string;
+  remote_doctype: string;
+  remote_name: string;
+  supplier_remote_name: string;
+  posting_date: string | null;
+  warehouse: string;
+  currency_code: string;
+  grand_total: string;
+  status: string;
+  docstatus: number;
+  item_count: number;
+  is_return: boolean;
+  return_against_remote_name: string;
+  items_json: Record<string, unknown>[];
+  metadata_json: Record<string, unknown>;
+  last_remote_modified_at: string | null;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ERPNextSupplierPaymentMirror = {
+  id: string;
+  shop_id: string;
+  supplier_id: string | null;
+  supplier_name: string;
+  remote_doctype: string;
+  remote_name: string;
+  supplier_remote_name: string;
+  posting_date: string | null;
+  payment_type: string;
+  mode_of_payment: string;
+  reference_no: string;
+  currency_code: string;
+  paid_amount: string;
+  received_amount: string;
+  docstatus: number;
+  status: string;
+  metadata_json: Record<string, unknown>;
+  last_remote_modified_at: string | null;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+};

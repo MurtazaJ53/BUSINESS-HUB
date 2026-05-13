@@ -21,21 +21,15 @@ Business Hub can now:
 - import ERPNext `Customer` records into local customers
 - reconcile local stock against ERPNext `Bin` quantities
 - import ERPNext `Supplier` records into local mirror tables
-- import ERPNext `Purchase Receipt` documents into local mirror tables
+- import ERPNext `Purchase Order`, `Purchase Receipt`, and `Purchase Invoice` documents into local mirror tables
+- import ERPNext outgoing supplier `Payment Entry` documents into local mirror tables
 - post local `Sale` records into ERPNext `Sales Invoice`
 - post local `SalePayment` records into ERPNext `Payment Entry`
 - track sync cursors and document links
 - run the whole cycle from HTTP or CLI
 - enqueue the cycle over Celery
-
-## What is not implemented yet
-
-These still remain outside the current handover scope:
-
-- supplier-side payment / return handling
-- purchase-order / purchase-invoice coverage
-- default recurring beat schedule policy
-- admin-web control plane for ERPNext operations
+- run recurring enabled-shop cycles through Celery beat policy
+- operate the ERPNext surface from the admin web UI at `/erpnext`
 
 ## Required backend env
 
@@ -47,6 +41,9 @@ Set these in [D:/business-hub/apps/backend/.env.example](D:/business-hub/apps/ba
 - `ERPNEXT_SITE_NAME`
 - `ERPNEXT_VERIFY_SSL`
 - `ERPNEXT_TIMEOUT_SECONDS`
+- `ERPNEXT_CYCLE_BEAT_ENABLED`
+- `ERPNEXT_CYCLE_BEAT_MINUTES`
+- `ERPNEXT_CYCLE_BEAT_LIMIT`
 
 For a fully local demo without live credentials, use:
 
@@ -101,12 +98,14 @@ Recommended `metadata_json`:
 - `POST /api/v1/shops/<shop_id>/erpnext/sync-stock/`
 - `POST /api/v1/shops/<shop_id>/erpnext/sync-suppliers/`
 - `POST /api/v1/shops/<shop_id>/erpnext/sync-purchases/`
+- `POST /api/v1/shops/<shop_id>/erpnext/sync-supplier-payments/`
 - `POST /api/v1/shops/<shop_id>/erpnext/push-sales/`
 - `POST /api/v1/shops/<shop_id>/erpnext/push-payments/`
 - `POST /api/v1/shops/<shop_id>/erpnext/run-cycle/`
 - `POST /api/v1/shops/<shop_id>/erpnext/enqueue-cycle/`
 - `GET /api/v1/shops/<shop_id>/erpnext/suppliers/`
 - `GET /api/v1/shops/<shop_id>/erpnext/purchases/`
+- `GET /api/v1/shops/<shop_id>/erpnext/supplier-payments/`
 - `GET /api/v1/shops/<shop_id>/erpnext/document-links/`
 
 ## Recommended first-run sequence
@@ -128,13 +127,15 @@ Recommended `metadata_json`:
    - `POST /api/v1/shops/<shop_id>/erpnext/sync-stock/`
 9. Pull suppliers:
    - `POST /api/v1/shops/<shop_id>/erpnext/sync-suppliers/`
-10. Pull purchase receipts:
+10. Pull purchase orders, receipts, and invoices:
    - `POST /api/v1/shops/<shop_id>/erpnext/sync-purchases/`
-11. Push sales:
+11. Pull supplier payments:
+   - `POST /api/v1/shops/<shop_id>/erpnext/sync-supplier-payments/`
+12. Push sales:
    - `POST /api/v1/shops/<shop_id>/erpnext/push-sales/`
-12. Push payments:
+13. Push payments:
    - `POST /api/v1/shops/<shop_id>/erpnext/push-payments/`
-13. Inspect cursor and link state:
+14. Inspect cursor and link state:
    - `GET /api/v1/shops/<shop_id>/erpnext/sync-state/`
    - `GET /api/v1/shops/<shop_id>/erpnext/document-links/`
 
@@ -200,6 +201,20 @@ POST /api/v1/shops/<shop_id>/erpnext/enqueue-cycle/
 }
 ```
 
+### Enabled-shop CLI / beat policy
+
+Run every enabled shop binding inline from the backend shell:
+
+```powershell
+D:\business-hub\apps\backend\.venv\Scripts\python.exe manage.py run_erpnext_enabled_cycles --limit 100
+```
+
+Default recurring beat policy now exists and is controlled by:
+
+- `ERPNEXT_CYCLE_BEAT_ENABLED`
+- `ERPNEXT_CYCLE_BEAT_MINUTES`
+- `ERPNEXT_CYCLE_BEAT_LIMIT`
+
 ## Failure triage
 
 ### Items fail to import
@@ -246,8 +261,16 @@ Check:
 Check:
 
 - purchase sync is enabled in the binding
-- purchase receipts exist in the ERPNext warehouse you filtered to
+- purchase documents exist in the ERPNext warehouse you filtered to
 - the supplier exists locally in the ERPNext supplier mirror first
+
+### Supplier payments look incomplete
+
+Check:
+
+- purchase sync is enabled in the binding
+- ERPNext `Payment Entry` rows for suppliers use `party_type=Supplier`
+- outgoing supplier payments are visible to the API token
 
 ## Handover acceptance checklist
 
@@ -259,10 +282,12 @@ The handover is considered usable when all are true:
 - customer sync imports at least one live customer
 - stock sync reconciles at least one mapped item
 - supplier sync imports at least one supplier
-- purchase sync imports at least one purchase receipt
+- purchase sync imports purchase-side documents across order / receipt / invoice as available
+- supplier payment sync imports at least one outgoing supplier payment when present
 - at least one sale pushes to ERPNext Sales Invoice successfully
 - at least one payment pushes to ERPNext Payment Entry successfully
 - document links show `linked` results for item, customer, supplier, purchase, sale, and payment domains
+- `/erpnext` in the admin web shows live ERPNext posture and can execute the main sync/push actions
 
 ## Main files
 
@@ -270,4 +295,6 @@ The handover is considered usable when all are true:
 - [D:/business-hub/apps/backend/platform_apps/erpnext/views.py](D:/business-hub/apps/backend/platform_apps/erpnext/views.py)
 - [D:/business-hub/apps/backend/platform_apps/erpnext/tasks.py](D:/business-hub/apps/backend/platform_apps/erpnext/tasks.py)
 - [D:/business-hub/apps/backend/platform_apps/erpnext/management/commands/run_erpnext_cycle.py](D:/business-hub/apps/backend/platform_apps/erpnext/management/commands/run_erpnext_cycle.py)
+- [D:/business-hub/apps/backend/platform_apps/erpnext/management/commands/run_erpnext_enabled_cycles.py](D:/business-hub/apps/backend/platform_apps/erpnext/management/commands/run_erpnext_enabled_cycles.py)
 - [D:/business-hub/docs/erpnext-execution-layer.md](D:/business-hub/docs/erpnext-execution-layer.md)
+- [D:/business-hub/docs/erpnext-local-demo-runbook.md](D:/business-hub/docs/erpnext-local-demo-runbook.md)

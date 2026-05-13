@@ -6,6 +6,7 @@ from platform_apps.erpnext.models import (
     ERPNextDocumentLink,
     ERPNextPurchaseMirror,
     ERPNextShopBinding,
+    ERPNextSupplierPaymentMirror,
     ERPNextSupplierMirror,
     ERPNextSyncCursor,
 )
@@ -113,6 +114,7 @@ class ERPNextCycleSerializer(ERPNextActionSerializer):
     sync_stock = serializers.BooleanField(required=False, default=True)
     sync_suppliers = serializers.BooleanField(required=False, default=True)
     sync_purchases = serializers.BooleanField(required=False, default=True)
+    sync_supplier_payments = serializers.BooleanField(required=False, default=True)
     push_sales = serializers.BooleanField(required=False, default=True)
     push_payments = serializers.BooleanField(required=False, default=True)
 
@@ -163,6 +165,38 @@ class ERPNextPurchaseMirrorSerializer(serializers.ModelSerializer):
             "docstatus",
             "item_count",
             "items_json",
+            "metadata_json",
+            "last_remote_modified_at",
+            "last_synced_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+
+class ERPNextSupplierPaymentMirrorSerializer(serializers.ModelSerializer):
+    shop_id = serializers.UUIDField(source="shop.id", read_only=True)
+    supplier_name = serializers.CharField(source="supplier.supplier_name", read_only=True)
+
+    class Meta:
+        model = ERPNextSupplierPaymentMirror
+        fields = [
+            "id",
+            "shop_id",
+            "supplier_id",
+            "supplier_name",
+            "remote_doctype",
+            "remote_name",
+            "supplier_remote_name",
+            "posting_date",
+            "payment_type",
+            "mode_of_payment",
+            "reference_no",
+            "currency_code",
+            "paid_amount",
+            "received_amount",
+            "docstatus",
+            "status",
             "metadata_json",
             "last_remote_modified_at",
             "last_synced_at",

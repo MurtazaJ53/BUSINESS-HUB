@@ -160,8 +160,73 @@ def build_demo_mock_state(*, company: str = DEFAULT_COMPANY, warehouse: str = DE
                     ],
                 }
             ],
+            "Purchase Order": [
+                {
+                    "name": "PO-0001",
+                    "supplier": "SUP-0002",
+                    "transaction_date": "2026-05-10",
+                    "grand_total": "5400.00",
+                    "status": "To Receive and Bill",
+                    "docstatus": 1,
+                    "currency": "INR",
+                    "set_warehouse": warehouse,
+                    "is_return": 0,
+                    "return_against": "",
+                    "modified": "2026-05-12 10:32:00",
+                    "items": [
+                        {
+                            "item_code": "ITEM-0002",
+                            "item_name": "Denim Jeans",
+                            "qty": 4,
+                            "rate": "950.00",
+                            "warehouse": warehouse,
+                        }
+                    ],
+                }
+            ],
+            "Purchase Invoice": [
+                {
+                    "name": "PINV-0001",
+                    "supplier": "SUP-0001",
+                    "posting_date": "2026-05-12",
+                    "grand_total": "1450.00",
+                    "status": "Paid",
+                    "docstatus": 1,
+                    "currency": "INR",
+                    "set_warehouse": warehouse,
+                    "is_return": 1,
+                    "return_against": "PREC-0001",
+                    "modified": "2026-05-12 10:34:00",
+                    "items": [
+                        {
+                            "item_code": "ITEM-0001",
+                            "item_name": "Cotton Shirt",
+                            "qty": 2,
+                            "rate": "725.00",
+                            "warehouse": warehouse,
+                        }
+                    ],
+                }
+            ],
             "Sales Invoice": [],
-            "Payment Entry": [],
+            "Payment Entry": [
+                {
+                    "name": "SUPPAY-0001",
+                    "party_type": "Supplier",
+                    "party": "SUP-0001",
+                    "posting_date": "2026-05-12",
+                    "payment_type": "Pay",
+                    "mode_of_payment": "Bank",
+                    "reference_no": "NEFT-0001",
+                    "paid_amount": "1450.00",
+                    "received_amount": "1450.00",
+                    "docstatus": 1,
+                    "status": "Submitted",
+                    "paid_from_account_currency": "INR",
+                    "paid_to_account_currency": "INR",
+                    "modified": "2026-05-12 10:36:00",
+                }
+            ],
         },
         "sequences": {
             "Sales Invoice": 1,

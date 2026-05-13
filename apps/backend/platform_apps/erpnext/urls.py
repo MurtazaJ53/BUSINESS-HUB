@@ -16,6 +16,8 @@ from platform_apps.erpnext.views import (
     ERPNextShopPocSummaryView,
     ERPNextShopSyncStateView,
     ERPNextStockSyncView,
+    ERPNextSupplierPaymentMirrorListView,
+    ERPNextSupplierPaymentSyncView,
     ERPNextSupplierMirrorListView,
     ERPNextSupplierSyncView,
     ERPNextShopVerifyConnectionView,
@@ -66,6 +68,11 @@ urlpatterns = [
         name="erpnext-sync-purchases",
     ),
     path(
+        "shops/<uuid:shop_id>/erpnext/sync-supplier-payments/",
+        ERPNextSupplierPaymentSyncView.as_view(),
+        name="erpnext-sync-supplier-payments",
+    ),
+    path(
         "shops/<uuid:shop_id>/erpnext/push-sales/",
         ERPNextSalesPushView.as_view(),
         name="erpnext-push-sales",
@@ -94,6 +101,11 @@ urlpatterns = [
         "shops/<uuid:shop_id>/erpnext/purchases/",
         ERPNextPurchaseMirrorListView.as_view(),
         name="erpnext-purchases",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/supplier-payments/",
+        ERPNextSupplierPaymentMirrorListView.as_view(),
+        name="erpnext-supplier-payments",
     ),
     path(
         "shops/<uuid:shop_id>/erpnext/document-links/",

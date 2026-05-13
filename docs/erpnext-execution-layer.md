@@ -30,9 +30,12 @@ It now adds:
 - local-to-ERP document-link tracking
 - supplier mirror storage
 - purchase mirror storage
+- supplier payment mirror storage
 - stock reconciliation against ERPNext bins
 - one-call run-cycle orchestration
 - queueable Celery handoff for the cycle runner
+- default recurring beat policy for enabled shop bindings
+- admin-web control surface at `/erpnext`
 
 ## Required environment variables
 
@@ -44,6 +47,11 @@ Set these in `apps/backend/.env`:
 - `ERPNEXT_SITE_NAME`
 - `ERPNEXT_VERIFY_SSL`
 - `ERPNEXT_TIMEOUT_SECONDS`
+- `ERPNEXT_MOCK_MODE`
+- `ERPNEXT_MOCK_STATE_PATH`
+- `ERPNEXT_CYCLE_BEAT_ENABLED`
+- `ERPNEXT_CYCLE_BEAT_MINUTES`
+- `ERPNEXT_CYCLE_BEAT_LIMIT`
 
 ## API endpoints
 
@@ -63,12 +71,14 @@ Set these in `apps/backend/.env`:
 - `POST /api/v1/shops/<shop_id>/erpnext/sync-stock/`
 - `POST /api/v1/shops/<shop_id>/erpnext/sync-suppliers/`
 - `POST /api/v1/shops/<shop_id>/erpnext/sync-purchases/`
+- `POST /api/v1/shops/<shop_id>/erpnext/sync-supplier-payments/`
 - `POST /api/v1/shops/<shop_id>/erpnext/push-sales/`
 - `POST /api/v1/shops/<shop_id>/erpnext/push-payments/`
 - `POST /api/v1/shops/<shop_id>/erpnext/run-cycle/`
 - `POST /api/v1/shops/<shop_id>/erpnext/enqueue-cycle/`
 - `GET /api/v1/shops/<shop_id>/erpnext/suppliers/`
 - `GET /api/v1/shops/<shop_id>/erpnext/purchases/`
+- `GET /api/v1/shops/<shop_id>/erpnext/supplier-payments/`
 - `GET /api/v1/shops/<shop_id>/erpnext/document-links/`
 
 ## Core models
@@ -118,6 +128,16 @@ Stores the current imported ERPNext supplier master set for a shop.
 
 Stores imported ERPNext purchase receipt documents for a shop.
 
+The same mirror now also stores:
+
+- `Purchase Order`
+- `Purchase Invoice`
+- return posture via `is_return` and `return_against_remote_name`
+
+### ERPNextSupplierPaymentMirror
+
+Stores imported outgoing supplier `Payment Entry` documents for a shop.
+
 ## Recommended execution flow
 
 1. Set ERPNext environment variables.
@@ -137,13 +157,15 @@ Stores imported ERPNext purchase receipt documents for a shop.
    - `POST /api/v1/shops/<shop_id>/erpnext/sync-stock/`
 9. Pull suppliers:
    - `POST /api/v1/shops/<shop_id>/erpnext/sync-suppliers/`
-10. Pull purchase receipts:
+10. Pull purchase orders, receipts, and invoices:
    - `POST /api/v1/shops/<shop_id>/erpnext/sync-purchases/`
-11. Push sales:
+11. Pull outgoing supplier payments:
+   - `POST /api/v1/shops/<shop_id>/erpnext/sync-supplier-payments/`
+12. Push sales:
    - `POST /api/v1/shops/<shop_id>/erpnext/push-sales/`
-12. Push payments:
+13. Push payments:
    - `POST /api/v1/shops/<shop_id>/erpnext/push-payments/`
-13. Or run the whole thing:
+14. Or run the whole thing:
    - `POST /api/v1/shops/<shop_id>/erpnext/run-cycle/`
 
 ## Binding metadata_json conventions
@@ -168,15 +190,18 @@ The binding fields themselves now also matter for the expanded import path:
 - `supplier_group`
   Optional supplier import filter.
 
-## What this layer still does not do
+## What is now complete repo-side
 
-This live execution layer still does **not** yet:
+This execution layer now covers the repo-side ERPNext integration scope for:
 
-- import supplier-side payments or returns
-- import purchase orders or purchase invoices beyond the current receipt mirror
-- auto-submit ERPNext documents through a custom finalize step
-- run periodic beat scheduling by default without an explicit trigger
-- expose ERPNext controls in the admin web UI
+- master data pull
+- stock reconciliation
+- purchase orders, receipts, invoices, and returns mirror posture
+- outgoing supplier payment mirror posture
+- sales and customer-payment push
+- recurring enabled-shop cycle policy
+- admin-web ERPNext controls
+- local mock-demo execution without live credentials
 
 ## Why this matters
 
@@ -188,15 +213,8 @@ With this layer, the team can now:
 - configure one shop cleanly
 - import ERP masters
 - reconcile stock
+- mirror purchase-side operations
+- mirror supplier-side payments
 - push sales and payments
 - track failures explicitly
-- operate the first cycle from HTTP, CLI, or Celery
-
-## Recommended next code step
-
-After this execution layer, the next implementation targets should be:
-
-1. purchase invoice / supplier payment coverage
-2. purchase-order and return coverage
-3. recurring beat-level scheduling policy
-4. admin-web controls for ERPNext sync operations
+- operate cycles from HTTP, CLI, Celery, or default beat orchestration

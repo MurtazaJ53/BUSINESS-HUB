@@ -12,6 +12,15 @@ import type {
   ExpenseStats,
   InventoryItem,
   InventoryStats,
+  ERPNextDocumentLink,
+  ERPNextHealthPayload,
+  ERPNextMetaPayload,
+  ERPNextPocSummary,
+  ERPNextPurchaseMirror,
+  ERPNextShopBinding,
+  ERPNextSupplierMirror,
+  ERPNextSupplierPaymentMirror,
+  ERPNextSyncState,
   MigrationDomainControl,
   MigrationBridgeReceipt,
   MigrationControlEvent,
@@ -315,6 +324,44 @@ export const getMigrationReconciliationEvents = cache(
     return apiFetch<MigrationReconciliationEvent[]>("/migration/reconciliation/");
   },
 );
+
+export const getERPNextMeta = cache(async (): Promise<ERPNextMetaPayload> => {
+  return apiFetch<ERPNextMetaPayload>("/erpnext/meta/");
+});
+
+export const getERPNextHealth = cache(async (): Promise<ERPNextHealthPayload> => {
+  return apiFetch<ERPNextHealthPayload>("/erpnext/health/");
+});
+
+export const getERPNextBinding = cache(async (shopId: string): Promise<ERPNextShopBinding> => {
+  return apiFetch<ERPNextShopBinding>(`/shops/${shopId}/erpnext/binding/`);
+});
+
+export const getERPNextSyncState = cache(async (shopId: string): Promise<ERPNextSyncState> => {
+  return apiFetch<ERPNextSyncState>(`/shops/${shopId}/erpnext/sync-state/`);
+});
+
+export const getERPNextPocSummary = cache(async (shopId: string): Promise<ERPNextPocSummary> => {
+  return apiFetch<ERPNextPocSummary>(`/shops/${shopId}/erpnext/poc-summary/`);
+});
+
+export const getERPNextSuppliers = cache(async (shopId: string): Promise<ERPNextSupplierMirror[]> => {
+  return apiFetch<ERPNextSupplierMirror[]>(`/shops/${shopId}/erpnext/suppliers/`);
+});
+
+export const getERPNextPurchases = cache(async (shopId: string): Promise<ERPNextPurchaseMirror[]> => {
+  return apiFetch<ERPNextPurchaseMirror[]>(`/shops/${shopId}/erpnext/purchases/`);
+});
+
+export const getERPNextSupplierPayments = cache(
+  async (shopId: string): Promise<ERPNextSupplierPaymentMirror[]> => {
+    return apiFetch<ERPNextSupplierPaymentMirror[]>(`/shops/${shopId}/erpnext/supplier-payments/`);
+  },
+);
+
+export const getERPNextDocumentLinks = cache(async (shopId: string): Promise<ERPNextDocumentLink[]> => {
+  return apiFetch<ERPNextDocumentLink[]>(`/shops/${shopId}/erpnext/document-links/`);
+});
 
 export function resolveActiveShop(session: SessionPayload): ShopMembership | null {
   if (!session.active_shop_id) {

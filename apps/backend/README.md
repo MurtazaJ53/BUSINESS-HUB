@@ -49,12 +49,14 @@ Phase 1 backend foundation for the Business Hub target platform.
 - `/api/v1/shops/<shop_id>/erpnext/sync-stock/`
 - `/api/v1/shops/<shop_id>/erpnext/sync-suppliers/`
 - `/api/v1/shops/<shop_id>/erpnext/sync-purchases/`
+- `/api/v1/shops/<shop_id>/erpnext/sync-supplier-payments/`
 - `/api/v1/shops/<shop_id>/erpnext/push-sales/`
 - `/api/v1/shops/<shop_id>/erpnext/push-payments/`
 - `/api/v1/shops/<shop_id>/erpnext/run-cycle/`
 - `/api/v1/shops/<shop_id>/erpnext/enqueue-cycle/`
 - `/api/v1/shops/<shop_id>/erpnext/suppliers/`
 - `/api/v1/shops/<shop_id>/erpnext/purchases/`
+- `/api/v1/shops/<shop_id>/erpnext/supplier-payments/`
 - `/api/v1/shops/<shop_id>/erpnext/document-links/`
 - `/api/v1/migration/domains/`
 - `/api/v1/migration/jobs/`
@@ -216,6 +218,9 @@ Configure the PoC credentials through:
 - `ERPNEXT_TIMEOUT_SECONDS`
 - `ERPNEXT_MOCK_MODE`
 - `ERPNEXT_MOCK_STATE_PATH`
+- `ERPNEXT_CYCLE_BEAT_ENABLED`
+- `ERPNEXT_CYCLE_BEAT_MINUTES`
+- `ERPNEXT_CYCLE_BEAT_LIMIT`
 
 Additional per-shop PoC mapping lives in the ERPNext binding `metadata_json`, including:
 
@@ -234,6 +239,7 @@ For local/operator execution, the backend also includes:
 
 - `manage.py run_erpnext_cycle --shop-slug <slug>`
 - `manage.py bootstrap_erpnext_demo --shop-slug demo-shop --reset-mock-state`
+- `manage.py run_erpnext_enabled_cycles`
 
 If you want a fully local ERPNext test without live credentials, set:
 

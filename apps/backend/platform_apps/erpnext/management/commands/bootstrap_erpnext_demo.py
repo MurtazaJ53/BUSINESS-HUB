@@ -10,8 +10,16 @@ from django.utils import timezone
 
 from platform_apps.customers.models import Customer
 from platform_apps.erpnext.mock_client import build_demo_mock_state, write_mock_state
-from platform_apps.erpnext.models import ERPNextShopBinding
+from platform_apps.erpnext.models import (
+    ERPNextDocumentLink,
+    ERPNextPurchaseMirror,
+    ERPNextShopBinding,
+    ERPNextSupplierMirror,
+    ERPNextSupplierPaymentMirror,
+    ERPNextSyncCursor,
+)
 from platform_apps.erpnext.services import ERPNextIntegrationService
+from platform_apps.inventory.models import InventoryItem, InventoryStockLedger
 from platform_apps.payments.models import SalePayment
 from platform_apps.sales.models import Sale, SaleItem
 from platform_apps.shops.models import Shop, ShopMembership
@@ -42,6 +50,9 @@ class Command(BaseCommand):
         binding = self._ensure_binding(shop=shop)
         service = ERPNextIntegrationService()
 
+        if options["reset_mock_state"]:
+            self._reset_local_demo_state(shop=shop)
+
         service.ensure_default_cursors(shop=shop)
         preflight = service.health_check(binding=binding)
         service.apply_health_payload(binding=binding, payload=preflight)
@@ -61,6 +72,7 @@ class Command(BaseCommand):
             sync_stock=True,
             sync_suppliers=True,
             sync_purchases=True,
+            sync_supplier_payments=True,
             push_sales=True,
             push_payments=True,
         )
@@ -263,3 +275,14 @@ class Command(BaseCommand):
             "receipt_number": sale.receipt_number,
             "payment_id": str(payment.id),
         }
+
+    def _reset_local_demo_state(self, *, shop: Shop) -> None:
+        Sale.objects.filter(shop=shop, receipt_number__startswith="ERPDEMO").delete()
+        ERPNextDocumentLink.objects.filter(shop=shop).delete()
+        ERPNextSyncCursor.objects.filter(shop=shop).delete()
+        ERPNextSupplierPaymentMirror.objects.filter(shop=shop).delete()
+        ERPNextPurchaseMirror.objects.filter(shop=shop).delete()
+        ERPNextSupplierMirror.objects.filter(shop=shop).delete()
+        InventoryStockLedger.objects.filter(shop=shop, source_system="erpnext").delete()
+        InventoryItem.objects.filter(shop=shop, source_system="erpnext").delete()
+        Customer.objects.filter(shop=shop, source_system="erpnext").delete()

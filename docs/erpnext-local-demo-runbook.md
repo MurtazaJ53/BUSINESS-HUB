@@ -22,7 +22,8 @@ That means you can exercise:
 - customer sync
 - stock reconciliation
 - supplier sync
-- purchase sync
+- purchase order / receipt / invoice sync
+- supplier payment sync
 - sales push
 - payment push
 
@@ -62,6 +63,10 @@ This command will:
 7. seed a local Business Hub sale and payment
 8. run the full ERPNext cycle
 9. print the final summary JSON
+
+You can then inspect the same shop from the admin web at:
+
+- `/erpnext`
 
 ## Outputs you should expect
 

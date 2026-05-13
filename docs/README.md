@@ -108,7 +108,7 @@ As of May 12, 2026:
 - Firestore is the shared cloud backbone
 - local SQLite remains the speed layer on clients
 - PostgreSQL + Django is the recommended final backend direction
-- ERPNext is now documented as an evaluation path for back-office acceleration, not as an automatic full UI replacement
+- ERPNext now has a working backend execution layer, local mock-demo mode, and admin-web control surface, but it is still intended as back-office acceleration rather than an automatic full UI replacement
 - the migration control plane now includes Phase 7 rollout and scale-optimization signoff surfaces, while Phase 8 defines steady-state operating posture
 
 ## Suggested use by audience

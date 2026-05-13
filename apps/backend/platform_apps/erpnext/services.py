@@ -21,6 +21,7 @@ from platform_apps.erpnext.models import (
     ERPNextDocumentLink,
     ERPNextPurchaseMirror,
     ERPNextShopBinding,
+    ERPNextSupplierPaymentMirror,
     ERPNextSupplierMirror,
     ERPNextSyncCursor,
 )
@@ -165,6 +166,7 @@ class ERPNextIntegrationService:
         (ERPNextSyncCursor.Domain.STOCK, ERPNextSyncCursor.Direction.PULL),
         (ERPNextSyncCursor.Domain.SUPPLIERS, ERPNextSyncCursor.Direction.PULL),
         (ERPNextSyncCursor.Domain.PURCHASES, ERPNextSyncCursor.Direction.PULL),
+        (ERPNextSyncCursor.Domain.SUPPLIER_PAYMENTS, ERPNextSyncCursor.Direction.PULL),
         (ERPNextSyncCursor.Domain.SALES, ERPNextSyncCursor.Direction.PUSH),
         (ERPNextSyncCursor.Domain.PAYMENTS, ERPNextSyncCursor.Direction.PUSH),
     )
@@ -195,6 +197,9 @@ class ERPNextIntegrationService:
             "has_api_secret": bool(settings.ERPNEXT_API_SECRET),
             "is_mock_mode": is_mock_mode,
             "mock_state_path": settings.ERPNEXT_MOCK_STATE_PATH,
+            "cycle_beat_enabled": settings.ERPNEXT_CYCLE_BEAT_ENABLED,
+            "cycle_beat_minutes": settings.ERPNEXT_CYCLE_BEAT_MINUTES,
+            "cycle_beat_limit": settings.ERPNEXT_CYCLE_BEAT_LIMIT,
         }
 
     def build_client(self, *, binding: ERPNextShopBinding | None = None) -> ERPNextClient | MockERPNextClient:
@@ -833,25 +838,265 @@ class ERPNextIntegrationService:
         client = self.build_client(binding=binding)
         self._begin_cursor_run(cursor=cursor)
 
+        imported = 0
+        latest_modified_at = cursor.last_remote_modified_at
+        latest_remote_name = cursor.last_remote_cursor
+        imported_by_doctype: dict[str, int] = {}
+        purchase_doctypes = ("Purchase Order", "Purchase Receipt", "Purchase Invoice")
+
+        try:
+            for doctype in purchase_doctypes:
+                response = client.list_resource(
+                    doctype=doctype,
+                    filters=self._purchase_list_filters(
+                        doctype=doctype,
+                        binding=binding,
+                        last_remote_modified_at=cursor.last_remote_modified_at,
+                    )
+                    or None,
+                    fields=self._purchase_list_fields(doctype=doctype),
+                    limit_page_length=limit,
+                )
+                rows = response.get("data", [])
+                imported_by_doctype.setdefault(doctype, 0)
+
+                for row in rows:
+                    remote_name = str(row.get("name", "")).strip()
+                    if not remote_name:
+                        continue
+                    detail_response = client.get_resource(doctype=doctype, name=remote_name)
+                    detail = detail_response.get("data") or {}
+                    modified_at = self._parse_remote_timestamp(row.get("modified") or detail.get("modified"))
+                    if modified_at and (latest_modified_at is None or modified_at > latest_modified_at):
+                        latest_modified_at = modified_at
+                        latest_remote_name = remote_name
+
+                    supplier_remote_name = str(detail.get("supplier") or row.get("supplier") or "").strip()
+                    supplier = None
+                    if supplier_remote_name:
+                        supplier = ERPNextSupplierMirror.objects.filter(shop=shop, remote_name=supplier_remote_name).first()
+
+                    items = detail.get("items") or []
+                    purchase = self._upsert_purchase_mirror(
+                        shop=shop,
+                        binding=binding,
+                        doctype=doctype,
+                        remote_name=remote_name,
+                        row=row,
+                        detail=detail,
+                        supplier=supplier,
+                        supplier_remote_name=supplier_remote_name,
+                        modified_at=modified_at,
+                        items=items,
+                    )
+                    self._update_inventory_from_purchase_items(
+                        shop=shop,
+                        purchase=purchase,
+                        supplier_remote_name=supplier_remote_name,
+                        items=items,
+                    )
+                    self._link_document(
+                        shop=shop,
+                        local_domain=ERPNextDocumentLink.LocalDomain.PURCHASE,
+                        local_object_id=str(purchase.id),
+                        remote_doctype=doctype,
+                        remote_name=remote_name,
+                        direction=ERPNextDocumentLink.Direction.PULL,
+                        metadata_json={
+                            "posting_date": str(purchase.posting_date) if purchase.posting_date else "",
+                            "supplier": supplier_remote_name,
+                            "is_return": purchase.is_return,
+                        },
+                    )
+                    imported += 1
+                    imported_by_doctype[doctype] += 1
+
+            self._finish_cursor_run(
+                cursor=cursor,
+                status=ERPNextSyncCursor.Status.SUCCEEDED,
+                result_count=imported,
+                remote_modified_at=latest_modified_at,
+                remote_cursor=latest_remote_name or "",
+            )
+            return {
+                "domain": ERPNextSyncCursor.Domain.PURCHASES,
+                "direction": ERPNextSyncCursor.Direction.PULL,
+                "imported_count": imported,
+                "imported_by_doctype": imported_by_doctype,
+                "cursor": cursor.last_remote_cursor,
+            }
+        except Exception as exc:
+            self._finish_cursor_run(
+                cursor=cursor,
+                status=ERPNextSyncCursor.Status.FAILED,
+                result_count=0,
+                error_message=str(exc),
+            )
+            raise
+
+    def _purchase_list_filters(
+        self,
+        *,
+        doctype: str,
+        binding: ERPNextShopBinding,
+        last_remote_modified_at,
+    ) -> list[list[Any]]:
         filters: list[list[Any]] = []
-        if cursor.last_remote_modified_at:
-            filters.append(["Purchase Receipt", "modified", ">", cursor.last_remote_modified_at.isoformat(sep=" ")])
+        if last_remote_modified_at:
+            filters.append([doctype, "modified", ">", last_remote_modified_at.isoformat(sep=" ")])
         if binding.warehouse:
-            filters.append(["Purchase Receipt", "set_warehouse", "=", binding.warehouse])
+            warehouse_field = "set_warehouse"
+            if doctype == "Purchase Order":
+                warehouse_field = "set_warehouse"
+            filters.append([doctype, warehouse_field, "=", binding.warehouse])
+        return filters
+
+    def _purchase_list_fields(self, *, doctype: str) -> list[str]:
+        if doctype == "Purchase Order":
+            return [
+                "name",
+                "supplier",
+                "transaction_date",
+                "grand_total",
+                "status",
+                "docstatus",
+                "currency",
+                "set_warehouse",
+                "modified",
+                "is_return",
+                "return_against",
+            ]
+        return [
+            "name",
+            "supplier",
+            "posting_date",
+            "grand_total",
+            "status",
+            "docstatus",
+            "currency",
+            "set_warehouse",
+            "modified",
+            "is_return",
+            "return_against",
+        ]
+
+    def _upsert_purchase_mirror(
+        self,
+        *,
+        shop: Shop,
+        binding: ERPNextShopBinding,
+        doctype: str,
+        remote_name: str,
+        row: dict[str, Any],
+        detail: dict[str, Any],
+        supplier: ERPNextSupplierMirror | None,
+        supplier_remote_name: str,
+        modified_at,
+        items: list[dict[str, Any]],
+    ) -> ERPNextPurchaseMirror:
+        posting_date = (
+            detail.get("posting_date")
+            or row.get("posting_date")
+            or detail.get("transaction_date")
+            or row.get("transaction_date")
+        )
+        warehouse = detail.get("set_warehouse") or row.get("set_warehouse") or ""
+        is_return = bool(detail.get("is_return") or row.get("is_return"))
+        return_against_remote_name = str(detail.get("return_against") or row.get("return_against") or "").strip()
+        defaults = {
+            "supplier": supplier,
+            "supplier_remote_name": supplier_remote_name,
+            "posting_date": posting_date,
+            "warehouse": warehouse,
+            "currency_code": detail.get("currency") or row.get("currency") or binding.currency_code,
+            "grand_total": Decimal(str(detail.get("grand_total") or row.get("grand_total") or "0")),
+            "status": self._map_purchase_status(
+                detail.get("docstatus", row.get("docstatus")),
+                detail.get("status") or row.get("status"),
+            ),
+            "docstatus": int(detail.get("docstatus") or row.get("docstatus") or 0),
+            "item_count": len(items),
+            "is_return": is_return,
+            "return_against_remote_name": return_against_remote_name,
+            "items_json": items,
+            "metadata_json": detail,
+            "last_remote_modified_at": modified_at,
+            "last_synced_at": timezone.now(),
+        }
+        purchase, created = ERPNextPurchaseMirror.objects.get_or_create(
+            shop=shop,
+            remote_doctype=doctype,
+            remote_name=remote_name,
+            defaults=defaults,
+        )
+        if not created:
+            for field_name, field_value in defaults.items():
+                setattr(purchase, field_name, field_value)
+            purchase.save()
+        return purchase
+
+    def _update_inventory_from_purchase_items(
+        self,
+        *,
+        shop: Shop,
+        purchase: ERPNextPurchaseMirror,
+        supplier_remote_name: str,
+        items: list[dict[str, Any]],
+    ) -> None:
+        for purchase_item in items:
+            item_code = str(purchase_item.get("item_code", "")).strip()
+            if not item_code:
+                continue
+            inventory_item = InventoryItem.objects.filter(
+                shop=shop,
+                source_system="erpnext",
+                source_id=item_code,
+                tombstone=False,
+            ).select_related("private").first()
+            if inventory_item is None:
+                continue
+            private, _ = InventoryItemPrivate.objects.get_or_create(item=inventory_item)
+            if supplier_remote_name:
+                private.supplier_id = supplier_remote_name
+            if purchase.posting_date:
+                private.last_purchase_date = purchase.posting_date
+            if purchase_item.get("rate") is not None:
+                private.cost_price = Decimal(str(purchase_item.get("rate") or "0"))
+            private.save()
+
+    def sync_supplier_payments(self, *, shop: Shop, limit: int = 100) -> dict[str, Any]:
+        binding = self._require_binding(shop=shop)
+        if not binding.purchase_sync_enabled:
+            raise ERPNextConfigurationError("Supplier payment sync is disabled because purchase sync is not enabled for this shop binding.")
+        cursor = self._get_cursor(shop=shop, domain=ERPNextSyncCursor.Domain.SUPPLIER_PAYMENTS, direction=ERPNextSyncCursor.Direction.PULL)
+        client = self.build_client(binding=binding)
+        self._begin_cursor_run(cursor=cursor)
+
+        filters: list[list[Any]] = [
+            ["Payment Entry", "party_type", "=", "Supplier"],
+            ["Payment Entry", "payment_type", "=", "Pay"],
+        ]
+        if cursor.last_remote_modified_at:
+            filters.append(["Payment Entry", "modified", ">", cursor.last_remote_modified_at.isoformat(sep=" ")])
 
         try:
             response = client.list_resource(
-                doctype="Purchase Receipt",
-                filters=filters or None,
+                doctype="Payment Entry",
+                filters=filters,
                 fields=[
                     "name",
-                    "supplier",
+                    "party_type",
+                    "party",
                     "posting_date",
-                    "grand_total",
-                    "status",
+                    "payment_type",
+                    "mode_of_payment",
+                    "reference_no",
+                    "paid_amount",
+                    "received_amount",
                     "docstatus",
-                    "currency",
-                    "set_warehouse",
+                    "status",
+                    "paid_from_account_currency",
+                    "paid_to_account_currency",
                     "modified",
                 ],
                 limit_page_length=limit,
@@ -865,85 +1110,53 @@ class ERPNextIntegrationService:
                 remote_name = str(row.get("name", "")).strip()
                 if not remote_name:
                     continue
-                detail_response = client.get_resource(doctype="Purchase Receipt", name=remote_name)
+                detail_response = client.get_resource(doctype="Payment Entry", name=remote_name)
                 detail = detail_response.get("data") or {}
                 modified_at = self._parse_remote_timestamp(row.get("modified") or detail.get("modified"))
                 if modified_at and (latest_modified_at is None or modified_at > latest_modified_at):
                     latest_modified_at = modified_at
                     latest_remote_name = remote_name
 
-                supplier_remote_name = str(detail.get("supplier") or row.get("supplier") or "").strip()
+                supplier_remote_name = str(detail.get("party") or row.get("party") or "").strip()
                 supplier = None
                 if supplier_remote_name:
                     supplier = ERPNextSupplierMirror.objects.filter(shop=shop, remote_name=supplier_remote_name).first()
 
-                items = detail.get("items") or []
-                purchase, created = ERPNextPurchaseMirror.objects.get_or_create(
+                defaults = {
+                    "supplier": supplier,
+                    "supplier_remote_name": supplier_remote_name,
+                    "posting_date": detail.get("posting_date") or row.get("posting_date"),
+                    "payment_type": str(detail.get("payment_type") or row.get("payment_type") or ""),
+                    "mode_of_payment": str(detail.get("mode_of_payment") or row.get("mode_of_payment") or ""),
+                    "reference_no": str(detail.get("reference_no") or row.get("reference_no") or ""),
+                    "currency_code": str(
+                        detail.get("paid_to_account_currency")
+                        or detail.get("paid_from_account_currency")
+                        or row.get("paid_to_account_currency")
+                        or row.get("paid_from_account_currency")
+                        or binding.currency_code
+                    ),
+                    "paid_amount": Decimal(str(detail.get("paid_amount") or row.get("paid_amount") or "0")),
+                    "received_amount": Decimal(str(detail.get("received_amount") or row.get("received_amount") or "0")),
+                    "docstatus": int(detail.get("docstatus") or row.get("docstatus") or 0),
+                    "status": self._map_supplier_payment_status(
+                        detail.get("docstatus", row.get("docstatus")),
+                        detail.get("status") or row.get("status"),
+                    ),
+                    "metadata_json": detail,
+                    "last_remote_modified_at": modified_at,
+                    "last_synced_at": timezone.now(),
+                }
+                payment, created = ERPNextSupplierPaymentMirror.objects.get_or_create(
                     shop=shop,
-                    remote_doctype="Purchase Receipt",
+                    remote_doctype="Payment Entry",
                     remote_name=remote_name,
-                    defaults={
-                        "supplier": supplier,
-                        "supplier_remote_name": supplier_remote_name,
-                        "posting_date": detail.get("posting_date") or row.get("posting_date"),
-                        "warehouse": detail.get("set_warehouse") or row.get("set_warehouse") or "",
-                        "currency_code": detail.get("currency") or row.get("currency") or binding.currency_code,
-                        "grand_total": Decimal(str(detail.get("grand_total") or row.get("grand_total") or "0")),
-                        "status": self._map_purchase_status(detail.get("docstatus", row.get("docstatus")), detail.get("status") or row.get("status")),
-                        "docstatus": int(detail.get("docstatus") or row.get("docstatus") or 0),
-                        "item_count": len(items),
-                        "items_json": items,
-                        "metadata_json": detail,
-                        "last_remote_modified_at": modified_at,
-                        "last_synced_at": timezone.now(),
-                    },
+                    defaults=defaults,
                 )
                 if not created:
-                    purchase.supplier = supplier
-                    purchase.supplier_remote_name = supplier_remote_name
-                    purchase.posting_date = detail.get("posting_date") or row.get("posting_date")
-                    purchase.warehouse = detail.get("set_warehouse") or row.get("set_warehouse") or ""
-                    purchase.currency_code = detail.get("currency") or row.get("currency") or binding.currency_code
-                    purchase.grand_total = Decimal(str(detail.get("grand_total") or row.get("grand_total") or "0"))
-                    purchase.status = self._map_purchase_status(detail.get("docstatus", row.get("docstatus")), detail.get("status") or row.get("status"))
-                    purchase.docstatus = int(detail.get("docstatus") or row.get("docstatus") or 0)
-                    purchase.item_count = len(items)
-                    purchase.items_json = items
-                    purchase.metadata_json = detail
-                    purchase.last_remote_modified_at = modified_at
-                    purchase.last_synced_at = timezone.now()
-                    purchase.save()
-
-                for purchase_item in items:
-                    item_code = str(purchase_item.get("item_code", "")).strip()
-                    if not item_code:
-                        continue
-                    inventory_item = InventoryItem.objects.filter(
-                        shop=shop,
-                        source_system="erpnext",
-                        source_id=item_code,
-                        tombstone=False,
-                    ).select_related("private").first()
-                    if inventory_item is None:
-                        continue
-                    private, _ = InventoryItemPrivate.objects.get_or_create(item=inventory_item)
-                    if supplier_remote_name:
-                        private.supplier_id = supplier_remote_name
-                    if purchase.posting_date:
-                        private.last_purchase_date = purchase.posting_date
-                    if purchase_item.get("rate") is not None:
-                        private.cost_price = Decimal(str(purchase_item.get("rate") or "0"))
-                    private.save()
-
-                self._link_document(
-                    shop=shop,
-                    local_domain=ERPNextDocumentLink.LocalDomain.PURCHASE,
-                    local_object_id=str(purchase.id),
-                    remote_doctype="Purchase Receipt",
-                    remote_name=remote_name,
-                    direction=ERPNextDocumentLink.Direction.PULL,
-                    metadata_json={"posting_date": str(purchase.posting_date), "supplier": supplier_remote_name},
-                )
+                    for field_name, field_value in defaults.items():
+                        setattr(payment, field_name, field_value)
+                    payment.save()
                 imported += 1
 
             self._finish_cursor_run(
@@ -954,7 +1167,7 @@ class ERPNextIntegrationService:
                 remote_cursor=latest_remote_name or "",
             )
             return {
-                "domain": ERPNextSyncCursor.Domain.PURCHASES,
+                "domain": ERPNextSyncCursor.Domain.SUPPLIER_PAYMENTS,
                 "direction": ERPNextSyncCursor.Direction.PULL,
                 "imported_count": imported,
                 "cursor": cursor.last_remote_cursor,
@@ -976,6 +1189,15 @@ class ERPNextIntegrationService:
         if int(docstatus or 0) == 0:
             return ERPNextPurchaseMirror.Status.DRAFT
         return ERPNextPurchaseMirror.Status.UNKNOWN
+
+    def _map_supplier_payment_status(self, docstatus: Any, status_value: Any) -> str:
+        if int(docstatus or 0) == 2:
+            return ERPNextSupplierPaymentMirror.Status.CANCELLED
+        if int(docstatus or 0) == 1:
+            return ERPNextSupplierPaymentMirror.Status.SUBMITTED
+        if int(docstatus or 0) == 0:
+            return ERPNextSupplierPaymentMirror.Status.DRAFT
+        return ERPNextSupplierPaymentMirror.Status.UNKNOWN
 
     def _resolve_sale_customer_remote_name(self, *, binding: ERPNextShopBinding, sale: Sale) -> str:
         if sale.customer_id and sale.customer and sale.customer.source_system == "erpnext" and sale.customer.source_id:
@@ -1233,6 +1455,7 @@ class ERPNextIntegrationService:
         sync_stock: bool = True,
         sync_suppliers: bool = True,
         sync_purchases: bool = True,
+        sync_supplier_payments: bool = True,
         push_sales: bool = True,
         push_payments: bool = True,
     ) -> dict[str, Any]:
@@ -1264,6 +1487,7 @@ class ERPNextIntegrationService:
             ("sync_stock", sync_stock, self.sync_stock),
             ("sync_suppliers", sync_suppliers, self.sync_suppliers),
             ("sync_purchases", sync_purchases, self.sync_purchases),
+            ("sync_supplier_payments", sync_supplier_payments, self.sync_supplier_payments),
             ("push_sales", push_sales, self.push_sales),
             ("push_payments", push_payments, self.push_payments),
         ]
@@ -1312,6 +1536,11 @@ class ERPNextIntegrationService:
                 "payments": SalePayment.objects.filter(shop=shop, sale__tombstone=False).count(),
                 "erpnext_suppliers": ERPNextSupplierMirror.objects.filter(shop=shop).count(),
                 "erpnext_purchases": ERPNextPurchaseMirror.objects.filter(shop=shop).count(),
+                "erpnext_purchase_orders": ERPNextPurchaseMirror.objects.filter(shop=shop, remote_doctype="Purchase Order").count(),
+                "erpnext_purchase_receipts": ERPNextPurchaseMirror.objects.filter(shop=shop, remote_doctype="Purchase Receipt").count(),
+                "erpnext_purchase_invoices": ERPNextPurchaseMirror.objects.filter(shop=shop, remote_doctype="Purchase Invoice").count(),
+                "erpnext_purchase_returns": ERPNextPurchaseMirror.objects.filter(shop=shop, is_return=True).count(),
+                "erpnext_supplier_payments": ERPNextSupplierPaymentMirror.objects.filter(shop=shop).count(),
             },
             "cursor_status": {
                 "total": cursor_rows.count(),
@@ -1327,6 +1556,6 @@ class ERPNextIntegrationService:
                 "failed": document_links.filter(sync_status=ERPNextDocumentLink.SyncStatus.FAILED).count(),
             },
             "recommendation": (
-                "Verify ERPNext connectivity, bind the shop company/warehouse, then run item/customer sync first."
+                "Verify ERPNext connectivity, bind the shop company/warehouse, then run the full master-data and purchase-side sync before monitoring sales/payment posting."
             ),
         }

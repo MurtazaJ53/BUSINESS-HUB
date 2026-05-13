@@ -9,6 +9,7 @@ from platform_apps.erpnext.models import (
     ERPNextDocumentLink,
     ERPNextPurchaseMirror,
     ERPNextShopBinding,
+    ERPNextSupplierPaymentMirror,
     ERPNextSupplierMirror,
     ERPNextSyncCursor,
 )
@@ -18,6 +19,7 @@ from platform_apps.erpnext.serializers import (
     ERPNextDocumentLinkSerializer,
     ERPNextPurchaseMirrorSerializer,
     ERPNextShopBindingSerializer,
+    ERPNextSupplierPaymentMirrorSerializer,
     ERPNextSupplierMirrorSerializer,
     ERPNextSyncCursorSerializer,
 )
@@ -235,6 +237,18 @@ class ERPNextPurchaseSyncView(ERPNextShopActionView):
         return Response({"action": self.action_name, "status": "ok", **payload})
 
 
+class ERPNextSupplierPaymentSyncView(ERPNextShopActionView):
+    action_name = "sync_supplier_payments"
+
+    def action_response(self, request, *args, **kwargs):
+        membership = self.get_membership()
+        payload = ERPNextIntegrationService().sync_supplier_payments(
+            shop=membership.shop,
+            limit=self.get_limit(request),
+        )
+        return Response({"action": self.action_name, "status": "ok", **payload})
+
+
 class ERPNextSalesPushView(ERPNextShopActionView):
     action_name = "push_sales"
 
@@ -345,5 +359,31 @@ class ERPNextPurchaseMirrorListView(ShopScopedMixin, generics.ListAPIView):
                 Q(remote_name__icontains=query)
                 | Q(supplier_remote_name__icontains=query)
                 | Q(warehouse__icontains=query)
+            )
+        remote_doctype = self.request.query_params.get("remote_doctype", "").strip()
+        if remote_doctype:
+            queryset = queryset.filter(remote_doctype=remote_doctype)
+        return queryset
+
+
+class ERPNextSupplierPaymentMirrorListView(ShopScopedMixin, generics.ListAPIView):
+    serializer_class = ERPNextSupplierPaymentMirrorSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    minimum_role = ShopMembership.Role.ADMIN
+    pagination_class = None
+
+    def get_queryset(self):
+        membership = self.get_membership()
+        queryset = ERPNextSupplierPaymentMirror.objects.filter(shop=membership.shop)
+        status_value = self.request.query_params.get("status", "").strip()
+        query = self.request.query_params.get("q", "").strip()
+        if status_value:
+            queryset = queryset.filter(status=status_value)
+        if query:
+            queryset = queryset.filter(
+                Q(remote_name__icontains=query)
+                | Q(supplier_remote_name__icontains=query)
+                | Q(reference_no__icontains=query)
+                | Q(mode_of_payment__icontains=query)
             )
         return queryset

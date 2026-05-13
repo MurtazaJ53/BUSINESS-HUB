@@ -11,7 +11,13 @@ from rest_framework.test import APIClient
 
 from platform_apps.customers.models import Customer
 from platform_apps.erpnext.mock_client import build_demo_mock_state, write_mock_state
-from platform_apps.erpnext.models import ERPNextDocumentLink, ERPNextShopBinding, ERPNextSyncCursor
+from platform_apps.erpnext.models import (
+    ERPNextDocumentLink,
+    ERPNextPurchaseMirror,
+    ERPNextShopBinding,
+    ERPNextSupplierPaymentMirror,
+    ERPNextSyncCursor,
+)
 from platform_apps.erpnext.services import ERPNextIntegrationService
 from platform_apps.inventory.models import InventoryItem
 from platform_apps.payments.models import SalePayment
@@ -405,8 +411,60 @@ class ERPNextApiTests(TestCase):
                         "modified": "2026-05-12 15:00:00",
                     }
                 ],
+                "Purchase Order": [
+                    {
+                        "name": "PO-0001",
+                        "supplier": "SUP-0001",
+                        "transaction_date": "2026-05-11",
+                        "grand_total": "980.00",
+                        "status": "To Receive and Bill",
+                        "docstatus": 1,
+                        "currency": "INR",
+                        "set_warehouse": self.binding.warehouse,
+                        "is_return": 0,
+                        "return_against": "",
+                        "modified": "2026-05-12 14:59:00",
+                    }
+                ],
+                "Purchase Invoice": [
+                    {
+                        "name": "PINV-0001",
+                        "supplier": "SUP-0001",
+                        "posting_date": "2026-05-12",
+                        "grand_total": "980.00",
+                        "status": "Paid",
+                        "docstatus": 1,
+                        "currency": "INR",
+                        "set_warehouse": self.binding.warehouse,
+                        "is_return": 1,
+                        "return_against": "PREC-0001",
+                        "modified": "2026-05-12 15:05:00",
+                    }
+                ],
             },
             resource_details={
+                ("Purchase Order", "PO-0001"): {
+                    "name": "PO-0001",
+                    "supplier": "SUP-0001",
+                    "transaction_date": "2026-05-11",
+                    "grand_total": "980.00",
+                    "status": "To Receive and Bill",
+                    "docstatus": 1,
+                    "currency": "INR",
+                    "set_warehouse": self.binding.warehouse,
+                    "items": [
+                        {
+                            "item_code": "ITEM-0001",
+                            "item_name": "Cotton Shirt",
+                            "qty": 4,
+                            "rate": "245.00",
+                            "warehouse": self.binding.warehouse,
+                        }
+                    ],
+                    "modified": "2026-05-12 14:59:00",
+                    "is_return": 0,
+                    "return_against": "",
+                },
                 ("Purchase Receipt", "PREC-0001"): {
                     "name": "PREC-0001",
                     "supplier": "SUP-0001",
@@ -426,6 +484,30 @@ class ERPNextApiTests(TestCase):
                         }
                     ],
                     "modified": "2026-05-12 15:00:00",
+                    "is_return": 0,
+                    "return_against": "",
+                },
+                ("Purchase Invoice", "PINV-0001"): {
+                    "name": "PINV-0001",
+                    "supplier": "SUP-0001",
+                    "posting_date": "2026-05-12",
+                    "grand_total": "980.00",
+                    "status": "Paid",
+                    "docstatus": 1,
+                    "currency": "INR",
+                    "set_warehouse": self.binding.warehouse,
+                    "items": [
+                        {
+                            "item_code": "ITEM-0001",
+                            "item_name": "Cotton Shirt",
+                            "qty": 2,
+                            "rate": "490.00",
+                            "warehouse": self.binding.warehouse,
+                        }
+                    ],
+                    "modified": "2026-05-12 15:05:00",
+                    "is_return": 1,
+                    "return_against": "PREC-0001",
                 }
             },
         )
@@ -454,10 +536,104 @@ class ERPNextApiTests(TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["imported_count"], 1)
+        self.assertEqual(response.json()["imported_count"], 3)
+        self.assertEqual(response.json()["imported_by_doctype"]["Purchase Receipt"], 1)
+        self.assertEqual(response.json()["imported_by_doctype"]["Purchase Order"], 1)
+        self.assertEqual(response.json()["imported_by_doctype"]["Purchase Invoice"], 1)
         item.refresh_from_db()
         self.assertEqual(item.private.supplier_id, "SUP-0001")
-        self.assertEqual(item.private.cost_price, Decimal("240.00"))
+        self.assertEqual(item.private.cost_price, Decimal("490.00"))
+        self.assertTrue(
+            ERPNextPurchaseMirror.objects.filter(
+                shop=self.shop,
+                remote_doctype="Purchase Invoice",
+                remote_name="PINV-0001",
+                is_return=True,
+                return_against_remote_name="PREC-0001",
+            ).exists()
+        )
+
+    def test_sync_supplier_payments_imports_supplier_payment_mirror(self):
+        self.binding.purchase_sync_enabled = True
+        self.binding.save(update_fields=["purchase_sync_enabled", "updated_at"])
+        supplier_client = FakeERPNextClient(
+            resource_lists={
+                "Supplier": [
+                    {
+                        "name": "SUP-0001",
+                        "supplier_name": "Alpha Textiles",
+                        "supplier_group": "Default Supplier Group",
+                        "supplier_type": "Company",
+                        "mobile_no": "8888888888",
+                        "email_id": "alpha@example.com",
+                        "disabled": 0,
+                        "modified": "2026-05-12 14:50:00",
+                    }
+                ],
+                "Payment Entry": [
+                    {
+                        "name": "PE-SUP-0001",
+                        "party_type": "Supplier",
+                        "party": "SUP-0001",
+                        "posting_date": "2026-05-12",
+                        "payment_type": "Pay",
+                        "mode_of_payment": "Bank",
+                        "reference_no": "NEFT-001",
+                        "paid_amount": "1200.00",
+                        "received_amount": "1200.00",
+                        "docstatus": 1,
+                        "status": "Submitted",
+                        "paid_from_account_currency": "INR",
+                        "paid_to_account_currency": "INR",
+                        "modified": "2026-05-12 15:20:00",
+                    }
+                ],
+            },
+            resource_details={
+                ("Payment Entry", "PE-SUP-0001"): {
+                    "name": "PE-SUP-0001",
+                    "party_type": "Supplier",
+                    "party": "SUP-0001",
+                    "posting_date": "2026-05-12",
+                    "payment_type": "Pay",
+                    "mode_of_payment": "Bank",
+                    "reference_no": "NEFT-001",
+                    "paid_amount": "1200.00",
+                    "received_amount": "1200.00",
+                    "docstatus": 1,
+                    "status": "Submitted",
+                    "paid_from_account_currency": "INR",
+                    "paid_to_account_currency": "INR",
+                    "modified": "2026-05-12 15:20:00",
+                }
+            },
+        )
+
+        with patch(
+            "platform_apps.erpnext.services.ERPNextIntegrationService.build_client",
+            return_value=supplier_client,
+        ):
+            self.client.post(
+                f"/api/v1/shops/{self.shop.id}/erpnext/sync-suppliers/",
+                {"limit": 10},
+                format="json",
+            )
+            response = self.client.post(
+                f"/api/v1/shops/{self.shop.id}/erpnext/sync-supplier-payments/",
+                {"limit": 10},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["imported_count"], 1)
+        self.assertTrue(
+            ERPNextSupplierPaymentMirror.objects.filter(
+                shop=self.shop,
+                remote_name="PE-SUP-0001",
+                supplier_remote_name="SUP-0001",
+                status=ERPNextSupplierPaymentMirror.Status.SUBMITTED,
+            ).exists()
+        )
 
     def test_push_sales_creates_sales_invoice_link(self):
         customer = Customer.objects.create(

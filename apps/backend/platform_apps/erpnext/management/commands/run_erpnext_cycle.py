@@ -21,6 +21,7 @@ class Command(BaseCommand):
         parser.add_argument("--skip-stock", action="store_true")
         parser.add_argument("--skip-suppliers", action="store_true")
         parser.add_argument("--skip-purchases", action="store_true")
+        parser.add_argument("--skip-supplier-payments", action="store_true")
         parser.add_argument("--skip-sales", action="store_true")
         parser.add_argument("--skip-payments", action="store_true")
 
@@ -37,6 +38,7 @@ class Command(BaseCommand):
                 sync_stock=not options["skip_stock"],
                 sync_suppliers=not options["skip_suppliers"],
                 sync_purchases=not options["skip_purchases"],
+                sync_supplier_payments=not options["skip_supplier_payments"],
                 push_sales=not options["skip_sales"],
                 push_payments=not options["skip_payments"],
             )
