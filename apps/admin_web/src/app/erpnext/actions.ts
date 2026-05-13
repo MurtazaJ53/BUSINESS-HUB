@@ -37,20 +37,13 @@ async function runERPNextAction(
   const shopId = getRequiredShopId(formData);
   const shopSlug = getOptionalField(formData, "shopSlug");
 
+  let successResult: Record<string, unknown> | null = null;
+
   try {
-    const result = await apiMutation<Record<string, unknown>>(pathBuilder(shopId), {
+    successResult = await apiMutation<Record<string, unknown>>(pathBuilder(shopId), {
       method: "POST",
       body: bodyBuilder ? bodyBuilder(formData) : {},
     });
-    revalidatePath("/erpnext");
-    redirect(
-      buildRedirectUrl({
-        status: "success",
-        action,
-        shop: shopSlug,
-        summary: JSON.stringify(result).slice(0, 180),
-      }),
-    );
   } catch (error) {
     const message =
       error instanceof Error
@@ -65,6 +58,16 @@ async function runERPNextAction(
       }),
     );
   }
+
+  revalidatePath("/erpnext");
+  redirect(
+    buildRedirectUrl({
+      status: "success",
+      action,
+      shop: shopSlug,
+      summary: JSON.stringify(successResult).slice(0, 180),
+    }),
+  );
 }
 
 function standardActionBody(formData: FormData) {
