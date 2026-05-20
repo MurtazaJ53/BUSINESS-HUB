@@ -32,6 +32,15 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     super.dispose();
   }
 
+  void _resetFilters() {
+    _searchController.clear();
+    setState(() {
+      _search = '';
+      _statusFilter = 'all';
+      _sortMode = 'due_desc';
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(mobileSessionProvider).asData?.value;
@@ -79,6 +88,10 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
               history: history,
               syncStatus: syncStatus,
             );
+            final hasActiveFilters =
+                _search.trim().isNotEmpty ||
+                _statusFilter != 'all' ||
+                _sortMode != 'due_desc';
             final backendFuture = _resolveBackendLookupFuture(
               backendApiClient: backendApiClient,
               session: session,
@@ -225,6 +238,50 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                             )
                             .toList(growable: false),
                       ),
+                      if (hasActiveFilters) ...<Widget>[
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: <Widget>[
+                            if (_search.trim().isNotEmpty)
+                              MobileTag(
+                                label: 'Search: ${_search.trim()}',
+                                icon: Icons.search_rounded,
+                                accent: const Color(0xFF38BDF8),
+                              ),
+                            if (_statusFilter != 'all')
+                              MobileTag(
+                                label: _customerStatusFilters
+                                    .firstWhere(
+                                      (filter) => filter.value == _statusFilter,
+                                    )
+                                    .label,
+                                icon: Icons.filter_alt_rounded,
+                                accent: const Color(0xFF14B8A6),
+                              ),
+                            if (_sortMode != 'due_desc')
+                              MobileTag(
+                                label: _customerSortModes
+                                    .firstWhere(
+                                      (sort) => sort.value == _sortMode,
+                                    )
+                                    .label,
+                                icon: Icons.sort_rounded,
+                                accent: const Color(0xFFA78BFA),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: FilledButton.tonalIcon(
+                            onPressed: _resetFilters,
+                            icon: const Icon(Icons.restart_alt_rounded),
+                            label: const Text('Clear filters'),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
