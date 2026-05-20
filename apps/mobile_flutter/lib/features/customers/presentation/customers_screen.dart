@@ -546,7 +546,9 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                     MobileSheetHeader(
                       title: customer.name,
                       subtitle:
-                          customer.phone ?? customer.email ?? 'No contact recorded',
+                          customer.phone ??
+                          customer.email ??
+                          'No contact recorded',
                       icon: Icons.groups_rounded,
                       accent: const Color(0xFF14B8A6),
                       tags: <Widget>[
@@ -606,16 +608,17 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                             if (customer.balance > 0.009)
                               FilledButton.tonalIcon(
                                 onPressed: () async {
-                                  final changed = await _showLedgerMutationDialog(
-                                    context,
-                                    backendApiClient: backendApiClient,
-                                    session: session,
-                                    customer: customer,
-                                    initialEventType: 'payment',
-                                    initialAmount: customer.balance,
-                                    initialNote:
-                                        'Full settlement from mobile ledger',
-                                  );
+                                  final changed =
+                                      await _showLedgerMutationDialog(
+                                        context,
+                                        backendApiClient: backendApiClient,
+                                        session: session,
+                                        customer: customer,
+                                        initialEventType: 'payment',
+                                        initialAmount: customer.balance,
+                                        initialNote:
+                                            'Full settlement from mobile ledger',
+                                      );
                                   if (changed == true && context.mounted) {
                                     Navigator.of(context).pop(true);
                                   }
@@ -752,148 +755,225 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         builder: (dialogContext) {
           return StatefulBuilder(
             builder: (context, setDialogState) {
-              return AlertDialog(
-                title: Text('Update ${customer.name}'),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    DropdownButtonFormField<String>(
-                      initialValue: eventType,
-                      items: const <DropdownMenuItem<String>>[
-                        DropdownMenuItem(
-                          value: 'payment',
-                          child: Text('Record payment received'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'adjustment',
-                          child: Text('Manual balance adjustment'),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setDialogState(() {
-                          eventType = value;
-                        });
-                      },
-                      decoration: const InputDecoration(
-                        labelText: 'Entry type',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Current balance ${formatCurrency(customer.balance)}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.68),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: amountController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        signed: true,
-                        decimal: true,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: eventType == 'payment'
-                            ? 'Amount received'
-                            : 'Balance delta (+ add due, - reduce)',
-                        helperText: eventType == 'payment'
-                            ? 'Payments reduce the customer due balance.'
-                            : 'Positive adds receivable, negative reduces it.',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: <Widget>[
-                        if (eventType == 'payment' && customer.balance > 0.009)
-                          _LedgerAmountPresetChip(
-                            label: 'Full due',
-                            onTap: () {
-                              amountController.text = customer.balance
-                                  .toStringAsFixed(2);
-                            },
-                          ),
-                        if (eventType == 'payment' && customer.balance > 0.009)
-                          _LedgerAmountPresetChip(
-                            label: 'Half due',
-                            onTap: () {
-                              amountController.text = (customer.balance / 2)
-                                  .toStringAsFixed(2);
-                            },
-                          ),
-                        _LedgerAmountPresetChip(
-                          label: '₹500',
-                          onTap: () {
-                            amountController.text = '500';
-                          },
-                        ),
-                        _LedgerAmountPresetChip(
-                          label: '₹1000',
-                          onTap: () {
-                            amountController.text = '1000';
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: noteController,
-                      minLines: 2,
-                      maxLines: 3,
-                      decoration: const InputDecoration(labelText: 'Note'),
-                    ),
-                  ],
+              final compact = MediaQuery.sizeOf(context).width < 420;
+              return Dialog(
+                backgroundColor: Colors.transparent,
+                insetPadding: EdgeInsets.symmetric(
+                  horizontal: compact ? 16 : 24,
+                  vertical: 24,
                 ),
-                actions: <Widget>[
-                  TextButton(
-                    onPressed: () => Navigator.of(dialogContext).pop(false),
-                    child: const Text('Cancel'),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF07111E),
+                    borderRadius: BorderRadius.circular(compact ? 24 : 28),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.06),
+                    ),
+                    boxShadow: const <BoxShadow>[
+                      BoxShadow(
+                        color: Color(0x55000000),
+                        blurRadius: 28,
+                        offset: Offset(0, 18),
+                      ),
+                    ],
                   ),
-                  FilledButton(
-                    onPressed: () async {
-                      final rawAmount =
-                          double.tryParse(amountController.text.trim()) ?? 0;
-                      if (rawAmount == 0) {
-                        return;
-                      }
-
-                      final draft = CustomerLedgerMutationDraft(
-                        eventType: eventType,
-                        amountDelta: eventType == 'payment'
-                            ? -rawAmount.abs()
-                            : rawAmount,
-                        note: noteController.text.trim(),
-                      );
-
-                      try {
-                        await backendApiClient.createCustomerLedgerEntry(
-                          user: session.user,
-                          shopId: session.shopId!,
-                          customerId: customer.id,
-                          draft: draft,
-                        );
-                        if (dialogContext.mounted) {
-                          Navigator.of(dialogContext).pop(true);
-                        }
-                      } catch (error) {
-                        if (dialogContext.mounted) {
-                          ScaffoldMessenger.of(dialogContext).showSnackBar(
-                            SnackBar(
-                              content: Text('Ledger update failed: $error'),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 540),
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.all(compact ? 18 : 22),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          MobileSheetHeader(
+                            eyebrow: 'Customer ledger',
+                            title: 'Update ${customer.name}',
+                            subtitle:
+                                'Record a payment or adjust the visible due balance without leaving the customer flow.',
+                            icon: eventType == 'payment'
+                                ? Icons.payments_rounded
+                                : Icons.tune_rounded,
+                            accent: eventType == 'payment'
+                                ? const Color(0xFF22C55E)
+                                : const Color(0xFFF59E0B),
+                            tags: <Widget>[
+                              MobileTag(
+                                label:
+                                    'Balance ${formatCurrency(customer.balance)}',
+                                icon: Icons.account_balance_wallet_rounded,
+                                accent: customer.balance > 0
+                                    ? const Color(0xFFFB7185)
+                                    : const Color(0xFF22C55E),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          MobileSheetSection(
+                            title: 'Entry details',
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                DropdownButtonFormField<String>(
+                                  initialValue: eventType,
+                                  items: const <DropdownMenuItem<String>>[
+                                    DropdownMenuItem(
+                                      value: 'payment',
+                                      child: Text('Record payment received'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'adjustment',
+                                      child: Text('Manual balance adjustment'),
+                                    ),
+                                  ],
+                                  onChanged: (value) {
+                                    if (value == null) {
+                                      return;
+                                    }
+                                    setDialogState(() {
+                                      eventType = value;
+                                    });
+                                  },
+                                  decoration: const InputDecoration(
+                                    labelText: 'Entry type',
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: amountController,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        signed: true,
+                                        decimal: true,
+                                      ),
+                                  decoration: InputDecoration(
+                                    labelText: eventType == 'payment'
+                                        ? 'Amount received'
+                                        : 'Balance delta (+ add due, - reduce)',
+                                    helperText: eventType == 'payment'
+                                        ? 'Payments reduce the customer due balance.'
+                                        : 'Positive adds receivable, negative reduces it.',
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: <Widget>[
+                                    if (eventType == 'payment' &&
+                                        customer.balance > 0.009)
+                                      _LedgerAmountPresetChip(
+                                        label: 'Full due',
+                                        onTap: () {
+                                          amountController.text = customer
+                                              .balance
+                                              .toStringAsFixed(2);
+                                        },
+                                      ),
+                                    if (eventType == 'payment' &&
+                                        customer.balance > 0.009)
+                                      _LedgerAmountPresetChip(
+                                        label: 'Half due',
+                                        onTap: () {
+                                          amountController.text =
+                                              (customer.balance / 2)
+                                                  .toStringAsFixed(2);
+                                        },
+                                      ),
+                                    _LedgerAmountPresetChip(
+                                      label: 'Rs 500',
+                                      onTap: () {
+                                        amountController.text = '500';
+                                      },
+                                    ),
+                                    _LedgerAmountPresetChip(
+                                      label: 'Rs 1000',
+                                      onTap: () {
+                                        amountController.text = '1000';
+                                      },
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: noteController,
+                                  minLines: 2,
+                                  maxLines: 3,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Note',
+                                  ),
+                                ),
+                              ],
                             ),
-                          );
-                        }
-                      }
-                    },
-                    child: const Text('Save'),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: <Widget>[
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () =>
+                                      Navigator.of(dialogContext).pop(false),
+                                  child: const Text('Cancel'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: FilledButton(
+                                  onPressed: () async {
+                                    final rawAmount =
+                                        double.tryParse(
+                                          amountController.text.trim(),
+                                        ) ??
+                                        0;
+                                    if (rawAmount == 0) {
+                                      return;
+                                    }
+
+                                    final draft = CustomerLedgerMutationDraft(
+                                      eventType: eventType,
+                                      amountDelta: eventType == 'payment'
+                                          ? -rawAmount.abs()
+                                          : rawAmount,
+                                      note: noteController.text.trim(),
+                                    );
+
+                                    try {
+                                      await backendApiClient
+                                          .createCustomerLedgerEntry(
+                                            user: session.user,
+                                            shopId: session.shopId!,
+                                            customerId: customer.id,
+                                            draft: draft,
+                                          );
+                                      if (dialogContext.mounted) {
+                                        Navigator.of(dialogContext).pop(true);
+                                      }
+                                    } catch (error) {
+                                      if (dialogContext.mounted) {
+                                        ScaffoldMessenger.of(
+                                          dialogContext,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Ledger update failed: $error',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
+                                  child: Text(
+                                    eventType == 'payment'
+                                        ? 'Record payment'
+                                        : 'Save adjustment',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ],
+                ),
               );
             },
           );
@@ -932,166 +1012,270 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         builder: (dialogContext) {
           return StatefulBuilder(
             builder: (context, setDialogState) {
-              return AlertDialog(
-                title: Text(
-                  existingCustomer == null
-                      ? 'Create migrated customer'
-                      : 'Edit ${existingCustomer.name}',
+              final compact = MediaQuery.sizeOf(context).width < 420;
+              return Dialog(
+                backgroundColor: Colors.transparent,
+                insetPadding: EdgeInsets.symmetric(
+                  horizontal: compact ? 16 : 24,
+                  vertical: 24,
                 ),
-                content: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      TextField(
-                        controller: nameController,
-                        textCapitalization: TextCapitalization.words,
-                        decoration: const InputDecoration(
-                          labelText: 'Customer name',
-                        ),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF07111E),
+                    borderRadius: BorderRadius.circular(compact ? 24 : 28),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.06),
+                    ),
+                    boxShadow: const <BoxShadow>[
+                      BoxShadow(
+                        color: Color(0x55000000),
+                        blurRadius: 28,
+                        offset: Offset(0, 18),
                       ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: phoneController,
-                        keyboardType: TextInputType.phone,
-                        decoration: const InputDecoration(labelText: 'Phone'),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(labelText: 'Email'),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: notesController,
-                        minLines: 2,
-                        maxLines: 3,
-                        decoration: const InputDecoration(labelText: 'Notes'),
-                      ),
-                      if (existingCustomer == null) ...<Widget>[
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: openingBalanceController,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            signed: true,
-                            decimal: true,
-                          ),
-                          decoration: const InputDecoration(
-                            labelText: 'Opening balance (optional)',
-                          ),
-                        ),
-                      ] else ...<Widget>[
-                        const SizedBox(height: 12),
-                        DropdownButtonFormField<String>(
-                          initialValue: status,
-                          items: const <DropdownMenuItem<String>>[
-                            DropdownMenuItem(
-                              value: 'active',
-                              child: Text('Active'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'inactive',
-                              child: Text('Inactive'),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            if (value == null) {
-                              return;
-                            }
-                            setDialogState(() {
-                              status = value;
-                            });
-                          },
-                          decoration: const InputDecoration(
-                            labelText: 'Status',
-                          ),
-                        ),
-                      ],
                     ],
                   ),
-                ),
-                actions: <Widget>[
-                  TextButton(
-                    onPressed: saving
-                        ? null
-                        : () => Navigator.of(dialogContext).pop(false),
-                    child: const Text('Cancel'),
-                  ),
-                  FilledButton(
-                    onPressed: saving
-                        ? null
-                        : () async {
-                            final name = nameController.text.trim();
-                            if (name.isEmpty) {
-                              ScaffoldMessenger.of(dialogContext).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Customer name is required.'),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 540),
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.all(compact ? 18 : 22),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          MobileSheetHeader(
+                            eyebrow: existingCustomer == null
+                                ? 'New customer'
+                                : 'Edit customer',
+                            title: existingCustomer == null
+                                ? 'Create migrated customer'
+                                : 'Edit ${existingCustomer.name}',
+                            subtitle: existingCustomer == null
+                                ? 'Add a buyer profile that will sync into the migrated customer path.'
+                                : 'Keep contact details and account posture updated without leaving the customer list.',
+                            icon: existingCustomer == null
+                                ? Icons.person_add_alt_1_rounded
+                                : Icons.edit_note_rounded,
+                            accent: const Color(0xFF14B8A6),
+                            tags: <Widget>[
+                              if (existingCustomer != null)
+                                MobileTag(
+                                  label: existingCustomer.status.toUpperCase(),
+                                  icon: existingCustomer.status == 'active'
+                                      ? Icons.verified_user_rounded
+                                      : Icons.pause_circle_rounded,
+                                  accent: existingCustomer.status == 'active'
+                                      ? const Color(0xFF22C55E)
+                                      : const Color(0xFFF59E0B),
+                                )
+                              else
+                                const MobileTag(
+                                  label: 'Bridge customer',
+                                  icon: Icons.cloud_sync_rounded,
+                                  accent: Color(0xFF38BDF8),
                                 ),
-                              );
-                              return;
-                            }
-
-                            setDialogState(() {
-                              saving = true;
-                            });
-
-                            try {
-                              if (existingCustomer == null) {
-                                await backendApiClient.createCustomer(
-                                  user: session.user,
-                                  shopId: session.shopId!,
-                                  name: name,
-                                  phone: phoneController.text.trim(),
-                                  email: emailController.text.trim(),
-                                  notes: notesController.text.trim(),
-                                  openingBalance:
-                                      double.tryParse(
-                                        openingBalanceController.text.trim(),
-                                      ) ??
-                                      0,
-                                );
-                              } else {
-                                await backendApiClient.updateCustomer(
-                                  user: session.user,
-                                  shopId: session.shopId!,
-                                  customerId: existingCustomer.id,
-                                  name: name,
-                                  phone: phoneController.text.trim(),
-                                  email: emailController.text.trim(),
-                                  notes: notesController.text.trim(),
-                                  status: status,
-                                );
-                              }
-                              if (dialogContext.mounted) {
-                                Navigator.of(dialogContext).pop(true);
-                              }
-                            } catch (error) {
-                              if (dialogContext.mounted) {
-                                ScaffoldMessenger.of(
-                                  dialogContext,
-                                ).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Customer save failed: $error',
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          MobileSheetSection(
+                            title: 'Profile details',
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                TextField(
+                                  controller: nameController,
+                                  textCapitalization: TextCapitalization.words,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Customer name',
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: phoneController,
+                                  keyboardType: TextInputType.phone,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Phone',
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: emailController,
+                                  keyboardType: TextInputType.emailAddress,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Email',
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: notesController,
+                                  minLines: 2,
+                                  maxLines: 3,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Notes',
+                                  ),
+                                ),
+                                if (existingCustomer == null) ...<Widget>[
+                                  const SizedBox(height: 12),
+                                  TextField(
+                                    controller: openingBalanceController,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                          signed: true,
+                                          decimal: true,
+                                        ),
+                                    decoration: const InputDecoration(
+                                      labelText: 'Opening balance (optional)',
                                     ),
                                   ),
-                                );
-                              }
-                              setDialogState(() {
-                                saving = false;
-                              });
-                            }
-                          },
-                    child: saving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(existingCustomer == null ? 'Create' : 'Save'),
+                                ] else ...<Widget>[
+                                  const SizedBox(height: 12),
+                                  DropdownButtonFormField<String>(
+                                    initialValue: status,
+                                    items: const <DropdownMenuItem<String>>[
+                                      DropdownMenuItem(
+                                        value: 'active',
+                                        child: Text('Active'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'inactive',
+                                        child: Text('Inactive'),
+                                      ),
+                                    ],
+                                    onChanged: (value) {
+                                      if (value == null) {
+                                        return;
+                                      }
+                                      setDialogState(() {
+                                        status = value;
+                                      });
+                                    },
+                                    decoration: const InputDecoration(
+                                      labelText: 'Status',
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: <Widget>[
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: saving
+                                      ? null
+                                      : () => Navigator.of(
+                                          dialogContext,
+                                        ).pop(false),
+                                  child: const Text('Cancel'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: FilledButton(
+                                  onPressed: saving
+                                      ? null
+                                      : () async {
+                                          final name = nameController.text
+                                              .trim();
+                                          if (name.isEmpty) {
+                                            ScaffoldMessenger.of(
+                                              dialogContext,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Customer name is required.',
+                                                ),
+                                              ),
+                                            );
+                                            return;
+                                          }
+
+                                          setDialogState(() {
+                                            saving = true;
+                                          });
+
+                                          try {
+                                            if (existingCustomer == null) {
+                                              await backendApiClient
+                                                  .createCustomer(
+                                                    user: session.user,
+                                                    shopId: session.shopId!,
+                                                    name: name,
+                                                    phone: phoneController.text
+                                                        .trim(),
+                                                    email: emailController.text
+                                                        .trim(),
+                                                    notes: notesController.text
+                                                        .trim(),
+                                                    openingBalance:
+                                                        double.tryParse(
+                                                          openingBalanceController
+                                                              .text
+                                                              .trim(),
+                                                        ) ??
+                                                        0,
+                                                  );
+                                            } else {
+                                              await backendApiClient
+                                                  .updateCustomer(
+                                                    user: session.user,
+                                                    shopId: session.shopId!,
+                                                    customerId:
+                                                        existingCustomer.id,
+                                                    name: name,
+                                                    phone: phoneController.text
+                                                        .trim(),
+                                                    email: emailController.text
+                                                        .trim(),
+                                                    notes: notesController.text
+                                                        .trim(),
+                                                    status: status,
+                                                  );
+                                            }
+                                            if (dialogContext.mounted) {
+                                              Navigator.of(
+                                                dialogContext,
+                                              ).pop(true);
+                                            }
+                                          } catch (error) {
+                                            if (dialogContext.mounted) {
+                                              ScaffoldMessenger.of(
+                                                dialogContext,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    'Customer save failed: $error',
+                                                  ),
+                                                ),
+                                              );
+                                            }
+                                          } finally {
+                                            setDialogState(() {
+                                              saving = false;
+                                            });
+                                          }
+                                        },
+                                  child: saving
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : Text(
+                                          existingCustomer == null
+                                              ? 'Create customer'
+                                              : 'Save changes',
+                                        ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ],
+                ),
               );
             },
           );
@@ -1275,13 +1459,12 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
             builder: (context, snapshot) {
               final legacyCustomers =
                   snapshot.data ?? const <BackendCustomerSummary>[];
-              final filteredLegacyCustomers =
-                  sortBackendCustomers(
-                    legacyCustomers.where(_matchesLegacyFilter).toList(
-                      growable: false,
-                    ),
-                    sortMode: sortMode,
-                  );
+              final filteredLegacyCustomers = sortBackendCustomers(
+                legacyCustomers
+                    .where(_matchesLegacyFilter)
+                    .toList(growable: false),
+                sortMode: sortMode,
+              );
 
               if (filteredLegacyCustomers.isNotEmpty) {
                 final summary = BackendCustomerOperationalReport.fromCustomers(

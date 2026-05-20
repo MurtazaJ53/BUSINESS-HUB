@@ -55,386 +55,377 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
       children: <Widget>[
-            MobileScreenLead(
-              title: roleProfile.leadTitle,
-              subtitle: roleProfile.leadSubtitle,
-              icon: roleProfile.leadIcon,
-              accent: roleProfile.leadAccent,
-              primaryTag: MobileTag(
-                label: roleProfile.primaryTagLabel,
-                icon: roleProfile.primaryTagIcon,
-                accent: roleProfile.primaryTagAccent,
+        MobileScreenLead(
+          title: roleProfile.leadTitle,
+          subtitle: roleProfile.leadSubtitle,
+          icon: roleProfile.leadIcon,
+          accent: roleProfile.leadAccent,
+          primaryTag: MobileTag(
+            label: roleProfile.primaryTagLabel,
+            icon: roleProfile.primaryTagIcon,
+            accent: roleProfile.primaryTagAccent,
+          ),
+          secondaryTag: MobileTag(
+            label: roleProfile.secondaryTagLabel,
+            icon: roleProfile.secondaryTagIcon,
+            accent: roleProfile.secondaryTagAccent,
+          ),
+        ),
+        const SizedBox(height: 18),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final count = constraints.maxWidth > 520 ? 4 : 2;
+            return GridView.count(
+              crossAxisCount: count,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 1.02,
+              children: <Widget>[
+                MobileMetricCard(
+                  label: 'Gross',
+                  value: formatCurrency(overview.totalRevenue),
+                  caption: '${overview.totalSales} stored receipts',
+                  icon: Icons.currency_rupee_rounded,
+                ),
+                MobileMetricCard(
+                  label: 'Synced',
+                  value: '${overview.syncedSales}',
+                  caption: 'Accepted by backend',
+                  icon: Icons.verified_rounded,
+                  accent: const Color(0xFF22C55E),
+                ),
+                MobileMetricCard(
+                  label: 'Queued',
+                  value: '${overview.queuedSales}',
+                  caption: overview.queuedSales > 0
+                      ? formatCurrency(overview.queuedRevenue)
+                      : 'Outbox clear',
+                  icon: Icons.cloud_upload_rounded,
+                  accent: const Color(0xFFF59E0B),
+                ),
+                MobileMetricCard(
+                  label: 'Attention',
+                  value: '${overview.failedSales}',
+                  caption: overview.failedSales > 0
+                      ? 'Needs replay review'
+                      : 'No failed receipts',
+                  icon: Icons.error_outline_rounded,
+                  accent: const Color(0xFFFB7185),
+                ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 18),
+        MobilePanel(
+          title: roleProfile.filterPanelTitle,
+          action: MobileTag(
+            label: _filter.syncState == null
+                ? 'ALL STATES'
+                : _syncLabel(_filter.syncState!),
+            icon: Icons.tune_rounded,
+            accent: const Color(0xFFA78BFA),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              TextField(
+                controller: _searchController,
+                onChanged: (value) {
+                  setState(() {
+                    _filter = _filter.copyWith(search: value);
+                  });
+                },
+                decoration: InputDecoration(
+                  hintText: 'Search customer, phone, or local receipt id',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: _filter.search.isEmpty
+                      ? null
+                      : IconButton(
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _filter = _filter.copyWith(search: '');
+                            });
+                          },
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                ),
               ),
-              secondaryTag: MobileTag(
-                label: roleProfile.secondaryTagLabel,
-                icon: roleProfile.secondaryTagIcon,
-                accent: roleProfile.secondaryTagAccent,
-              ),
-            ),
-            const SizedBox(height: 18),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final count = constraints.maxWidth > 520 ? 4 : 2;
-                return GridView.count(
-                  crossAxisCount: count,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                  childAspectRatio: 1.02,
-                  children: <Widget>[
-                    MobileMetricCard(
-                      label: 'Gross',
-                      value: formatCurrency(overview.totalRevenue),
-                      caption: '${overview.totalSales} stored receipts',
-                      icon: Icons.currency_rupee_rounded,
-                    ),
-                    MobileMetricCard(
-                      label: 'Synced',
-                      value: '${overview.syncedSales}',
-                      caption: 'Accepted by backend',
-                      icon: Icons.verified_rounded,
-                      accent: const Color(0xFF22C55E),
-                    ),
-                    MobileMetricCard(
-                      label: 'Queued',
-                      value: '${overview.queuedSales}',
-                      caption: overview.queuedSales > 0
-                          ? formatCurrency(overview.queuedRevenue)
-                          : 'Outbox clear',
-                      icon: Icons.cloud_upload_rounded,
-                      accent: const Color(0xFFF59E0B),
-                    ),
-                    MobileMetricCard(
-                      label: 'Attention',
-                      value: '${overview.failedSales}',
-                      caption: overview.failedSales > 0
-                          ? 'Needs replay review'
-                          : 'No failed receipts',
-                      icon: Icons.error_outline_rounded,
-                      accent: const Color(0xFFFB7185),
-                    ),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 18),
-            MobilePanel(
-              title: roleProfile.filterPanelTitle,
-              action: MobileTag(
-                label: _filter.syncState == null
-                    ? 'ALL STATES'
-                    : _syncLabel(_filter.syncState!),
-                icon: Icons.tune_rounded,
-                accent: const Color(0xFFA78BFA),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: <Widget>[
-                  TextField(
-                    controller: _searchController,
-                    onChanged: (value) {
+                  _SyncFilterChip(
+                    label: 'All',
+                    active: _filter.syncState == null,
+                    onTap: () {
                       setState(() {
-                        _filter = _filter.copyWith(search: value);
+                        _filter = _filter.copyWith(clearSyncState: true);
                       });
                     },
-                    decoration: InputDecoration(
-                      hintText: 'Search customer, phone, or local receipt id',
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      suffixIcon: _filter.search.isEmpty
-                          ? null
-                          : IconButton(
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {
-                                  _filter = _filter.copyWith(search: '');
-                                });
-                              },
-                              icon: const Icon(Icons.close_rounded),
-                            ),
+                  ),
+                  ...CommerceSyncState.values.map(
+                    (state) => _SyncFilterChip(
+                      label: _syncLabel(state),
+                      active: _filter.syncState == state,
+                      onTap: () {
+                        setState(() {
+                          _filter = _filter.copyWith(syncState: state);
+                        });
+                      },
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: <Widget>[
-                      _SyncFilterChip(
-                        label: 'All',
-                        active: _filter.syncState == null,
-                        onTap: () {
-                          setState(() {
-                            _filter = _filter.copyWith(clearSyncState: true);
-                          });
-                        },
-                      ),
-                      ...CommerceSyncState.values.map(
-                        (state) => _SyncFilterChip(
-                          label: _syncLabel(state),
-                          active: _filter.syncState == state,
-                          onTap: () {
-                            setState(() {
-                              _filter = _filter.copyWith(syncState: state);
-                            });
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: <Widget>[
-                      _SyncFilterChip(
-                        label: 'Any pay',
-                        active: _filter.paymentMode == null,
-                        onTap: () {
-                          setState(() {
-                            _filter = _filter.copyWith(clearPaymentMode: true);
-                          });
-                        },
-                      ),
-                      ..._historyPaymentModes.map(
-                        (mode) => _SyncFilterChip(
-                          label: mode,
-                          active: _filter.paymentMode == mode,
-                          onTap: () {
-                            setState(() {
-                              _filter = _filter.copyWith(paymentMode: mode);
-                            });
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: HistoryDateWindow.values
-                        .map(
-                          (window) => _SyncFilterChip(
-                            label: window.label,
-                            active: _filter.dateWindow == window,
-                            onTap: () {
-                              setState(() {
-                                _filter = _filter.copyWith(dateWindow: window);
-                              });
-                            },
-                          ),
-                        )
-                        .toList(growable: false),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: <Widget>[
-                      _SyncFilterChip(
-                        label: _filter.onlyDueSales
-                            ? 'Due only'
-                            : 'All balances',
-                        active: _filter.onlyDueSales,
-                        onTap: () {
-                          setState(() {
-                            _filter = _filter.copyWith(
-                              onlyDueSales: !_filter.onlyDueSales,
-                            );
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton.tonalIcon(
-                    onPressed:
-                        overview.queuedSales > 0 || overview.failedSales > 0
-                        ? () async {
-                            final result = await syncCoordinator
-                                .flushCommerceOutbox();
-                            if (!context.mounted) {
-                              return;
-                            }
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  result.message ??
-                                      'Queued receipts are being retried.',
-                                ),
-                              ),
-                            );
-                          }
-                        : null,
-                    icon: const Icon(Icons.cloud_upload_rounded),
-                    label: const Text('Retry receipt sync'),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 18),
-            MobilePanel(
-              title: 'Sync lanes',
-              action: MobileTag(
-                label: syncStatus == MobileSyncStatus.syncing
-                    ? 'Refreshing'
-                    : 'Live posture',
-                icon: syncStatus == MobileSyncStatus.syncing
-                    ? Icons.sync_rounded
-                    : Icons.wifi_tethering_rounded,
-                accent: syncStatus == MobileSyncStatus.error
-                    ? const Color(0xFFFB7185)
-                    : const Color(0xFF38BDF8),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  _SyncFilterChip(
+                    label: 'Any pay',
+                    active: _filter.paymentMode == null,
+                    onTap: () {
+                      setState(() {
+                        _filter = _filter.copyWith(clearPaymentMode: true);
+                      });
+                    },
+                  ),
+                  ..._historyPaymentModes.map(
+                    (mode) => _SyncFilterChip(
+                      label: mode,
+                      active: _filter.paymentMode == mode,
+                      onTap: () {
+                        setState(() {
+                          _filter = _filter.copyWith(paymentMode: mode);
+                        });
+                      },
+                    ),
+                  ),
+                ],
               ),
-              child: Column(
-                children: states
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: HistoryDateWindow.values
                     .map(
-                      (state) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _DomainPostureRow(state: state),
+                      (window) => _SyncFilterChip(
+                        label: window.label,
+                        active: _filter.dateWindow == window,
+                        onTap: () {
+                          setState(() {
+                            _filter = _filter.copyWith(dateWindow: window);
+                          });
+                        },
                       ),
                     )
                     .toList(growable: false),
               ),
-            ),
-            const SizedBox(height: 18),
-            MobilePanel(
-                  title: roleProfile.summaryPanelTitle,
-                  action: MobileTag(
-                    label: _filter.dateWindow.label,
-                    icon: Icons.insights_rounded,
-                    accent: const Color(0xFF22C55E),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  _SyncFilterChip(
+                    label: _filter.onlyDueSales ? 'Due only' : 'All balances',
+                    active: _filter.onlyDueSales,
+                    onTap: () {
+                      setState(() {
+                        _filter = _filter.copyWith(
+                          onlyDueSales: !_filter.onlyDueSales,
+                        );
+                      });
+                    },
                   ),
-                  child: sales.isEmpty
-                      ? const MobileEmptyState(
-                          icon: Icons.query_stats_rounded,
-                          title: 'No data for this filter',
-                          body:
-                              'Broaden the search, date window, or payment filters to generate a live report pulse.',
-                        )
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              children: <Widget>[
-                                _HistoryMetricTile(
-                                  label: 'Receipts',
-                                  value: '${report.receiptCount}',
-                                  tone: const Color(0xFFF59E0B),
-                                ),
-                                _HistoryMetricTile(
-                                  label: 'Gross',
-                                  value: formatCurrency(report.grossTotal),
-                                  tone: const Color(0xFF22C55E),
-                                ),
-                                _HistoryMetricTile(
-                                  label: 'Collected',
-                                  value: formatCurrency(report.collectedTotal),
-                                  tone: const Color(0xFF38BDF8),
-                                ),
-                                _HistoryMetricTile(
-                                  label: 'Due',
-                                  value: formatCurrency(report.dueTotal),
-                                  tone: report.dueTotal > 0
-                                      ? const Color(0xFFF59E0B)
-                                      : const Color(0xFF22C55E),
-                                ),
-                                _HistoryMetricTile(
-                                  label: 'Avg ticket',
-                                  value: formatCurrency(
-                                    report.averageTicketValue,
-                                  ),
-                                  tone: const Color(0xFFA78BFA),
-                                ),
-                                _HistoryMetricTile(
-                                  label: 'Named buyers',
-                                  value: '${report.namedBuyerCount}',
-                                  tone: const Color(0xFF14B8A6),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 14),
-                            Text(
-                              '${report.syncedCount} synced | ${report.queuedCount} queued | ${report.failedCount} failed',
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.62),
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              report.topPaymentMode == null
-                                  ? 'No payment mode mix available yet.'
-                                  : 'Top mode ${report.topPaymentMode} | ${report.dueReceiptCount} receipt(s) still carry due balance | ${report.walkInCount} walk-in sale(s).',
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.54),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
-                            if (report.paymentMix.isNotEmpty) ...<Widget>[
-                              const SizedBox(height: 14),
-                              Text(
-                                'Payment mix',
-                                style: Theme.of(context).textTheme.titleSmall
-                                    ?.copyWith(fontWeight: FontWeight.w900),
-                              ),
-                              const SizedBox(height: 10),
-                              ...report.paymentMix.map(
-                                (mix) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: _HistoryPaymentMixRow(mix: mix),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-            ),
-            const SizedBox(height: 18),
-            MobilePanel(
-              title: roleProfile.feedPanelTitle,
-              action: MobileTag(
-                label: overview.lastSyncedAt == null
-                    ? 'Freshness unknown'
-                    : 'Last sync ${formatCompactDate(overview.lastSyncedAt!)}',
-                icon: Icons.schedule_rounded,
-                accent: const Color(0xFFA78BFA),
+                ],
               ),
-              child: sales.isEmpty
-                  ? MobileEmptyState(
-                      icon: syncStatus == MobileSyncStatus.syncing
-                          ? Icons.sync_rounded
-                          : Icons.history_toggle_off_rounded,
-                      title: syncStatus == MobileSyncStatus.syncing
-                          ? 'Receipt feed is still landing'
-                          : 'No receipt history yet',
-                      body: syncStatus == MobileSyncStatus.syncing
-                          ? 'Give the mobile vault a moment while it hydrates the recent commerce trail.'
-                          : 'As soon as sales hit the local vault or backend replay, they will appear here.',
-                    )
-                  : Column(
-                      children: sales
-                          .map(
-                            (sale) => Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _HistorySaleRow(
-                                sale: sale,
-                                onTap: () => _openSaleDetail(
-                                  context,
-                                  salesRepository,
-                                  sale,
-                                ),
-                              ),
+              const SizedBox(height: 12),
+              FilledButton.tonalIcon(
+                onPressed: overview.queuedSales > 0 || overview.failedSales > 0
+                    ? () async {
+                        final result = await syncCoordinator
+                            .flushCommerceOutbox();
+                        if (!context.mounted) {
+                          return;
+                        }
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              result.message ??
+                                  'Queued receipts are being retried.',
                             ),
-                          )
-                          .toList(growable: false),
+                          ),
+                        );
+                      }
+                    : null,
+                icon: const Icon(Icons.cloud_upload_rounded),
+                label: const Text('Retry receipt sync'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        MobilePanel(
+          title: 'Sync lanes',
+          action: MobileTag(
+            label: syncStatus == MobileSyncStatus.syncing
+                ? 'Refreshing'
+                : 'Live posture',
+            icon: syncStatus == MobileSyncStatus.syncing
+                ? Icons.sync_rounded
+                : Icons.wifi_tethering_rounded,
+            accent: syncStatus == MobileSyncStatus.error
+                ? const Color(0xFFFB7185)
+                : const Color(0xFF38BDF8),
+          ),
+          child: Column(
+            children: states
+                .map(
+                  (state) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _DomainPostureRow(state: state),
+                  ),
+                )
+                .toList(growable: false),
+          ),
+        ),
+        const SizedBox(height: 18),
+        MobilePanel(
+          title: roleProfile.summaryPanelTitle,
+          action: MobileTag(
+            label: _filter.dateWindow.label,
+            icon: Icons.insights_rounded,
+            accent: const Color(0xFF22C55E),
+          ),
+          child: sales.isEmpty
+              ? const MobileEmptyState(
+                  icon: Icons.query_stats_rounded,
+                  title: 'No data for this filter',
+                  body:
+                      'Broaden the search, date window, or payment filters to generate a live report pulse.',
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: <Widget>[
+                        _HistoryMetricTile(
+                          label: 'Receipts',
+                          value: '${report.receiptCount}',
+                          tone: const Color(0xFFF59E0B),
+                        ),
+                        _HistoryMetricTile(
+                          label: 'Gross',
+                          value: formatCurrency(report.grossTotal),
+                          tone: const Color(0xFF22C55E),
+                        ),
+                        _HistoryMetricTile(
+                          label: 'Collected',
+                          value: formatCurrency(report.collectedTotal),
+                          tone: const Color(0xFF38BDF8),
+                        ),
+                        _HistoryMetricTile(
+                          label: 'Due',
+                          value: formatCurrency(report.dueTotal),
+                          tone: report.dueTotal > 0
+                              ? const Color(0xFFF59E0B)
+                              : const Color(0xFF22C55E),
+                        ),
+                        _HistoryMetricTile(
+                          label: 'Avg ticket',
+                          value: formatCurrency(report.averageTicketValue),
+                          tone: const Color(0xFFA78BFA),
+                        ),
+                        _HistoryMetricTile(
+                          label: 'Named buyers',
+                          value: '${report.namedBuyerCount}',
+                          tone: const Color(0xFF14B8A6),
+                        ),
+                      ],
                     ),
-            ),
-          ],
-        );
+                    const SizedBox(height: 14),
+                    Text(
+                      '${report.syncedCount} synced | ${report.queuedCount} queued | ${report.failedCount} failed',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.62),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      report.topPaymentMode == null
+                          ? 'No payment mode mix available yet.'
+                          : 'Top mode ${report.topPaymentMode} | ${report.dueReceiptCount} receipt(s) still carry due balance | ${report.walkInCount} walk-in sale(s).',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.54),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (report.paymentMix.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 14),
+                      Text(
+                        'Payment mix',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ...report.paymentMix.map(
+                        (mix) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _HistoryPaymentMixRow(mix: mix),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+        ),
+        const SizedBox(height: 18),
+        MobilePanel(
+          title: roleProfile.feedPanelTitle,
+          action: MobileTag(
+            label: overview.lastSyncedAt == null
+                ? 'Freshness unknown'
+                : 'Last sync ${formatCompactDate(overview.lastSyncedAt!)}',
+            icon: Icons.schedule_rounded,
+            accent: const Color(0xFFA78BFA),
+          ),
+          child: sales.isEmpty
+              ? MobileEmptyState(
+                  icon: syncStatus == MobileSyncStatus.syncing
+                      ? Icons.sync_rounded
+                      : Icons.history_toggle_off_rounded,
+                  title: syncStatus == MobileSyncStatus.syncing
+                      ? 'Receipt feed is still landing'
+                      : 'No receipt history yet',
+                  body: syncStatus == MobileSyncStatus.syncing
+                      ? 'Give the mobile vault a moment while it hydrates the recent commerce trail.'
+                      : 'As soon as sales hit the local vault or backend replay, they will appear here.',
+                )
+              : Column(
+                  children: sales
+                      .map(
+                        (sale) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _HistorySaleRow(
+                            sale: sale,
+                            onTap: () =>
+                                _openSaleDetail(context, salesRepository, sale),
+                          ),
+                        ),
+                      )
+                      .toList(growable: false),
+                ),
+        ),
+      ],
+    );
   }
 
   Future<void> _openSaleDetail(

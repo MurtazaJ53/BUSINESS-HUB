@@ -179,7 +179,8 @@ class MobileHeroBanner extends StatelessWidget {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final stacked =
-                    trailing != null && constraints.maxWidth < (compact ? 520 : 470);
+                    trailing != null &&
+                    constraints.maxWidth < (compact ? 520 : 470);
                 final content = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
@@ -201,10 +202,10 @@ class MobileHeroBanner extends StatelessWidget {
                                   ? theme.textTheme.headlineSmall
                                   : theme.textTheme.headlineMedium)
                               ?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        height: compact ? 0.98 : 0.94,
-                        letterSpacing: compact ? -0.8 : -1.15,
-                      ),
+                                fontWeight: FontWeight.w900,
+                                height: compact ? 0.98 : 0.94,
+                                letterSpacing: compact ? -0.8 : -1.15,
+                              ),
                     ),
                     SizedBox(height: compact ? 10 : 14),
                     Text(
@@ -273,11 +274,10 @@ class MobilePanel extends StatelessWidget {
         child: Text(
           title,
           style:
-              (compact ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)
-                  ?.copyWith(
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.45,
-          ),
+              (compact
+                      ? theme.textTheme.titleMedium
+                      : theme.textTheme.titleLarge)
+                  ?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -0.45),
         ),
       ),
       if (action case final nextAction?) ...<Widget>[nextAction],
@@ -362,13 +362,14 @@ class MobileScreenLead extends StatelessWidget {
                     children: <Widget>[
                       Text(
                         title,
-                        style: (compact
-                                ? theme.textTheme.titleLarge
-                                : theme.textTheme.headlineSmall)
-                            ?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.6,
-                            ),
+                        style:
+                            (compact
+                                    ? theme.textTheme.titleLarge
+                                    : theme.textTheme.headlineSmall)
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.6,
+                                ),
                       ),
                       const SizedBox(height: 6),
                       Text(
@@ -465,9 +466,9 @@ class MobileMetricCard extends StatelessWidget {
                               ? theme.textTheme.titleLarge
                               : theme.textTheme.headlineSmall)
                           ?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.7,
-                  ),
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.7,
+                          ),
                 ),
                 if (caption != null) ...<Widget>[
                   const SizedBox(height: 8),
@@ -541,7 +542,11 @@ class MobileActionCard extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(compact ? 14 : 18),
                   ),
-                  child: Icon(icon, color: Colors.white, size: compact ? 24 : 28),
+                  child: Icon(
+                    icon,
+                    color: Colors.white,
+                    size: compact ? 24 : 28,
+                  ),
                 ),
                 const Spacer(),
                 if (kicker != null) ...<Widget>[
@@ -561,10 +566,7 @@ class MobileActionCard extends StatelessWidget {
                       (compact
                               ? theme.textTheme.titleLarge
                               : theme.textTheme.headlineSmall)
-                          ?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    height: 0.98,
-                  ),
+                          ?.copyWith(fontWeight: FontWeight.w900, height: 0.98),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -688,6 +690,7 @@ class MobileSheetHeader extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.icon,
+    this.eyebrow,
     this.accent = const Color(0xFF38BDF8),
     this.tags = const <Widget>[],
   });
@@ -695,6 +698,7 @@ class MobileSheetHeader extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
+  final String? eyebrow;
   final Color accent;
   final List<Widget> tags;
 
@@ -729,6 +733,17 @@ class MobileSheetHeader extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
+                      if (eyebrow != null) ...<Widget>[
+                        Text(
+                          eyebrow!.toUpperCase(),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.15,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                      ],
                       Text(
                         title,
                         style: theme.textTheme.titleLarge?.copyWith(
@@ -752,11 +767,7 @@ class MobileSheetHeader extends StatelessWidget {
             ),
             if (tags.isNotEmpty) ...<Widget>[
               const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: tags,
-              ),
+              Wrap(spacing: 8, runSpacing: 8, children: tags),
             ],
           ],
         ),
@@ -803,9 +814,9 @@ class MobileSheetSection extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   title,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ],
             ),

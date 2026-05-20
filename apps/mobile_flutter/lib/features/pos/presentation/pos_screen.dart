@@ -201,18 +201,21 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   const MobileEmptyState(
                     icon: Icons.shopping_cart_outlined,
                     title: 'Cart is empty',
-                    body: 'Search or scan a product below, then review the cart when you are ready to collect payment.',
+                    body:
+                        'Search or scan a product below, then review the cart when you are ready to collect payment.',
                   )
                 else
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      ..._cart.take(2).map(
-                        (item) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _PosCartPreviewRow(item: item),
-                        ),
-                      ),
+                      ..._cart
+                          .take(2)
+                          .map(
+                            (item) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: _PosCartPreviewRow(item: item),
+                            ),
+                          ),
                       if (_cart.length > 2)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 12),
@@ -254,9 +257,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                           includeCost: session?.canViewCost ?? false,
                         ),
                         icon: const Icon(Icons.qr_code_scanner_rounded),
-                        label: Text(
-                          compactActions ? 'Scan' : 'Scan / lookup',
-                        ),
+                        label: Text(compactActions ? 'Scan' : 'Scan / lookup'),
                       ),
                     ];
                     if (constraints.maxWidth < 370) {
@@ -339,7 +340,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                if (_search.isNotEmpty || _selectedCategory != null) ...<Widget>[
+                if (_search.isNotEmpty ||
+                    _selectedCategory != null) ...<Widget>[
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -499,7 +501,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   accent: const Color(0xFF38BDF8),
                   tags: <Widget>[
                     MobileTag(
-                      label: typedCode.isEmpty ? 'TYPE A CODE FIRST' : 'TYPED CODE READY',
+                      label: typedCode.isEmpty
+                          ? 'TYPE A CODE FIRST'
+                          : 'TYPED CODE READY',
                       icon: typedCode.isEmpty
                           ? Icons.keyboard_alt_rounded
                           : Icons.verified_rounded,
@@ -519,7 +523,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                         contentPadding: EdgeInsets.zero,
                         leading: const Icon(Icons.qr_code_scanner_rounded),
                         title: const Text('Open live scanner'),
-                        subtitle: const Text('Scan barcode, QR, or SKU with camera'),
+                        subtitle: const Text(
+                          'Scan barcode, QR, or SKU with camera',
+                        ),
                         onTap: () => Navigator.of(context).pop('scan'),
                       ),
                       ListTile(
@@ -1960,9 +1966,9 @@ class _PosPulseCard extends StatelessWidget {
               value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w900,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 4),
             Text(
