@@ -40,6 +40,152 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     });
   }
 
+  Future<void> _showInventoryDetailSheet(
+    BuildContext context,
+    InventoryCatalogItem item,
+  ) {
+    final compact = MediaQuery.sizeOf(context).width < 420;
+    final stockAccent = item.stock <= 5
+        ? const Color(0xFFFB7185)
+        : const Color(0xFF22C55E);
+    final tags = <Widget>[
+      MobileTag(
+        label: formatCurrency(item.price),
+        icon: Icons.currency_rupee_rounded,
+        accent: const Color(0xFF38BDF8),
+      ),
+      MobileTag(
+        label: 'Stock ${item.stock}',
+        icon: Icons.inventory_2_rounded,
+        accent: stockAccent,
+      ),
+      MobileTag(
+        label: item.category,
+        icon: Icons.category_rounded,
+        accent: const Color(0xFFA78BFA),
+      ),
+    ];
+    if ((item.size ?? '').isNotEmpty) {
+      tags.add(
+        MobileTag(
+          label: item.size!,
+          icon: Icons.straighten_rounded,
+          accent: const Color(0xFF14B8A6),
+        ),
+      );
+    }
+    if ((item.sku ?? '').isNotEmpty) {
+      tags.add(
+        MobileTag(
+          label: item.sku!,
+          icon: Icons.qr_code_2_rounded,
+          accent: const Color(0xFFF59E0B),
+        ),
+      );
+    }
+
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF070B13),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.only(
+              left: compact ? 16 : 18,
+              right: compact ? 16 : 18,
+              top: compact ? 16 : 18,
+              bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                MobileSheetHeader(
+                  eyebrow: 'Product detail',
+                  title: item.name,
+                  subtitle:
+                      'Review stock posture, sell price, and product identity without leaving the inventory flow.',
+                  icon: Icons.inventory_2_rounded,
+                  accent: const Color(0xFF38BDF8),
+                  tags: tags,
+                ),
+                const SizedBox(height: 16),
+                MobileSheetSection(
+                  title: 'Product snapshot',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      _InventoryDetailLine(
+                        label: 'Category',
+                        value: item.category,
+                      ),
+                      if ((item.subcategory ?? '').isNotEmpty)
+                        _InventoryDetailLine(
+                          label: 'Subcategory',
+                          value: item.subcategory!,
+                        ),
+                      if ((item.size ?? '').isNotEmpty)
+                        _InventoryDetailLine(label: 'Size', value: item.size!),
+                      if ((item.sku ?? '').isNotEmpty)
+                        _InventoryDetailLine(label: 'SKU', value: item.sku!),
+                      _InventoryDetailLine(
+                        label: 'Created',
+                        value: formatCompactDate(item.createdAt),
+                      ),
+                      if ((item.sourceMeta ?? '').isNotEmpty)
+                        _InventoryDetailLine(
+                          label: 'Source',
+                          value: item.sourceMeta!,
+                        ),
+                    ],
+                  ),
+                ),
+                if ((item.description ?? '').trim().isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 12),
+                  MobileSheetSection(
+                    title: 'Description',
+                    child: Text(item.description!.trim()),
+                  ),
+                ],
+                if (item.costPrice != null) ...<Widget>[
+                  const SizedBox(height: 12),
+                  MobileSheetSection(
+                    title: 'Value view',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        _InventoryDetailLine(
+                          label: 'Cost price',
+                          value: formatCurrency(item.costPrice!),
+                        ),
+                        _InventoryDetailLine(
+                          label: 'Margin per unit',
+                          value: formatCurrency(item.marginPerUnit),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                        icon: const Icon(Icons.arrow_back_rounded),
+                        label: const Text('Back to inventory'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(mobileSessionProvider).asData?.value;
@@ -289,7 +435,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     ...items.map(
                       (item) => Padding(
                         padding: const EdgeInsets.only(bottom: 12),
-                        child: _InventoryRow(item: item),
+                        child: _InventoryRow(
+                          item: item,
+                          onTap: () => _showInventoryDetailSheet(context, item),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -479,9 +628,10 @@ class _CategoryChip extends StatelessWidget {
 }
 
 class _InventoryRow extends StatelessWidget {
-  const _InventoryRow({required this.item});
+  const _InventoryRow({required this.item, required this.onTap});
 
   final InventoryCatalogItem item;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -494,70 +644,119 @@ class _InventoryRow extends StatelessWidget {
       if ((item.sku ?? '').isNotEmpty) item.sku!,
     ].join(' | ');
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A1220),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: <Widget>[
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: priceTone.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(Icons.inventory_2_rounded, color: priceTone),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    item.name,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    secondary,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.58),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 14),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A1220),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
               children: <Widget>[
-                Text(
-                  formatCurrency(item.price),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: priceTone,
-                    fontWeight: FontWeight.w900,
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: priceTone.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(Icons.inventory_2_rounded, color: priceTone),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        item.name,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        secondary,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.58),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  'Stock ${item.stock}',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.72),
-                    fontWeight: FontWeight.w700,
-                  ),
+                const SizedBox(width: 14),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: <Widget>[
+                    Text(
+                      formatCurrency(item.price),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: priceTone,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Stock ${item.stock}',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.72),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: Colors.white.withValues(alpha: 0.45),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _InventoryDetailLine extends StatelessWidget {
+  const _InventoryDetailLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          SizedBox(
+            width: 104,
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.56),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
       ),
     );
   }
