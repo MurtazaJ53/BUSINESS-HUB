@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/checkout/checkout_policy.dart';
 import '../../../core/backend/backend_api_client.dart';
@@ -78,6 +79,15 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         const <InventoryCatalogItem>[];
     final totalCount =
         ref.watch(posCatalogCountProvider(catalogFilter)).asData?.value ?? 0;
+    final roleProfile = _PosRoleProfile.fromSession(
+      session: session,
+      cartCount: _cart.length,
+      cartTotal: _cartTotal,
+      pending: pending,
+      syncStatus: syncStatus,
+    );
+    final totalPages = totalCount == 0 ? 1 : (totalCount / _pageSize).ceil();
+    final compactActions = MediaQuery.sizeOf(context).width < 390;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -97,7 +107,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               backgroundColor: const Color(0xFF2563EB),
               icon: const Icon(Icons.shopping_bag_rounded),
               label: Text(
-                '${_cart.length} items | ${formatCurrency(_cartTotal)}',
+                'Checkout ${formatCurrency(_cartTotal)}',
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
             ),
@@ -105,36 +115,26 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 140),
         children: <Widget>[
           MobileScreenLead(
-            title: 'POS',
-            subtitle:
-                'Search, scan, add, and bill with the fewest taps possible.',
-            icon: Icons.point_of_sale_rounded,
-            accent: const Color(0xFF60A5FA),
+            title: roleProfile.leadTitle,
+            subtitle: roleProfile.leadSubtitle,
+            icon: roleProfile.leadIcon,
+            accent: roleProfile.leadAccent,
             primaryTag: MobileTag(
-              label: pending > 0
-                  ? '$pending queued'
-                  : '${_cart.length} in cart',
-              icon: pending > 0
-                  ? Icons.cloud_upload_rounded
-                  : Icons.shopping_cart_checkout_rounded,
-              accent: pending > 0
-                  ? const Color(0xFFF59E0B)
-                  : const Color(0xFF22C55E),
+              label: roleProfile.primaryTagLabel,
+              icon: roleProfile.primaryTagIcon,
+              accent: roleProfile.primaryTagAccent,
             ),
             secondaryTag: MobileTag(
-              label: syncStatus == MobileSyncStatus.syncing
-                  ? 'Syncing'
-                  : 'Ready',
-              icon: syncStatus == MobileSyncStatus.syncing
-                  ? Icons.sync_rounded
-                  : Icons.flash_on_rounded,
+              label: roleProfile.secondaryTagLabel,
+              icon: roleProfile.secondaryTagIcon,
+              accent: roleProfile.secondaryTagAccent,
             ),
           ),
           const SizedBox(height: 18),
           MobilePanel(
-            title: 'Cart',
+            title: roleProfile.checkoutPanelTitle,
             action: MobileTag(
-              label: _cart.isEmpty ? 'EMPTY' : 'READY',
+              label: _cart.isEmpty ? 'WAITING' : 'LIVE CART',
               icon: _cart.isEmpty
                   ? Icons.hourglass_top_rounded
                   : Icons.shopping_bag_rounded,
@@ -142,156 +142,155 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   ? const Color(0xFFA78BFA)
                   : const Color(0xFF22C55E),
             ),
-            child: _cart.isEmpty
-                ? const MobileEmptyState(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final stacked = constraints.maxWidth < 370;
+                    final metrics = <Widget>[
+                      _PosPulseCard(
+                        label: 'Cart total',
+                        value: formatCurrency(_cartTotal),
+                        caption: _cart.isEmpty
+                            ? 'Ready for the first bill'
+                            : '${_cart.length} line${_cart.length == 1 ? '' : 's'} ready',
+                        icon: Icons.currency_rupee_rounded,
+                        accent: const Color(0xFF22C55E),
+                      ),
+                      _PosPulseCard(
+                        label: 'Customer',
+                        value: _selectedCustomer?.name ?? 'Walk-in',
+                        caption: _selectedCustomer == null
+                            ? 'Attach only when needed'
+                            : (_selectedCustomer?.phone ??
+                                  _selectedCustomer?.email ??
+                                  'Ledger linked'),
+                        icon: Icons.groups_rounded,
+                        accent: const Color(0xFF38BDF8),
+                      ),
+                    ];
+                    if (stacked) {
+                      return Column(
+                        children: metrics
+                            .expand(
+                              (widget) => <Widget>[
+                                widget,
+                                if (widget != metrics.last)
+                                  const SizedBox(height: 10),
+                              ],
+                            )
+                            .toList(growable: false),
+                      );
+                    }
+                    return Row(
+                      children: metrics
+                          .expand(
+                            (widget) => <Widget>[
+                              Expanded(child: widget),
+                              if (widget != metrics.last)
+                                const SizedBox(width: 10),
+                            ],
+                          )
+                          .toList(growable: false),
+                    );
+                  },
+                ),
+                const SizedBox(height: 14),
+                if (_cart.isEmpty)
+                  const MobileEmptyState(
                     icon: Icons.shopping_cart_outlined,
                     title: 'Cart is empty',
-                    body: 'Search or scan a product below to begin billing.',
+                    body: 'Search or scan a product below, then review the cart when you are ready to collect payment.',
                   )
-                : Column(
+                else
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0D1A11),
-                          borderRadius: BorderRadius.circular(26),
-                          border: Border.all(
-                            color: const Color(
-                              0xFF22C55E,
-                            ).withValues(alpha: 0.18),
-                          ),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(18),
-                          child: Row(
-                            children: <Widget>[
-                              Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: const Color(
-                                    0xFF22C55E,
-                                  ).withValues(alpha: 0.14),
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: const Icon(
-                                  Icons.payments_rounded,
-                                  color: Color(0xFF22C55E),
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: <Widget>[
-                                    Text(
-                                      'Checkout ready',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${_cart.length} line${_cart.length == 1 ? '' : 's'} in cart',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: Colors.white.withValues(
-                                              alpha: 0.62,
-                                            ),
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Text(
-                                formatCurrency(_cartTotal),
-                                style: Theme.of(context).textTheme.titleLarge
-                                    ?.copyWith(
-                                      color: const Color(0xFF22C55E),
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                              ),
-                            ],
-                          ),
+                      ..._cart.take(2).map(
+                        (item) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _PosCartPreviewRow(item: item),
                         ),
                       ),
-                      const SizedBox(height: 14),
-                      ..._cart
-                          .take(3)
-                          .map(
-                            (item) => Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0A1220),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.05),
-                                  ),
+                      if (_cart.length > 2)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Text(
+                            '+ ${_cart.length - 2} more line${_cart.length - 2 == 1 ? '' : 's'} in cart',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.6),
+                                  fontWeight: FontWeight.w700,
                                 ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(14),
-                                  child: Row(
-                                    children: <Widget>[
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: <Widget>[
-                                            Text(
-                                              item.name,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .titleMedium
-                                                  ?.copyWith(
-                                                    fontWeight: FontWeight.w800,
-                                                  ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              '${item.quantity} x ${formatCurrency(item.price)}',
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall
-                                                  ?.copyWith(
-                                                    color: Colors.white
-                                                        .withValues(
-                                                          alpha: 0.58,
-                                                        ),
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Text(
-                                        formatCurrency(item.lineTotal),
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .labelLarge
-                                            ?.copyWith(
-                                              color: const Color(0xFF22C55E),
-                                              fontWeight: FontWeight.w900,
-                                            ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
                           ),
+                        ),
                     ],
                   ),
+                const SizedBox(height: 4),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final actions = <Widget>[
+                      FilledButton.icon(
+                        onPressed: _cart.isEmpty
+                            ? null
+                            : () => _openCartSheet(
+                                context,
+                                session: session,
+                                backendApiClient: backendApiClient,
+                                salesRepository: salesRepository,
+                                syncCoordinator: syncCoordinator,
+                                shop: shop,
+                                customerDomainState: customerDomainState,
+                                activeShopId: session?.shopId,
+                              ),
+                        icon: const Icon(Icons.shopping_bag_rounded),
+                        label: const Text('Review cart'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => _showLookupActions(
+                          context,
+                          inventoryRepository: inventoryRepository,
+                          includeCost: session?.canViewCost ?? false,
+                        ),
+                        icon: const Icon(Icons.qr_code_scanner_rounded),
+                        label: Text(
+                          compactActions ? 'Scan' : 'Scan / lookup',
+                        ),
+                      ),
+                    ];
+                    if (constraints.maxWidth < 370) {
+                      return Column(
+                        children: actions
+                            .expand(
+                              (widget) => <Widget>[
+                                widget,
+                                if (widget != actions.last)
+                                  const SizedBox(height: 10),
+                              ],
+                            )
+                            .toList(growable: false),
+                      );
+                    }
+                    return Row(
+                      children: actions
+                          .expand(
+                            (widget) => <Widget>[
+                              Expanded(child: widget),
+                              if (widget != actions.last)
+                                const SizedBox(width: 10),
+                            ],
+                          )
+                          .toList(growable: false),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 18),
           MobilePanel(
-            title: 'Search products',
+            title: roleProfile.catalogPanelTitle,
             action: MobileTag(
               label: _selectedCategory ?? 'All categories',
               icon: Icons.tune_rounded,
@@ -340,6 +339,27 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
+                if (_search.isNotEmpty || _selectedCategory != null) ...<Widget>[
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: <Widget>[
+                      if (_search.isNotEmpty)
+                        MobileTag(
+                          label: 'Search: ${_search.trim()}',
+                          icon: Icons.search_rounded,
+                          accent: const Color(0xFF38BDF8),
+                        ),
+                      if (_selectedCategory != null)
+                        MobileTag(
+                          label: _selectedCategory!,
+                          icon: Icons.inventory_2_rounded,
+                          accent: const Color(0xFFA78BFA),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 SizedBox(
                   height: 46,
                   child: ListView(
@@ -370,87 +390,84 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          Builder(
-            builder: (context) {
-              final totalPages = totalCount == 0
-                  ? 1
-                  : (totalCount / _pageSize).ceil();
-              return MobilePanel(
-                title: 'Product results',
-                action: MobileTag(
-                  label: '$totalCount results',
-                  icon: Icons.inventory_rounded,
-                  accent: const Color(0xFFA78BFA),
+                const SizedBox(height: 18),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        '$totalCount result${totalCount == 1 ? '' : 's'}',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    Text(
+                      'Page $_page / $totalPages',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.6),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
-                child: items.isEmpty
-                    ? MobileEmptyState(
-                        icon: syncStatus == MobileSyncStatus.syncing
-                            ? Icons.sync_rounded
-                            : Icons.point_of_sale_outlined,
-                        title: syncStatus == MobileSyncStatus.syncing
-                            ? 'POS catalog is still syncing'
-                            : 'No billable products found',
-                        body: syncStatus == MobileSyncStatus.syncing
-                            ? 'Wait a moment while inventory lands into the local mobile catalog.'
-                            : 'Try a different search or category filter.',
-                      )
-                    : Column(
+                const SizedBox(height: 12),
+                if (items.isEmpty)
+                  MobileEmptyState(
+                    icon: syncStatus == MobileSyncStatus.syncing
+                        ? Icons.sync_rounded
+                        : Icons.point_of_sale_outlined,
+                    title: syncStatus == MobileSyncStatus.syncing
+                        ? 'POS catalog is still syncing'
+                        : 'No billable products found',
+                    body: syncStatus == MobileSyncStatus.syncing
+                        ? 'Wait a moment while inventory lands into the local mobile catalog.'
+                        : 'Try a different search or category filter.',
+                  )
+                else
+                  Column(
+                    children: <Widget>[
+                      ...items.map(
+                        (item) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _PosCatalogRow(
+                            item: item,
+                            onAdd: () => _addToCart(item),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
                         children: <Widget>[
-                          ...items.map(
-                            (item) => Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _PosCatalogRow(
-                                item: item,
-                                onAdd: () => _addToCart(item),
-                              ),
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _page > 1
+                                  ? () {
+                                      setState(() {
+                                        _page -= 1;
+                                      });
+                                    }
+                                  : null,
+                              child: const Text('Previous'),
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: <Widget>[
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: _page > 1
-                                      ? () {
-                                          setState(() {
-                                            _page -= 1;
-                                          });
-                                        }
-                                      : null,
-                                  child: const Text('Previous'),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                ),
-                                child: Text(
-                                  'Page $_page / $totalPages',
-                                  style: Theme.of(context).textTheme.labelLarge,
-                                ),
-                              ),
-                              Expanded(
-                                child: FilledButton.tonal(
-                                  onPressed: _page < totalPages
-                                      ? () {
-                                          setState(() {
-                                            _page += 1;
-                                          });
-                                        }
-                                      : null,
-                                  child: const Text('Next'),
-                                ),
-                              ),
-                            ],
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: FilledButton.tonal(
+                              onPressed: _page < totalPages
+                                  ? () {
+                                      setState(() {
+                                        _page += 1;
+                                      });
+                                    }
+                                  : null,
+                              child: const Text('Next'),
+                            ),
                           ),
                         ],
                       ),
-              );
-            },
+                    ],
+                  ),
+              ],
+            ),
           ),
         ],
       ),
@@ -589,6 +606,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
   void _addToCart(InventoryCatalogItem item) {
     final index = _cart.indexWhere((entry) => entry.id == item.id);
+    HapticFeedback.selectionClick();
     setState(() {
       if (index >= 0) {
         _cart[index] = _cart[index].copyWith(
@@ -1330,6 +1348,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                     if (!mounted || !context.mounted) {
                                       return;
                                     }
+                                    HapticFeedback.lightImpact();
                                     Navigator.of(context).pop();
                                     ScaffoldMessenger.of(
                                       this.context,
@@ -1758,6 +1777,253 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   }
 }
 
+class _PosRoleProfile {
+  const _PosRoleProfile({
+    required this.leadTitle,
+    required this.leadSubtitle,
+    required this.leadIcon,
+    required this.leadAccent,
+    required this.primaryTagLabel,
+    required this.primaryTagIcon,
+    required this.primaryTagAccent,
+    required this.secondaryTagLabel,
+    required this.secondaryTagIcon,
+    required this.secondaryTagAccent,
+    required this.checkoutPanelTitle,
+    required this.catalogPanelTitle,
+  });
+
+  final String leadTitle;
+  final String leadSubtitle;
+  final IconData leadIcon;
+  final Color leadAccent;
+  final String primaryTagLabel;
+  final IconData primaryTagIcon;
+  final Color primaryTagAccent;
+  final String secondaryTagLabel;
+  final IconData secondaryTagIcon;
+  final Color secondaryTagAccent;
+  final String checkoutPanelTitle;
+  final String catalogPanelTitle;
+
+  factory _PosRoleProfile.fromSession({
+    required MobileSession? session,
+    required int cartCount,
+    required double cartTotal,
+    required int pending,
+    required MobileSyncStatus syncStatus,
+  }) {
+    final syncing = syncStatus == MobileSyncStatus.syncing;
+    final hasCart = cartCount > 0;
+    final primaryLabel = pending > 0
+        ? '$pending queued'
+        : hasCart
+        ? '$cartCount in cart'
+        : 'Ready to bill';
+    final primaryIcon = pending > 0
+        ? Icons.cloud_upload_rounded
+        : hasCart
+        ? Icons.shopping_cart_checkout_rounded
+        : Icons.flash_on_rounded;
+    final primaryAccent = pending > 0
+        ? const Color(0xFFF59E0B)
+        : const Color(0xFF22C55E);
+    final secondaryLabel = syncing ? 'Syncing' : 'Local fast path';
+    final secondaryIcon = syncing ? Icons.sync_rounded : Icons.bolt_rounded;
+    final secondaryAccent = syncing
+        ? const Color(0xFF38BDF8)
+        : const Color(0xFFA78BFA);
+
+    if (session?.isCashierLike ?? false) {
+      return _PosRoleProfile(
+        leadTitle: hasCart
+            ? 'Close ${formatCurrency(cartTotal)} fast'
+            : 'Ready for the next bill',
+        leadSubtitle: hasCart
+            ? 'The cart is live. Review it when you are ready to collect payment, or keep adding products without losing pace.'
+            : 'Search, scan, and add products with the fewest taps possible. Checkout stays one step away.',
+        leadIcon: Icons.point_of_sale_rounded,
+        leadAccent: const Color(0xFF60A5FA),
+        primaryTagLabel: primaryLabel,
+        primaryTagIcon: primaryIcon,
+        primaryTagAccent: primaryAccent,
+        secondaryTagLabel: secondaryLabel,
+        secondaryTagIcon: secondaryIcon,
+        secondaryTagAccent: secondaryAccent,
+        checkoutPanelTitle: 'Current sale',
+        catalogPanelTitle: 'Sell products',
+      );
+    }
+
+    if (session?.isManager ?? false) {
+      return _PosRoleProfile(
+        leadTitle: hasCart
+            ? '${formatCurrency(cartTotal)} ready to close'
+            : 'Checkout floor is ready',
+        leadSubtitle: hasCart
+            ? 'This cart is ready for payment. Keep the line moving while stock and customer context stay close.'
+            : 'Use the same fast checkout surface while keeping customer and stock context within one screen.',
+        leadIcon: Icons.payments_rounded,
+        leadAccent: const Color(0xFF14B8A6),
+        primaryTagLabel: primaryLabel,
+        primaryTagIcon: primaryIcon,
+        primaryTagAccent: primaryAccent,
+        secondaryTagLabel: secondaryLabel,
+        secondaryTagIcon: secondaryIcon,
+        secondaryTagAccent: secondaryAccent,
+        checkoutPanelTitle: 'Checkout flow',
+        catalogPanelTitle: 'Product lookup',
+      );
+    }
+
+    return _PosRoleProfile(
+      leadTitle: hasCart
+          ? '${formatCurrency(cartTotal)} ready to close'
+          : 'POS is ready',
+      leadSubtitle: hasCart
+          ? 'Billing is active. Revenue, customers, and stock movement stay inside one clean checkout flow.'
+          : 'Use the checkout surface to bill quickly without dragging admin complexity into the sales counter.',
+      leadIcon: Icons.point_of_sale_rounded,
+      leadAccent: const Color(0xFF60A5FA),
+      primaryTagLabel: primaryLabel,
+      primaryTagIcon: primaryIcon,
+      primaryTagAccent: primaryAccent,
+      secondaryTagLabel: secondaryLabel,
+      secondaryTagIcon: secondaryIcon,
+      secondaryTagAccent: secondaryAccent,
+      checkoutPanelTitle: 'Active checkout',
+      catalogPanelTitle: 'Product lookup',
+    );
+  }
+}
+
+class _PosPulseCard extends StatelessWidget {
+  const _PosPulseCard({
+    required this.label,
+    required this.value,
+    required this.caption,
+    required this.icon,
+    required this.accent,
+  });
+
+  final String label;
+  final String value;
+  final String caption;
+  final IconData icon;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1220),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: accent, size: 18),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              label.toUpperCase(),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.48),
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.1,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              caption,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.58),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PosCartPreviewRow extends StatelessWidget {
+  const _PosCartPreviewRow({required this.item});
+
+  final PosCartItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1220),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: <Widget>[
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    item.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${item.quantity} x ${formatCurrency(item.price)}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.58),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              formatCurrency(item.lineTotal),
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: const Color(0xFF22C55E),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PosCatalogRow extends StatelessWidget {
   const _PosCatalogRow({required this.item, required this.onAdd});
 
@@ -1770,6 +2036,7 @@ class _PosCatalogRow extends StatelessWidget {
         ? const Color(0xFFFB7185)
         : const Color(0xFF22C55E);
     final secondary = [
+      if ((item.sku ?? '').isNotEmpty) item.sku!,
       item.category,
       if ((item.size ?? '').isNotEmpty) item.size!,
       'Stock ${item.stock}',
@@ -1786,13 +2053,13 @@ class _PosCatalogRow extends StatelessWidget {
         child: Row(
           children: <Widget>[
             Container(
-              width: 46,
-              height: 46,
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
                 color: stockTone.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(Icons.sell_rounded, color: stockTone),
+              child: Icon(Icons.sell_rounded, color: stockTone, size: 20),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -1827,8 +2094,32 @@ class _PosCatalogRow extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
+                const SizedBox(height: 6),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: stockTone.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    child: Text(
+                      item.stock <= 5 ? 'Low stock' : 'In stock',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: stockTone,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 8),
-                FilledButton.tonal(onPressed: onAdd, child: const Text('Add')),
+                FilledButton.tonalIcon(
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Add'),
+                ),
               ],
             ),
           ],
