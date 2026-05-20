@@ -72,6 +72,13 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
           stream: historyStream,
           builder: (context, historySnapshot) {
             final history = historySnapshot.data ?? HistoryOverview.empty();
+            final roleProfile = _CustomersRoleProfile.fromSession(
+              session: session,
+              domainState: domainState,
+              ledgerDomainState: ledgerDomainState,
+              history: history,
+              syncStatus: syncStatus,
+            );
             final backendFuture = _resolveBackendLookupFuture(
               backendApiClient: backendApiClient,
               session: session,
@@ -82,27 +89,19 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
               padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
               children: <Widget>[
                 MobileScreenLead(
-                  title: 'Customers',
-                  subtitle: domainState.isPostgresPrimary
-                      ? 'Customer balances and ledger actions are live from the new backend.'
-                      : 'Legacy customer data and sales recall are available while migration finishes.',
-                  icon: Icons.groups_rounded,
-                  accent: const Color(0xFF14B8A6),
+                  title: roleProfile.leadTitle,
+                  subtitle: roleProfile.leadSubtitle,
+                  icon: roleProfile.leadIcon,
+                  accent: roleProfile.leadAccent,
                   primaryTag: MobileTag(
-                    label: domainState.postureLabel,
-                    icon: domainState.isPostgresPrimary
-                        ? Icons.verified_rounded
-                        : Icons.swap_horiz_rounded,
-                    accent: domainState.isPostgresPrimary
-                        ? const Color(0xFF22C55E)
-                        : const Color(0xFF14B8A6),
+                    label: roleProfile.primaryTagLabel,
+                    icon: roleProfile.primaryTagIcon,
+                    accent: roleProfile.primaryTagAccent,
                   ),
                   secondaryTag: MobileTag(
-                    label: history.totalSales > 0
-                        ? '${history.totalSales} receipts known'
-                        : 'Awaiting local history',
-                    icon: Icons.receipt_long_rounded,
-                    accent: const Color(0xFF38BDF8),
+                    label: roleProfile.secondaryTagLabel,
+                    icon: roleProfile.secondaryTagIcon,
+                    accent: roleProfile.secondaryTagAccent,
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -118,20 +117,13 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                       childAspectRatio: 1.02,
                       children: <Widget>[
                         MobileMetricCard(
-                          label: 'Posture',
+                          label: 'Customer mode',
                           value: domainState.isPostgresPrimary
                               ? 'Ledger live'
                               : 'Recall mode',
-                          caption:
-                              domainState.pilotSignoffStatus
-                                      ?.replaceAll('_', ' ')
-                                      .isNotEmpty ==
-                                  true
-                              ? domainState.pilotSignoffStatus!.replaceAll(
-                                  '_',
-                                  ' ',
-                                )
-                              : domainState.postureLabel,
+                          caption: domainState.isPostgresPrimary
+                              ? 'Backend customer master'
+                              : 'Legacy and local recall',
                           icon: Icons.groups_rounded,
                           accent: const Color(0xFF14B8A6),
                         ),
@@ -140,31 +132,22 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                           value: ledgerDomainState.isPostgresPrimary
                               ? 'Writable'
                               : 'Read only',
-                          caption:
-                              ledgerDomainState.pilotSignoffStatus
-                                      ?.replaceAll('_', ' ')
-                                      .isNotEmpty ==
-                                  true
-                              ? ledgerDomainState.pilotSignoffStatus!
-                                    .replaceAll('_', ' ')
-                              : ledgerDomainState.postureLabel,
+                          caption: ledgerDomainState.isPostgresPrimary
+                              ? 'Payments and adjustments'
+                              : 'Browse and review only',
                           icon: Icons.account_balance_wallet_rounded,
                           accent: ledgerDomainState.isPostgresPrimary
                               ? const Color(0xFF22C55E)
                               : const Color(0xFFF59E0B),
                         ),
                         MobileMetricCard(
-                          label: 'Sync',
-                          value: syncStatus == MobileSyncStatus.syncing
-                              ? 'Refreshing'
-                              : 'Stable',
-                          caption: syncStatus == MobileSyncStatus.error
-                              ? 'Last sync needs attention'
-                              : 'Mobile workspace active',
-                          icon: Icons.wifi_tethering_rounded,
-                          accent: syncStatus == MobileSyncStatus.error
-                              ? const Color(0xFFFB7185)
-                              : const Color(0xFF38BDF8),
+                          label: 'Known sales',
+                          value: '${history.totalSales}',
+                          caption: history.totalSales > 0
+                              ? '${history.queuedSales} queued receipt${history.queuedSales == 1 ? '' : 's'}'
+                              : 'Awaiting local history',
+                          icon: Icons.receipt_long_rounded,
+                          accent: const Color(0xFF38BDF8),
                         ),
                       ],
                     );
@@ -172,10 +155,10 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                 ),
                 const SizedBox(height: 18),
                 MobilePanel(
-                  title: 'Find customer',
+                  title: roleProfile.searchPanelTitle,
                   action: MobileTag(
                     label: _statusFilter == 'all'
-                        ? (_search.isEmpty ? 'ALL KNOWN BUYERS' : 'FILTERED')
+                        ? (_search.isEmpty ? 'ALL BUYERS' : 'FILTERED')
                         : _statusFilter.replaceAll('_', ' ').toUpperCase(),
                     icon: Icons.manage_search_rounded,
                     accent: const Color(0xFF14B8A6),
@@ -262,7 +245,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                         }
                       },
                       icon: const Icon(Icons.person_add_alt_1_rounded),
-                      label: const Text('Create migrated customer'),
+                      label: const Text('Create customer'),
                     ),
                   ),
                 ],
@@ -273,12 +256,12 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const MobilePanel(
-                          title: 'Customer ledger view',
+                          title: 'Customer accounts',
                           child: MobileEmptyState(
                             icon: Icons.sync_rounded,
-                            title: 'Loading PostgreSQL customers',
+                            title: 'Loading customer accounts',
                             body:
-                                'The mobile desk is pulling the live customer surface from the new backend.',
+                                'The mobile desk is pulling live customer balances from the backend.',
                           ),
                         );
                       }
@@ -301,14 +284,14 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                       );
                       if (customers.isEmpty) {
                         return MobilePanel(
-                          title: 'Customer ledger view',
+                          title: 'Customer accounts',
                           child: Column(
                             children: <Widget>[
                               const MobileEmptyState(
                                 icon: Icons.groups_outlined,
                                 title: 'No customers matched',
                                 body:
-                                    'This PostgreSQL customer surface is live, but no records matched the current lookup.',
+                                    'The live customer account list is ready, but no records matched the current lookup.',
                               ),
                               if (session?.hasShop == true) ...<Widget>[
                                 const SizedBox(height: 12),
@@ -327,7 +310,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                                   icon: const Icon(
                                     Icons.person_add_alt_1_rounded,
                                   ),
-                                  label: const Text('Create first customer'),
+                                  label: const Text('Create customer'),
                                 ),
                               ],
                             ],
@@ -344,7 +327,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                             orderedCustomers,
                           );
                       return MobilePanel(
-                        title: 'Customer ledger view',
+                        title: 'Customer accounts',
                         action: MobileTag(
                           label: '${orderedCustomers.length} live',
                           icon: Icons.verified_rounded,
@@ -395,7 +378,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                               Text(
                                 summary.highestBalanceCustomer == null
                                     ? 'No customer currently holds a due balance.'
-                                    : 'Highest due: ${summary.highestBalanceCustomer!.name} · ${formatCurrency(summary.highestBalanceCustomer!.balance)}',
+                                    : 'Highest due: ${summary.highestBalanceCustomer!.name} | ${formatCurrency(summary.highestBalanceCustomer!.balance)}',
                                 style: Theme.of(context).textTheme.bodySmall
                                     ?.copyWith(
                                       color: Colors.white.withValues(
@@ -1128,6 +1111,119 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   }
 }
 
+class _CustomersRoleProfile {
+  const _CustomersRoleProfile({
+    required this.leadTitle,
+    required this.leadSubtitle,
+    required this.leadIcon,
+    required this.leadAccent,
+    required this.primaryTagLabel,
+    required this.primaryTagIcon,
+    required this.primaryTagAccent,
+    required this.secondaryTagLabel,
+    required this.secondaryTagIcon,
+    required this.secondaryTagAccent,
+    required this.searchPanelTitle,
+  });
+
+  final String leadTitle;
+  final String leadSubtitle;
+  final IconData leadIcon;
+  final Color leadAccent;
+  final String primaryTagLabel;
+  final IconData primaryTagIcon;
+  final Color primaryTagAccent;
+  final String secondaryTagLabel;
+  final IconData secondaryTagIcon;
+  final Color secondaryTagAccent;
+  final String searchPanelTitle;
+
+  factory _CustomersRoleProfile.fromSession({
+    required MobileSession? session,
+    required DomainControlState domainState,
+    required DomainControlState ledgerDomainState,
+    required HistoryOverview history,
+    required MobileSyncStatus syncStatus,
+  }) {
+    final primaryLabel = domainState.isPostgresPrimary
+        ? 'Live customer mode'
+        : 'Bridge customer mode';
+    final primaryIcon = domainState.isPostgresPrimary
+        ? Icons.verified_rounded
+        : Icons.swap_horiz_rounded;
+    final primaryAccent = domainState.isPostgresPrimary
+        ? const Color(0xFF22C55E)
+        : const Color(0xFF14B8A6);
+    final secondaryLabel = history.totalSales > 0
+        ? '${history.totalSales} receipts known'
+        : (syncStatus == MobileSyncStatus.syncing
+              ? 'Refreshing history'
+              : 'Awaiting local history');
+    final secondaryIcon = history.totalSales > 0
+        ? Icons.receipt_long_rounded
+        : syncStatus == MobileSyncStatus.syncing
+        ? Icons.sync_rounded
+        : Icons.schedule_rounded;
+    final secondaryAccent = const Color(0xFF38BDF8);
+
+    if (session?.isCashierLike ?? false) {
+      return _CustomersRoleProfile(
+        leadTitle: ledgerDomainState.isPostgresPrimary
+            ? 'Find buyers and dues fast'
+            : 'Buyer recall is ready',
+        leadSubtitle: ledgerDomainState.isPostgresPrimary
+            ? 'Check buyer balances, attach the right customer, and review dues without leaving the floor flow.'
+            : 'Search old cloud buyers and local sales recall while the live customer ledger finishes rolling out.',
+        leadIcon: Icons.groups_rounded,
+        leadAccent: const Color(0xFF14B8A6),
+        primaryTagLabel: primaryLabel,
+        primaryTagIcon: primaryIcon,
+        primaryTagAccent: primaryAccent,
+        secondaryTagLabel: secondaryLabel,
+        secondaryTagIcon: secondaryIcon,
+        secondaryTagAccent: secondaryAccent,
+        searchPanelTitle: 'Find buyers',
+      );
+    }
+
+    if (session?.isManager ?? false) {
+      return _CustomersRoleProfile(
+        leadTitle: domainState.isPostgresPrimary
+            ? 'Customer balances are live'
+            : 'Customer bridge is active',
+        leadSubtitle:
+            'Track buyer accounts, receivables, and follow-up queues from a cleaner customer view.',
+        leadIcon: Icons.groups_rounded,
+        leadAccent: const Color(0xFF14B8A6),
+        primaryTagLabel: primaryLabel,
+        primaryTagIcon: primaryIcon,
+        primaryTagAccent: primaryAccent,
+        secondaryTagLabel: secondaryLabel,
+        secondaryTagIcon: secondaryIcon,
+        secondaryTagAccent: secondaryAccent,
+        searchPanelTitle: 'Find customer accounts',
+      );
+    }
+
+    return _CustomersRoleProfile(
+      leadTitle: domainState.isPostgresPrimary
+          ? 'Customer accounts are live'
+          : 'Customer bridge is active',
+      leadSubtitle:
+          'Review buyer balances, receivables, and collections without exposing heavy ERP behavior to daily users.',
+      leadIcon: Icons.groups_rounded,
+      leadAccent: const Color(0xFF14B8A6),
+      primaryTagLabel: primaryLabel,
+      primaryTagIcon: primaryIcon,
+      primaryTagAccent: primaryAccent,
+      secondaryTagLabel: secondaryLabel,
+      secondaryTagIcon: secondaryIcon,
+      secondaryTagAccent: secondaryAccent,
+      searchPanelTitle: 'Find customer accounts',
+    );
+  }
+}
+
 class _LocalCustomersFallbackPanel extends StatelessWidget {
   const _LocalCustomersFallbackPanel({
     required this.legacyCustomersStream,
@@ -1146,7 +1242,7 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MobilePanel(
-      title: 'Legacy customer bridge',
+      title: 'Local buyer bridge',
       action: MobileTag(
         label: 'FIRESTORE',
         icon: Icons.cloud_done_rounded,
@@ -1198,7 +1294,7 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      'Legacy customer records are loading from the old cloud collection for this shop.',
+                      'Customer records are loading from the old cloud collection for this shop.',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Colors.white.withValues(alpha: 0.68),
                         fontWeight: FontWeight.w600,
@@ -1272,7 +1368,7 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        'The legacy cloud customer master is empty for this view, so the app is reconstructing buyer recall from local sales history.',
+                        'The cloud customer master is empty for this view, so the app is rebuilding buyer recall from local sales history.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Colors.white.withValues(alpha: 0.68),
                           fontWeight: FontWeight.w600,

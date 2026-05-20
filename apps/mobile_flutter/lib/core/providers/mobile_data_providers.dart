@@ -90,6 +90,40 @@ final inventoryCategoriesProvider =
       return inventoryRepository.watchCategories();
     });
 
+final inventoryOverviewProvider =
+    StreamProvider.family<DashboardOverview, bool>((ref, includeCost) {
+      final inventoryRepository = ref.watch(inventoryRepositoryProvider);
+      return inventoryRepository.watchDashboardOverview(
+        includeCost: includeCost,
+      );
+    });
+
+final inventoryCatalogPageProvider =
+    StreamProvider.family<List<InventoryCatalogItem>, InventoryCatalogFilter>((
+      ref,
+      filter,
+    ) {
+      final inventoryRepository = ref.watch(inventoryRepositoryProvider);
+      return inventoryRepository.watchCatalogPage(
+        search: filter.search,
+        category: filter.category,
+        page: filter.page,
+        pageSize: filter.pageSize,
+        includeCost: filter.includeCost,
+        lowStockOnly: filter.lowStockOnly,
+      );
+    });
+
+final inventoryCatalogCountProvider =
+    StreamProvider.family<int, InventoryCatalogFilter>((ref, filter) {
+      final inventoryRepository = ref.watch(inventoryRepositoryProvider);
+      return inventoryRepository.watchCatalogCount(
+        search: filter.search,
+        category: filter.category,
+        lowStockOnly: filter.lowStockOnly,
+      );
+    });
+
 final posCatalogPageProvider =
     StreamProvider.family<List<InventoryCatalogItem>, PosCatalogFilter>((
       ref,

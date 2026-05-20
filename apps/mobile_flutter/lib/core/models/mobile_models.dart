@@ -371,6 +371,58 @@ class PosCatalogFilter {
       Object.hash(search, category, page, pageSize, includeCost, lowStockOnly);
 }
 
+class InventoryCatalogFilter {
+  const InventoryCatalogFilter({
+    this.search = '',
+    this.category,
+    this.page = 1,
+    this.pageSize = 40,
+    this.includeCost = false,
+    this.lowStockOnly = false,
+  });
+
+  final String search;
+  final String? category;
+  final int page;
+  final int pageSize;
+  final bool includeCost;
+  final bool lowStockOnly;
+
+  InventoryCatalogFilter copyWith({
+    String? search,
+    String? category,
+    int? page,
+    int? pageSize,
+    bool? includeCost,
+    bool? lowStockOnly,
+    bool clearCategory = false,
+  }) {
+    return InventoryCatalogFilter(
+      search: search ?? this.search,
+      category: clearCategory ? null : (category ?? this.category),
+      page: page ?? this.page,
+      pageSize: pageSize ?? this.pageSize,
+      includeCost: includeCost ?? this.includeCost,
+      lowStockOnly: lowStockOnly ?? this.lowStockOnly,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is InventoryCatalogFilter &&
+        other.search == search &&
+        other.category == category &&
+        other.page == page &&
+        other.pageSize == pageSize &&
+        other.includeCost == includeCost &&
+        other.lowStockOnly == lowStockOnly;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(search, category, page, pageSize, includeCost, lowStockOnly);
+}
+
 class LowStockItem {
   const LowStockItem({
     required this.id,

@@ -5,6 +5,7 @@ import '../../../core/database/mobile_repository.dart';
 import '../../../core/insights/mobile_operational_insights.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
+import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/utils/formatters.dart';
 import '../../shell/presentation/mobile_surface.dart';
@@ -28,6 +29,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final session = ref.watch(mobileSessionProvider).asData?.value;
     final salesRepository = ref.read(salesRepositoryProvider);
     final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
     final syncStatus = ref.watch(syncStatusProvider);
@@ -44,31 +46,29 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           DomainControlState.legacy('payments'),
         ];
     final report = HistoryReportSnapshot.fromSales(sales);
+    final roleProfile = _HistoryRoleProfile.fromSession(
+      session: session,
+      overview: overview,
+      syncStatus: syncStatus,
+    );
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
       children: <Widget>[
             MobileScreenLead(
-              title: 'History',
-              subtitle:
-                  'Search receipts, check sync state, and open exact sale details without extra steps.',
-              icon: Icons.receipt_long_rounded,
-              accent: const Color(0xFFF59E0B),
+              title: roleProfile.leadTitle,
+              subtitle: roleProfile.leadSubtitle,
+              icon: roleProfile.leadIcon,
+              accent: roleProfile.leadAccent,
               primaryTag: MobileTag(
-                label: '${overview.totalSales} receipts',
-                icon: Icons.receipt_long_rounded,
-                accent: const Color(0xFFF59E0B),
+                label: roleProfile.primaryTagLabel,
+                icon: roleProfile.primaryTagIcon,
+                accent: roleProfile.primaryTagAccent,
               ),
               secondaryTag: MobileTag(
-                label: overview.queuedSales > 0
-                    ? '${overview.queuedSales} queued'
-                    : 'Replay clear',
-                icon: overview.queuedSales > 0
-                    ? Icons.cloud_upload_rounded
-                    : Icons.verified_rounded,
-                accent: overview.queuedSales > 0
-                    ? const Color(0xFFF59E0B)
-                    : const Color(0xFF22C55E),
+                label: roleProfile.secondaryTagLabel,
+                icon: roleProfile.secondaryTagIcon,
+                accent: roleProfile.secondaryTagAccent,
               ),
             ),
             const SizedBox(height: 18),
@@ -120,7 +120,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             ),
             const SizedBox(height: 18),
             MobilePanel(
-              title: 'Find receipts',
+              title: roleProfile.filterPanelTitle,
               action: MobileTag(
                 label: _filter.syncState == null
                     ? 'ALL STATES'
@@ -267,14 +267,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                           }
                         : null,
                     icon: const Icon(Icons.cloud_upload_rounded),
-                    label: const Text('Retry queued receipts'),
+                    label: const Text('Retry receipt sync'),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 18),
             MobilePanel(
-              title: 'Commerce cutover posture',
+              title: 'Sync lanes',
               action: MobileTag(
                 label: syncStatus == MobileSyncStatus.syncing
                     ? 'Refreshing'
@@ -299,7 +299,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             ),
             const SizedBox(height: 18),
             MobilePanel(
-                  title: 'Filtered report pulse',
+                  title: roleProfile.summaryPanelTitle,
                   action: MobileTag(
                     label: _filter.dateWindow.label,
                     icon: Icons.insights_rounded,
@@ -357,7 +357,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                             ),
                             const SizedBox(height: 14),
                             Text(
-                              '${report.syncedCount} synced · ${report.queuedCount} queued · ${report.failedCount} failed',
+                              '${report.syncedCount} synced | ${report.queuedCount} queued | ${report.failedCount} failed',
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
                                     color: Colors.white.withValues(alpha: 0.62),
@@ -368,7 +368,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                             Text(
                               report.topPaymentMode == null
                                   ? 'No payment mode mix available yet.'
-                                  : 'Top mode ${report.topPaymentMode} · ${report.dueReceiptCount} receipt(s) still carry due balance · ${report.walkInCount} walk-in sale(s).',
+                                  : 'Top mode ${report.topPaymentMode} | ${report.dueReceiptCount} receipt(s) still carry due balance | ${report.walkInCount} walk-in sale(s).',
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
                                     color: Colors.white.withValues(alpha: 0.54),
@@ -395,7 +395,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             ),
             const SizedBox(height: 18),
             MobilePanel(
-              title: 'Recent receipt feed',
+              title: roleProfile.feedPanelTitle,
               action: MobileTag(
                 label: overview.lastSyncedAt == null
                     ? 'Freshness unknown'
@@ -607,6 +607,120 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+class _HistoryRoleProfile {
+  const _HistoryRoleProfile({
+    required this.leadTitle,
+    required this.leadSubtitle,
+    required this.leadIcon,
+    required this.leadAccent,
+    required this.primaryTagLabel,
+    required this.primaryTagIcon,
+    required this.primaryTagAccent,
+    required this.secondaryTagLabel,
+    required this.secondaryTagIcon,
+    required this.secondaryTagAccent,
+    required this.filterPanelTitle,
+    required this.summaryPanelTitle,
+    required this.feedPanelTitle,
+  });
+
+  final String leadTitle;
+  final String leadSubtitle;
+  final IconData leadIcon;
+  final Color leadAccent;
+  final String primaryTagLabel;
+  final IconData primaryTagIcon;
+  final Color primaryTagAccent;
+  final String secondaryTagLabel;
+  final IconData secondaryTagIcon;
+  final Color secondaryTagAccent;
+  final String filterPanelTitle;
+  final String summaryPanelTitle;
+  final String feedPanelTitle;
+
+  factory _HistoryRoleProfile.fromSession({
+    required dynamic session,
+    required HistoryOverview overview,
+    required MobileSyncStatus syncStatus,
+  }) {
+    final primaryLabel = '${overview.totalSales} receipts';
+    final primaryIcon = Icons.receipt_long_rounded;
+    final primaryAccent = const Color(0xFFF59E0B);
+    final secondaryLabel = overview.queuedSales > 0
+        ? '${overview.queuedSales} queued'
+        : (syncStatus == MobileSyncStatus.syncing ? 'Syncing' : 'Replay clear');
+    final secondaryIcon = overview.queuedSales > 0
+        ? Icons.cloud_upload_rounded
+        : (syncStatus == MobileSyncStatus.syncing
+              ? Icons.sync_rounded
+              : Icons.verified_rounded);
+    final secondaryAccent = overview.queuedSales > 0
+        ? const Color(0xFFF59E0B)
+        : const Color(0xFF22C55E);
+
+    if (session?.isCashierLike ?? false) {
+      return _HistoryRoleProfile(
+        leadTitle: overview.totalSales > 0
+            ? 'Recent sales are ready'
+            : 'Receipt search is ready',
+        leadSubtitle:
+            'Find receipts fast, check queued sync, and open exact sale details without leaving the floor workflow.',
+        leadIcon: Icons.receipt_long_rounded,
+        leadAccent: const Color(0xFFF59E0B),
+        primaryTagLabel: primaryLabel,
+        primaryTagIcon: primaryIcon,
+        primaryTagAccent: primaryAccent,
+        secondaryTagLabel: secondaryLabel,
+        secondaryTagIcon: secondaryIcon,
+        secondaryTagAccent: secondaryAccent,
+        filterPanelTitle: 'Find sales',
+        summaryPanelTitle: 'Quick summary',
+        feedPanelTitle: 'Receipt list',
+      );
+    }
+
+    if (session?.isManager ?? false) {
+      return _HistoryRoleProfile(
+        leadTitle: overview.totalSales > 0
+            ? 'Sales history is live'
+            : 'History is ready',
+        leadSubtitle:
+            'Track recent receipts, queue posture, and filter-driven sales summaries from one cleaner history view.',
+        leadIcon: Icons.receipt_long_rounded,
+        leadAccent: const Color(0xFFF59E0B),
+        primaryTagLabel: primaryLabel,
+        primaryTagIcon: primaryIcon,
+        primaryTagAccent: primaryAccent,
+        secondaryTagLabel: secondaryLabel,
+        secondaryTagIcon: secondaryIcon,
+        secondaryTagAccent: secondaryAccent,
+        filterPanelTitle: 'Find receipts',
+        summaryPanelTitle: 'Quick summary',
+        feedPanelTitle: 'Receipt list',
+      );
+    }
+
+    return _HistoryRoleProfile(
+      leadTitle: overview.totalSales > 0
+          ? 'Receipt history is live'
+          : 'History pulse is ready',
+      leadSubtitle:
+          'Review revenue flow, replay posture, and recent sales without turning the mobile app into a dense reporting console.',
+      leadIcon: Icons.receipt_long_rounded,
+      leadAccent: const Color(0xFFF59E0B),
+      primaryTagLabel: primaryLabel,
+      primaryTagIcon: primaryIcon,
+      primaryTagAccent: primaryAccent,
+      secondaryTagLabel: secondaryLabel,
+      secondaryTagIcon: secondaryIcon,
+      secondaryTagAccent: secondaryAccent,
+      filterPanelTitle: 'Find receipts',
+      summaryPanelTitle: 'Quick summary',
+      feedPanelTitle: 'Receipt list',
     );
   }
 }

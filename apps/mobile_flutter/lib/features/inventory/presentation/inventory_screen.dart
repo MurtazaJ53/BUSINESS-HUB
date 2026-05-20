@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
+import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/utils/formatters.dart';
@@ -33,13 +33,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(mobileSessionProvider).asData?.value;
-    final inventoryRepository = ref.watch(inventoryRepositoryProvider);
     final syncStatus = ref.watch(syncStatusProvider);
-    final metricsStream = inventoryRepository.watchDashboardOverview(
-      includeCost: session?.canViewCost ?? false,
-    );
-    final categoriesStream = inventoryRepository.watchCategories();
-    final pageStream = inventoryRepository.watchCatalogPage(
+    final filter = InventoryCatalogFilter(
       search: _search,
       category: _selectedCategory,
       page: _page,
@@ -47,74 +42,81 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       includeCost: session?.canViewCost ?? false,
       lowStockOnly: _lowStockOnly,
     );
-    final countStream = inventoryRepository.watchCatalogCount(
-      search: _search,
-      category: _selectedCategory,
-      lowStockOnly: _lowStockOnly,
+    final metrics =
+        ref
+            .watch(inventoryOverviewProvider(session?.canViewCost ?? false))
+            .asData
+            ?.value
+            .metrics ??
+        InventoryMetrics.empty();
+    final categories =
+        ref.watch(inventoryCategoriesProvider).asData?.value ??
+        const <InventoryCategorySummary>[];
+    final items =
+        ref.watch(inventoryCatalogPageProvider(filter)).asData?.value ??
+        const <InventoryCatalogItem>[];
+    final totalCount =
+        ref.watch(inventoryCatalogCountProvider(filter)).asData?.value ?? 0;
+    final totalPages = totalCount == 0 ? 1 : (totalCount / _pageSize).ceil();
+    final roleProfile = _InventoryRoleProfile.fromSession(
+      session: session,
+      metrics: metrics,
+      syncStatus: syncStatus,
     );
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
       children: <Widget>[
-        StreamBuilder<DashboardOverview>(
-          stream: metricsStream,
-          builder: (context, snapshot) {
-            final metrics = snapshot.data?.metrics ?? InventoryMetrics.empty();
-            return Column(
+        MobileScreenLead(
+          title: roleProfile.leadTitle,
+          subtitle: roleProfile.leadSubtitle,
+          icon: roleProfile.leadIcon,
+          accent: roleProfile.leadAccent,
+          primaryTag: MobileTag(
+            label: roleProfile.primaryTagLabel,
+            icon: roleProfile.primaryTagIcon,
+            accent: roleProfile.primaryTagAccent,
+          ),
+          secondaryTag: MobileTag(
+            label: roleProfile.secondaryTagLabel,
+            icon: roleProfile.secondaryTagIcon,
+            accent: roleProfile.secondaryTagAccent,
+          ),
+        ),
+        const SizedBox(height: 18),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final count = constraints.maxWidth > 520 ? 3 : 2;
+            return GridView.count(
+              crossAxisCount: count,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 1.02,
               children: <Widget>[
-                MobileScreenLead(
-                  title: 'Inventory',
-                  subtitle:
-                      'Search first, filter fast, and spot low stock without extra visual noise.',
-                  icon: Icons.inventory_2_rounded,
-                  accent: const Color(0xFF1D4ED8),
-                  primaryTag: MobileTag(
-                    label: '${metrics.totalItems} products',
-                    icon: Icons.apps_rounded,
-                  ),
-                  secondaryTag: MobileTag(
-                    label: '${metrics.lowStock} low',
-                    icon: Icons.warning_amber_rounded,
-                    accent: const Color(0xFFFB7185),
-                  ),
+                MobileMetricCard(
+                  label: 'Catalog',
+                  value: '${metrics.totalItems}',
+                  caption: 'Products available',
+                  icon: Icons.apps_rounded,
+                  accent: const Color(0xFF38BDF8),
                 ),
-                const SizedBox(height: 18),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final count = constraints.maxWidth > 520 ? 3 : 2;
-                    return GridView.count(
-                      crossAxisCount: count,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
-                      childAspectRatio: 1.02,
-                      children: <Widget>[
-                        MobileMetricCard(
-                          label: 'Items',
-                          value: '${metrics.totalItems}',
-                          caption: 'Catalog size',
-                          icon: Icons.apps_rounded,
-                        ),
-                        MobileMetricCard(
-                          label: 'Low stock',
-                          value: '${metrics.lowStock}',
-                          caption: 'Watchlist',
-                          icon: Icons.error_outline_rounded,
-                          accent: const Color(0xFFFB7185),
-                        ),
-                        MobileMetricCard(
-                          label: 'Value',
-                          value: formatCurrency(metrics.inventoryValue),
-                          caption: syncStatus == MobileSyncStatus.syncing
-                              ? 'Syncing now'
-                              : 'Local total',
-                          icon: Icons.currency_rupee_rounded,
-                          accent: const Color(0xFF22C55E),
-                        ),
-                      ],
-                    );
-                  },
+                MobileMetricCard(
+                  label: 'Low stock',
+                  value: '${metrics.lowStock}',
+                  caption: _lowStockOnly ? 'Filtered now' : 'Needs refill',
+                  icon: Icons.error_outline_rounded,
+                  accent: const Color(0xFFFB7185),
+                ),
+                MobileMetricCard(
+                  label: 'Stock value',
+                  value: formatCurrency(metrics.inventoryValue),
+                  caption: syncStatus == MobileSyncStatus.syncing
+                      ? 'Refreshing locally'
+                      : 'Local inventory total',
+                  icon: Icons.currency_rupee_rounded,
+                  accent: const Color(0xFF22C55E),
                 ),
               ],
             );
@@ -122,9 +124,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         ),
         const SizedBox(height: 18),
         MobilePanel(
-          title: 'Find products',
+          title: roleProfile.panelTitle,
           action: MobileTag(
-            label: _lowStockOnly ? 'LOW STOCK ONLY' : 'ALL CATALOG',
+            label: _lowStockOnly ? 'LOW STOCK ONLY' : '$totalCount VISIBLE',
             icon: _lowStockOnly ? Icons.filter_alt_rounded : Icons.tune_rounded,
           ),
           child: Column(
@@ -158,7 +160,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               const SizedBox(height: 14),
               FilterChip(
                 selected: _lowStockOnly,
-                label: const Text('Low stock only'),
+                label: const Text('Low stock first'),
                 onSelected: (selected) {
                   setState(() {
                     _lowStockOnly = selected;
@@ -167,133 +169,236 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 },
               ),
               const SizedBox(height: 16),
-              StreamBuilder<List<InventoryCategorySummary>>(
-                stream: categoriesStream,
-                builder: (context, snapshot) {
-                  final categories =
-                      snapshot.data ?? const <InventoryCategorySummary>[];
-                  return SizedBox(
-                    height: 46,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
+              SizedBox(
+                height: 46,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: <Widget>[
+                    _CategoryChip(
+                      label: 'All',
+                      active: _selectedCategory == null,
+                      onTap: () {
+                        setState(() {
+                          _selectedCategory = null;
+                          _page = 1;
+                        });
+                      },
+                    ),
+                    ...categories.map(
+                      (category) => _CategoryChip(
+                        label: '${category.category} (${category.productCount})',
+                        active: _selectedCategory == category.category,
+                        onTap: () {
+                          setState(() {
+                            _selectedCategory = category.category;
+                            _page = 1;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_search.isNotEmpty || _selectedCategory != null) ...<Widget>[
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: <Widget>[
+                    if (_search.isNotEmpty)
+                      MobileTag(
+                        label: 'Search: ${_search.trim()}',
+                        icon: Icons.search_rounded,
+                        accent: const Color(0xFF38BDF8),
+                      ),
+                    if (_selectedCategory != null)
+                      MobileTag(
+                        label: _selectedCategory!,
+                        icon: Icons.inventory_2_rounded,
+                        accent: const Color(0xFFA78BFA),
+                      ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 18),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      '$totalCount result${totalCount == 1 ? '' : 's'}',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    'Page $_page / $totalPages',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.6),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (items.isEmpty)
+                MobileEmptyState(
+                  icon: syncStatus == MobileSyncStatus.syncing
+                      ? Icons.sync_rounded
+                      : Icons.inventory_2_outlined,
+                  title: syncStatus == MobileSyncStatus.syncing
+                      ? 'Inventory is syncing in'
+                      : 'No products matched',
+                  body: syncStatus == MobileSyncStatus.syncing
+                      ? 'Give the workspace a moment while the first inventory batch lands locally.'
+                      : 'Try a different search term or category filter.',
+                )
+              else
+                Column(
+                  children: <Widget>[
+                    ...items.map(
+                      (item) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _InventoryRow(item: item),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
                       children: <Widget>[
-                        _CategoryChip(
-                          label: 'All',
-                          active: _selectedCategory == null,
-                          onTap: () {
-                            setState(() {
-                              _selectedCategory = null;
-                              _page = 1;
-                            });
-                          },
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _page > 1
+                                ? () {
+                                    setState(() {
+                                      _page -= 1;
+                                    });
+                                  }
+                                : null,
+                            child: const Text('Previous'),
+                          ),
                         ),
-                        ...categories.map(
-                          (category) => _CategoryChip(
-                            label:
-                                '${category.category} (${category.productCount})',
-                            active: _selectedCategory == category.category,
-                            onTap: () {
-                              setState(() {
-                                _selectedCategory = category.category;
-                                _page = 1;
-                              });
-                            },
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton.tonal(
+                            onPressed: _page < totalPages
+                                ? () {
+                                    setState(() {
+                                      _page += 1;
+                                    });
+                                  }
+                                : null,
+                            child: const Text('Next'),
                           ),
                         ),
                       ],
                     ),
-                  );
-                },
-              ),
+                  ],
+                ),
             ],
           ),
         ),
-        const SizedBox(height: 18),
-        StreamBuilder<int>(
-          stream: countStream,
-          builder: (context, countSnapshot) {
-            final totalCount = countSnapshot.data ?? 0;
-            final totalPages = totalCount == 0
-                ? 1
-                : (totalCount / _pageSize).ceil();
-            return MobilePanel(
-              title: 'Inventory stream',
-              action: MobileTag(
-                label: '$totalCount visible',
-                icon: Icons.view_agenda_rounded,
-                accent: const Color(0xFFA78BFA),
-              ),
-              child: StreamBuilder<List<InventoryCatalogItem>>(
-                stream: pageStream,
-                builder: (context, snapshot) {
-                  final items = snapshot.data ?? const <InventoryCatalogItem>[];
-
-                  if (items.isEmpty) {
-                    return MobileEmptyState(
-                      icon: syncStatus == MobileSyncStatus.syncing
-                          ? Icons.sync_rounded
-                          : Icons.inventory_2_outlined,
-                      title: syncStatus == MobileSyncStatus.syncing
-                          ? 'Inventory is syncing in'
-                          : 'No products matched',
-                      body: syncStatus == MobileSyncStatus.syncing
-                          ? 'Give the workspace a moment while the first inventory batch lands locally.'
-                          : 'Try a different search term or category filter.',
-                    );
-                  }
-
-                  return Column(
-                    children: <Widget>[
-                      ...items.map(
-                        (item) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _InventoryRow(item: item),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: <Widget>[
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: _page > 1
-                                  ? () {
-                                      setState(() {
-                                        _page -= 1;
-                                      });
-                                    }
-                                  : null,
-                              child: const Text('Previous'),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Text(
-                              'Page $_page / $totalPages',
-                              style: Theme.of(context).textTheme.labelLarge,
-                            ),
-                          ),
-                          Expanded(
-                            child: FilledButton.tonal(
-                              onPressed: _page < totalPages
-                                  ? () {
-                                      setState(() {
-                                        _page += 1;
-                                      });
-                                    }
-                                  : null,
-                              child: const Text('Next'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  );
-                },
-              ),
-            );
-          },
-        ),
       ],
+    );
+  }
+}
+
+class _InventoryRoleProfile {
+  const _InventoryRoleProfile({
+    required this.leadTitle,
+    required this.leadSubtitle,
+    required this.leadIcon,
+    required this.leadAccent,
+    required this.primaryTagLabel,
+    required this.primaryTagIcon,
+    required this.primaryTagAccent,
+    required this.secondaryTagLabel,
+    required this.secondaryTagIcon,
+    required this.secondaryTagAccent,
+    required this.panelTitle,
+  });
+
+  final String leadTitle;
+  final String leadSubtitle;
+  final IconData leadIcon;
+  final Color leadAccent;
+  final String primaryTagLabel;
+  final IconData primaryTagIcon;
+  final Color primaryTagAccent;
+  final String secondaryTagLabel;
+  final IconData secondaryTagIcon;
+  final Color secondaryTagAccent;
+  final String panelTitle;
+
+  factory _InventoryRoleProfile.fromSession({
+    required dynamic session,
+    required InventoryMetrics metrics,
+    required MobileSyncStatus syncStatus,
+  }) {
+    final syncing = syncStatus == MobileSyncStatus.syncing;
+    final primaryLabel = metrics.lowStock > 0
+        ? '${metrics.lowStock} low stock'
+        : '${metrics.totalItems} products';
+    final primaryAccent = metrics.lowStock > 0
+        ? const Color(0xFFFB7185)
+        : const Color(0xFF38BDF8);
+    final secondaryLabel = syncing ? 'Refreshing' : 'Stock view ready';
+    final secondaryAccent = syncing
+        ? const Color(0xFF38BDF8)
+        : const Color(0xFF22C55E);
+
+    if (session?.isCashierLike ?? false) {
+      return _InventoryRoleProfile(
+        leadTitle: metrics.lowStock > 0
+            ? '${metrics.lowStock} items need refill'
+            : 'Find stock fast',
+        leadSubtitle:
+            'Search products, check available stock, and spot refill risk without leaving the selling flow.',
+        leadIcon: Icons.inventory_2_rounded,
+        leadAccent: const Color(0xFF1D4ED8),
+        primaryTagLabel: primaryLabel,
+        primaryTagIcon: Icons.inventory_2_rounded,
+        primaryTagAccent: primaryAccent,
+        secondaryTagLabel: secondaryLabel,
+        secondaryTagIcon: syncing ? Icons.sync_rounded : Icons.verified_rounded,
+        secondaryTagAccent: secondaryAccent,
+        panelTitle: 'Find stock',
+      );
+    }
+
+    if (session?.isManager ?? false) {
+      return _InventoryRoleProfile(
+        leadTitle: metrics.lowStock > 0
+            ? '${metrics.lowStock} products need attention'
+            : 'Inventory is under control',
+        leadSubtitle:
+            'Use one fast surface to search the catalog, scan refill risk, and monitor local stock value.',
+        leadIcon: Icons.inventory_2_rounded,
+        leadAccent: const Color(0xFF1D4ED8),
+        primaryTagLabel: primaryLabel,
+        primaryTagIcon: Icons.error_outline_rounded,
+        primaryTagAccent: primaryAccent,
+        secondaryTagLabel: secondaryLabel,
+        secondaryTagIcon: syncing ? Icons.sync_rounded : Icons.assessment_rounded,
+        secondaryTagAccent: secondaryAccent,
+        panelTitle: 'Stock search',
+      );
+    }
+
+    return _InventoryRoleProfile(
+      leadTitle: metrics.lowStock > 0
+          ? '${metrics.lowStock} products need refill'
+          : 'Inventory pulse ready',
+      leadSubtitle:
+          'Track stock health, product count, and local inventory value from one cleaner catalog view.',
+      leadIcon: Icons.inventory_2_rounded,
+      leadAccent: const Color(0xFF1D4ED8),
+      primaryTagLabel: primaryLabel,
+      primaryTagIcon: Icons.inventory_2_rounded,
+      primaryTagAccent: primaryAccent,
+      secondaryTagLabel: secondaryLabel,
+      secondaryTagIcon: syncing ? Icons.sync_rounded : Icons.currency_rupee_rounded,
+      secondaryTagAccent: secondaryAccent,
+      panelTitle: 'Catalog search',
     );
   }
 }
