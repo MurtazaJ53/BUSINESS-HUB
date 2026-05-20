@@ -1420,6 +1420,210 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
   final String sortMode;
   final String? warning;
 
+  Future<void> _showLegacyCustomerDetailSheet(
+    BuildContext context,
+    BackendCustomerSummary customer,
+  ) {
+    final compact = MediaQuery.sizeOf(context).width < 420;
+    final balanceAccent = customer.balance > 0
+        ? const Color(0xFFFB7185)
+        : const Color(0xFF22C55E);
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF070B13),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.only(
+              left: compact ? 16 : 18,
+              right: compact ? 16 : 18,
+              top: compact ? 16 : 18,
+              bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                MobileSheetHeader(
+                  eyebrow: 'Legacy customer',
+                  title: customer.name,
+                  subtitle:
+                      customer.phone ??
+                      customer.email ??
+                      'Loaded from the old cloud customer collection.',
+                  icon: Icons.cloud_sync_rounded,
+                  accent: const Color(0xFF14B8A6),
+                  tags: <Widget>[
+                    MobileTag(
+                      label: 'Spent ${formatCurrency(customer.totalSpent)}',
+                      icon: Icons.trending_up_rounded,
+                      accent: const Color(0xFF38BDF8),
+                    ),
+                    MobileTag(
+                      label: 'Balance ${formatCurrency(customer.balance)}',
+                      icon: Icons.account_balance_wallet_rounded,
+                      accent: balanceAccent,
+                    ),
+                    MobileTag(
+                      label: customer.status.toUpperCase(),
+                      icon: Icons.verified_rounded,
+                      accent: const Color(0xFFA78BFA),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                MobileSheetSection(
+                  title: 'Customer snapshot',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      _CustomerDetailLine(
+                        label: 'Phone',
+                        value: customer.phone,
+                      ),
+                      _CustomerDetailLine(
+                        label: 'Email',
+                        value: customer.email,
+                      ),
+                      _CustomerDetailLine(
+                        label: 'Status',
+                        value: customer.status,
+                      ),
+                      _CustomerDetailLine(
+                        label: 'Lifetime spent',
+                        value: formatCurrency(customer.totalSpent),
+                      ),
+                      _CustomerDetailLine(
+                        label: 'Current balance',
+                        value: formatCurrency(customer.balance),
+                      ),
+                    ],
+                  ),
+                ),
+                if ((customer.notes ?? '').trim().isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 12),
+                  MobileSheetSection(
+                    title: 'Notes',
+                    child: Text(customer.notes!.trim()),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                        icon: const Icon(Icons.arrow_back_rounded),
+                        label: const Text('Back to customers'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showLocalCustomerDetailSheet(
+    BuildContext context,
+    CustomerPulseSummary customer,
+  ) {
+    final compact = MediaQuery.sizeOf(context).width < 420;
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF070B13),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.only(
+              left: compact ? 16 : 18,
+              right: compact ? 16 : 18,
+              top: compact ? 16 : 18,
+              bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                MobileSheetHeader(
+                  eyebrow: 'Local buyer recall',
+                  title: customer.name,
+                  subtitle:
+                      customer.phone ??
+                      'Rebuilt from local sales history because the cloud customer master is empty for this view.',
+                  icon: Icons.person_search_rounded,
+                  accent: const Color(0xFF14B8A6),
+                  tags: <Widget>[
+                    MobileTag(
+                      label: '${customer.visitCount} visits',
+                      icon: Icons.repeat_rounded,
+                      accent: const Color(0xFF38BDF8),
+                    ),
+                    MobileTag(
+                      label: 'Spent ${formatCurrency(customer.lifetimeSpend)}',
+                      icon: Icons.currency_rupee_rounded,
+                      accent: const Color(0xFF22C55E),
+                    ),
+                    if (customer.pendingSales > 0)
+                      MobileTag(
+                        label: '${customer.pendingSales} queued',
+                        icon: Icons.cloud_upload_rounded,
+                        accent: const Color(0xFFF59E0B),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                MobileSheetSection(
+                  title: 'Buyer snapshot',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      _CustomerDetailLine(
+                        label: 'Phone',
+                        value: customer.phone,
+                      ),
+                      _CustomerDetailLine(
+                        label: 'Last seen',
+                        value: formatCompactDate(customer.lastSeenAt),
+                      ),
+                      _CustomerDetailLine(
+                        label: 'Visits',
+                        value: '${customer.visitCount}',
+                      ),
+                      _CustomerDetailLine(
+                        label: 'Lifetime spend',
+                        value: formatCurrency(customer.lifetimeSpend),
+                      ),
+                      _CustomerDetailLine(
+                        label: 'Queued receipts',
+                        value: '${customer.pendingSales}',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                        icon: const Icon(Icons.arrow_back_rounded),
+                        label: const Text('Back to customers'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MobilePanel(
@@ -1523,7 +1727,11 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
                     ...filteredLegacyCustomers.map(
                       (customer) => Padding(
                         padding: const EdgeInsets.only(bottom: 12),
-                        child: _LegacyCloudCustomerRow(customer: customer),
+                        child: _LegacyCloudCustomerRow(
+                          customer: customer,
+                          onTap: () =>
+                              _showLegacyCustomerDetailSheet(context, customer),
+                        ),
                       ),
                     ),
                   ],
@@ -1558,7 +1766,13 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
                       ...customers.map(
                         (customer) => Padding(
                           padding: const EdgeInsets.only(bottom: 12),
-                          child: _LocalCustomerRow(customer: customer),
+                          child: _LocalCustomerRow(
+                            customer: customer,
+                            onTap: () => _showLocalCustomerDetailSheet(
+                              context,
+                              customer,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -1888,85 +2102,99 @@ class _BackendCustomerRow extends StatelessWidget {
 }
 
 class _LegacyCloudCustomerRow extends StatelessWidget {
-  const _LegacyCloudCustomerRow({required this.customer});
+  const _LegacyCloudCustomerRow({required this.customer, required this.onTap});
 
   final BackendCustomerSummary customer;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final balanceTone = customer.balance > 0
         ? const Color(0xFFFB7185)
         : const Color(0xFF22C55E);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A1220),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: <Widget>[
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: const Color(0xFF14B8A6).withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Icon(
-                Icons.cloud_sync_rounded,
-                color: Color(0xFF14B8A6),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    customer.name,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A1220),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF14B8A6).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    customer.phone ??
-                        customer.email ??
-                        customer.notes ??
-                        customer.status,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.58),
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: const Icon(
+                    Icons.cloud_sync_rounded,
+                    color: Color(0xFF14B8A6),
                   ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      MobileTag(
-                        label: 'Spent ${formatCurrency(customer.totalSpent)}',
-                        icon: Icons.trending_up_rounded,
-                        accent: const Color(0xFF38BDF8),
+                      Text(
+                        customer.name,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
                       ),
-                      MobileTag(
-                        label: 'Balance ${formatCurrency(customer.balance)}',
-                        icon: Icons.account_balance_wallet_rounded,
-                        accent: balanceTone,
+                      const SizedBox(height: 4),
+                      Text(
+                        customer.phone ??
+                            customer.email ??
+                            customer.notes ??
+                            customer.status,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.58),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                      MobileTag(
-                        label: customer.status.toUpperCase(),
-                        icon: Icons.cloud_done_rounded,
-                        accent: const Color(0xFF14B8A6),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: <Widget>[
+                          MobileTag(
+                            label:
+                                'Spent ${formatCurrency(customer.totalSpent)}',
+                            icon: Icons.trending_up_rounded,
+                            accent: const Color(0xFF38BDF8),
+                          ),
+                          MobileTag(
+                            label:
+                                'Balance ${formatCurrency(customer.balance)}',
+                            icon: Icons.account_balance_wallet_rounded,
+                            accent: balanceTone,
+                          ),
+                          MobileTag(
+                            label: customer.status.toUpperCase(),
+                            icon: Icons.cloud_done_rounded,
+                            accent: const Color(0xFF14B8A6),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 12),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.white.withValues(alpha: 0.45),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -1974,83 +2202,134 @@ class _LegacyCloudCustomerRow extends StatelessWidget {
 }
 
 class _LocalCustomerRow extends StatelessWidget {
-  const _LocalCustomerRow({required this.customer});
+  const _LocalCustomerRow({required this.customer, required this.onTap});
 
   final CustomerPulseSummary customer;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A1220),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: <Widget>[
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: const Color(0xFF14B8A6).withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Icon(
-                Icons.person_search_rounded,
-                color: Color(0xFF14B8A6),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    customer.name,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A1220),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF14B8A6).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    customer.phone ??
-                        'Last seen ${formatCompactDate(customer.lastSeenAt)}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.58),
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: const Icon(
+                    Icons.person_search_rounded,
+                    color: Color(0xFF14B8A6),
                   ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      MobileTag(
-                        label: '${customer.visitCount} visits',
-                        icon: Icons.repeat_rounded,
-                        accent: const Color(0xFF38BDF8),
+                      Text(
+                        customer.name,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
                       ),
-                      MobileTag(
-                        label:
-                            'Spent ${formatCurrency(customer.lifetimeSpend)}',
-                        icon: Icons.currency_rupee_rounded,
-                        accent: const Color(0xFF22C55E),
-                      ),
-                      if (customer.pendingSales > 0)
-                        MobileTag(
-                          label: '${customer.pendingSales} queued',
-                          icon: Icons.cloud_upload_rounded,
-                          accent: const Color(0xFFF59E0B),
+                      const SizedBox(height: 4),
+                      Text(
+                        customer.phone ??
+                            'Last seen ${formatCompactDate(customer.lastSeenAt)}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.58),
+                          fontWeight: FontWeight.w600,
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: <Widget>[
+                          MobileTag(
+                            label: '${customer.visitCount} visits',
+                            icon: Icons.repeat_rounded,
+                            accent: const Color(0xFF38BDF8),
+                          ),
+                          MobileTag(
+                            label:
+                                'Spent ${formatCurrency(customer.lifetimeSpend)}',
+                            icon: Icons.currency_rupee_rounded,
+                            accent: const Color(0xFF22C55E),
+                          ),
+                          if (customer.pendingSales > 0)
+                            MobileTag(
+                              label: '${customer.pendingSales} queued',
+                              icon: Icons.cloud_upload_rounded,
+                              accent: const Color(0xFFF59E0B),
+                            ),
+                        ],
+                      ),
                     ],
                   ),
-                ],
+                ),
+                const SizedBox(width: 12),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.white.withValues(alpha: 0.45),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CustomerDetailLine extends StatelessWidget {
+  const _CustomerDetailLine({required this.label, required this.value});
+
+  final String label;
+  final String? value;
+
+  @override
+  Widget build(BuildContext context) {
+    final safeValue = (value ?? '').trim().isEmpty ? 'Not available' : value!;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          SizedBox(
+            width: 112,
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.56),
+                fontWeight: FontWeight.w700,
               ),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              safeValue,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
       ),
     );
   }
