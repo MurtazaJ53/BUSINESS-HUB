@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/session/mobile_session_controller.dart';
@@ -15,6 +16,7 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(mobileSessionProvider).asData?.value;
+    final salesRepository = ref.read(salesRepositoryProvider);
     final syncStatus = ref.watch(syncStatusProvider);
     final overview =
         ref
@@ -226,13 +228,177 @@ class DashboardScreen extends ConsumerWidget {
                               '${sale.customerName?.isNotEmpty == true ? sale.customerName : 'Walk-in customer'} | ${sale.date}',
                           trailing: sale.paymentMode,
                           accent: const Color(0xFF22C55E),
-                          onTap: () => context.go('/history'),
+                          onTap: () =>
+                              _openSaleDetail(context, salesRepository, sale),
                         ),
                       )
                       .toList(growable: false),
                 ),
         ),
       ],
+    );
+  }
+
+  Future<void> _openSaleDetail(
+    BuildContext context,
+    SalesRepository salesRepository,
+    RecentSaleSummary sale,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF070B13),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+            child: FutureBuilder<SaleRecordDetail?>(
+              future: salesRepository.getSaleDetail(sale.id),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const MobileEmptyState(
+                    icon: Icons.sync_rounded,
+                    title: 'Loading receipt detail',
+                    body:
+                        'The mobile vault is unpacking the full receipt payload for this sale.',
+                  );
+                }
+
+                final detail = snapshot.data;
+                if (detail == null) {
+                  return const MobileEmptyState(
+                    icon: Icons.receipt_long_outlined,
+                    title: 'Receipt detail unavailable',
+                    body:
+                        'This receipt summary exists, but the full local payload could not be loaded.',
+                  );
+                }
+
+                return ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 680),
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: <Widget>[
+                      MobileSheetHeader(
+                        eyebrow: 'Recent receipt',
+                        title: formatCurrency(detail.total),
+                        subtitle:
+                            '${detail.customerName?.isNotEmpty == true ? detail.customerName : 'Walk-in customer'} | ${detail.date}',
+                        icon: Icons.receipt_long_rounded,
+                        accent: const Color(0xFFF59E0B),
+                        tags: <Widget>[
+                          MobileTag(
+                            label: _syncLabel(detail.syncState),
+                            icon: Icons.cloud_done_rounded,
+                            accent: _syncTone(detail.syncState),
+                          ),
+                          MobileTag(
+                            label: detail.paymentMode,
+                            icon: Icons.payments_rounded,
+                            accent: const Color(0xFF38BDF8),
+                          ),
+                          MobileTag(
+                            label: '${detail.itemCount} items',
+                            icon: Icons.shopping_bag_rounded,
+                            accent: const Color(0xFFA78BFA),
+                          ),
+                          if (detail.hasOutstandingDue)
+                            MobileTag(
+                              label: 'Due ${formatCurrency(detail.amountDue)}',
+                              icon: Icons.warning_amber_rounded,
+                              accent: const Color(0xFFF59E0B),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      _DashboardDetailSection(
+                        title: 'Items',
+                        child: Column(
+                          children: detail.items
+                              .map(
+                                (item) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: _DashboardSaleItemRow(item: item),
+                                ),
+                              )
+                              .toList(growable: false),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      _DashboardDetailSection(
+                        title: 'Payments',
+                        child: Column(
+                          children: detail.payments
+                              .map(
+                                (payment) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: _DashboardSalePaymentRow(
+                                    payment: payment,
+                                  ),
+                                ),
+                              )
+                              .toList(growable: false),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      _DashboardDetailSection(
+                        title: 'Summary',
+                        child: Column(
+                          children: <Widget>[
+                            _DashboardSummaryRow(
+                              label: 'Subtotal',
+                              value: formatCurrency(detail.subtotal),
+                            ),
+                            _DashboardSummaryRow(
+                              label: 'Discount',
+                              value: formatCurrency(detail.discount),
+                            ),
+                            _DashboardSummaryRow(
+                              label: 'Total',
+                              value: formatCurrency(detail.total),
+                              emphasize: true,
+                            ),
+                            _DashboardSummaryRow(
+                              label: 'Collected',
+                              value: formatCurrency(detail.amountReceived),
+                            ),
+                            _DashboardSummaryRow(
+                              label: 'Due outstanding',
+                              value: formatCurrency(detail.amountDue),
+                              emphasize: detail.hasOutstandingDue,
+                            ),
+                            if ((detail.customerPhone ?? '').isNotEmpty)
+                              _DashboardSummaryRow(
+                                label: 'Phone',
+                                value: detail.customerPhone!,
+                              ),
+                            if ((detail.footerNote ?? '').isNotEmpty)
+                              _DashboardSummaryRow(
+                                label: 'Footer note',
+                                value: detail.footerNote!,
+                              ),
+                            if ((detail.commandId ?? '').isNotEmpty)
+                              _DashboardSummaryRow(
+                                label: 'Command',
+                                value: detail.commandId!,
+                              ),
+                            if ((detail.lastSyncError ?? '').isNotEmpty)
+                              _DashboardSummaryRow(
+                                label: 'Last sync error',
+                                value: detail.lastSyncError!,
+                                emphasize: true,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -858,4 +1024,160 @@ class _DashboardRow extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DashboardDetailSection extends StatelessWidget {
+  const _DashboardDetailSection({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return MobileSheetSection(
+      title: title,
+      accent: const Color(0xFFF59E0B),
+      child: child,
+    );
+  }
+}
+
+class _DashboardSaleItemRow extends StatelessWidget {
+  const _DashboardSaleItemRow({required this.item});
+
+  final SaleDetailItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                item.name,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${item.quantity} x ${formatCurrency(item.unitPrice)}${item.size?.isNotEmpty == true ? ' | ${item.size}' : ''}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.58),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Text(
+          formatCurrency(item.lineTotal),
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: const Color(0xFF22C55E),
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DashboardSalePaymentRow extends StatelessWidget {
+  const _DashboardSalePaymentRow({required this.payment});
+
+  final SaleDetailPayment payment;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                payment.mode,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              if ((payment.referenceCode ?? '').isNotEmpty ||
+                  (payment.note ?? '').isNotEmpty) ...<Widget>[
+                const SizedBox(height: 4),
+                Text(
+                  payment.referenceCode ?? payment.note!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.58),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        Text(
+          formatCurrency(payment.amount),
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: const Color(0xFF38BDF8),
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DashboardSummaryRow extends StatelessWidget {
+  const _DashboardSummaryRow({
+    required this.label,
+    required this.value,
+    this.emphasize = false,
+  });
+
+  final String label;
+  final String value;
+  final bool emphasize;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodyMedium?.copyWith(
+      color: emphasize ? Colors.white : Colors.white.withValues(alpha: 0.72),
+      fontWeight: emphasize ? FontWeight.w900 : FontWeight.w600,
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Expanded(child: Text(label, style: style)),
+          const SizedBox(width: 16),
+          Flexible(
+            child: Text(value, textAlign: TextAlign.right, style: style),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _syncLabel(CommerceSyncState state) {
+  return switch (state) {
+    CommerceSyncState.localOnly => 'LOCAL',
+    CommerceSyncState.queued => 'QUEUED',
+    CommerceSyncState.syncing => 'SYNCING',
+    CommerceSyncState.synced => 'SYNCED',
+    CommerceSyncState.failed => 'FAILED',
+  };
+}
+
+Color _syncTone(CommerceSyncState state) {
+  return switch (state) {
+    CommerceSyncState.synced => const Color(0xFF22C55E),
+    CommerceSyncState.queued => const Color(0xFFF59E0B),
+    CommerceSyncState.syncing => const Color(0xFF38BDF8),
+    CommerceSyncState.failed => const Color(0xFFFB7185),
+    CommerceSyncState.localOnly => Colors.white70,
+  };
 }
