@@ -98,6 +98,7 @@ It is designed to support:
 71. [ERPNext Execution Layer](./erpnext-execution-layer.md)
 72. [ERPNext Handover Runbook](./erpnext-handover-runbook.md)
 73. [ERPNext Local Demo Runbook](./erpnext-local-demo-runbook.md)
+74. [Business Hub Frappe / ERPNext Weekly Implementation Plan](./business-hub-frappe-erpnext-weekly-implementation-plan.md)
 
 ## Current truth
 
