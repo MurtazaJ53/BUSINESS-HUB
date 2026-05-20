@@ -134,7 +134,7 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen> {
             _redirecting = true;
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) {
-                context.go('/dashboard');
+                context.go(session.defaultRoute);
               }
             });
           }

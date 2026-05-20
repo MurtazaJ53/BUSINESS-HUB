@@ -21,8 +21,36 @@ class MobileSession {
 
   bool get isSignedIn => true;
   bool get hasShop => shopId != null && shopId!.isNotEmpty;
-  bool get isAdmin => role == 'admin';
-  bool get canViewCost => isAdmin || isElevatedAdmin;
+  String get normalizedRole => (role ?? '').trim().toLowerCase();
+  bool get isAdmin => normalizedRole == 'admin';
+  bool get isManager => normalizedRole == 'manager';
+  bool get isCashierLike =>
+      normalizedRole == 'cashier' ||
+      normalizedRole == 'staff' ||
+      (!isElevatedAdmin && !isManager && !isAdmin);
+  bool get isOwnerLike => isElevatedAdmin || isAdmin;
+  bool get canViewCost => isOwnerLike;
+  bool get canAccessAdvancedOps => isOwnerLike;
+  bool get landsOnPosByDefault => isCashierLike;
+  String get defaultRoute => landsOnPosByDefault ? '/pos' : '/dashboard';
+  String get displayRoleLabel {
+    if (isElevatedAdmin) {
+      return 'OWNER';
+    }
+    if (isAdmin) {
+      return 'ADMIN';
+    }
+    if (isManager) {
+      return 'MANAGER';
+    }
+    if (normalizedRole == 'cashier') {
+      return 'CASHIER';
+    }
+    if (normalizedRole == 'staff') {
+      return 'STAFF';
+    }
+    return 'OPERATOR';
+  }
 
   static MobileSession fromClaims(
     User user,

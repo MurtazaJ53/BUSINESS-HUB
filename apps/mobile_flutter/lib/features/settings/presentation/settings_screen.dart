@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/backend/backend_api_client.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/runtime/app_runtime_info.dart';
@@ -18,7 +17,6 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(mobileSessionProvider).asData?.value;
-    final backendApiClient = ref.watch(backendApiClientProvider);
     final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
     final syncStatus = ref.watch(syncStatusProvider);
     final runtimeInfoAsync = ref.watch(appRuntimeInfoProvider);
@@ -28,22 +26,22 @@ class SettingsScreen extends ConsumerWidget {
         ref.watch(historyOverviewProvider).asData?.value ??
         HistoryOverview.empty();
     final pending = ref.watch(pendingOutboxCountProvider).asData?.value ?? 0;
+    final profile = _SettingsRoleProfile.fromSession(session);
 
     return MobileStandaloneScaffold(
-      title: 'Settings',
+      title: profile.screenTitle,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
         children: <Widget>[
           MobileScreenLead(
-            title: 'Settings',
-            subtitle:
-                'Keep daily settings simple. Heavy rollout and recovery tools live in Advanced Ops only.',
-            icon: Icons.settings_rounded,
-            accent: const Color(0xFFA78BFA),
+            title: profile.leadTitle,
+            subtitle: profile.leadSubtitle,
+            icon: profile.leadIcon,
+            accent: profile.leadAccent,
             primaryTag: MobileTag(
-              label: session?.role?.toUpperCase() ?? 'GUEST',
+              label: session?.displayRoleLabel ?? 'GUEST',
               icon: Icons.badge_rounded,
-              accent: const Color(0xFFA78BFA),
+              accent: profile.leadAccent,
             ),
             secondaryTag: MobileTag(
               label: switch (syncStatus) {
@@ -70,7 +68,7 @@ class SettingsScreen extends ConsumerWidget {
           MobilePanel(
             title: 'Workspace',
             action: MobileTag(
-              label: session?.shopId ?? 'No shop',
+              label: profile.workspaceTag,
               icon: Icons.storefront_rounded,
               accent: const Color(0xFF14B8A6),
             ),
@@ -90,20 +88,15 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 _SettingsRow(
                   label: 'Role',
-                  value: session?.role?.toUpperCase() ?? 'UNKNOWN',
+                  value: session?.displayRoleLabel ?? 'UNKNOWN',
                   icon: Icons.admin_panel_settings_rounded,
-                ),
-                _SettingsRow(
-                  label: 'Backend API',
-                  value: backendApiClient.baseUrl,
-                  icon: Icons.cloud_outlined,
                 ),
               ],
             ),
           ),
           const SizedBox(height: 18),
           MobilePanel(
-            title: 'Sync health',
+            title: profile.syncPanelTitle,
             action: MobileTag(
               label: pending > 0 ? '$pending queued' : 'Queue clear',
               icon: pending > 0
@@ -117,23 +110,13 @@ class SettingsScreen extends ConsumerWidget {
               children: <Widget>[
                 _SettingsRow(
                   label: 'Sync posture',
-                  value: syncStatus.name.toUpperCase(),
+                  value: profile.syncLabelFor(syncStatus),
                   icon: Icons.sync_alt_rounded,
                 ),
                 _SettingsRow(
-                  label: 'Queued commands',
+                  label: 'Queued receipts',
                   value: '$pending',
                   icon: Icons.outbox_rounded,
-                ),
-                _SettingsRow(
-                  label: 'Queued value',
-                  value: formatCurrency(history.queuedRevenue),
-                  icon: Icons.currency_rupee_rounded,
-                ),
-                _SettingsRow(
-                  label: 'Failed receipts',
-                  value: '${history.failedSales}',
-                  icon: Icons.error_outline_rounded,
                 ),
                 _SettingsRow(
                   label: 'Last receipt sync',
@@ -142,6 +125,18 @@ class SettingsScreen extends ConsumerWidget {
                       : formatCompactDate(history.lastSyncedAt!),
                   icon: Icons.schedule_rounded,
                 ),
+                if (profile.showOwnerSyncDetails) ...<Widget>[
+                  _SettingsRow(
+                    label: 'Queued value',
+                    value: formatCurrency(history.queuedRevenue),
+                    icon: Icons.currency_rupee_rounded,
+                  ),
+                  _SettingsRow(
+                    label: 'Failed receipts',
+                    value: '${history.failedSales}',
+                    icon: Icons.error_outline_rounded,
+                  ),
+                ],
                 const SizedBox(height: 8),
                 LayoutBuilder(
                   builder: (context, constraints) {
@@ -161,7 +156,7 @@ class SettingsScreen extends ConsumerWidget {
                             );
                           },
                           icon: const Icon(Icons.refresh_rounded),
-                          label: const Text('Refresh'),
+                          label: Text(profile.refreshButtonLabel),
                         ),
                       ),
                       Expanded(
@@ -177,7 +172,7 @@ class SettingsScreen extends ConsumerWidget {
                                     SnackBar(
                                       content: Text(
                                         result.message ??
-                                            'Outbox flush requested.',
+                                            'Queued receipts retry requested.',
                                       ),
                                     ),
                                   );
@@ -223,11 +218,6 @@ class SettingsScreen extends ConsumerWidget {
               data: (runtime) => Column(
                 children: <Widget>[
                   _SettingsRow(
-                    label: 'App',
-                    value: runtime.appName,
-                    icon: Icons.android_rounded,
-                  ),
-                  _SettingsRow(
                     label: 'Version',
                     value: runtime.versionLabel,
                     icon: Icons.sell_rounded,
@@ -237,11 +227,18 @@ class SettingsScreen extends ConsumerWidget {
                     value: runtime.releaseFingerprint,
                     icon: Icons.flag_rounded,
                   ),
-                  _SettingsRow(
-                    label: 'Package',
-                    value: runtime.packageName,
-                    icon: Icons.inventory_2_rounded,
-                  ),
+                  if (profile.showOwnerSyncDetails) ...<Widget>[
+                    _SettingsRow(
+                      label: 'App',
+                      value: runtime.appName,
+                      icon: Icons.android_rounded,
+                    ),
+                    _SettingsRow(
+                      label: 'Package',
+                      value: runtime.packageName,
+                      icon: Icons.inventory_2_rounded,
+                    ),
+                  ],
                 ],
               ),
               loading: () => const MobileEmptyState(
@@ -258,25 +255,26 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 18),
           MobilePanel(
-            title: 'Account and support',
+            title: profile.accountPanelTitle,
             action: MobileTag(
-              label: 'FAST PATH',
-              icon: Icons.flash_on_rounded,
-              accent: const Color(0xFF22C55E),
+              label: profile.accountTag,
+              icon: profile.accountIcon,
+              accent: profile.accountAccent,
             ),
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final stacked = constraints.maxWidth < 430;
                 final actions = <Widget>[
-                  Expanded(
-                    child: FilledButton.tonalIcon(
-                      onPressed: () {
-                        context.push('/settings/advanced');
-                      },
-                      icon: const Icon(Icons.tune_rounded),
-                      label: const Text('Advanced ops'),
+                  if (profile.showAdvancedOpsButton)
+                    Expanded(
+                      child: FilledButton.tonalIcon(
+                        onPressed: () {
+                          context.push('/settings/advanced');
+                        },
+                        icon: const Icon(Icons.tune_rounded),
+                        label: const Text('Advanced ops'),
+                      ),
                     ),
-                  ),
                   Expanded(
                     child: FilledButton.tonalIcon(
                       onPressed: () async {
@@ -294,20 +292,24 @@ class SettingsScreen extends ConsumerWidget {
 
                 if (stacked) {
                   return Column(
-                    children: <Widget>[
-                      actions[0],
-                      const SizedBox(height: 10),
-                      actions[1],
-                    ],
+                    children: actions
+                        .expand((widget) => <Widget>[
+                              widget,
+                              if (widget != actions.last)
+                                const SizedBox(height: 10),
+                            ])
+                        .toList(growable: false),
                   );
                 }
 
                 return Row(
-                  children: <Widget>[
-                    actions[0],
-                    const SizedBox(width: 10),
-                    actions[1],
-                  ],
+                  children: actions
+                      .expand((widget) => <Widget>[
+                            widget,
+                            if (widget != actions.last)
+                              const SizedBox(width: 10),
+                          ])
+                      .toList(growable: false),
                 );
               },
             ),
@@ -315,6 +317,109 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+class _SettingsRoleProfile {
+  const _SettingsRoleProfile({
+    required this.screenTitle,
+    required this.leadTitle,
+    required this.leadSubtitle,
+    required this.leadIcon,
+    required this.leadAccent,
+    required this.workspaceTag,
+    required this.syncPanelTitle,
+    required this.refreshButtonLabel,
+    required this.accountPanelTitle,
+    required this.accountTag,
+    required this.accountIcon,
+    required this.accountAccent,
+    required this.showAdvancedOpsButton,
+    required this.showOwnerSyncDetails,
+  });
+
+  final String screenTitle;
+  final String leadTitle;
+  final String leadSubtitle;
+  final IconData leadIcon;
+  final Color leadAccent;
+  final String workspaceTag;
+  final String syncPanelTitle;
+  final String refreshButtonLabel;
+  final String accountPanelTitle;
+  final String accountTag;
+  final IconData accountIcon;
+  final Color accountAccent;
+  final bool showAdvancedOpsButton;
+  final bool showOwnerSyncDetails;
+
+  factory _SettingsRoleProfile.fromSession(dynamic session) {
+    if (session?.isCashierLike ?? false) {
+      return const _SettingsRoleProfile(
+        screenTitle: 'Shift settings',
+        leadTitle: 'Shift settings',
+        leadSubtitle:
+            'Keep the day simple here. Check app health, refresh the workspace, and sign out when the shift ends.',
+        leadIcon: Icons.settings_rounded,
+        leadAccent: Color(0xFF38BDF8),
+        workspaceTag: 'SHIFT READY',
+        syncPanelTitle: 'App health',
+        refreshButtonLabel: 'Refresh app',
+        accountPanelTitle: 'Account',
+        accountTag: 'FAST EXIT',
+        accountIcon: Icons.flash_on_rounded,
+        accountAccent: Color(0xFF22C55E),
+        showAdvancedOpsButton: false,
+        showOwnerSyncDetails: false,
+      );
+    }
+
+    if (session?.isManager ?? false) {
+      return const _SettingsRoleProfile(
+        screenTitle: 'Operations settings',
+        leadTitle: 'Operations settings',
+        leadSubtitle:
+            'Use this space for daily store settings and app health. Heavy platform tooling stays out of the way.',
+        leadIcon: Icons.settings_applications_rounded,
+        leadAccent: Color(0xFF14B8A6),
+        workspaceTag: 'STORE READY',
+        syncPanelTitle: 'Workspace health',
+        refreshButtonLabel: 'Refresh workspace',
+        accountPanelTitle: 'Account',
+        accountTag: 'DAILY USE',
+        accountIcon: Icons.badge_rounded,
+        accountAccent: Color(0xFF14B8A6),
+        showAdvancedOpsButton: false,
+        showOwnerSyncDetails: false,
+      );
+    }
+
+    return const _SettingsRoleProfile(
+      screenTitle: 'Store settings',
+      leadTitle: 'Store settings',
+      leadSubtitle:
+          'Daily controls stay simple here. Advanced recovery, rollout, and technical tooling remain behind the admin-only ops area.',
+      leadIcon: Icons.settings_rounded,
+      leadAccent: Color(0xFFA78BFA),
+      workspaceTag: 'OWNER VIEW',
+      syncPanelTitle: 'Workspace health',
+      refreshButtonLabel: 'Refresh workspace',
+      accountPanelTitle: 'Owner and support',
+      accountTag: 'ADMIN PATH',
+      accountIcon: Icons.shield_rounded,
+      accountAccent: Color(0xFFA78BFA),
+      showAdvancedOpsButton: true,
+      showOwnerSyncDetails: true,
+    );
+  }
+
+  String syncLabelFor(MobileSyncStatus syncStatus) {
+    return switch (syncStatus) {
+      MobileSyncStatus.syncing => 'Refreshing',
+      MobileSyncStatus.error => 'Needs attention',
+      MobileSyncStatus.offline => 'Offline',
+      MobileSyncStatus.idle => 'Stable',
+    };
   }
 }
 
@@ -360,19 +465,18 @@ class _SettingsRow extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      label.toUpperCase(),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.48),
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1,
+                      label,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.52),
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
                       value,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white.withValues(alpha: 0.9),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ],
