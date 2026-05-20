@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Business Hub Command Center",
-  description: "Phase 1 admin web shell for the Business Hub platform backend.",
+  title: "Business Hub Admin",
+  description: "Curated owner and manager workspace for Business Hub.",
 };
 
 export default function RootLayout({

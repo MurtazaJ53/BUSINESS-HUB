@@ -1,20 +1,20 @@
 @import "tailwindcss";
 
 :root {
-  --bg-app: #05070d;
-  --bg-panel: #0b101a;
-  --bg-panel-strong: #101726;
-  --bg-panel-soft: rgba(16, 23, 38, 0.72);
-  --border-soft: rgba(152, 164, 189, 0.16);
-  --border-strong: rgba(89, 172, 255, 0.28);
-  --text-primary: #f4f7fb;
-  --text-secondary: #96a4bd;
-  --text-muted: #62718f;
-  --accent: #5caefe;
-  --accent-strong: #368cff;
-  --success: #34d399;
-  --warning: #fb7185;
-  --glow: 0 0 0 1px rgba(89, 172, 255, 0.2), 0 18px 80px rgba(13, 28, 59, 0.48);
+  --bg-app: #071017;
+  --bg-panel: #0f1824;
+  --bg-panel-strong: #152132;
+  --bg-panel-soft: rgba(15, 24, 36, 0.84);
+  --border-soft: rgba(152, 164, 189, 0.12);
+  --border-strong: rgba(89, 172, 255, 0.22);
+  --text-primary: #edf3fb;
+  --text-secondary: #9dadc4;
+  --text-muted: #70809a;
+  --accent: #47b0ff;
+  --accent-strong: #218cff;
+  --success: #3ad7a2;
+  --warning: #ff8a6a;
+  --glow: 0 0 0 1px rgba(89, 172, 255, 0.16), 0 22px 56px rgba(8, 18, 30, 0.34);
 }
 
 @theme inline {
@@ -30,17 +30,17 @@
 
 html {
   background:
-    radial-gradient(circle at top left, rgba(36, 83, 173, 0.32), transparent 26%),
-    radial-gradient(circle at top right, rgba(17, 120, 91, 0.22), transparent 22%),
-    linear-gradient(180deg, #05070d 0%, #070b12 56%, #04060b 100%);
+    radial-gradient(circle at top left, rgba(34, 124, 214, 0.22), transparent 24%),
+    radial-gradient(circle at top right, rgba(31, 150, 115, 0.14), transparent 18%),
+    linear-gradient(180deg, #071017 0%, #09131d 48%, #050a10 100%);
 }
 
 body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(36, 83, 173, 0.18), transparent 28%),
-    linear-gradient(180deg, rgba(4, 6, 11, 0.96), rgba(5, 7, 13, 1));
+    radial-gradient(circle at top left, rgba(34, 124, 214, 0.12), transparent 24%),
+    linear-gradient(180deg, rgba(7, 16, 23, 0.98), rgba(5, 10, 16, 1));
   color: var(--text-primary);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
@@ -56,7 +56,7 @@ a {
 }
 
 .panel {
-  background: linear-gradient(180deg, rgba(16, 23, 38, 0.94), rgba(11, 16, 26, 0.94));
+  background: linear-gradient(180deg, rgba(18, 28, 42, 0.94), rgba(12, 18, 29, 0.96));
   border: 1px solid var(--border-soft);
   box-shadow: var(--glow);
 }
@@ -64,7 +64,7 @@ a {
 .panel-soft {
   background: var(--bg-panel-soft);
   border: 1px solid rgba(152, 164, 189, 0.12);
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(12px);
 }
 
 .eyebrow {
@@ -88,17 +88,22 @@ a {
 }
 
 .nav-pill-active {
-  background: linear-gradient(135deg, rgba(92, 174, 254, 0.94), rgba(54, 140, 255, 0.82));
+  background: linear-gradient(135deg, rgba(71, 176, 255, 0.94), rgba(33, 140, 255, 0.84));
   color: #ffffff;
   box-shadow:
-    0 0 0 1px rgba(92, 174, 254, 0.28),
-    0 18px 50px rgba(43, 119, 255, 0.28);
+    0 0 0 1px rgba(71, 176, 255, 0.24),
+    0 16px 42px rgba(21, 83, 165, 0.28);
 }
 
 .nav-pill-idle {
-  background: rgba(13, 18, 28, 0.68);
+  background: rgba(12, 18, 29, 0.72);
   border: 1px solid rgba(152, 164, 189, 0.12);
   color: var(--text-secondary);
+}
+
+.surface-muted {
+  background: rgba(9, 14, 22, 0.56);
+  border: 1px solid rgba(152, 164, 189, 0.1);
 }
 
 .line-clamp-2 {
