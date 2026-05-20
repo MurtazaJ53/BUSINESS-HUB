@@ -491,41 +491,53 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  'Scanner actions',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Use the camera for live scanning or run an exact lookup against the code already typed into search.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.68),
-                    fontWeight: FontWeight.w600,
-                  ),
+                MobileSheetHeader(
+                  title: 'Scanner actions',
+                  subtitle:
+                      'Use the camera for live scanning or run an exact lookup against the code already typed into search.',
+                  icon: Icons.qr_code_scanner_rounded,
+                  accent: const Color(0xFF38BDF8),
+                  tags: <Widget>[
+                    MobileTag(
+                      label: typedCode.isEmpty ? 'TYPE A CODE FIRST' : 'TYPED CODE READY',
+                      icon: typedCode.isEmpty
+                          ? Icons.keyboard_alt_rounded
+                          : Icons.verified_rounded,
+                      accent: typedCode.isEmpty
+                          ? const Color(0xFFA78BFA)
+                          : const Color(0xFF22C55E),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 18),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.qr_code_scanner_rounded),
-                  title: const Text('Open live scanner'),
-                  subtitle: const Text('Scan barcode, QR, or SKU with camera'),
-                  onTap: () => Navigator.of(context).pop('scan'),
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.search_rounded),
-                  title: const Text('Lookup typed code'),
-                  subtitle: Text(
-                    typedCode.isEmpty
-                        ? 'Type a SKU or barcode into search first'
-                        : typedCode,
+                MobileSheetSection(
+                  title: 'Choose action',
+                  accent: const Color(0xFF38BDF8),
+                  child: Column(
+                    children: <Widget>[
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.qr_code_scanner_rounded),
+                        title: const Text('Open live scanner'),
+                        subtitle: const Text('Scan barcode, QR, or SKU with camera'),
+                        onTap: () => Navigator.of(context).pop('scan'),
+                      ),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.search_rounded),
+                        title: const Text('Lookup typed code'),
+                        subtitle: Text(
+                          typedCode.isEmpty
+                              ? 'Type a SKU or barcode into search first'
+                              : typedCode,
+                        ),
+                        enabled: typedCode.isNotEmpty,
+                        onTap: typedCode.isEmpty
+                            ? null
+                            : () => Navigator.of(context).pop('typed'),
+                      ),
+                    ],
                   ),
-                  enabled: typedCode.isNotEmpty,
-                  onTap: typedCode.isEmpty
-                      ? null
-                      : () => Navigator.of(context).pop('typed'),
                 ),
               ],
             ),

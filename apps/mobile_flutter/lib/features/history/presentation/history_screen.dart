@@ -453,7 +453,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             child: FutureBuilder<SaleRecordDetail?>(
               future: salesRepository.getSaleDetail(sale.id),
               builder: (context, snapshot) {
-                final theme = Theme.of(context);
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const MobileEmptyState(
                     icon: Icons.sync_rounded,
@@ -478,25 +477,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   child: ListView(
                     shrinkWrap: true,
                     children: <Widget>[
-                      Text(
-                        formatCurrency(detail.total),
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${detail.customerName?.isNotEmpty == true ? detail.customerName : 'Walk-in customer'} | ${detail.date}',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.68),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: <Widget>[
+                      MobileSheetHeader(
+                        title: formatCurrency(detail.total),
+                        subtitle:
+                            '${detail.customerName?.isNotEmpty == true ? detail.customerName : 'Walk-in customer'} | ${detail.date}',
+                        icon: Icons.receipt_long_rounded,
+                        accent: const Color(0xFFF59E0B),
+                        tags: <Widget>[
                           MobileTag(
                             label: _syncLabel(detail.syncState),
                             icon: Icons.cloud_done_rounded,
@@ -945,28 +932,10 @@ class _SaleDetailSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A1220),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              title,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 12),
-            child,
-          ],
-        ),
-      ),
+    return MobileSheetSection(
+      title: title,
+      accent: const Color(0xFFF59E0B),
+      child: child,
     );
   }
 }

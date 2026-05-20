@@ -543,25 +543,13 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(
-                      customer.name,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      customer.phone ?? customer.email ?? 'No contact recorded',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.68),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: <Widget>[
+                    MobileSheetHeader(
+                      title: customer.name,
+                      subtitle:
+                          customer.phone ?? customer.email ?? 'No contact recorded',
+                      icon: Icons.groups_rounded,
+                      accent: const Color(0xFF14B8A6),
+                      tags: <Widget>[
                         MobileTag(
                           label: 'Balance ${formatCurrency(customer.balance)}',
                           icon: Icons.account_balance_wallet_rounded,
@@ -578,41 +566,28 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                     ),
                     if (ledgerDomainState.isPostgresPrimary) ...<Widget>[
                       const SizedBox(height: 14),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: <Widget>[
-                          FilledButton.tonalIcon(
-                            onPressed: () async {
-                              final changed = await _showCustomerUpsertDialog(
-                                context,
-                                backendApiClient: backendApiClient,
-                                session: session,
-                                existingCustomer: customer,
-                              );
-                              if (changed && context.mounted) {
-                                Navigator.of(context).pop(true);
-                              }
-                            },
-                            icon: const Icon(Icons.edit_rounded),
-                            label: const Text('Edit customer'),
-                          ),
-                          FilledButton.tonalIcon(
-                            onPressed: () async {
-                              final changed = await _showLedgerMutationDialog(
-                                context,
-                                backendApiClient: backendApiClient,
-                                session: session,
-                                customer: customer,
-                              );
-                              if (changed == true && context.mounted) {
-                                Navigator.of(context).pop(true);
-                              }
-                            },
-                            icon: const Icon(Icons.edit_note_rounded),
-                            label: const Text('Record payment or adjustment'),
-                          ),
-                          if (customer.balance > 0.009)
+                      MobileSheetSection(
+                        title: 'Customer actions',
+                        accent: const Color(0xFF14B8A6),
+                        child: Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: <Widget>[
+                            FilledButton.tonalIcon(
+                              onPressed: () async {
+                                final changed = await _showCustomerUpsertDialog(
+                                  context,
+                                  backendApiClient: backendApiClient,
+                                  session: session,
+                                  existingCustomer: customer,
+                                );
+                                if (changed && context.mounted) {
+                                  Navigator.of(context).pop(true);
+                                }
+                              },
+                              icon: const Icon(Icons.edit_rounded),
+                              label: const Text('Edit customer'),
+                            ),
                             FilledButton.tonalIcon(
                               onPressed: () async {
                                 final changed = await _showLedgerMutationDialog(
@@ -620,19 +595,36 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                                   backendApiClient: backendApiClient,
                                   session: session,
                                   customer: customer,
-                                  initialEventType: 'payment',
-                                  initialAmount: customer.balance,
-                                  initialNote:
-                                      'Full settlement from mobile ledger',
                                 );
                                 if (changed == true && context.mounted) {
                                   Navigator.of(context).pop(true);
                                 }
                               },
-                              icon: const Icon(Icons.payments_rounded),
-                              label: const Text('Settle full due'),
+                              icon: const Icon(Icons.edit_note_rounded),
+                              label: const Text('Record payment or adjustment'),
                             ),
-                        ],
+                            if (customer.balance > 0.009)
+                              FilledButton.tonalIcon(
+                                onPressed: () async {
+                                  final changed = await _showLedgerMutationDialog(
+                                    context,
+                                    backendApiClient: backendApiClient,
+                                    session: session,
+                                    customer: customer,
+                                    initialEventType: 'payment',
+                                    initialAmount: customer.balance,
+                                    initialNote:
+                                        'Full settlement from mobile ledger',
+                                  );
+                                  if (changed == true && context.mounted) {
+                                    Navigator.of(context).pop(true);
+                                  }
+                                },
+                                icon: const Icon(Icons.payments_rounded),
+                                label: const Text('Settle full due'),
+                              ),
+                          ],
+                        ),
                       ),
                     ],
                     const SizedBox(height: 18),
@@ -644,84 +636,89 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                             'This customer exists on the backend, but the mobile desk has no ledger entries to preview yet.',
                       )
                     else
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 320),
-                        child: ListView(
-                          shrinkWrap: true,
-                          children: entries
-                              .map(
-                                (entry) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF0A1220),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(
+                      MobileSheetSection(
+                        title: 'Recent ledger entries',
+                        accent: const Color(0xFFA78BFA),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 320),
+                          child: ListView(
+                            shrinkWrap: true,
+                            children: entries
+                                .map(
+                                  (entry) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
                                         color: Colors.white.withValues(
-                                          alpha: 0.05,
+                                          alpha: 0.03,
+                                        ),
+                                        borderRadius: BorderRadius.circular(18),
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(14),
+                                        child: Row(
+                                          children: <Widget>[
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: <Widget>[
+                                                  Text(
+                                                    entry.eventType
+                                                        .replaceAll('_', ' ')
+                                                        .toUpperCase(),
+                                                    style: theme
+                                                        .textTheme
+                                                        .labelLarge
+                                                        ?.copyWith(
+                                                          fontWeight:
+                                                              FontWeight.w900,
+                                                        ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    entry.note ??
+                                                        entry.actorName ??
+                                                        formatCompactDate(
+                                                          entry.occurredAt,
+                                                        ),
+                                                    style: theme
+                                                        .textTheme
+                                                        .bodySmall
+                                                        ?.copyWith(
+                                                          color: Colors.white
+                                                              .withValues(
+                                                                alpha: 0.62,
+                                                              ),
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                        ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Text(
+                                              formatCurrency(entry.amountDelta),
+                                              style: theme.textTheme.titleMedium
+                                                  ?.copyWith(
+                                                    color: entry.amountDelta > 0
+                                                        ? const Color(
+                                                            0xFFFB7185,
+                                                          )
+                                                        : const Color(
+                                                            0xFF22C55E,
+                                                          ),
+                                                    fontWeight: FontWeight.w900,
+                                                  ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(14),
-                                      child: Row(
-                                        children: <Widget>[
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: <Widget>[
-                                                Text(
-                                                  entry.eventType
-                                                      .replaceAll('_', ' ')
-                                                      .toUpperCase(),
-                                                  style: theme
-                                                      .textTheme
-                                                      .labelLarge
-                                                      ?.copyWith(
-                                                        fontWeight:
-                                                            FontWeight.w900,
-                                                      ),
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  entry.note ??
-                                                      entry.actorName ??
-                                                      formatCompactDate(
-                                                        entry.occurredAt,
-                                                      ),
-                                                  style: theme
-                                                      .textTheme
-                                                      .bodySmall
-                                                      ?.copyWith(
-                                                        color: Colors.white
-                                                            .withValues(
-                                                              alpha: 0.62,
-                                                            ),
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                      ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          Text(
-                                            formatCurrency(entry.amountDelta),
-                                            style: theme.textTheme.titleMedium
-                                                ?.copyWith(
-                                                  color: entry.amountDelta > 0
-                                                      ? const Color(0xFFFB7185)
-                                                      : const Color(0xFF22C55E),
-                                                  fontWeight: FontWeight.w900,
-                                                ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
                                   ),
-                                ),
-                              )
-                              .toList(growable: false),
+                                )
+                                .toList(growable: false),
+                          ),
                         ),
                       ),
                   ],
