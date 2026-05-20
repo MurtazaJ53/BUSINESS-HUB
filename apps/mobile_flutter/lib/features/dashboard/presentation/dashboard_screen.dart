@@ -36,6 +36,13 @@ class DashboardScreen extends ConsumerWidget {
       overview: overview,
       history: history,
     );
+    final focus = _DashboardFocus.fromState(
+      session: session,
+      overview: overview,
+      history: history,
+      syncStatus: syncStatus,
+      roleProfile: roleProfile,
+    );
     final quickActions = <Widget>[
       _QuickActionTile(
         icon: Icons.point_of_sale_rounded,
@@ -99,6 +106,15 @@ class DashboardScreen extends ConsumerWidget {
                 ? const Color(0xFFFB7185)
                 : const Color(0xFF38BDF8),
           ),
+        ),
+        const SizedBox(height: 18),
+        MobileActionCard(
+          kicker: focus.kicker,
+          title: focus.title,
+          subtitle: focus.subtitle,
+          icon: focus.icon,
+          accent: focus.accent,
+          onTap: () => context.go(focus.route),
         ),
         const SizedBox(height: 18),
         MobilePanel(
@@ -175,6 +191,7 @@ class DashboardScreen extends ConsumerWidget {
                               : item.category,
                           trailing: 'Stock ${item.stock}',
                           accent: const Color(0xFFFB7185),
+                          onTap: () => context.go('/inventory'),
                         ),
                       )
                       .toList(growable: false),
@@ -209,6 +226,7 @@ class DashboardScreen extends ConsumerWidget {
                               '${sale.customerName?.isNotEmpty == true ? sale.customerName : 'Walk-in customer'} | ${sale.date}',
                           trailing: sale.paymentMode,
                           accent: const Color(0xFF22C55E),
+                          onTap: () => context.go('/history'),
                         ),
                       )
                       .toList(growable: false),
@@ -347,7 +365,9 @@ class _DashboardRoleProfile {
     }
 
     return _DashboardRoleProfile(
-      leadTitle: receiptsToday > 0 ? '$revenueToday today' : 'Store pulse ready',
+      leadTitle: receiptsToday > 0
+          ? '$revenueToday today'
+          : 'Store pulse ready',
       leadSubtitle: receiptsToday > 0
           ? '$receiptsToday sale${receiptsToday == 1 ? '' : 's'} are already recorded. Revenue, stock pressure, and receipt flow are grouped here in one owner-ready view.'
           : 'See today’s business pulse, stock pressure, and recent activity without opening dense management screens.',
@@ -643,73 +663,196 @@ class _QuickActionTile extends StatelessWidget {
   }
 }
 
+class _DashboardFocus {
+  const _DashboardFocus({
+    required this.kicker,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.accent,
+    required this.route,
+  });
+
+  final String kicker;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color accent;
+  final String route;
+
+  factory _DashboardFocus.fromState({
+    required dynamic session,
+    required DashboardOverview overview,
+    required HistoryOverview history,
+    required MobileSyncStatus syncStatus,
+    required _DashboardRoleProfile roleProfile,
+  }) {
+    if (history.failedSales > 0) {
+      return _DashboardFocus(
+        kicker: 'Needs attention',
+        title: 'Review failed receipts',
+        subtitle:
+            '${history.failedSales} receipt${history.failedSales == 1 ? '' : 's'} still need attention. Open History and clear the blocked replay path first.',
+        icon: Icons.error_outline_rounded,
+        accent: const Color(0xFFFB7185),
+        route: '/history',
+      );
+    }
+    if (history.queuedSales > 0) {
+      return _DashboardFocus(
+        kicker: 'Queue watch',
+        title: 'Clear queued receipts',
+        subtitle:
+            '${history.queuedSales} receipt${history.queuedSales == 1 ? '' : 's'} are waiting to upload. Retry sync before the queue grows.',
+        icon: Icons.cloud_upload_rounded,
+        accent: const Color(0xFFF59E0B),
+        route: '/history',
+      );
+    }
+    if (overview.metrics.lowStock > 0) {
+      return _DashboardFocus(
+        kicker: 'Stock watch',
+        title: 'Refill low-stock items',
+        subtitle:
+            '${overview.metrics.lowStock} product${overview.metrics.lowStock == 1 ? '' : 's'} need refill attention. Jump into Inventory and scan the affected items.',
+        icon: Icons.inventory_2_rounded,
+        accent: const Color(0xFFFB7185),
+        route: '/inventory',
+      );
+    }
+    if (overview.todaySalesCount == 0) {
+      return _DashboardFocus(
+        kicker: 'Next move',
+        title: roleProfile.primaryActionTitle,
+        subtitle:
+            '${roleProfile.primaryActionSubtitle}. The day is still quiet, so this is the fastest place to begin.',
+        icon: Icons.flash_on_rounded,
+        accent: const Color(0xFF38BDF8),
+        route: '/pos',
+      );
+    }
+    if (session?.isCashierLike ?? false) {
+      return const _DashboardFocus(
+        kicker: 'Keep selling',
+        title: 'Jump back into checkout',
+        subtitle:
+            'Sales are already moving. Open POS and keep the next customer flow fast.',
+        icon: Icons.point_of_sale_rounded,
+        accent: Color(0xFF38BDF8),
+        route: '/pos',
+      );
+    }
+    if (syncStatus == MobileSyncStatus.syncing) {
+      return const _DashboardFocus(
+        kicker: 'Refreshing',
+        title: 'Monitor live receipt flow',
+        subtitle:
+            'The app is syncing in the background. Open History to watch recent receipts land cleanly.',
+        icon: Icons.sync_rounded,
+        accent: Color(0xFF14B8A6),
+        route: '/history',
+      );
+    }
+    return const _DashboardFocus(
+      kicker: 'Business pulse',
+      title: 'Review today\'s activity',
+      subtitle:
+          'Revenue, receipts, and stock look healthy. Use History for a quick business check-in.',
+      icon: Icons.query_stats_rounded,
+      accent: Color(0xFF22C55E),
+      route: '/history',
+    );
+  }
+}
+
 class _DashboardRow extends StatelessWidget {
   const _DashboardRow({
     required this.title,
     required this.subtitle,
     required this.trailing,
     required this.accent,
+    this.onTap,
   });
 
   final String title;
   final String subtitle;
   final String trailing;
   final Color accent;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: const Color(0xFF0A1220),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: <Widget>[
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: accent,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+          child: Ink(
+            decoration: BoxDecoration(
+              color: const Color(0xFF0A1220),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: <Widget>[
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      shape: BoxShape.circle,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.58),
-                        fontWeight: FontWeight.w600,
-                      ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          title,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          subtitle,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.58),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: <Widget>[
+                      Text(
+                        trailing,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: accent,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      if (onTap != null) ...<Widget>[
+                        const SizedBox(height: 6),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: Colors.white.withValues(alpha: 0.45),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Text(
-                trailing,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: accent,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
