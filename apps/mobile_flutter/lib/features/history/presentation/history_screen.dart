@@ -27,6 +27,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     super.dispose();
   }
 
+  void _resetFilters() {
+    _searchController.clear();
+    setState(() {
+      _filter = const HistoryFilter();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(mobileSessionProvider).asData?.value;
@@ -46,6 +53,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           DomainControlState.legacy('payments'),
         ];
     final report = HistoryReportSnapshot.fromSales(sales);
+    final hasActiveFilters =
+        _filter.search.trim().isNotEmpty ||
+        _filter.syncState != null ||
+        _filter.paymentMode != null ||
+        _filter.dateWindow != HistoryDateWindow.all ||
+        _filter.onlyDueSales;
     final roleProfile = _HistoryRoleProfile.fromSession(
       session: session,
       overview: overview,
@@ -244,6 +257,54 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   ),
                 ],
               ),
+              if (hasActiveFilters) ...<Widget>[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: <Widget>[
+                    if (_filter.search.trim().isNotEmpty)
+                      MobileTag(
+                        label: 'Search: ${_filter.search.trim()}',
+                        icon: Icons.search_rounded,
+                        accent: const Color(0xFF38BDF8),
+                      ),
+                    if (_filter.syncState != null)
+                      MobileTag(
+                        label: _syncLabel(_filter.syncState!),
+                        icon: Icons.sync_alt_rounded,
+                        accent: const Color(0xFFA78BFA),
+                      ),
+                    if (_filter.paymentMode != null)
+                      MobileTag(
+                        label: _filter.paymentMode!,
+                        icon: Icons.payments_rounded,
+                        accent: const Color(0xFF22C55E),
+                      ),
+                    if (_filter.dateWindow != HistoryDateWindow.all)
+                      MobileTag(
+                        label: _filter.dateWindow.label,
+                        icon: Icons.date_range_rounded,
+                        accent: const Color(0xFFF59E0B),
+                      ),
+                    if (_filter.onlyDueSales)
+                      const MobileTag(
+                        label: 'Due only',
+                        icon: Icons.account_balance_wallet_rounded,
+                        accent: Color(0xFFFB7185),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.tonalIcon(
+                    onPressed: _resetFilters,
+                    icon: const Icon(Icons.restart_alt_rounded),
+                    label: const Text('Clear filters'),
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               FilledButton.tonalIcon(
                 onPressed: overview.queuedSales > 0 || overview.failedSales > 0

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../shell/presentation/mobile_surface.dart';
+
 class PosScannerSheet extends StatefulWidget {
   const PosScannerSheet({super.key});
 
@@ -33,80 +35,82 @@ class _PosScannerSheetState extends State<PosScannerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final compact = MediaQuery.sizeOf(context).width < 420;
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(
-          left: 18,
-          right: 18,
-          top: 18,
+          left: compact ? 16 : 18,
+          right: compact ? 16 : 18,
+          top: compact ? 16 : 18,
           bottom: MediaQuery.of(context).viewInsets.bottom + 20,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: Text(
-                    'Scan barcode or exact code',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
+            const MobileSheetHeader(
+              eyebrow: 'Fast lookup',
+              title: 'Scan barcode or exact code',
+              subtitle:
+                  'Point the camera at a barcode, QR code, or exact inventory code. You can also type the code manually below.',
+              icon: Icons.qr_code_scanner_rounded,
+              accent: Color(0xFF38BDF8),
+              tags: <Widget>[
+                MobileTag(
+                  label: 'Camera ready',
+                  icon: Icons.camera_alt_rounded,
+                  accent: Color(0xFF22C55E),
                 ),
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close_rounded),
+                MobileTag(
+                  label: 'Exact lookup',
+                  icon: Icons.keyboard_alt_rounded,
+                  accent: Color(0xFFA78BFA),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Point the camera at a barcode, QR code, or exact inventory code. You can also type the code manually below.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: Colors.white.withValues(alpha: 0.68),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
             const SizedBox(height: 16),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(26),
-              child: AspectRatio(
-                aspectRatio: 1,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF050A12),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.06),
+            MobileSheetSection(
+              title: 'Scan live code',
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(26),
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF050A12),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.06),
+                      ),
                     ),
-                  ),
-                  child: MobileScanner(
-                    controller: _controller,
-                    onDetect: (capture) {
-                      for (final barcode in capture.barcodes) {
-                        final raw = barcode.rawValue;
-                        if (raw != null && raw.trim().isNotEmpty) {
-                          _resolveCode(raw);
-                          break;
+                    child: MobileScanner(
+                      controller: _controller,
+                      onDetect: (capture) {
+                        for (final barcode in capture.barcodes) {
+                          final raw = barcode.rawValue;
+                          if (raw != null && raw.trim().isNotEmpty) {
+                            _resolveCode(raw);
+                            break;
+                          }
                         }
-                      }
-                    },
+                      },
+                    ),
                   ),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            TextField(
-              controller: _manualCodeController,
-              textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.keyboard_alt_rounded),
-                labelText: 'Manual code',
-                hintText: 'Enter SKU or barcode',
+            MobileSheetSection(
+              title: 'Type code manually',
+              child: TextField(
+                controller: _manualCodeController,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.keyboard_alt_rounded),
+                  labelText: 'Manual code',
+                  hintText: 'Enter SKU or barcode',
+                ),
+                onSubmitted: _resolveCode,
               ),
-              onSubmitted: _resolveCode,
             ),
             const SizedBox(height: 12),
             Row(

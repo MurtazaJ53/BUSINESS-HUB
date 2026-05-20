@@ -30,6 +30,16 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     super.dispose();
   }
 
+  void _resetFilters() {
+    _searchController.clear();
+    setState(() {
+      _search = '';
+      _selectedCategory = null;
+      _lowStockOnly = false;
+      _page = 1;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(mobileSessionProvider).asData?.value;
@@ -58,6 +68,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     final totalCount =
         ref.watch(inventoryCatalogCountProvider(filter)).asData?.value ?? 0;
     final totalPages = totalCount == 0 ? 1 : (totalCount / _pageSize).ceil();
+    final hasActiveFilters =
+        _search.trim().isNotEmpty || _selectedCategory != null || _lowStockOnly;
     final roleProfile = _InventoryRoleProfile.fromSession(
       session: session,
       metrics: metrics,
@@ -186,7 +198,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     ),
                     ...categories.map(
                       (category) => _CategoryChip(
-                        label: '${category.category} (${category.productCount})',
+                        label:
+                            '${category.category} (${category.productCount})',
                         active: _selectedCategory == category.category,
                         onTap: () {
                           setState(() {
@@ -217,7 +230,24 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         icon: Icons.inventory_2_rounded,
                         accent: const Color(0xFFA78BFA),
                       ),
+                    if (_lowStockOnly)
+                      const MobileTag(
+                        label: 'Low stock only',
+                        icon: Icons.error_outline_rounded,
+                        accent: Color(0xFFFB7185),
+                      ),
                   ],
+                ),
+              ],
+              if (hasActiveFilters) ...<Widget>[
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.tonalIcon(
+                    onPressed: _resetFilters,
+                    icon: const Icon(Icons.restart_alt_rounded),
+                    label: const Text('Clear filters'),
+                  ),
                 ),
               ],
               const SizedBox(height: 18),
@@ -378,7 +408,9 @@ class _InventoryRoleProfile {
         primaryTagIcon: Icons.error_outline_rounded,
         primaryTagAccent: primaryAccent,
         secondaryTagLabel: secondaryLabel,
-        secondaryTagIcon: syncing ? Icons.sync_rounded : Icons.assessment_rounded,
+        secondaryTagIcon: syncing
+            ? Icons.sync_rounded
+            : Icons.assessment_rounded,
         secondaryTagAccent: secondaryAccent,
         panelTitle: 'Stock search',
       );
@@ -396,7 +428,9 @@ class _InventoryRoleProfile {
       primaryTagIcon: Icons.inventory_2_rounded,
       primaryTagAccent: primaryAccent,
       secondaryTagLabel: secondaryLabel,
-      secondaryTagIcon: syncing ? Icons.sync_rounded : Icons.currency_rupee_rounded,
+      secondaryTagIcon: syncing
+          ? Icons.sync_rounded
+          : Icons.currency_rupee_rounded,
       secondaryTagAccent: secondaryAccent,
       panelTitle: 'Catalog search',
     );
