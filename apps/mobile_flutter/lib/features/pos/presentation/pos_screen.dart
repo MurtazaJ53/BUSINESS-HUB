@@ -1443,39 +1443,82 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final result = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Confirm credit exposure'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                '${customer.name} already carries ${formatCurrency(currentBalance)} due.',
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'This sale adds ${formatCurrency(additionalDue)} more and moves the projected balance to ${formatCurrency(projectedBalance)}.',
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Continue only if you want this customer ledger to hold the new due after backend replay.',
-                style: Theme.of(dialogContext).textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.68),
-                  fontWeight: FontWeight.w600,
+        final compact = MediaQuery.sizeOf(dialogContext).width < 420;
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.symmetric(
+            horizontal: compact ? 16 : 24,
+            vertical: 24,
+          ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: const Color(0xFF07111E),
+              borderRadius: BorderRadius.circular(compact ? 24 : 28),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+              boxShadow: const <BoxShadow>[
+                BoxShadow(
+                  color: Color(0x55000000),
+                  blurRadius: 28,
+                  offset: Offset(0, 18),
+                ),
+              ],
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Padding(
+                padding: EdgeInsets.all(compact ? 18 : 22),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    MobileSheetHeader(
+                      eyebrow: 'Credit warning',
+                      title: 'Confirm credit exposure',
+                      subtitle:
+                          '${customer.name} already carries ${formatCurrency(currentBalance)} due. This sale adds ${formatCurrency(additionalDue)} more and moves the projected balance to ${formatCurrency(projectedBalance)}.',
+                      icon: Icons.warning_amber_rounded,
+                      accent: const Color(0xFFF59E0B),
+                      tags: <Widget>[
+                        MobileTag(
+                          label:
+                              'Projected ${formatCurrency(projectedBalance)}',
+                          icon: Icons.account_balance_wallet_rounded,
+                          accent: const Color(0xFFFB7185),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const MobileSheetSection(
+                      title: 'Before you continue',
+                      child: Text(
+                        'Continue only if you want this customer ledger to hold the new due after backend replay.',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () =>
+                                Navigator.of(dialogContext).pop(false),
+                            child: const Text('Review sale'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () =>
+                                Navigator.of(dialogContext).pop(true),
+                            child: const Text('Continue'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Review sale'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Continue'),
-            ),
-          ],
         );
       },
     );
@@ -1501,6 +1544,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         isScrollControlled: true,
         backgroundColor: const Color(0xFF070B13),
         builder: (context) {
+          final compact = MediaQuery.sizeOf(context).width < 420;
           return SafeArea(
             child: StatefulBuilder(
               builder: (context, setModalState) {
@@ -1512,31 +1556,44 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
                 return Padding(
                   padding: EdgeInsets.only(
-                    left: 18,
-                    right: 18,
-                    top: 18,
+                    left: compact ? 16 : 18,
+                    right: compact ? 16 : 18,
+                    top: compact ? 16 : 18,
                     bottom: MediaQuery.of(context).viewInsets.bottom + 20,
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Text(
-                        'Pick migrated customer',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.w900),
+                      MobileSheetHeader(
+                        eyebrow: 'Customer attach',
+                        title: 'Pick migrated customer',
+                        subtitle:
+                            'Search the migrated customer list and attach the right buyer before checkout.',
+                        icon: Icons.groups_rounded,
+                        accent: const Color(0xFF14B8A6),
+                        tags: const <Widget>[
+                          MobileTag(
+                            label: 'Live customer mode',
+                            icon: Icons.verified_rounded,
+                            accent: Color(0xFF22C55E),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: searchController,
-                        onChanged: (value) {
-                          setModalState(() {
-                            query = value.trim();
-                          });
-                        },
-                        decoration: const InputDecoration(
-                          prefixIcon: Icon(Icons.search_rounded),
-                          hintText: 'Search customer name or phone',
+                      const SizedBox(height: 14),
+                      MobileSheetSection(
+                        title: 'Search buyers',
+                        child: TextField(
+                          controller: searchController,
+                          onChanged: (value) {
+                            setModalState(() {
+                              query = value.trim();
+                            });
+                          },
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.search_rounded),
+                            hintText: 'Search customer name or phone',
+                          ),
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -1724,37 +1781,92 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   ) async {
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Stock is short'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              const Text(
-                'This cart needs more quantity than current stock. Force sale no longer needs a PIN, but we still want you to confirm it.',
-              ),
-              const SizedBox(height: 12),
-              ...shortages.map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(
-                    '${item.name}: need ${item.quantity}, available ${item.stock}',
-                  ),
+      builder: (dialogContext) {
+        final compact = MediaQuery.sizeOf(dialogContext).width < 420;
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.symmetric(
+            horizontal: compact ? 16 : 24,
+            vertical: 24,
+          ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: const Color(0xFF07111E),
+              borderRadius: BorderRadius.circular(compact ? 24 : 28),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+              boxShadow: const <BoxShadow>[
+                BoxShadow(
+                  color: Color(0x55000000),
+                  blurRadius: 28,
+                  offset: Offset(0, 18),
+                ),
+              ],
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Padding(
+                padding: EdgeInsets.all(compact ? 18 : 22),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    MobileSheetHeader(
+                      eyebrow: 'Stock warning',
+                      title: 'Stock is short',
+                      subtitle:
+                          'This cart needs more quantity than current stock. Force sale no longer needs a PIN, but we still want a clear confirmation.',
+                      icon: Icons.inventory_2_rounded,
+                      accent: const Color(0xFFFB7185),
+                      tags: <Widget>[
+                        MobileTag(
+                          label: '${shortages.length} short lines',
+                          icon: Icons.priority_high_rounded,
+                          accent: const Color(0xFFF59E0B),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    MobileSheetSection(
+                      title: 'Items needing attention',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: shortages
+                            .map(
+                              (item) => Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Text(
+                                  '${item.name}: need ${item.quantity}, available ${item.stock}',
+                                ),
+                              ),
+                            )
+                            .toList(growable: false),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () =>
+                                Navigator.of(dialogContext).pop(false),
+                            child: const Text('Go back'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () =>
+                                Navigator.of(dialogContext).pop(true),
+                            child: const Text('Force sale'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Go back'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Force sale'),
-            ),
-          ],
         );
       },
     );
