@@ -103,6 +103,8 @@ It is designed to support:
 76. [Business Hub Domain Ownership Matrix](./business-hub-domain-ownership-matrix.md)
 77. [Business Hub Plan Tier Feature Matrix](./business-hub-plan-tier-feature-matrix.md)
 78. [Business Hub UI And Experience Principles](./business-hub-ui-and-experience-principles.md)
+79. [Business Hub Role-Based Screen Map](./business-hub-role-based-screen-map.md)
+80. [Business Hub UI Redesign Execution Plan](./business-hub-ui-redesign-execution-plan.md)
 
 ## Current truth
 
