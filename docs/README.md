@@ -99,6 +99,10 @@ It is designed to support:
 72. [ERPNext Handover Runbook](./erpnext-handover-runbook.md)
 73. [ERPNext Local Demo Runbook](./erpnext-local-demo-runbook.md)
 74. [Business Hub Frappe / ERPNext Weekly Implementation Plan](./business-hub-frappe-erpnext-weekly-implementation-plan.md)
+75. [Business Hub Client-Facing Module Matrix](./business-hub-client-facing-module-matrix.md)
+76. [Business Hub Domain Ownership Matrix](./business-hub-domain-ownership-matrix.md)
+77. [Business Hub Plan Tier Feature Matrix](./business-hub-plan-tier-feature-matrix.md)
+78. [Business Hub UI And Experience Principles](./business-hub-ui-and-experience-principles.md)
 
 ## Current truth
 
