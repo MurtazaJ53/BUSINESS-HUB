@@ -26,7 +26,11 @@ export function CustomerTable({ customers, currencyCode = "INR" }: CustomerTable
               customers.map((customer) => {
                 const balance = Number(customer.balance || 0);
                 const tone =
-                  balance > 0 ? "text-[var(--warning)]" : balance < 0 ? "text-[var(--success)]" : "text-[var(--text-primary)]";
+                  balance > 0
+                    ? "text-[var(--warning)]"
+                    : balance < 0
+                      ? "text-[var(--success)]"
+                      : "text-[var(--text-primary)]";
 
                 return (
                   <tr key={customer.id} className="border-b border-[rgba(152,164,189,0.08)] align-top">
@@ -34,12 +38,16 @@ export function CustomerTable({ customers, currencyCode = "INR" }: CustomerTable
                       <div className="max-w-[18rem]">
                         <p className="text-base font-semibold">{customer.name}</p>
                         <p className="mt-1 text-sm text-[var(--text-secondary)] line-clamp-2">
-                          {customer.notes || "No operator note captured yet for this customer."}
+                          {customer.notes || "No note has been added for this customer yet."}
                         </p>
                       </div>
                     </td>
-                    <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">{customer.phone || "—"}</td>
-                    <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">{customer.email || "—"}</td>
+                    <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
+                      {customer.phone || "No phone"}
+                    </td>
+                    <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
+                      {customer.email || "No email"}
+                    </td>
                     <td className={`px-5 py-4 text-sm font-semibold ${tone}`}>
                       {formatCurrency(balance, currencyCode)}
                     </td>
@@ -56,8 +64,11 @@ export function CustomerTable({ customers, currencyCode = "INR" }: CustomerTable
               })
             ) : (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-sm text-[var(--text-secondary)]">
-                  No customers returned from the phase 1 API yet.
+                <td
+                  colSpan={6}
+                  className="px-5 py-10 text-center text-sm text-[var(--text-secondary)]"
+                >
+                  No customers are available for this store yet.
                 </td>
               </tr>
             )}

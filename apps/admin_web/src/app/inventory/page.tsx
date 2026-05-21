@@ -19,10 +19,10 @@ function buildInventoryModeCopy(
     return {
       accent:
         "border-[rgba(52,211,153,0.22)] bg-[rgba(7,33,25,0.84)] text-[var(--success)]" as const,
-      badge: "Postgres primary",
-      title: "Inventory pilot is now running on PostgreSQL.",
+      badge: "Stable backend path",
+      title: "Inventory updates are flowing normally.",
       body:
-        "This shop is already promoted on the new inventory path. New Django-admin inventory writes are allowed, bridge replay is still tracked, and rollback is available from the migration console if drift appears.",
+        "This store is already using the newer inventory path, so stock updates and product changes can be managed here with normal confidence.",
     };
   }
 
@@ -30,20 +30,20 @@ function buildInventoryModeCopy(
     return {
       accent:
         "border-[rgba(251,113,133,0.22)] bg-[rgba(40,12,19,0.84)] text-[var(--warning)]" as const,
-      badge: "Shadow / pilot guard",
-      title: "Inventory is still protected by legacy ownership.",
+      badge: "Watching transition",
+      title: "Inventory is still under a cautious transition.",
       body:
-        "This shop is in a migration pilot posture, but PostgreSQL is not yet the write master. Reads can be verified here, while write ownership and final promotion must still be confirmed through the migration gate.",
+        "The catalog is available here, but the store is still being watched closely before the new path becomes the long-term write owner.",
     };
   }
 
   return {
     accent:
       "border-[rgba(92,174,254,0.22)] bg-[rgba(9,18,34,0.82)] text-[var(--accent)]" as const,
-    badge: "Legacy baseline",
-    title: "Inventory is still operating in the legacy migration baseline.",
+    badge: "Legacy-aligned",
+    title: "Inventory is still aligned to the legacy source.",
     body:
-      "No explicit migration control exists for this shop/domain yet. The Django contract is useful for shadow validation and reporting, but Firebase still represents the default source of truth for inventory ownership.",
+      "This view is still useful for product lookup and stock review, even though the store has not been promoted to the newer inventory path yet.",
   };
 }
 
@@ -56,123 +56,171 @@ export default async function InventoryPage() {
     : null;
   const stats = buildInventoryStats(items);
   const inventoryMode = domainState ? buildInventoryModeCopy(domainState) : null;
+  const lowStockItems = items
+    .filter((item) => item.stock_on_hand <= 5)
+    .sort((left, right) => left.stock_on_hand - right.stock_on_hand)
+    .slice(0, 6);
 
   return (
     <AdminShell
       session={session}
       activeShop={activeShop}
       activeRoute="inventory"
-      title="Inventory Ledger"
-      subtitle="Phase 3 inventory surface powered by Django, with migration ownership, pilot visibility, and cutover-safe read/write posture for each shop."
+      title="Inventory overview"
+      subtitle="Check stock, review product status, and spot restock risk without opening a heavy back-office flow."
     >
       {!activeShop ? (
         <EmptyState
-          title="No inventory scope available"
-          body="The admin web shell needs an active shop membership before it can query inventory. Once memberships are available, this route will use the same backend contract as the command center."
+          title="No inventory workspace available"
+          body="This web workspace needs an active shop membership before it can show the product catalog and stock view for a store."
         />
       ) : (
         <div className="space-y-8">
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard
-              label="Catalog size"
+              label="Products live"
               value={stats.totalItems.toString()}
-              detail={`${stats.categories} categories currently mapped`}
+              detail={`${stats.categories} categories currently in the store catalog`}
               icon="CAT"
             />
             <MetricCard
-              label="In stock"
+              label="Ready to sell"
               value={(stats.totalItems - stats.outOfStockItems).toString()}
-              detail="Items with stock still available to sell"
+              detail="Products that still have stock available"
               accent="green"
               icon="AVL"
             />
             <MetricCard
-              label="Critical low stock"
+              label="Needs restock"
               value={stats.lowStockItems.toString()}
-              detail="Needs replenishment planning or procurement follow-up"
+              detail="Products at five units or lower"
               accent="rose"
               icon="LOW"
             />
             <MetricCard
-              label="Projected sales value"
+              label="Retail value"
               value={formatCurrency(stats.projectedSellValue, activeShop.shop.currency_code)}
-              detail="Useful as a phase 1 working inventory KPI"
+              detail="Current sell-side value of visible inventory"
               accent="blue"
               icon="VAL"
             />
           </section>
 
-          {domainState && inventoryMode ? (
-            <section className={`panel-soft rounded-[28px] border px-6 py-5 ${inventoryMode.accent}`}>
-              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <p className="eyebrow text-current/70">Inventory migration mode</p>
-                  <h2 className="mt-3 text-2xl font-bold text-[var(--text-primary)]">
-                    {inventoryMode.title}
-                  </h2>
-                  <p className="mt-2 max-w-3xl text-sm text-[var(--text-secondary)]">
-                    {inventoryMode.body}
-                  </p>
-                </div>
-                <div className="grid gap-2 text-sm text-[var(--text-secondary)] md:min-w-[270px]">
-                  <div className="rounded-[18px] border border-current/20 bg-[rgba(0,0,0,0.12)] px-4 py-3">
-                    <div className="font-semibold text-[var(--text-primary)]">{inventoryMode.badge}</div>
-                    <div className="mt-1">
-                      write_master=
-                      {" "}
-                      <span className="font-mono text-[var(--text-primary)]">{domainState.write_master}</span>
-                    </div>
+          <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)]">
+            <div className="space-y-6">
+              {domainState && inventoryMode ? (
+                <section
+                  className={`panel-soft rounded-[28px] border px-6 py-5 ${inventoryMode.accent}`}
+                >
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div>
-                      bridge_mode=
-                      {" "}
-                      <span className="font-mono text-[var(--text-primary)]">{domainState.bridge_mode}</span>
+                      <p className="eyebrow text-current/70">Inventory health</p>
+                      <h2 className="mt-3 text-2xl font-bold text-[var(--text-primary)]">
+                        {inventoryMode.title}
+                      </h2>
+                      <p className="mt-2 max-w-3xl text-sm text-[var(--text-secondary)]">
+                        {inventoryMode.body}
+                      </p>
                     </div>
-                    <div>
-                      cutover_status=
-                      {" "}
-                      <span className="font-mono text-[var(--text-primary)]">{domainState.cutover_status}</span>
-                    </div>
-                    <div>
-                      epoch=
-                      {" "}
-                      <span className="font-mono text-[var(--text-primary)]">{domainState.current_epoch}</span>
+                    <div className="grid gap-2 text-sm text-[var(--text-secondary)] md:min-w-[270px]">
+                      <div className="rounded-[18px] border border-current/20 bg-[rgba(0,0,0,0.12)] px-4 py-3">
+                        <div className="font-semibold text-[var(--text-primary)]">
+                          {inventoryMode.badge}
+                        </div>
+                        <div className="mt-1">
+                          Write owner{" "}
+                          <span className="font-mono text-[var(--text-primary)]">
+                            {domainState.write_master}
+                          </span>
+                        </div>
+                        <div>
+                          Bridge mode{" "}
+                          <span className="font-mono text-[var(--text-primary)]">
+                            {domainState.bridge_mode}
+                          </span>
+                        </div>
+                        <div>
+                          Status{" "}
+                          <span className="font-mono text-[var(--text-primary)]">
+                            {domainState.cutover_status}
+                          </span>
+                        </div>
+                      </div>
+                      <DomainPilotSignoffCard
+                        domainState={domainState}
+                        domainLabel="Inventory"
+                      />
                     </div>
                   </div>
-                  <DomainPilotSignoffCard
-                    domainState={domainState}
-                    domainLabel="Inventory"
+                </section>
+              ) : null}
+
+              <section className="panel-soft rounded-[28px] px-6 py-6">
+                <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <p className="eyebrow">Stock list</p>
+                    <h2 className="mt-3 text-2xl font-bold">Current catalog</h2>
+                    <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                      Use this view to review stock, price, category, and product availability for
+                      the active store.
+                    </p>
+                  </div>
+                  <div className="rounded-[18px] border border-[rgba(152,164,189,0.12)] bg-[rgba(13,18,28,0.68)] px-4 py-3 text-sm text-[var(--text-secondary)]">
+                    Shop
+                    <div className="mt-1 text-base font-semibold text-[var(--text-primary)]">
+                      {activeShop.shop.name}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <InventoryTable
+                    items={items}
+                    currencyCode={activeShop.shop.currency_code}
                   />
                 </div>
-              </div>
-            </section>
-          ) : null}
-
-          <section className="panel-soft rounded-[28px] px-6 py-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-              <div>
-                <p className="eyebrow">Inventory dataset</p>
-                <h2 className="mt-3 text-2xl font-bold">Live backend results</h2>
-                <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                  This table is being resolved against
-                  {" "}
-                  <code>/api/v1/shops/{activeShop.shop.id}/inventory/</code>
-                  {" "}
-                  plus the membership-safe domain-state endpoint for pilot visibility.
-                </p>
-              </div>
-              <div className="rounded-[18px] border border-[rgba(152,164,189,0.12)] bg-[rgba(13,18,28,0.68)] px-4 py-3 text-sm text-[var(--text-secondary)]">
-                Shop
-                <div className="mt-1 text-base font-semibold text-[var(--text-primary)]">
-                  {activeShop.shop.name}
-                </div>
-              </div>
+              </section>
             </div>
 
-            <div className="mt-6">
-              <InventoryTable
-                items={items}
-                currencyCode={activeShop.shop.currency_code}
-              />
+            <div className="space-y-6">
+              <section className="panel-soft rounded-[28px] px-6 py-6">
+                <p className="eyebrow">Restock watch</p>
+                <h2 className="mt-3 text-2xl font-bold">Products needing review</h2>
+                <div className="mt-5 space-y-3">
+                  {lowStockItems.length ? (
+                    lowStockItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="surface-muted flex items-center justify-between rounded-[20px] px-4 py-4"
+                      >
+                        <div>
+                          <p className="font-semibold">{item.name}</p>
+                          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                            {item.category || "Uncategorized"} | {item.sku || "No SKU"}
+                          </p>
+                        </div>
+                        <span className="rounded-full border border-[rgba(255,138,106,0.18)] px-3 py-1 text-sm font-semibold text-[var(--warning)]">
+                          {item.stock_on_hand} left
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-[var(--text-secondary)]">
+                      No urgent restock items are showing in this store right now.
+                    </p>
+                  )}
+                </div>
+              </section>
+
+              <section className="panel-soft rounded-[28px] px-6 py-6">
+                <p className="eyebrow">Use this page for</p>
+                <h2 className="mt-3 text-2xl font-bold">Fast stock decisions</h2>
+                <ul className="mt-5 space-y-3 text-sm leading-7 text-[var(--text-secondary)]">
+                  <li>- Check whether a product is still available before the next sale.</li>
+                  <li>- Review low-stock items before they become stock-outs.</li>
+                  <li>- Confirm pricing and status without opening technical inventory tools.</li>
+                </ul>
+              </section>
             </div>
           </section>
         </div>

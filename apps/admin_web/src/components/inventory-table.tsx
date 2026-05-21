@@ -37,7 +37,7 @@ export function InventoryTable({ items, currencyCode = "INR" }: InventoryTablePr
                       <div className="max-w-[20rem]">
                         <p className="text-base font-semibold">{item.name}</p>
                         <p className="mt-1 text-sm text-[var(--text-secondary)] line-clamp-2">
-                          {item.description || "Phase 1 item with no extended note yet."}
+                          {item.description || "No note has been added for this product yet."}
                         </p>
                       </div>
                     </td>
@@ -45,9 +45,11 @@ export function InventoryTable({ items, currencyCode = "INR" }: InventoryTablePr
                       {item.category || "Uncategorized"}
                     </td>
                     <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
-                      {item.sku || "—"}
+                      {item.sku || "No SKU"}
                     </td>
-                    <td className={`px-5 py-4 text-sm font-semibold ${tone}`}>{item.stock_on_hand}</td>
+                    <td className={`px-5 py-4 text-sm font-semibold ${tone}`}>
+                      {item.stock_on_hand}
+                    </td>
                     <td className="px-5 py-4 text-sm text-[var(--text-primary)]">
                       {formatCurrency(Number(item.sell_price), currencyCode)}
                     </td>
@@ -65,7 +67,7 @@ export function InventoryTable({ items, currencyCode = "INR" }: InventoryTablePr
                   colSpan={6}
                   className="px-5 py-10 text-center text-sm text-[var(--text-secondary)]"
                 >
-                  No inventory items returned from the phase 1 API yet.
+                  No products are available for this store yet.
                 </td>
               </tr>
             )}

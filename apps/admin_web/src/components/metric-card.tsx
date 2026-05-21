@@ -29,8 +29,10 @@ export function MetricCard({
           <p className="metric-value mt-5">{value}</p>
           <p className="mt-3 text-sm text-[var(--text-secondary)]">{detail}</p>
         </div>
-        <div className={`rounded-[18px] border px-4 py-3 text-sm font-semibold ${accentMap[accent]}`}>
-          {icon ?? "•"}
+        <div
+          className={`rounded-[18px] border px-4 py-3 text-sm font-semibold ${accentMap[accent]}`}
+        >
+          {icon ?? "*"}
         </div>
       </div>
     </div>

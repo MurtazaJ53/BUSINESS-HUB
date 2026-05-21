@@ -13,7 +13,7 @@ function getTone(status: ShopDomainState["pilot_signoff_status"]) {
           "border-[rgba(52,211,153,0.18)] bg-[rgba(7,33,25,0.72)]",
         badge:
           "border-[rgba(52,211,153,0.18)] bg-[rgba(7,33,25,0.82)] text-[var(--success)]",
-        label: "Production-safe",
+        label: "Healthy",
       };
     case "ready_for_cutover":
       return {
@@ -21,7 +21,7 @@ function getTone(status: ShopDomainState["pilot_signoff_status"]) {
           "border-[rgba(92,174,254,0.18)] bg-[rgba(9,18,34,0.72)]",
         badge:
           "border-[rgba(92,174,254,0.18)] bg-[rgba(9,18,34,0.82)] text-[var(--accent)]",
-        label: "Ready for cutover",
+        label: "Ready",
       };
     case "rollback_recommended":
       return {
@@ -29,7 +29,7 @@ function getTone(status: ShopDomainState["pilot_signoff_status"]) {
           "border-[rgba(251,113,133,0.18)] bg-[rgba(40,12,19,0.72)]",
         badge:
           "border-[rgba(251,113,133,0.18)] bg-[rgba(40,12,19,0.82)] text-[var(--warning)]",
-        label: "Rollback recommended",
+        label: "Needs attention",
       };
     case "monitoring":
       return {
@@ -45,7 +45,7 @@ function getTone(status: ShopDomainState["pilot_signoff_status"]) {
           "border-[rgba(152,164,189,0.16)] bg-[rgba(13,18,28,0.62)]",
         badge:
           "border-[rgba(152,164,189,0.18)] bg-[rgba(18,21,32,0.82)] text-[var(--text-secondary)]",
-        label: "Not staged yet",
+        label: "Pending",
       };
   }
 }
@@ -65,10 +65,10 @@ export function DomainPilotSignoffCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-[11px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-            {domainLabel} pilot signoff
+            {domainLabel} domain health
           </p>
           <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-            {domainState.pilot_recommended_action ?? "Run pilot prep and verification before signoff."}
+            {domainState.pilot_recommended_action ?? "No extra domain action is needed right now."}
           </p>
         </div>
         <div
@@ -80,11 +80,11 @@ export function DomainPilotSignoffCard({
 
       <p className="mt-3 text-sm text-[var(--text-secondary)]">
         {domainState.pilot_signoff_summary ??
-          "No signoff summary is available yet for this domain."}
+          "No health summary is available for this domain yet."}
       </p>
 
       <div className="mt-3 text-xs text-[var(--text-muted)]">
-        latest_verify=
+        latest check
         {" "}
         <span className="font-mono text-[var(--text-secondary)]">
           {domainState.pilot_latest_verify_result ?? "not-run"}
