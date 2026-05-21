@@ -77,3 +77,11 @@ export function canAccessExpenses(activeShop: ShopMembership | null): boolean {
 export function canAccessAttendance(activeShop: ShopMembership | null): boolean {
   return hasShopFeature(activeShop, "attendance");
 }
+
+export function canAccessAdvancedReports(activeShop: ShopMembership | null): boolean {
+  return hasShopFeature(activeShop, "advanced_reports");
+}
+
+export function canAccessFinanceSummary(activeShop: ShopMembership | null): boolean {
+  return hasShopFeature(activeShop, "finance_summary");
+}

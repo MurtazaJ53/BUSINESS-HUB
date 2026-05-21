@@ -6,6 +6,7 @@ import '../../../core/database/mobile_repository.dart';
 import '../../../core/insights/mobile_operational_insights.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/models/mobile_session.dart';
+import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/utils/formatters.dart';
@@ -49,6 +50,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     final customerRepository = ref.watch(customerRepositoryProvider);
     final backendApiClient = ref.watch(backendApiClientProvider);
     final syncStatus = ref.watch(syncStatusProvider);
+    final shop = ref.watch(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
     final customerPulseStream = salesRepository.watchCustomerPulse(
       search: _search,
     );
@@ -325,6 +327,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
 
                       if (snapshot.hasError) {
                         return _LocalCustomersFallbackPanel(
+                          shop: shop,
                           legacyCustomersStream: legacyCustomersStream,
                           customerPulseStream: customerPulseStream,
                           statusFilter: _statusFilter,
@@ -383,6 +386,9 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                           BackendCustomerOperationalReport.fromCustomers(
                             orderedCustomers,
                           );
+                      final showFinanceSummary = shop.supportsFinanceSummary;
+                      final showCollectionsQueue =
+                          shop.normalizedPlanTier != 'starter';
                       return MobilePanel(
                         title: 'Customer accounts',
                         action: MobileTag(
@@ -411,31 +417,35 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                                     tone: const Color(0xFF14B8A6),
                                   ),
                                   _CustomerSummaryTile(
-                                    label: 'Receivable',
-                                    value: formatCurrency(
-                                      summary.receivableBalance,
-                                    ),
-                                    tone: summary.receivableBalance > 0
-                                        ? const Color(0xFFF59E0B)
-                                        : const Color(0xFF22C55E),
-                                  ),
-                                  _CustomerSummaryTile(
                                     label: 'With due',
                                     value: '${summary.dueCount}',
                                     tone: const Color(0xFFFB7185),
                                   ),
-                                  _CustomerSummaryTile(
-                                    label: 'Inactive',
-                                    value: '${summary.inactiveCount}',
-                                    tone: const Color(0xFFA78BFA),
-                                  ),
+                                  if (showFinanceSummary)
+                                    _CustomerSummaryTile(
+                                      label: 'Receivable',
+                                      value: formatCurrency(
+                                        summary.receivableBalance,
+                                      ),
+                                      tone: summary.receivableBalance > 0
+                                          ? const Color(0xFFF59E0B)
+                                          : const Color(0xFF22C55E),
+                                    ),
+                                  if (showFinanceSummary)
+                                    _CustomerSummaryTile(
+                                      label: 'Inactive',
+                                      value: '${summary.inactiveCount}',
+                                      tone: const Color(0xFFA78BFA),
+                                    ),
                                 ],
                               ),
                               const SizedBox(height: 14),
                               Text(
                                 summary.highestBalanceCustomer == null
                                     ? 'No customer currently holds a due balance.'
-                                    : 'Highest due: ${summary.highestBalanceCustomer!.name} | ${formatCurrency(summary.highestBalanceCustomer!.balance)}',
+                                    : showFinanceSummary
+                                        ? 'Highest due: ${summary.highestBalanceCustomer!.name} | ${formatCurrency(summary.highestBalanceCustomer!.balance)}'
+                                        : '${shop.planLabel} keeps account review lighter. Upgrade to Pro for full receivable rollups.',
                                 style: Theme.of(context).textTheme.bodySmall
                                     ?.copyWith(
                                       color: Colors.white.withValues(
@@ -445,7 +455,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                                     ),
                               ),
                               const SizedBox(height: 14),
-                              if (summary.collectionsQueue.isNotEmpty)
+                              if (showCollectionsQueue &&
+                                  summary.collectionsQueue.isNotEmpty)
                                 _CollectionsQueuePanel(
                                   customers: summary.collectionsQueue,
                                   onSelectCustomer: (customer) async {
@@ -461,7 +472,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                                     }
                                   },
                                 ),
-                              if (summary.collectionsQueue.isNotEmpty)
+                              if (showCollectionsQueue &&
+                                  summary.collectionsQueue.isNotEmpty)
                                 const SizedBox(height: 14),
                               ...orderedCustomers.map(
                                 (customer) => Padding(
@@ -491,6 +503,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                   )
                 else
                   _LocalCustomersFallbackPanel(
+                    shop: shop,
                     legacyCustomersStream: legacyCustomersStream,
                     customerPulseStream: customerPulseStream,
                     statusFilter: _statusFilter,
@@ -1464,6 +1477,7 @@ class _CustomersRoleProfile {
 
 class _LocalCustomersFallbackPanel extends StatelessWidget {
   const _LocalCustomersFallbackPanel({
+    required this.shop,
     required this.legacyCustomersStream,
     required this.customerPulseStream,
     required this.statusFilter,
@@ -1471,6 +1485,7 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
     this.warning,
   });
 
+  final ShopInfo shop;
   final Stream<List<BackendCustomerSummary>> legacyCustomersStream;
   final Stream<List<CustomerPulseSummary>> customerPulseStream;
   final String statusFilter;
@@ -1731,6 +1746,7 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
                 final summary = BackendCustomerOperationalReport.fromCustomers(
                   filteredLegacyCustomers,
                 );
+                final showFinanceSummary = shop.supportsFinanceSummary;
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
@@ -1752,28 +1768,32 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
                           tone: const Color(0xFF14B8A6),
                         ),
                         _CustomerSummaryTile(
-                          label: 'Receivable',
-                          value: formatCurrency(summary.receivableBalance),
-                          tone: summary.receivableBalance > 0
-                              ? const Color(0xFFF59E0B)
-                              : const Color(0xFF22C55E),
-                        ),
-                        _CustomerSummaryTile(
                           label: 'With due',
                           value: '${summary.dueCount}',
                           tone: const Color(0xFFFB7185),
                         ),
-                        _CustomerSummaryTile(
-                          label: 'Inactive',
-                          value: '${summary.inactiveCount}',
-                          tone: const Color(0xFFA78BFA),
-                        ),
+                        if (showFinanceSummary)
+                          _CustomerSummaryTile(
+                            label: 'Receivable',
+                            value: formatCurrency(summary.receivableBalance),
+                            tone: summary.receivableBalance > 0
+                                ? const Color(0xFFF59E0B)
+                                : const Color(0xFF22C55E),
+                          ),
+                        if (showFinanceSummary)
+                          _CustomerSummaryTile(
+                            label: 'Inactive',
+                            value: '${summary.inactiveCount}',
+                            tone: const Color(0xFFA78BFA),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 14),
                     if (summary.highestBalanceCustomer != null)
                       Text(
-                        'Highest due: ${summary.highestBalanceCustomer!.name} | ${formatCurrency(summary.highestBalanceCustomer!.balance)}',
+                        showFinanceSummary
+                            ? 'Highest due: ${summary.highestBalanceCustomer!.name} | ${formatCurrency(summary.highestBalanceCustomer!.balance)}'
+                            : '${shop.planLabel} keeps local customer recall lighter. Upgrade to Pro for full receivable rollups.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Colors.white.withValues(alpha: 0.62),
                           fontWeight: FontWeight.w600,

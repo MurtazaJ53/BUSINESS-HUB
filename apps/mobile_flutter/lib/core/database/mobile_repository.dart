@@ -293,6 +293,8 @@ Map<String, bool> _coerceEnabledFeatures(
   final features = <String, bool>{
     'expenses': normalizedPlan != 'starter',
     'attendance': normalizedPlan != 'starter',
+    'advanced_reports': normalizedPlan == 'pro',
+    'finance_summary': normalizedPlan == 'pro',
     'advanced_ops': normalizedPlan == 'pro',
   };
 

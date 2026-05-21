@@ -11,6 +11,7 @@ import {
   resolveActiveShop,
 } from "@/lib/admin-api";
 import { formatCurrency } from "@/lib/formatters";
+import { canAccessAdvancedReports, canAccessFinanceSummary, formatPlanTier } from "@/lib/plans";
 
 function buildCustomerModeCopy(
   domainState: Awaited<ReturnType<typeof getShopDomainState>>,
@@ -56,6 +57,8 @@ export default async function CustomersPage() {
     : null;
   const stats = buildCustomerStats(customers);
   const customerMode = domainState ? buildCustomerModeCopy(domainState) : null;
+  const canUseAdvancedReports = canAccessAdvancedReports(activeShop);
+  const canUseFinanceSummary = canAccessFinanceSummary(activeShop);
   const highCreditCustomers = customers
     .filter((customer) => Number(customer.balance) > 0)
     .sort((left, right) => Number(right.balance) - Number(left.balance))
@@ -97,13 +100,23 @@ export default async function CustomersPage() {
               accent="blue"
               icon="BAL"
             />
-            <MetricCard
-              label="Lifetime spend"
-              value={formatCurrency(stats.totalLifetimeSpend, activeShop.shop.currency_code)}
-              detail="Total customer value captured in this store"
-              accent="green"
-              icon="LTV"
-            />
+            {canUseFinanceSummary ? (
+              <MetricCard
+                label="Lifetime spend"
+                value={formatCurrency(stats.totalLifetimeSpend, activeShop.shop.currency_code)}
+                detail="Total customer value captured in this store"
+                accent="green"
+                icon="LTV"
+              />
+            ) : (
+              <MetricCard
+                label="Plan insight"
+                value={`${formatPlanTier(activeShop.shop.plan_tier)} plan`}
+                detail="Deeper customer value rollups unlock on Pro."
+                accent="blue"
+                icon="PLN"
+              />
+            )}
           </section>
 
           <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)]">
@@ -182,35 +195,46 @@ export default async function CustomersPage() {
             </div>
 
             <div className="space-y-6">
-              <section className="panel-soft rounded-[28px] px-6 py-6">
-                <p className="eyebrow">Collections watch</p>
-                <h2 className="mt-3 text-2xl font-bold">Balances to review</h2>
-                <div className="mt-5 space-y-3">
-                  {highCreditCustomers.length ? (
-                    highCreditCustomers.map((customer) => (
-                      <div
-                        key={customer.id}
-                        className="surface-muted flex items-center justify-between rounded-[20px] px-4 py-4"
-                      >
-                        <div>
-                          <p className="font-semibold">{customer.name}</p>
-                          <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                            {customer.phone || "No phone"}
-                            {customer.email ? ` | ${customer.email}` : ""}
-                          </p>
+              {canUseAdvancedReports ? (
+                <section className="panel-soft rounded-[28px] px-6 py-6">
+                  <p className="eyebrow">Collections watch</p>
+                  <h2 className="mt-3 text-2xl font-bold">Balances to review</h2>
+                  <div className="mt-5 space-y-3">
+                    {highCreditCustomers.length ? (
+                      highCreditCustomers.map((customer) => (
+                        <div
+                          key={customer.id}
+                          className="surface-muted flex items-center justify-between rounded-[20px] px-4 py-4"
+                        >
+                          <div>
+                            <p className="font-semibold">{customer.name}</p>
+                            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                              {customer.phone || "No phone"}
+                              {customer.email ? ` | ${customer.email}` : ""}
+                            </p>
+                          </div>
+                          <span className="rounded-full border border-[rgba(255,138,106,0.18)] px-3 py-1 text-sm font-semibold text-[var(--warning)]">
+                            {formatCurrency(Number(customer.balance), activeShop.shop.currency_code)}
+                          </span>
                         </div>
-                        <span className="rounded-full border border-[rgba(255,138,106,0.18)] px-3 py-1 text-sm font-semibold text-[var(--warning)]">
-                          {formatCurrency(Number(customer.balance), activeShop.shop.currency_code)}
-                        </span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-[var(--text-secondary)]">
-                      No customer balances need urgent follow-up right now.
-                    </p>
-                  )}
-                </div>
-              </section>
+                      ))
+                    ) : (
+                      <p className="text-sm text-[var(--text-secondary)]">
+                        No customer balances need urgent follow-up right now.
+                      </p>
+                    )}
+                  </div>
+                </section>
+              ) : (
+                <section className="panel-soft rounded-[28px] px-6 py-6">
+                  <p className="eyebrow">Upgrade path</p>
+                  <h2 className="mt-3 text-2xl font-bold">Deeper collections view stays hidden</h2>
+                  <p className="mt-5 text-sm leading-7 text-[var(--text-secondary)]">
+                    This workspace still shows customer balances inside the main list, but the ranked
+                    collections watch and richer account rollups unlock on Pro.
+                  </p>
+                </section>
+              )}
 
               <section className="panel-soft rounded-[28px] px-6 py-6">
                 <p className="eyebrow">Use this page for</p>

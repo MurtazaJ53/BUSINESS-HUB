@@ -33,6 +33,10 @@ class ShopInfo {
       enabledFeatures['expenses'] ?? normalizedPlanTier != 'starter';
   bool get supportsAttendance =>
       enabledFeatures['attendance'] ?? normalizedPlanTier != 'starter';
+  bool get supportsAdvancedReports =>
+      enabledFeatures['advanced_reports'] ?? normalizedPlanTier == 'pro';
+  bool get supportsFinanceSummary =>
+      enabledFeatures['finance_summary'] ?? normalizedPlanTier == 'pro';
   bool get supportsAdvancedOps =>
       enabledFeatures['advanced_ops'] ?? normalizedPlanTier == 'pro';
 
@@ -47,6 +51,8 @@ class ShopInfo {
       enabledFeatures: <String, bool>{
         'expenses': true,
         'attendance': true,
+        'advanced_reports': false,
+        'finance_summary': false,
         'advanced_ops': false,
       },
     );

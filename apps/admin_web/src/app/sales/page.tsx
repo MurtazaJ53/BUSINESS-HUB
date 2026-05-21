@@ -11,6 +11,7 @@ import {
   resolveActiveShop,
 } from "@/lib/admin-api";
 import { formatCurrency } from "@/lib/formatters";
+import { canAccessAdvancedReports, canAccessFinanceSummary, formatPlanTier } from "@/lib/plans";
 
 export default async function SalesPage() {
   const session = await getSession();
@@ -22,6 +23,8 @@ export default async function SalesPage() {
       ])
     : [[], null];
   const stats = buildSalesStats(sales);
+  const canUseAdvancedReports = canAccessAdvancedReports(activeShop);
+  const canUseFinanceSummary = canAccessFinanceSummary(activeShop);
   const creditHeavy = sales
     .filter((sale) => Number(sale.amount_due) > 0)
     .sort((left, right) => Number(right.amount_due) - Number(left.amount_due))
@@ -56,20 +59,40 @@ export default async function SalesPage() {
               accent="green"
               icon="REV"
             />
-            <MetricCard
-              label="Outstanding due"
-              value={formatCurrency(stats.outstandingRevenue, activeShop.shop.currency_code)}
-              detail="Credit exposure still open on recorded sales"
-              accent="rose"
-              icon="DUE"
-            />
-            <MetricCard
-              label="Average ticket"
-              value={formatCurrency(stats.averageTicket, activeShop.shop.currency_code)}
-              detail="Average sale value across captured receipts"
-              accent="blue"
-              icon="AVG"
-            />
+            {canUseFinanceSummary ? (
+              <MetricCard
+                label="Outstanding due"
+                value={formatCurrency(stats.outstandingRevenue, activeShop.shop.currency_code)}
+                detail="Credit exposure still open on recorded sales"
+                accent="rose"
+                icon="DUE"
+              />
+            ) : (
+              <MetricCard
+                label="Plan insight"
+                value={`${formatPlanTier(activeShop.shop.plan_tier)} plan`}
+                detail="Finance rollups stay hidden until Pro."
+                accent="blue"
+                icon="PLN"
+              />
+            )}
+            {canUseAdvancedReports ? (
+              <MetricCard
+                label="Average ticket"
+                value={formatCurrency(stats.averageTicket, activeShop.shop.currency_code)}
+                detail="Average sale value across captured receipts"
+                accent="blue"
+                icon="AVG"
+              />
+            ) : (
+              <MetricCard
+                label="Receipt mode"
+                value="Simple review"
+                detail="Detailed sales analytics unlock on Pro."
+                accent="green"
+                icon="LGT"
+              />
+            )}
           </section>
 
           <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)]">
@@ -103,34 +126,45 @@ export default async function SalesPage() {
                 <DomainPilotSignoffCard domainState={domainState} domainLabel="Sales" />
               ) : null}
 
-              <section className="panel-soft rounded-[28px] px-6 py-6">
-                <p className="eyebrow">Credit watch</p>
-                <h2 className="mt-3 text-2xl font-bold">Receipts with open due</h2>
-                <div className="mt-5 space-y-3">
-                  {creditHeavy.length ? (
-                    creditHeavy.map((sale) => (
-                      <div
-                        key={sale.id}
-                        className="surface-muted flex items-center justify-between rounded-[20px] px-4 py-4"
-                      >
-                        <div>
-                          <p className="font-semibold">{sale.receipt_number}</p>
-                          <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                            {sale.customer_name || "Walk-in"} | {sale.sale_date}
-                          </p>
+              {canUseFinanceSummary ? (
+                <section className="panel-soft rounded-[28px] px-6 py-6">
+                  <p className="eyebrow">Credit watch</p>
+                  <h2 className="mt-3 text-2xl font-bold">Receipts with open due</h2>
+                  <div className="mt-5 space-y-3">
+                    {creditHeavy.length ? (
+                      creditHeavy.map((sale) => (
+                        <div
+                          key={sale.id}
+                          className="surface-muted flex items-center justify-between rounded-[20px] px-4 py-4"
+                        >
+                          <div>
+                            <p className="font-semibold">{sale.receipt_number}</p>
+                            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                              {sale.customer_name || "Walk-in"} | {sale.sale_date}
+                            </p>
+                          </div>
+                          <span className="rounded-full border border-[rgba(255,138,106,0.18)] px-3 py-1 text-sm font-semibold text-[var(--warning)]">
+                            {formatCurrency(Number(sale.amount_due), activeShop.shop.currency_code)}
+                          </span>
                         </div>
-                        <span className="rounded-full border border-[rgba(255,138,106,0.18)] px-3 py-1 text-sm font-semibold text-[var(--warning)]">
-                          {formatCurrency(Number(sale.amount_due), activeShop.shop.currency_code)}
-                        </span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-[var(--text-secondary)]">
-                      No receipts with urgent due balances are showing right now.
-                    </p>
-                  )}
-                </div>
-              </section>
+                      ))
+                    ) : (
+                      <p className="text-sm text-[var(--text-secondary)]">
+                        No receipts with urgent due balances are showing right now.
+                      </p>
+                    )}
+                  </div>
+                </section>
+              ) : (
+                <section className="panel-soft rounded-[28px] px-6 py-6">
+                  <p className="eyebrow">Upgrade path</p>
+                  <h2 className="mt-3 text-2xl font-bold">Finance watch stays hidden</h2>
+                  <p className="mt-5 text-sm leading-7 text-[var(--text-secondary)]">
+                    This workspace still lets owners review receipts, but credit-heavy sales rollups and deeper
+                    revenue analysis stay behind Pro.
+                  </p>
+                </section>
+              )}
 
               <section className="panel-soft rounded-[28px] px-6 py-6">
                 <p className="eyebrow">Use this page for</p>

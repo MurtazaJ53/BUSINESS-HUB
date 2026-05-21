@@ -40,6 +40,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     final salesRepository = ref.read(salesRepositoryProvider);
     final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
     final syncStatus = ref.watch(syncStatusProvider);
+    final shop = ref.watch(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
     final overview =
         ref.watch(historyOverviewProvider).asData?.value ??
         HistoryOverview.empty();
@@ -53,6 +54,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           DomainControlState.legacy('payments'),
         ];
     final report = HistoryReportSnapshot.fromSales(sales);
+    final showOperationalSummary = shop.normalizedPlanTier != 'starter';
+    final showAdvancedReport = shop.supportsAdvancedReports;
     final hasActiveFilters =
         _filter.search.trim().isNotEmpty ||
         _filter.syncState != null ||
@@ -387,28 +390,32 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                           value: formatCurrency(report.grossTotal),
                           tone: const Color(0xFF22C55E),
                         ),
-                        _HistoryMetricTile(
-                          label: 'Collected',
-                          value: formatCurrency(report.collectedTotal),
-                          tone: const Color(0xFF38BDF8),
-                        ),
-                        _HistoryMetricTile(
-                          label: 'Due',
-                          value: formatCurrency(report.dueTotal),
-                          tone: report.dueTotal > 0
-                              ? const Color(0xFFF59E0B)
-                              : const Color(0xFF22C55E),
-                        ),
-                        _HistoryMetricTile(
-                          label: 'Avg ticket',
-                          value: formatCurrency(report.averageTicketValue),
-                          tone: const Color(0xFFA78BFA),
-                        ),
-                        _HistoryMetricTile(
-                          label: 'Named buyers',
-                          value: '${report.namedBuyerCount}',
-                          tone: const Color(0xFF14B8A6),
-                        ),
+                        if (showOperationalSummary)
+                          _HistoryMetricTile(
+                            label: 'Collected',
+                            value: formatCurrency(report.collectedTotal),
+                            tone: const Color(0xFF38BDF8),
+                          ),
+                        if (showOperationalSummary)
+                          _HistoryMetricTile(
+                            label: 'Due',
+                            value: formatCurrency(report.dueTotal),
+                            tone: report.dueTotal > 0
+                                ? const Color(0xFFF59E0B)
+                                : const Color(0xFF22C55E),
+                          ),
+                        if (showAdvancedReport)
+                          _HistoryMetricTile(
+                            label: 'Avg ticket',
+                            value: formatCurrency(report.averageTicketValue),
+                            tone: const Color(0xFFA78BFA),
+                          ),
+                        if (showAdvancedReport)
+                          _HistoryMetricTile(
+                            label: 'Named buyers',
+                            value: '${report.namedBuyerCount}',
+                            tone: const Color(0xFF14B8A6),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 14),
@@ -421,15 +428,19 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      report.topPaymentMode == null
-                          ? 'No payment mode mix available yet.'
-                          : 'Top mode ${report.topPaymentMode} | ${report.dueReceiptCount} receipt(s) still carry due balance | ${report.walkInCount} walk-in sale(s).',
+                      showAdvancedReport
+                          ? (report.topPaymentMode == null
+                              ? 'No payment mode mix available yet.'
+                              : 'Top mode ${report.topPaymentMode} | ${report.dueReceiptCount} receipt(s) still carry due balance | ${report.walkInCount} walk-in sale(s).')
+                          : showOperationalSummary
+                              ? '${shop.planLabel} keeps reporting lighter here. Upgrade to Pro for payment-mix and buyer-pattern insights.'
+                              : '${shop.planLabel} focuses on simple receipt review. Upgrade to unlock deeper report rollups.',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Colors.white.withValues(alpha: 0.54),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    if (report.paymentMix.isNotEmpty) ...<Widget>[
+                    if (showAdvancedReport && report.paymentMix.isNotEmpty) ...<Widget>[
                       const SizedBox(height: 14),
                       Text(
                         'Payment mix',
