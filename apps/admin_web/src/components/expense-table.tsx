@@ -28,16 +28,22 @@ export function ExpenseTable({ expenses, currencyCode = "INR" }: ExpenseTablePro
                   <td className="px-5 py-4">
                     <p className="text-base font-semibold">{expense.category}</p>
                     {expense.payment_reference ? (
-                      <p className="mt-1 text-xs text-[var(--text-muted)]">{expense.payment_reference}</p>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        {expense.payment_reference}
+                      </p>
                     ) : null}
                   </td>
                   <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
                     <div className="max-w-[22rem] line-clamp-2">
-                      {expense.description || "No extended description"}
+                      {expense.description || "No extra note has been added."}
                     </div>
                   </td>
-                  <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">{expense.payment_method}</td>
-                  <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">{expense.expense_date}</td>
+                  <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
+                    {expense.payment_method}
+                  </td>
+                  <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
+                    {expense.expense_date}
+                  </td>
                   <td className="px-5 py-4 text-sm font-semibold text-[var(--warning)]">
                     {formatCurrency(Number(expense.amount || 0), currencyCode)}
                   </td>
@@ -48,8 +54,11 @@ export function ExpenseTable({ expenses, currencyCode = "INR" }: ExpenseTablePro
               ))
             ) : (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-sm text-[var(--text-secondary)]">
-                  No expense entries returned from the phase 1 API yet.
+                <td
+                  colSpan={6}
+                  className="px-5 py-10 text-center text-sm text-[var(--text-secondary)]"
+                >
+                  No expenses are available for this store yet.
                 </td>
               </tr>
             )}

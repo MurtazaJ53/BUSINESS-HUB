@@ -29,19 +29,30 @@ export function PaymentsTable({ payments, currencyCode = "INR" }: PaymentsTableP
                     <p className="text-base font-semibold">{payment.receipt_number}</p>
                     <p className="mt-1 text-xs text-[var(--text-muted)]">{payment.occurred_at}</p>
                   </td>
-                  <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">{payment.customer_name || "Walk-in"}</td>
-                  <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">{payment.payment_method}</td>
+                  <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
+                    {payment.customer_name || "Walk-in"}
+                  </td>
+                  <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
+                    {payment.payment_method}
+                  </td>
                   <td className="px-5 py-4 text-sm font-semibold text-[var(--accent)]">
                     {formatCurrency(Number(payment.amount || 0), currencyCode)}
                   </td>
-                  <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">{payment.reference_code || "—"}</td>
-                  <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">{payment.actor_name || "System"}</td>
+                  <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
+                    {payment.reference_code || "No reference"}
+                  </td>
+                  <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
+                    {payment.actor_name || "System"}
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-sm text-[var(--text-secondary)]">
-                  No payments returned from the phase 1 API yet.
+                <td
+                  colSpan={6}
+                  className="px-5 py-10 text-center text-sm text-[var(--text-secondary)]"
+                >
+                  No payments are available for this store yet.
                 </td>
               </tr>
             )}

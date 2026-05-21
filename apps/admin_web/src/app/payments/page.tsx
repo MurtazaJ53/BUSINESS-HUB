@@ -5,9 +5,9 @@ import { MetricCard } from "@/components/metric-card";
 import { PaymentsTable } from "@/components/payments-table";
 import {
   buildPaymentStats,
-  getShopDomainState,
   getPayments,
   getSession,
+  getShopDomainState,
   resolveActiveShop,
 } from "@/lib/admin-api";
 import { formatCurrency } from "@/lib/formatters";
@@ -22,79 +22,130 @@ export default async function PaymentsPage() {
       ])
     : [[], null];
   const stats = buildPaymentStats(payments);
+  const recentHighValue = [...payments]
+    .sort((left, right) => Number(right.amount) - Number(left.amount))
+    .slice(0, 6);
 
   return (
     <AdminShell
       session={session}
       activeShop={activeShop}
       activeRoute="payments"
-      title="Payment Capture"
-      subtitle="Phase 1 settlement view for the new commerce contract. This surface lets us inspect payment mode mix before the full POS and reconciliation phases."
+      title="Payments overview"
+      subtitle="Review collections, payment mix, and receipt settlement without opening a finance-heavy screen."
     >
       {!activeShop ? (
         <EmptyState
-          title="No payment scope available"
-          body="The admin shell needs an active shop membership before it can query payments. Once your workspace is bootstrapped, this route will hydrate from the Django payments API."
+          title="No payment workspace available"
+          body="This web workspace needs an active shop membership before it can show captured payments and collection history for a store."
         />
       ) : (
         <div className="space-y-8">
-          {domainState ? (
-            <DomainPilotSignoffCard domainState={domainState} domainLabel="Payments" />
-          ) : null}
-
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label="Payments captured"
               value={stats.paymentCount.toString()}
-              detail="Phase 1 payment documents linked to recorded sales"
+              detail="Payment records currently visible in this store"
               icon="PAY"
             />
             <MetricCard
               label="Collected value"
               value={formatCurrency(stats.totalCollected, activeShop.shop.currency_code)}
-              detail="Total captured across all payment entries"
+              detail="Total amount collected across recorded payment entries"
               accent="green"
               icon="COL"
             />
             <MetricCard
               label="Credit entries"
               value={stats.creditCount.toString()}
-              detail="Payment records that keep dues open"
+              detail="Payments that still leave due open on the receipt"
               accent="rose"
               icon="CRD"
             />
             <MetricCard
               label="Digital mix"
               value={stats.digitalShareCount.toString()}
-              detail="UPI, bank, and card capture count"
+              detail="UPI, bank, and card payment count"
               accent="blue"
               icon="DIG"
             />
           </section>
 
-          <section className="panel-soft rounded-[28px] px-6 py-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-              <div>
-                <p className="eyebrow">Payment dataset</p>
-                <h2 className="mt-3 text-2xl font-bold">Live backend results</h2>
-                <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                  This screen is reading
-                  {" "}
-                  <code>/api/v1/shops/{activeShop.shop.id}/payments/</code>
-                  {" "}
-                  from the new Django phase 1 backend.
-                </p>
-              </div>
-              <div className="rounded-[18px] border border-[rgba(152,164,189,0.12)] bg-[rgba(13,18,28,0.68)] px-4 py-3 text-sm text-[var(--text-secondary)]">
-                Shop
-                <div className="mt-1 text-base font-semibold text-[var(--text-primary)]">
-                  {activeShop.shop.name}
+          <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)]">
+            <div className="space-y-6">
+              <section className="panel-soft rounded-[28px] px-6 py-6">
+                <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <p className="eyebrow">Payment list</p>
+                    <h2 className="mt-3 text-2xl font-bold">Recent collections</h2>
+                    <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                      Use this page to review who paid, how they paid, and how much was collected
+                      against each receipt.
+                    </p>
+                  </div>
+                  <div className="rounded-[18px] border border-[rgba(152,164,189,0.12)] bg-[rgba(13,18,28,0.68)] px-4 py-3 text-sm text-[var(--text-secondary)]">
+                    Shop
+                    <div className="mt-1 text-base font-semibold text-[var(--text-primary)]">
+                      {activeShop.shop.name}
+                    </div>
+                  </div>
                 </div>
-              </div>
+
+                <div className="mt-6">
+                  <PaymentsTable
+                    payments={payments}
+                    currencyCode={activeShop.shop.currency_code}
+                  />
+                </div>
+              </section>
             </div>
 
-            <div className="mt-6">
-              <PaymentsTable payments={payments} currencyCode={activeShop.shop.currency_code} />
+            <div className="space-y-6">
+              {domainState ? (
+                <DomainPilotSignoffCard
+                  domainState={domainState}
+                  domainLabel="Payments"
+                />
+              ) : null}
+
+              <section className="panel-soft rounded-[28px] px-6 py-6">
+                <p className="eyebrow">Collections watch</p>
+                <h2 className="mt-3 text-2xl font-bold">Highest captured payments</h2>
+                <div className="mt-5 space-y-3">
+                  {recentHighValue.length ? (
+                    recentHighValue.map((payment) => (
+                      <div
+                        key={payment.id}
+                        className="surface-muted flex items-center justify-between rounded-[20px] px-4 py-4"
+                      >
+                        <div>
+                          <p className="font-semibold">{payment.receipt_number}</p>
+                          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                            {(payment.customer_name || "Walk-in") + " | " + payment.payment_method}
+                          </p>
+                        </div>
+                        <span className="rounded-full border border-[rgba(58,215,162,0.18)] px-3 py-1 text-sm font-semibold text-[var(--success)]">
+                          {formatCurrency(Number(payment.amount || 0), activeShop.shop.currency_code)}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-[var(--text-secondary)]">
+                      No payment activity is available for this store yet.
+                    </p>
+                  )}
+                </div>
+              </section>
+
+              <section className="panel-soft rounded-[28px] px-6 py-6">
+                <p className="eyebrow">Use this page for</p>
+                <h2 className="mt-3 text-2xl font-bold">Clear collection review</h2>
+                <ul className="mt-5 space-y-3 text-sm leading-7 text-[var(--text-secondary)]">
+                  <li>- See how much money has actually been collected.</li>
+                  <li>- Review payment method mix without opening raw accounting tools.</li>
+                  <li>- Spot receipts that still depend on credit instead of clean settlement.</li>
+                </ul>
+              </section>
             </div>
           </section>
         </div>

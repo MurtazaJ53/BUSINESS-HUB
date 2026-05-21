@@ -35,20 +35,35 @@ export function AttendanceTable({ sessions }: AttendanceTableProps) {
                   <tr key={session.id} className="border-b border-[rgba(152,164,189,0.08)] align-top">
                     <td className="px-5 py-4">
                       <p className="text-base font-semibold">{session.member_name}</p>
-                      <p className="mt-1 text-sm text-[var(--text-secondary)]">{session.member_role}</p>
+                      <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                        {session.member_role}
+                      </p>
                     </td>
-                    <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">{session.session_date}</td>
-                    <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">{session.clock_in_at || "—"}</td>
-                    <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">{session.clock_out_at || "—"}</td>
-                    <td className={`px-5 py-4 text-sm font-semibold ${tone}`}>{session.status}</td>
-                    <td className="px-5 py-4 text-sm text-[var(--text-primary)]">{session.total_hours || "—"}</td>
+                    <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
+                      {session.session_date}
+                    </td>
+                    <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
+                      {session.clock_in_at || "No clock-in"}
+                    </td>
+                    <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
+                      {session.clock_out_at || "Not closed"}
+                    </td>
+                    <td className={`px-5 py-4 text-sm font-semibold ${tone}`}>
+                      {session.status}
+                    </td>
+                    <td className="px-5 py-4 text-sm text-[var(--text-primary)]">
+                      {session.total_hours || "Not logged"}
+                    </td>
                   </tr>
                 );
               })
             ) : (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-sm text-[var(--text-secondary)]">
-                  No attendance sessions returned from the phase 1 API yet.
+                <td
+                  colSpan={6}
+                  className="px-5 py-10 text-center text-sm text-[var(--text-secondary)]"
+                >
+                  No attendance sessions are available for this store yet.
                 </td>
               </tr>
             )}
