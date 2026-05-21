@@ -1,9 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/models/mobile_models.dart';
+import '../../../core/models/mobile_session.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/runtime/app_runtime_info.dart';
 import '../../../core/session/mobile_session_controller.dart';
@@ -134,6 +136,81 @@ class SettingsScreen extends ConsumerWidget {
                   title: 'Unlock next',
                   lines: _unlockNext(shop),
                 ),
+                if (session?.isOwnerLike ?? false) ...<Widget>[
+                  const SizedBox(height: 12),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final stacked = constraints.maxWidth < 430;
+                      final actions = <Widget>[
+                        Expanded(
+                          child: FilledButton.tonalIcon(
+                            onPressed: () async {
+                              await Clipboard.setData(
+                                ClipboardData(
+                                  text: _buildPlanSummaryText(shop, session),
+                                ),
+                              );
+                              if (!context.mounted) {
+                                return;
+                              }
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Plan summary copied.'),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.copy_rounded),
+                            label: const Text('Copy summary'),
+                          ),
+                        ),
+                        if (shop.normalizedPlanTier != 'pro')
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              onPressed: () async {
+                                await Clipboard.setData(
+                                  ClipboardData(
+                                    text: _buildUpgradeBriefText(shop, session),
+                                  ),
+                                );
+                                if (!context.mounted) {
+                                  return;
+                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Upgrade brief copied.'),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.trending_up_rounded),
+                              label: Text(_upgradeButtonLabel(shop)),
+                            ),
+                          ),
+                      ];
+
+                      if (stacked) {
+                        return Column(
+                          children: actions
+                              .expand((widget) => <Widget>[
+                                    widget,
+                                    if (widget != actions.last)
+                                      const SizedBox(height: 10),
+                                  ])
+                              .toList(growable: false),
+                        );
+                      }
+
+                      return Row(
+                        children: actions
+                            .expand((widget) => <Widget>[
+                                  widget,
+                                  if (widget != actions.last)
+                                    const SizedBox(width: 10),
+                                ])
+                            .toList(growable: false),
+                      );
+                    },
+                  ),
+                ],
               ],
             ),
           ),
@@ -528,6 +605,77 @@ List<String> _unlockNext(ShopInfo shop) {
         'Pro opens stronger admin and support surfaces when needed',
       ];
   }
+}
+
+String _upgradeButtonLabel(ShopInfo shop) {
+  switch (shop.normalizedPlanTier) {
+    case 'starter':
+      return 'Copy Growth brief';
+    case 'growth':
+      return 'Copy Pro brief';
+    default:
+      return 'Copy upgrade brief';
+  }
+}
+
+String _nextPlanLabel(ShopInfo shop) {
+  switch (shop.normalizedPlanTier) {
+    case 'starter':
+      return 'Growth';
+    case 'growth':
+      return 'Pro';
+    default:
+      return 'Pro';
+  }
+}
+
+String _buildPlanSummaryText(ShopInfo shop, MobileSession? session) {
+  final buffer = StringBuffer()
+    ..writeln('Business Hub workspace plan summary')
+    ..writeln('Workspace: ${shop.name}')
+    ..writeln('Current plan: ${shop.planLabel}')
+    ..writeln('Operator role: ${session?.displayRoleLabel ?? 'UNKNOWN'}')
+    ..writeln()
+    ..writeln('Included now:');
+
+  for (final line in _includedNow(shop)) {
+    buffer.writeln('- $line');
+  }
+
+  buffer
+    ..writeln()
+    ..writeln('Unlock next:');
+
+  for (final line in _unlockNext(shop)) {
+    buffer.writeln('- $line');
+  }
+
+  return buffer.toString().trimRight();
+}
+
+String _buildUpgradeBriefText(ShopInfo shop, MobileSession? session) {
+  final buffer = StringBuffer()
+    ..writeln('Business Hub workspace upgrade brief')
+    ..writeln('Workspace: ${shop.name}')
+    ..writeln('Current plan: ${shop.planLabel}')
+    ..writeln('Requested next plan: ${_nextPlanLabel(shop)}')
+    ..writeln('Operator role: ${session?.displayRoleLabel ?? 'UNKNOWN'}')
+    ..writeln()
+    ..writeln('Included now:');
+
+  for (final line in _includedNow(shop)) {
+    buffer.writeln('- $line');
+  }
+
+  buffer
+    ..writeln()
+    ..writeln('Why upgrade next:');
+
+  for (final line in _unlockNext(shop)) {
+    buffer.writeln('- $line');
+  }
+
+  return buffer.toString().trimRight();
 }
 
 class _PlanSection extends StatelessWidget {
