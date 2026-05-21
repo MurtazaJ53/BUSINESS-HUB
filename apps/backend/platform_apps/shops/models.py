@@ -4,6 +4,7 @@ from django.conf import settings
 from django.db import models
 
 from platform_apps.common.models import SourceTrackedModel
+from platform_apps.shops.plans import build_enabled_features, normalize_plan_tier
 
 
 class Shop(SourceTrackedModel):
@@ -22,6 +23,16 @@ class Shop(SourceTrackedModel):
     timezone = models.CharField(max_length=64, default="Asia/Kolkata")
     currency_code = models.CharField(max_length=8, default="INR")
     is_active = models.BooleanField(default=True)
+
+    @property
+    def plan_tier(self) -> str:
+        return normalize_plan_tier(self.settings_json.get("plan_tier"))
+
+    @property
+    def enabled_features(self) -> dict[str, bool]:
+        explicit = self.settings_json.get("enabled_features")
+        overrides = explicit if isinstance(explicit, dict) else None
+        return build_enabled_features(self.plan_tier, overrides=overrides)
 
     def __str__(self) -> str:
         return self.name

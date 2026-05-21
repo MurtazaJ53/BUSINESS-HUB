@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { formatRole } from "@/lib/formatters";
+import { canAccessAttendance, canAccessExpenses, formatPlanTier } from "@/lib/plans";
 import type { SessionPayload, ShopMembership } from "@/lib/types";
 
 type AdminShellProps = {
@@ -117,7 +118,19 @@ function getSectionedNav(
     }
 
     if (item.group === "operations") {
-      return canSeeOperations(workspaceRole);
+      if (!canSeeOperations(workspaceRole)) {
+        return false;
+      }
+
+      if (item.key === "expenses") {
+        return canAccessExpenses(activeShop);
+      }
+
+      if (item.key === "attendance") {
+        return canAccessAttendance(activeShop);
+      }
+
+      return true;
     }
 
     return true;
@@ -150,6 +163,7 @@ export function AdminShell({
   const workspaceRole = getWorkspaceRole(activeShop);
   const workspaceRoleLabel = workspaceRole ? formatRole(workspaceRole) : "Unassigned";
   const isInternal = surfaceMode === "internal";
+  const workspacePlanLabel = activeShop ? formatPlanTier(activeShop.shop.plan_tier) : "Growth";
 
   return (
     <div className="min-h-screen px-4 py-4 md:px-6 lg:px-8">
@@ -213,6 +227,9 @@ export function AdminShell({
                     Platform admin
                   </span>
                 ) : null}
+                <span className="rounded-full border border-[rgba(245,158,11,0.18)] bg-[rgba(77,49,9,0.34)] px-3 py-1 text-xs font-medium text-[var(--warning)]">
+                  {workspacePlanLabel} plan
+                </span>
               </div>
             </div>
 
@@ -224,7 +241,7 @@ export function AdminShell({
                 </p>
                 <p className="mt-1 text-sm text-[var(--text-secondary)]">
                   {activeShop
-                    ? `${activeShop.shop.slug} | ${activeShop.shop.currency_code} | ${activeShop.shop.timezone}`
+                    ? `${activeShop.shop.slug} | ${workspacePlanLabel} | ${activeShop.shop.currency_code} | ${activeShop.shop.timezone}`
                     : "Add a shop membership to unlock the curated web workspace."}
                 </p>
               </div>
@@ -263,6 +280,11 @@ export function AdminShell({
                     <span className="rounded-full border border-[rgba(152,164,189,0.12)] bg-[rgba(9,14,22,0.52)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
                       {workspaceRoleLabel} workspace
                     </span>
+                    {activeShop ? (
+                      <span className="rounded-full border border-[rgba(245,158,11,0.18)] bg-[rgba(77,49,9,0.34)] px-3 py-1 text-xs font-medium text-[var(--warning)]">
+                        {workspacePlanLabel} plan
+                      </span>
+                    ) : null}
                     {isInternal ? (
                       <span className="rounded-full border border-[rgba(255,138,106,0.18)] bg-[rgba(44,18,14,0.56)] px-3 py-1 text-xs font-medium text-[var(--warning)]">
                         Internal control plane

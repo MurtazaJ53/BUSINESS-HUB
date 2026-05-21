@@ -5,6 +5,8 @@ class ShopInfo {
     required this.footer,
     required this.currency,
     required this.phone,
+    this.planTier = 'growth',
+    this.enabledFeatures = const <String, bool>{},
   });
 
   final String name;
@@ -12,6 +14,27 @@ class ShopInfo {
   final String footer;
   final String currency;
   final String phone;
+  final String planTier;
+  final Map<String, bool> enabledFeatures;
+
+  String get normalizedPlanTier => _normalizePlanTier(planTier);
+  String get planLabel {
+    switch (normalizedPlanTier) {
+      case 'starter':
+        return 'Starter';
+      case 'pro':
+        return 'Pro';
+      default:
+        return 'Growth';
+    }
+  }
+
+  bool get supportsExpenses =>
+      enabledFeatures['expenses'] ?? normalizedPlanTier != 'starter';
+  bool get supportsAttendance =>
+      enabledFeatures['attendance'] ?? normalizedPlanTier != 'starter';
+  bool get supportsAdvancedOps =>
+      enabledFeatures['advanced_ops'] ?? normalizedPlanTier == 'pro';
 
   factory ShopInfo.fallback() {
     return const ShopInfo(
@@ -20,8 +43,22 @@ class ShopInfo {
       footer: 'Thank you for your business!',
       currency: 'INR',
       phone: '',
+      planTier: 'growth',
+      enabledFeatures: <String, bool>{
+        'expenses': true,
+        'attendance': true,
+        'advanced_ops': false,
+      },
     );
   }
+}
+
+String _normalizePlanTier(String value) {
+  final normalized = value.trim().toLowerCase();
+  if (normalized == 'starter' || normalized == 'pro') {
+    return normalized;
+  }
+  return 'growth';
 }
 
 class DomainControlState {

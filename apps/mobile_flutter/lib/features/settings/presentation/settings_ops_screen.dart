@@ -43,6 +43,40 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(mobileSessionProvider).asData?.value;
+    final shop = ref.watch(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
+    if (!shop.supportsAdvancedOps) {
+      return MobileStandaloneScaffold(
+        title: 'Advanced ops',
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
+          children: <Widget>[
+            MobileScreenLead(
+              title: 'Advanced ops locked',
+              subtitle:
+                  'This workspace stays on the curated Business Hub path. Advanced recovery and rollout tooling only opens on Pro workspaces.',
+              icon: Icons.lock_rounded,
+              accent: const Color(0xFFF59E0B),
+              primaryTag: MobileTag(
+                label: '${shop.planLabel} plan',
+                icon: Icons.workspace_premium_rounded,
+                accent: const Color(0xFFF59E0B),
+              ),
+            ),
+            const SizedBox(height: 18),
+            const MobilePanel(
+              title: 'Upgrade path',
+              child: MobileEmptyState(
+                icon: Icons.lock_outline_rounded,
+                title: 'Advanced ops stay hidden here',
+                body:
+                    'Use the normal Settings screen for day-to-day app health. Pro workspaces unlock deeper recovery, rollout, and technical support tools.',
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final backendApiClient = ref.watch(backendApiClientProvider);
     final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
     final syncStatus = ref.watch(syncStatusProvider.select((status) => status));
@@ -53,7 +87,6 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
     final evidenceTrackerController = ref.watch(
       pilotEvidenceTrackerControllerProvider,
     );
-    final shop = ref.watch(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
     final history =
         ref.watch(historyOverviewProvider).asData?.value ??
         HistoryOverview.empty();

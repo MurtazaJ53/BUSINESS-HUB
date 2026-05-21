@@ -26,7 +26,7 @@ class SettingsScreen extends ConsumerWidget {
         ref.watch(historyOverviewProvider).asData?.value ??
         HistoryOverview.empty();
     final pending = ref.watch(pendingOutboxCountProvider).asData?.value ?? 0;
-    final profile = _SettingsRoleProfile.fromSession(session);
+    final profile = _SettingsRoleProfile.fromSession(session, shop);
 
     return MobileStandaloneScaffold(
       title: profile.screenTitle,
@@ -90,6 +90,11 @@ class SettingsScreen extends ConsumerWidget {
                   label: 'Role',
                   value: session?.displayRoleLabel ?? 'UNKNOWN',
                   icon: Icons.admin_panel_settings_rounded,
+                ),
+                _SettingsRow(
+                  label: 'Plan',
+                  value: '${shop.planLabel} plan',
+                  icon: Icons.workspace_premium_rounded,
                 ),
               ],
             ),
@@ -353,7 +358,7 @@ class _SettingsRoleProfile {
   final bool showAdvancedOpsButton;
   final bool showOwnerSyncDetails;
 
-  factory _SettingsRoleProfile.fromSession(dynamic session) {
+  factory _SettingsRoleProfile.fromSession(dynamic session, ShopInfo shop) {
     if (session?.isCashierLike ?? false) {
       return const _SettingsRoleProfile(
         screenTitle: 'Shift settings',
@@ -394,7 +399,7 @@ class _SettingsRoleProfile {
       );
     }
 
-    return const _SettingsRoleProfile(
+    return _SettingsRoleProfile(
       screenTitle: 'Store settings',
       leadTitle: 'Store settings',
       leadSubtitle:
@@ -408,8 +413,8 @@ class _SettingsRoleProfile {
       accountTag: 'ADMIN PATH',
       accountIcon: Icons.shield_rounded,
       accountAccent: Color(0xFFA78BFA),
-      showAdvancedOpsButton: true,
-      showOwnerSyncDetails: true,
+      showAdvancedOpsButton: shop.supportsAdvancedOps,
+      showOwnerSyncDetails: shop.supportsAdvancedOps,
     );
   }
 

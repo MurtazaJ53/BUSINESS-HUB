@@ -8,6 +8,7 @@ import {
   getSession,
   resolveActiveShop,
 } from "@/lib/admin-api";
+import { canAccessAttendance } from "@/lib/plans";
 
 function toToday() {
   const now = new Date();
@@ -19,8 +20,9 @@ function toToday() {
 export default async function AttendancePage() {
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
+  const canUseAttendance = canAccessAttendance(activeShop);
   const today = toToday();
-  const sessions = activeShop
+  const sessions = activeShop && canUseAttendance
     ? await getAttendanceSessions(activeShop.shop.id, { dateFrom: today })
     : [];
   const stats = buildAttendanceStats(sessions, today);
@@ -40,6 +42,11 @@ export default async function AttendancePage() {
         <EmptyState
           title="No attendance workspace available"
           body="This web workspace needs an active shop membership before it can show attendance sessions for a store."
+        />
+      ) : !canUseAttendance ? (
+        <EmptyState
+          title="Attendance unlocks on Growth and Pro"
+          body="This workspace is on a lighter plan, so staffing visibility stays hidden here. Upgrade the shop plan when you want attendance tools inside Business Hub."
         />
       ) : (
         <div className="space-y-8">

@@ -19,6 +19,10 @@ class MembershipShopSerializer(serializers.Serializer):
     currency_code = serializers.CharField()
     timezone = serializers.CharField()
     is_active = serializers.BooleanField()
+    plan_tier = serializers.CharField()
+    enabled_features = serializers.DictField(
+        child=serializers.BooleanField(),
+    )
 
 
 class SessionMembershipSerializer(serializers.ModelSerializer):
@@ -30,4 +34,3 @@ class SessionMembershipSerializer(serializers.ModelSerializer):
 
     def get_shop(self, obj):
         return MembershipShopSerializer(obj.shop).data
-

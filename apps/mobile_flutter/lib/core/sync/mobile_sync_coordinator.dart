@@ -249,12 +249,16 @@ class MobileSyncCoordinator {
       'footer': footer,
       'phone': phone,
       'currency': currentShop.currency,
+      'plan_tier': currentShop.planTier,
+      'enabled_features': currentShop.enabledFeatures,
       'settings': <String, dynamic>{
         'name': currentShop.name,
         'tagline': tagline,
         'footer': footer,
         'phone': phone,
         'currency': currentShop.currency,
+        'plan_tier': currentShop.planTier,
+        'enabled_features': currentShop.enabledFeatures,
       },
     };
 

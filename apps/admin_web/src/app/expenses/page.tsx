@@ -9,11 +9,13 @@ import {
   resolveActiveShop,
 } from "@/lib/admin-api";
 import { formatCurrency } from "@/lib/formatters";
+import { canAccessExpenses } from "@/lib/plans";
 
 export default async function ExpensesPage() {
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
-  const expenses = activeShop ? await getExpenses(activeShop.shop.id) : [];
+  const canUseExpenses = canAccessExpenses(activeShop);
+  const expenses = activeShop && canUseExpenses ? await getExpenses(activeShop.shop.id) : [];
   const stats = buildExpenseStats(expenses);
   const topExpenses = [...expenses]
     .sort((left, right) => Number(right.amount) - Number(left.amount))
@@ -31,6 +33,11 @@ export default async function ExpensesPage() {
         <EmptyState
           title="No expense workspace available"
           body="This web workspace needs an active shop membership before it can show expense activity for a store."
+        />
+      ) : !canUseExpenses ? (
+        <EmptyState
+          title="Expenses unlock on Growth and Pro"
+          body="This workspace is on a lighter plan, so expense tracking stays hidden here. Upgrade the shop plan when you want outgoing spend controls in Business Hub."
         />
       ) : (
         <div className="space-y-8">

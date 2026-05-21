@@ -10,7 +10,11 @@ from platform_apps.users.models import PlatformUser
 class SessionBootstrapTests(TestCase):
     def test_session_bootstrap_returns_memberships(self):
         user = PlatformUser.objects.create_user(email="murtaza@example.com", full_name="Murtaza")
-        shop = Shop.objects.create(name="Business Hub Pro", slug="business-hub-pro")
+        shop = Shop.objects.create(
+            name="Business Hub Pro",
+            slug="business-hub-pro",
+            settings_json={"plan_tier": "starter"},
+        )
         ShopMembership.objects.create(
             user=user,
             shop=shop,
@@ -25,3 +29,7 @@ class SessionBootstrapTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["user"]["email"], "murtaza@example.com")
         self.assertEqual(len(response.json()["memberships"]), 1)
+        membership = response.json()["memberships"][0]
+        self.assertEqual(membership["shop"]["plan_tier"], "starter")
+        self.assertFalse(membership["shop"]["enabled_features"]["expenses"])
+        self.assertFalse(membership["shop"]["enabled_features"]["attendance"])

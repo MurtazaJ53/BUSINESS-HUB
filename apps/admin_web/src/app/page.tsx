@@ -11,6 +11,7 @@ import {
   resolveActiveShop,
 } from "@/lib/admin-api";
 import { formatCurrency, formatRole } from "@/lib/formatters";
+import { canAccessAttendance, canAccessExpenses } from "@/lib/plans";
 import type { DashboardSnapshot, ShopMembership } from "@/lib/types";
 
 type QuickAction = {
@@ -44,18 +45,21 @@ function buildQuickActions(activeShop: ShopMembership | null): QuickAction[] {
   ];
 
   if (canManageWorkspace(role)) {
-    actions.push(
-      {
+    if (canAccessExpenses(activeShop)) {
+      actions.push({
         label: "Track expenses",
         body: "Keep daily spend visible without opening a heavy back-office tool.",
         href: "/expenses",
-      },
-      {
+      });
+    }
+
+    if (canAccessAttendance(activeShop)) {
+      actions.push({
         label: "Review attendance",
         body: "Check who clocked in and whether the shift is staffed correctly.",
         href: "/attendance",
-      },
-    );
+      });
+    }
   }
 
   return actions.slice(0, 4);

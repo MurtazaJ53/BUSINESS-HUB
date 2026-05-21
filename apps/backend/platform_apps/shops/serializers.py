@@ -11,6 +11,11 @@ class ShopMembershipListSerializer(serializers.ModelSerializer):
     shop_slug = serializers.CharField(source="shop.slug")
     shop_currency_code = serializers.CharField(source="shop.currency_code")
     shop_timezone = serializers.CharField(source="shop.timezone")
+    shop_plan_tier = serializers.CharField(source="shop.plan_tier")
+    shop_enabled_features = serializers.DictField(
+        source="shop.enabled_features",
+        child=serializers.BooleanField(),
+    )
 
     class Meta:
         model = ShopMembership
@@ -25,6 +30,8 @@ class ShopMembershipListSerializer(serializers.ModelSerializer):
             "shop_slug",
             "shop_currency_code",
             "shop_timezone",
+            "shop_plan_tier",
+            "shop_enabled_features",
         )
 
 

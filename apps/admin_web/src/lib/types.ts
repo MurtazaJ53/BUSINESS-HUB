@@ -1,3 +1,5 @@
+export type BusinessHubPlanTier = "starter" | "growth" | "pro";
+
 export type SessionUser = {
   id: string;
   email: string;
@@ -20,6 +22,8 @@ export type ShopMembership = {
     currency_code: string;
     timezone: string;
     is_active: boolean;
+    plan_tier: BusinessHubPlanTier;
+    enabled_features: Record<string, boolean>;
   };
 };
 

@@ -48,6 +48,11 @@ class ShopRepository {
               .toString(),
           currency: (decoded['currency'] ?? 'INR').toString(),
           phone: (decoded['phone'] ?? '').toString(),
+          planTier: (decoded['plan_tier'] ?? 'growth').toString(),
+          enabledFeatures: _coerceEnabledFeatures(
+            decoded['enabled_features'],
+            fallbackPlanTier: (decoded['plan_tier'] ?? 'growth').toString(),
+          ),
         );
       } catch (_) {
         return ShopInfo.fallback();
@@ -72,6 +77,12 @@ class ShopRepository {
         'Thank you for your business!';
     settings['currency'] = settings['currency'] ?? rawData['currency'] ?? 'INR';
     settings['phone'] = settings['phone'] ?? rawData['phone'] ?? '';
+    settings['plan_tier'] =
+        rawData['plan_tier'] ?? settings['plan_tier'] ?? 'growth';
+    settings['enabled_features'] = _coerceEnabledFeatures(
+      rawData['enabled_features'] ?? settings['enabled_features'],
+      fallbackPlanTier: settings['plan_tier'].toString(),
+    );
 
     await _db
         .into(_db.shopSettingsEntries)
@@ -272,6 +283,26 @@ class ShopRepository {
       return const PilotEvidenceTrackerState();
     }
   }
+}
+
+Map<String, bool> _coerceEnabledFeatures(
+  dynamic rawValue, {
+  required String fallbackPlanTier,
+}) {
+  final normalizedPlan = fallbackPlanTier.trim().toLowerCase();
+  final features = <String, bool>{
+    'expenses': normalizedPlan != 'starter',
+    'attendance': normalizedPlan != 'starter',
+    'advanced_ops': normalizedPlan == 'pro',
+  };
+
+  if (rawValue is Map) {
+    for (final entry in rawValue.entries) {
+      features[entry.key.toString()] = entry.value == true;
+    }
+  }
+
+  return features;
 }
 
 class InventoryRepository {
