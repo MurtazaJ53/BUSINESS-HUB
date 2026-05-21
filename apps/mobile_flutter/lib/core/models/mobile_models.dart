@@ -37,6 +37,10 @@ class ShopInfo {
       enabledFeatures['advanced_reports'] ?? normalizedPlanTier == 'pro';
   bool get supportsFinanceSummary =>
       enabledFeatures['finance_summary'] ?? normalizedPlanTier == 'pro';
+  bool get supportsSupplierDirectory =>
+      enabledFeatures['supplier_directory'] ?? normalizedPlanTier != 'starter';
+  bool get supportsPurchaseWorkflow =>
+      enabledFeatures['purchase_workflow'] ?? normalizedPlanTier == 'pro';
   bool get supportsAdvancedOps =>
       enabledFeatures['advanced_ops'] ?? normalizedPlanTier == 'pro';
 

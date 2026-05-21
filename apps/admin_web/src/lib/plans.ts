@@ -85,3 +85,52 @@ export function canAccessAdvancedReports(activeShop: ShopMembership | null): boo
 export function canAccessFinanceSummary(activeShop: ShopMembership | null): boolean {
   return hasShopFeature(activeShop, "finance_summary");
 }
+
+export function getPlanIncludedNow(planTier: BusinessHubPlanTier): string[] {
+  switch (planTier) {
+    case "starter":
+      return [
+        "POS and barcode selling",
+        "Inventory browsing and low-stock watch",
+        "Customer balances and receipt history",
+        "Simple store settings",
+      ];
+    case "growth":
+      return [
+        "Everything in Starter",
+        "Expenses and attendance",
+        "Supplier directory basics",
+        "Daily store operations with less clutter",
+      ];
+    case "pro":
+      return [
+        "Everything in Growth",
+        "Deeper customer and sales insights",
+        "Finance and advanced reporting summaries",
+        "Advanced owner/admin control surfaces",
+      ];
+  }
+}
+
+export function getPlanUnlockNext(planTier: BusinessHubPlanTier): {
+  title: string;
+  body: string;
+} {
+  switch (planTier) {
+    case "starter":
+      return {
+        title: "Growth unlocks store operations",
+        body: "Upgrade when the shop needs expenses, attendance, and light supplier workflows without becoming ERP-heavy.",
+      };
+    case "growth":
+      return {
+        title: "Pro unlocks deeper business control",
+        body: "Upgrade when the owner needs richer finance summaries, advanced reports, and stronger admin/support tools.",
+      };
+    case "pro":
+      return {
+        title: "Pro already includes the full curated stack",
+        body: "Keep the workspace focused and only expose deeper controls to the right owners and admins.",
+      };
+  }
+}

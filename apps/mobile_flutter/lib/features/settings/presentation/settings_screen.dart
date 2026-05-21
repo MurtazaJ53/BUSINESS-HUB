@@ -101,6 +101,44 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 18),
           MobilePanel(
+            title: 'Workspace plan',
+            action: MobileTag(
+              label: '${shop.planLabel} plan',
+              icon: Icons.workspace_premium_rounded,
+              accent: const Color(0xFFF59E0B),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  _planTitle(shop),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _planBody(shop),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.70),
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _PlanSection(
+                  title: 'Included now',
+                  lines: _includedNow(shop),
+                ),
+                const SizedBox(height: 12),
+                _PlanSection(
+                  title: 'Unlock next',
+                  lines: _unlockNext(shop),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          MobilePanel(
             title: profile.syncPanelTitle,
             action: MobileTag(
               label: pending > 0 ? '$pending queued' : 'Queue clear',
@@ -425,6 +463,121 @@ class _SettingsRoleProfile {
       MobileSyncStatus.offline => 'Offline',
       MobileSyncStatus.idle => 'Stable',
     };
+  }
+}
+
+String _planTitle(ShopInfo shop) {
+  switch (shop.normalizedPlanTier) {
+    case 'starter':
+      return 'Starter keeps this workspace calm';
+    case 'pro':
+      return 'Pro unlocks the full curated stack';
+    default:
+      return 'Growth adds daily store operations';
+  }
+}
+
+String _planBody(ShopInfo shop) {
+  switch (shop.normalizedPlanTier) {
+    case 'starter':
+      return 'This workspace focuses on selling, stock, customers, and receipts. Heavier operations stay hidden until the shop actually needs them.';
+    case 'pro':
+      return 'This workspace can open deeper insights and stronger admin support tools while still keeping raw ERP complexity out of normal daily use.';
+    default:
+      return 'This workspace includes practical store operations like expenses and attendance without turning the product into a crowded ERP shell.';
+  }
+}
+
+List<String> _includedNow(ShopInfo shop) {
+  final lines = <String>[
+    'POS, stock lookup, customer accounts, and receipt history',
+  ];
+  if (shop.supportsExpenses) {
+    lines.add('Expenses for daily outgoing spend');
+  }
+  if (shop.supportsAttendance) {
+    lines.add('Attendance for staffing visibility');
+  }
+  if (shop.supportsSupplierDirectory) {
+    lines.add('Supplier-ready data path for future operations');
+  }
+  if (shop.supportsAdvancedReports) {
+    lines.add('Deeper customer and sales insight');
+  }
+  if (shop.supportsFinanceSummary) {
+    lines.add('Finance and owner summary rollups');
+  }
+  return lines;
+}
+
+List<String> _unlockNext(ShopInfo shop) {
+  switch (shop.normalizedPlanTier) {
+    case 'starter':
+      return const <String>[
+        'Growth unlocks expenses and attendance',
+        'Growth adds light supplier operations without clutter',
+      ];
+    case 'pro':
+      return const <String>[
+        'This workspace already has the highest curated plan',
+        'Keep deeper tools limited to the right owners and admins',
+      ];
+    default:
+      return const <String>[
+        'Pro unlocks deeper reporting and finance summaries',
+        'Pro opens stronger admin and support surfaces when needed',
+      ];
+  }
+}
+
+class _PlanSection extends StatelessWidget {
+  const _PlanSection({
+    required this.title,
+    required this.lines,
+  });
+
+  final String title;
+  final List<String> lines;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1220),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              title,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: Colors.white.withValues(alpha: 0.60),
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.35,
+              ),
+            ),
+            const SizedBox(height: 10),
+            ...lines.map(
+              (line) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  '- $line',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.76),
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

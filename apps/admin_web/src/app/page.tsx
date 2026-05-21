@@ -11,7 +11,13 @@ import {
   resolveActiveShop,
 } from "@/lib/admin-api";
 import { formatCurrency, formatRole } from "@/lib/formatters";
-import { canAccessAttendance, canAccessExpenses, formatPlanTier } from "@/lib/plans";
+import {
+  canAccessAttendance,
+  canAccessExpenses,
+  formatPlanTier,
+  getPlanIncludedNow,
+  getPlanUnlockNext,
+} from "@/lib/plans";
 import type { DashboardSnapshot, ShopMembership } from "@/lib/types";
 
 type QuickAction = {
@@ -155,6 +161,8 @@ export default async function HomePage() {
     activeShop?.shop.currency_code ?? "INR",
   );
   const planGuidance = buildPlanGuidance(activeShop);
+  const includedNow = activeShop ? getPlanIncludedNow(activeShop.shop.plan_tier) : [];
+  const unlockNext = activeShop ? getPlanUnlockNext(activeShop.shop.plan_tier) : null;
   const lowStockPreview = dashboardSnapshot?.low_stock_preview ?? [];
   const totalOutstanding = Number(dashboardSnapshot?.total_outstanding_balance ?? 0);
   const grossRevenue = Number(dashboardSnapshot?.gross_revenue ?? 0);
@@ -237,6 +245,45 @@ export default async function HomePage() {
                   <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-secondary)]">
                     {planGuidance.body}
                   </p>
+                </div>
+              ) : null}
+
+              {activeShop && unlockNext ? (
+                <div className="panel-soft rounded-[28px] px-6 py-6">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <p className="eyebrow">Workspace plan</p>
+                      <h2 className="mt-3 text-2xl font-bold">
+                        {formatPlanTier(activeShop.shop.plan_tier)} keeps this workspace curated
+                      </h2>
+                      <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                        Use this as the owner-facing summary of what the current plan includes and what the next upgrade unlocks.
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-[rgba(245,158,11,0.18)] bg-[rgba(77,49,9,0.34)] px-3 py-1 text-xs font-medium text-[var(--warning)]">
+                      {formatPlanTier(activeShop.shop.plan_tier)} plan
+                    </span>
+                  </div>
+
+                  <div className="mt-6 grid gap-4 md:grid-cols-2">
+                    <div className="surface-muted rounded-[22px] px-4 py-4">
+                      <p className="eyebrow">Included now</p>
+                      <ul className="mt-4 space-y-3 text-sm leading-6 text-[var(--text-secondary)]">
+                        {includedNow.map((line) => (
+                          <li key={line}>- {line}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="surface-muted rounded-[22px] px-4 py-4">
+                      <p className="eyebrow">Unlock next</p>
+                      <h3 className="mt-3 text-lg font-bold text-[var(--text-primary)]">
+                        {unlockNext.title}
+                      </h3>
+                      <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
+                        {unlockNext.body}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               ) : null}
 
