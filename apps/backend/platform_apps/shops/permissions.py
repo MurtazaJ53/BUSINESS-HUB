@@ -3,12 +3,24 @@ from __future__ import annotations
 from rest_framework import exceptions
 
 from platform_apps.shops.models import ShopMembership
+from platform_apps.shops.plans import normalize_plan_tier
 
 ROLE_ORDER = {
     ShopMembership.Role.VIEWER: 10,
     ShopMembership.Role.STAFF: 20,
     ShopMembership.Role.ADMIN: 30,
     ShopMembership.Role.OWNER: 40,
+}
+
+FEATURE_LABELS = {
+    "expenses": "Expenses",
+    "attendance": "Attendance",
+    "supplier_directory": "Supplier directory",
+    "purchase_workflow": "Purchase workflow",
+    "advanced_reports": "Advanced reports",
+    "multi_branch": "Multi-branch visibility",
+    "finance_summary": "Finance summary",
+    "advanced_ops": "Advanced ops",
 }
 
 
@@ -25,3 +37,15 @@ def get_membership_or_403(user, shop_id, minimum_role: str = ShopMembership.Role
         raise exceptions.PermissionDenied("Your role does not allow this action.")
 
     return membership
+
+
+def ensure_feature_enabled_or_403(membership: ShopMembership, feature_key: str) -> None:
+    features = membership.shop.enabled_features
+    if features.get(feature_key) is True:
+        return
+
+    plan_label = normalize_plan_tier(membership.shop.plan_tier).title()
+    feature_label = FEATURE_LABELS.get(feature_key, feature_key.replace("_", " ").title())
+    raise exceptions.PermissionDenied(
+        f"{feature_label} is not available on the {plan_label} plan for this workspace."
+    )

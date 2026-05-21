@@ -6,7 +6,7 @@ from rest_framework import generics, permissions
 from platform_apps.attendance.models import AttendanceSession
 from platform_apps.attendance.serializers import AttendanceSessionSerializer, AttendanceSessionWriteSerializer
 from platform_apps.shops.models import ShopMembership
-from platform_apps.shops.permissions import get_membership_or_403
+from platform_apps.shops.permissions import ensure_feature_enabled_or_403, get_membership_or_403
 
 
 class ShopScopedMixin:
@@ -37,6 +37,7 @@ class AttendanceSessionListCreateView(ShopScopedMixin, generics.ListCreateAPIVie
 
     def get_queryset(self):
         membership = self.get_membership()
+        ensure_feature_enabled_or_403(membership, "attendance")
         queryset = AttendanceSession.objects.filter(shop=membership.shop, tombstone=False).select_related(
             "membership",
             "membership__user",
@@ -69,6 +70,7 @@ class AttendanceSessionListCreateView(ShopScopedMixin, generics.ListCreateAPIVie
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
+        ensure_feature_enabled_or_403(self.get_membership(), "attendance")
         context.update(
             {
                 "shop": self.get_membership().shop,
@@ -78,7 +80,10 @@ class AttendanceSessionListCreateView(ShopScopedMixin, generics.ListCreateAPIVie
         return context
 
     def perform_create(self, serializer):
-        get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.ADMIN)
+        membership = get_membership_or_403(
+            self.request.user, self.kwargs["shop_id"], ShopMembership.Role.ADMIN
+        )
+        ensure_feature_enabled_or_403(membership, "attendance")
         serializer.save()
 
 
@@ -90,6 +95,7 @@ class AttendanceSessionDetailView(ShopScopedMixin, generics.RetrieveUpdateDestro
 
     def get_queryset(self):
         membership = self.get_membership()
+        ensure_feature_enabled_or_403(membership, "attendance")
         return AttendanceSession.objects.filter(shop=membership.shop, tombstone=False).select_related(
             "membership",
             "membership__user",
@@ -97,6 +103,7 @@ class AttendanceSessionDetailView(ShopScopedMixin, generics.RetrieveUpdateDestro
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
+        ensure_feature_enabled_or_403(self.get_membership(), "attendance")
         context.update(
             {
                 "shop": self.get_membership().shop,
@@ -106,5 +113,6 @@ class AttendanceSessionDetailView(ShopScopedMixin, generics.RetrieveUpdateDestro
         return context
 
     def perform_destroy(self, instance):
+        ensure_feature_enabled_or_403(self.get_membership(), "attendance")
         instance.tombstone = True
         instance.save(update_fields=["tombstone", "updated_at"])

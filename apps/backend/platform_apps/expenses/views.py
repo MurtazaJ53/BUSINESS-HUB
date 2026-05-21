@@ -6,7 +6,7 @@ from rest_framework import generics, permissions
 from platform_apps.expenses.models import Expense
 from platform_apps.expenses.serializers import ExpenseSerializer
 from platform_apps.shops.models import ShopMembership
-from platform_apps.shops.permissions import get_membership_or_403
+from platform_apps.shops.permissions import ensure_feature_enabled_or_403, get_membership_or_403
 
 
 class ShopScopedMixin:
@@ -29,6 +29,7 @@ class ExpenseListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
 
     def get_queryset(self):
         membership = self.get_membership()
+        ensure_feature_enabled_or_403(membership, "expenses")
         queryset = Expense.objects.filter(shop=membership.shop, tombstone=False).select_related("actor_user")
 
         query = self.request.query_params.get("q", "").strip()
@@ -43,6 +44,7 @@ class ExpenseListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
+        ensure_feature_enabled_or_403(self.get_membership(), "expenses")
         context.update(
             {
                 "shop": self.get_membership().shop,
@@ -52,7 +54,10 @@ class ExpenseListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
         return context
 
     def perform_create(self, serializer):
-        get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.STAFF)
+        membership = get_membership_or_403(
+            self.request.user, self.kwargs["shop_id"], ShopMembership.Role.STAFF
+        )
+        ensure_feature_enabled_or_403(membership, "expenses")
         serializer.save()
 
 
@@ -64,10 +69,12 @@ class ExpenseDetailView(ShopScopedMixin, generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         membership = self.get_membership()
+        ensure_feature_enabled_or_403(membership, "expenses")
         return Expense.objects.filter(shop=membership.shop, tombstone=False).select_related("actor_user")
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
+        ensure_feature_enabled_or_403(self.get_membership(), "expenses")
         context.update(
             {
                 "shop": self.get_membership().shop,
@@ -80,6 +87,9 @@ class ExpenseDetailView(ShopScopedMixin, generics.RetrieveUpdateDestroyAPIView):
         serializer.save()
 
     def perform_destroy(self, instance):
-        get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.ADMIN)
+        membership = get_membership_or_403(
+            self.request.user, self.kwargs["shop_id"], ShopMembership.Role.ADMIN
+        )
+        ensure_feature_enabled_or_403(membership, "expenses")
         instance.tombstone = True
         instance.save(update_fields=["tombstone", "updated_at"])

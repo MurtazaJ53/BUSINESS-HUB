@@ -92,3 +92,22 @@ class AttendanceApiTests(TestCase):
         response = self.client.get(f"/api/v1/shops/{self.shop.id}/attendance/{session.id}/")
 
         self.assertEqual(response.status_code, 404)
+
+    def test_starter_plan_blocks_attendance_access(self):
+        self.shop.settings_json = {"plan_tier": "starter"}
+        self.shop.save(update_fields=["settings_json"])
+
+        list_response = self.client.get(f"/api/v1/shops/{self.shop.id}/attendance/")
+        self.assertEqual(list_response.status_code, 403)
+        self.assertIn("Attendance is not available", str(list_response.json()))
+
+        create_response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/attendance/",
+            {
+                "membership_id": str(self.staff_membership.id),
+                "session_date": "2026-04-30",
+                "status": "PRESENT",
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, 403)

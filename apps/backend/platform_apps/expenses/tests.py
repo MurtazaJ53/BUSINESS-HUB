@@ -71,3 +71,25 @@ class ExpenseApiTests(TestCase):
         response = self.client.get(f"/api/v1/shops/{self.shop.id}/expenses/{expense.id}/")
 
         self.assertEqual(response.status_code, 404)
+
+    def test_starter_plan_blocks_expense_access(self):
+        self.shop.settings_json = {"plan_tier": "starter"}
+        self.shop.save(update_fields=["settings_json"])
+
+        list_response = self.client.get(f"/api/v1/shops/{self.shop.id}/expenses/")
+        self.assertEqual(list_response.status_code, 403)
+        self.assertIn("Expenses is not available", str(list_response.json()))
+
+        create_response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/expenses/",
+            {
+                "category": "Packaging",
+                "amount": "240.00",
+                "description": "Courier bags and tape",
+                "payment_method": "UPI",
+                "payment_reference": "upi-7782",
+                "expense_date": "2026-04-30",
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, 403)

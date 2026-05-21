@@ -11,7 +11,7 @@ import {
   resolveActiveShop,
 } from "@/lib/admin-api";
 import { formatCurrency, formatRole } from "@/lib/formatters";
-import { canAccessAttendance, canAccessExpenses } from "@/lib/plans";
+import { canAccessAttendance, canAccessExpenses, formatPlanTier } from "@/lib/plans";
 import type { DashboardSnapshot, ShopMembership } from "@/lib/types";
 
 type QuickAction = {
@@ -115,6 +115,34 @@ function buildAttentionCard(snapshot: DashboardSnapshot | null, currencyCode = "
   };
 }
 
+function buildPlanGuidance(activeShop: ShopMembership | null) {
+  if (!activeShop) {
+    return null;
+  }
+
+  if (activeShop.shop.plan_tier === "starter") {
+    return {
+      title: "Starter keeps the workspace lean",
+      body: "This plan focuses on selling, stock, customers, and receipts. Expenses and attendance stay hidden until the shop upgrades.",
+      tone: "text-[var(--accent)] border-[rgba(71,176,255,0.18)] bg-[rgba(11,24,41,0.72)]",
+    };
+  }
+
+  if (activeShop.shop.plan_tier === "growth") {
+    return {
+      title: "Growth adds store operations",
+      body: "This workspace includes daily operations like expenses and attendance while still avoiding heavier back-office clutter.",
+      tone: "text-[var(--success)] border-[rgba(58,215,162,0.18)] bg-[rgba(8,34,26,0.72)]",
+    };
+  }
+
+  return {
+    title: "Pro unlocks deeper control",
+    body: "This workspace can open stronger operations and support paths while still keeping ERP internals out of normal store flows.",
+    tone: "text-[var(--warning)] border-[rgba(245,158,11,0.18)] bg-[rgba(52,34,8,0.72)]",
+  };
+}
+
 export default async function HomePage() {
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
@@ -126,6 +154,7 @@ export default async function HomePage() {
     dashboardSnapshot,
     activeShop?.shop.currency_code ?? "INR",
   );
+  const planGuidance = buildPlanGuidance(activeShop);
   const lowStockPreview = dashboardSnapshot?.low_stock_preview ?? [];
   const totalOutstanding = Number(dashboardSnapshot?.total_outstanding_balance ?? 0);
   const grossRevenue = Number(dashboardSnapshot?.gross_revenue ?? 0);
@@ -198,6 +227,18 @@ export default async function HomePage() {
                   </Link>
                 </div>
               </div>
+
+              {planGuidance ? (
+                <div className={`panel-soft rounded-[28px] border px-6 py-6 ${planGuidance.tone}`}>
+                  <p className="eyebrow text-current/70">{formatPlanTier(activeShop.shop.plan_tier)} plan</p>
+                  <h2 className="mt-3 text-2xl font-bold text-[var(--text-primary)]">
+                    {planGuidance.title}
+                  </h2>
+                  <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-secondary)]">
+                    {planGuidance.body}
+                  </p>
+                </div>
+              ) : null}
 
               <div className="panel-soft rounded-[28px] px-6 py-6">
                 <div className="flex items-center justify-between gap-4">
