@@ -196,6 +196,7 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
         session={session}
         activeShop={activeShop}
         activeRoute="migration"
+        surfaceMode="internal"
         title="Migration Control"
         subtitle="This control plane is restricted to platform-admin operators."
       >
@@ -239,8 +240,9 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
       session={session}
       activeShop={activeShop}
       activeRoute="migration"
+      surfaceMode="internal"
       title="Migration Control"
-      subtitle="Unified migration control plane for pilot cutovers, commerce hardening, retirement readiness, go-live execution, rollout scaling, and steady-state governance."
+      subtitle="Platform-only migration governance for cutovers, rollout safety, and steady-state controls that must stay outside the normal client workspace."
     >
       <div className="space-y-8">
         {actionBanner ? (

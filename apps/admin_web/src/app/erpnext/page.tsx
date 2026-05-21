@@ -104,14 +104,33 @@ export default async function ERPNextPage({ searchParams }: ERPNextPageProps) {
   const activeShop = resolveActiveShop(session);
   const actionBanner = buildActionBanner(resolvedSearchParams);
 
+  if (!session.user.is_platform_admin) {
+    return (
+      <AdminShell
+        session={session}
+        activeShop={activeShop}
+        activeRoute="erpnext"
+        surfaceMode="internal"
+        title="ERPNext Control"
+        subtitle="This control plane is restricted to platform-admin operators."
+      >
+        <EmptyState
+          title="Platform admin required"
+          body="ERPNext bindings, sync actions, and recurring engine controls are only available to platform-admin accounts."
+        />
+      </AdminShell>
+    );
+  }
+
   if (!activeShop) {
     return (
       <AdminShell
         session={session}
         activeShop={activeShop}
         activeRoute="erpnext"
+        surfaceMode="internal"
         title="ERPNext Control"
-        subtitle="No shop is active yet, so the ERPNext command surface cannot resolve a binding."
+        subtitle="No shop is active yet, so the internal ERPNext control plane cannot resolve a binding."
       >
         <EmptyState
           title="No shop membership found"
@@ -144,8 +163,9 @@ export default async function ERPNextPage({ searchParams }: ERPNextPageProps) {
       session={session}
       activeShop={activeShop}
       activeRoute="erpnext"
+      surfaceMode="internal"
       title="ERPNext Control"
-      subtitle="End-to-end ERPNext control plane for one-shop execution, recurring cycle policy, and purchase-side mirror visibility."
+      subtitle="Platform-only ERP engine controls for sync policy, recurring execution, and purchase-side mirror management."
     >
       <div className="space-y-8">
         {actionBanner ? (

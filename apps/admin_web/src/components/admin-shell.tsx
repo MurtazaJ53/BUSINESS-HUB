@@ -19,6 +19,7 @@ type AdminShellProps = {
     | "erpnext";
   title: string;
   subtitle: string;
+  surfaceMode?: "product" | "internal";
   children: ReactNode;
 };
 
@@ -142,16 +143,22 @@ export function AdminShell({
   activeRoute,
   title,
   subtitle,
+  surfaceMode = "product",
   children,
 }: AdminShellProps) {
   const navSections = getSectionedNav(session, activeShop);
   const workspaceRole = getWorkspaceRole(activeShop);
   const workspaceRoleLabel = workspaceRole ? formatRole(workspaceRole) : "Unassigned";
+  const isInternal = surfaceMode === "internal";
 
   return (
     <div className="min-h-screen px-4 py-4 md:px-6 lg:px-8">
       <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-[1500px] gap-4 lg:grid-cols-[270px_minmax(0,1fr)]">
-        <aside className="panel relative overflow-hidden rounded-[28px] px-5 py-5">
+        <aside
+          className={`panel relative overflow-hidden rounded-[28px] px-5 py-5 ${
+            isInternal ? "border-[rgba(255,138,106,0.14)]" : ""
+          }`}
+        >
           <div className="absolute inset-0 gridlines opacity-20" />
           <div className="relative flex h-full flex-col">
             <div className="mb-6 flex items-center gap-4">
@@ -221,6 +228,14 @@ export function AdminShell({
                     : "Add a shop membership to unlock the curated web workspace."}
                 </p>
               </div>
+              {isInternal ? (
+                <div className="rounded-[24px] border border-[rgba(255,138,106,0.16)] bg-[rgba(44,18,14,0.64)] px-4 py-4 text-sm text-[var(--warning)]">
+                  Internal only
+                  <p className="mt-1 text-[var(--text-secondary)]">
+                    These controls affect platform migration, ERP sync, and rollout safety.
+                  </p>
+                </div>
+              ) : null}
               <div className="rounded-[24px] border border-[rgba(58,215,162,0.16)] bg-[rgba(9,42,31,0.64)] px-4 py-4 text-sm text-[var(--success)]">
                 Backend connected
                 <p className="mt-1 text-[var(--text-secondary)]">
@@ -231,7 +246,11 @@ export function AdminShell({
           </div>
         </aside>
 
-        <main className="panel relative overflow-hidden rounded-[30px]">
+        <main
+          className={`panel relative overflow-hidden rounded-[30px] ${
+            isInternal ? "border-[rgba(255,138,106,0.14)]" : ""
+          }`}
+        >
           <div className="absolute inset-0 gridlines opacity-15" />
           <div className="relative px-6 py-6 md:px-8 lg:px-10">
             <header className="flex flex-col gap-5 border-b border-[var(--border-soft)] pb-7">
@@ -244,6 +263,11 @@ export function AdminShell({
                     <span className="rounded-full border border-[rgba(152,164,189,0.12)] bg-[rgba(9,14,22,0.52)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
                       {workspaceRoleLabel} workspace
                     </span>
+                    {isInternal ? (
+                      <span className="rounded-full border border-[rgba(255,138,106,0.18)] bg-[rgba(44,18,14,0.56)] px-3 py-1 text-xs font-medium text-[var(--warning)]">
+                        Internal control plane
+                      </span>
+                    ) : null}
                   </div>
                   <h1 className="mt-4 text-4xl font-black tracking-[-0.04em] md:text-5xl">
                     {title}
@@ -270,7 +294,20 @@ export function AdminShell({
               </div>
             </header>
 
-            <div className="pt-8">{children}</div>
+            <div className="pt-8">
+              {isInternal ? (
+                <div className="mb-6 rounded-[24px] border border-[rgba(255,138,106,0.16)] bg-[rgba(44,18,14,0.52)] px-5 py-4 text-sm text-[var(--warning)]">
+                  <div className="font-semibold text-[var(--text-primary)]">
+                    Internal tools are separated from the normal product workspace.
+                  </div>
+                  <p className="mt-2 text-[var(--text-secondary)]">
+                    Use these pages for platform operations, migration governance, and ERP engine
+                    management, not normal owner or manager workflows.
+                  </p>
+                </div>
+              ) : null}
+              {children}
+            </div>
           </div>
         </main>
       </div>
