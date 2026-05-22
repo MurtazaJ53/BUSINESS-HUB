@@ -9,6 +9,7 @@ import '../../features/history/presentation/history_screen.dart';
 import '../../features/inventory/presentation/inventory_screen.dart';
 import '../../features/pos/presentation/pos_screen.dart';
 import '../../features/settings/presentation/settings_ops_screen.dart';
+import '../../features/settings/presentation/settings_plan_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/shell/presentation/mobile_shell_screen.dart';
 
@@ -78,6 +79,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) =>
             const NoTransitionPage<void>(child: SettingsScreen()),
         routes: [
+          GoRoute(
+            parentNavigatorKey: appRootNavigatorKey,
+            path: 'plan',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage<void>(child: SettingsPlanScreen()),
+          ),
           GoRoute(
             parentNavigatorKey: appRootNavigatorKey,
             path: 'advanced',

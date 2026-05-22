@@ -144,6 +144,15 @@ class SettingsScreen extends ConsumerWidget {
                       final actions = <Widget>[
                         Expanded(
                           child: FilledButton.tonalIcon(
+                            onPressed: () {
+                              context.push('/settings/plan');
+                            },
+                            icon: const Icon(Icons.open_in_new_rounded),
+                            label: const Text('Open compare'),
+                          ),
+                        ),
+                        Expanded(
+                          child: FilledButton.tonalIcon(
                             onPressed: () async {
                               await Clipboard.setData(
                                 ClipboardData(
