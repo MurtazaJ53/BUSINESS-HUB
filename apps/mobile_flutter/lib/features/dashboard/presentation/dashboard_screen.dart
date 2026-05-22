@@ -18,6 +18,8 @@ class DashboardScreen extends ConsumerWidget {
     final session = ref.watch(mobileSessionProvider).asData?.value;
     final salesRepository = ref.read(salesRepositoryProvider);
     final syncStatus = ref.watch(syncStatusProvider);
+    final shop =
+        ref.watch(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
     final overview =
         ref
             .watch(dashboardOverviewProvider(session?.canViewCost ?? false))
@@ -35,6 +37,7 @@ class DashboardScreen extends ConsumerWidget {
         const <RecentSaleSummary>[];
     final roleProfile = _DashboardRoleProfile.fromSession(
       session: session,
+      shop: shop,
       overview: overview,
       history: history,
     );
@@ -79,6 +82,45 @@ class DashboardScreen extends ConsumerWidget {
       overview: overview,
       history: history,
     );
+    final displayedMetricCards =
+        (session?.isOwnerLike ?? false) && !shop.supportsFinanceSummary
+        ? <Widget>[
+            MobileMetricCard(
+              label: 'Sales today',
+              value: '${overview.todaySalesCount}',
+              caption: 'Receipts created',
+              icon: Icons.shopping_bag_rounded,
+              accent: const Color(0xFF38BDF8),
+            ),
+            MobileMetricCard(
+              label: 'Low stock',
+              value: '${overview.metrics.lowStock}',
+              caption: overview.metrics.lowStock > 0 ? 'Needs refill' : 'Healthy',
+              icon: Icons.warning_amber_rounded,
+              accent: overview.metrics.lowStock > 0
+                  ? const Color(0xFFFB7185)
+                  : const Color(0xFF22C55E),
+            ),
+            MobileMetricCard(
+              label: 'Queue',
+              value: '${history.queuedSales}',
+              caption: history.queuedSales > 0
+                  ? 'Pending upload'
+                  : 'Everything sent',
+              icon: Icons.cloud_upload_rounded,
+              accent: history.queuedSales > 0
+                  ? const Color(0xFFF59E0B)
+                  : const Color(0xFF22C55E),
+            ),
+            MobileMetricCard(
+              label: 'Catalog',
+              value: '${overview.metrics.totalItems}',
+              caption: 'Products loaded',
+              icon: Icons.inventory_2_rounded,
+              accent: const Color(0xFFA78BFA),
+            ),
+          ]
+        : metricCards;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
@@ -152,11 +194,45 @@ class DashboardScreen extends ConsumerWidget {
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
               childAspectRatio: 1.02,
-              children: metricCards,
+              children: displayedMetricCards,
             );
           },
         ),
         const SizedBox(height: 18),
+        if ((session?.isOwnerLike ?? false) && !shop.supportsFinanceSummary) ...<Widget>[
+          MobilePanel(
+            title: 'Plan compare',
+            action: MobileTag(
+              label: '${shop.planLabel} now',
+              icon: Icons.workspace_premium_rounded,
+              accent: const Color(0xFFF59E0B),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                _DashboardPlanBlock(
+                  title: _dashboardCurrentPlanTitle(shop),
+                  lines: _dashboardCurrentPlanLines(shop),
+                ),
+                const SizedBox(height: 12),
+                _DashboardPlanBlock(
+                  title: _dashboardNextPlanTitle(shop),
+                  lines: _dashboardNextPlanLines(shop),
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => context.go('/settings'),
+                    icon: const Icon(Icons.trending_up_rounded),
+                    label: const Text('Open plan details'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+        ],
         MobilePanel(
           title: roleProfile.attentionTitle,
           action: MobileTag(
@@ -450,6 +526,7 @@ class _DashboardRoleProfile {
 
   factory _DashboardRoleProfile.fromSession({
     required dynamic session,
+    required ShopInfo shop,
     required DashboardOverview overview,
     required HistoryOverview history,
   }) {
@@ -531,9 +608,11 @@ class _DashboardRoleProfile {
     }
 
     return _DashboardRoleProfile(
-      leadTitle: receiptsToday > 0
-          ? '$revenueToday today'
-          : 'Store pulse ready',
+      leadTitle: shop.supportsFinanceSummary
+          ? (receiptsToday > 0 ? '$revenueToday today' : 'Store pulse ready')
+          : (receiptsToday > 0
+                ? '$receiptsToday receipt${receiptsToday == 1 ? '' : 's'} active'
+                : 'Store pulse ready'),
       leadSubtitle: receiptsToday > 0
           ? '$receiptsToday sale${receiptsToday == 1 ? '' : 's'} are already recorded. Revenue, stock pressure, and receipt flow are grouped here in one owner-ready view.'
           : 'See today’s business pulse, stock pressure, and recent activity without opening dense management screens.',
@@ -758,6 +837,119 @@ class _MetricBlueprint {
     required DashboardOverview overview,
     required HistoryOverview history,
   }) => const Color(0xFFA78BFA);
+}
+
+String _dashboardCurrentPlanTitle(ShopInfo shop) {
+  switch (shop.normalizedPlanTier) {
+    case 'starter':
+      return 'Starter now';
+    case 'pro':
+      return 'Pro now';
+    default:
+      return 'Growth now';
+  }
+}
+
+List<String> _dashboardCurrentPlanLines(ShopInfo shop) {
+  switch (shop.normalizedPlanTier) {
+    case 'starter':
+      return const <String>[
+        'Selling, stock, customers, and receipts',
+        'Lean owner view without extra operations clutter',
+      ];
+    case 'pro':
+      return const <String>[
+        'Finance and advanced reporting',
+        'Stronger owner and support visibility',
+      ];
+    default:
+      return const <String>[
+        'Everything in Starter',
+        'Expenses, attendance, and supplier-ready operations',
+      ];
+  }
+}
+
+String _dashboardNextPlanTitle(ShopInfo shop) {
+  switch (shop.normalizedPlanTier) {
+    case 'starter':
+      return 'Growth next';
+    case 'pro':
+      return 'Keep it curated';
+    default:
+      return 'Pro next';
+  }
+}
+
+List<String> _dashboardNextPlanLines(ShopInfo shop) {
+  switch (shop.normalizedPlanTier) {
+    case 'starter':
+      return const <String>[
+        'Unlock expenses and attendance',
+        'Add light supplier workflows',
+      ];
+    case 'pro':
+      return const <String>[
+        'Keep deep controls limited to owners and admins',
+        'Leave daily work simple for staff',
+      ];
+    default:
+      return const <String>[
+        'Unlock finance and advanced reporting',
+        'Add richer customer and sales insight',
+      ];
+  }
+}
+
+class _DashboardPlanBlock extends StatelessWidget {
+  const _DashboardPlanBlock({
+    required this.title,
+    required this.lines,
+  });
+
+  final String title;
+  final List<String> lines;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1220),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              title,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: Colors.white.withValues(alpha: 0.60),
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.35,
+              ),
+            ),
+            const SizedBox(height: 10),
+            ...lines.map(
+              (line) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  '- $line',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.76),
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _QuickActionTile extends StatelessWidget {

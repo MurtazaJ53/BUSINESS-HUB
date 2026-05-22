@@ -94,6 +94,61 @@ export function canAccessPurchaseWorkflow(activeShop: ShopMembership | null): bo
   return hasShopFeature(activeShop, "purchase_workflow");
 }
 
+export function getPlanCompareSnapshot(planTier: BusinessHubPlanTier): {
+  currentLabel: string;
+  currentLines: string[];
+  nextLabel: string;
+  nextLines: string[];
+} {
+  switch (planTier) {
+    case "starter":
+      return {
+        currentLabel: "Starter now",
+        currentLines: [
+          "POS and barcode selling",
+          "Inventory and low-stock watch",
+          "Customer balances and receipts",
+        ],
+        nextLabel: "Growth next",
+        nextLines: [
+          "Expenses and attendance",
+          "Supplier-ready store operations",
+          "More operational control without ERP clutter",
+        ],
+      };
+    case "growth":
+      return {
+        currentLabel: "Growth now",
+        currentLines: [
+          "Everything in Starter",
+          "Expenses and attendance",
+          "Supplier directory basics",
+        ],
+        nextLabel: "Pro next",
+        nextLines: [
+          "Finance and owner summary rollups",
+          "Advanced customer and sales insight",
+          "Stronger owner/admin control surfaces",
+        ],
+      };
+    case "pro":
+      return {
+        currentLabel: "Pro now",
+        currentLines: [
+          "Finance and advanced reporting",
+          "Deeper owner/admin controls",
+          "The full curated Business Hub stack",
+        ],
+        nextLabel: "Keep it curated",
+        nextLines: [
+          "Limit deep tools to owners and admins",
+          "Keep daily screens simple for staff",
+          "Avoid exposing raw ERP complexity",
+        ],
+      };
+  }
+}
+
 export function getPlanIncludedNow(planTier: BusinessHubPlanTier): string[] {
   switch (planTier) {
     case "starter":

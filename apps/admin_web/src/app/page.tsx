@@ -13,8 +13,10 @@ import {
 } from "@/lib/admin-api";
 import { formatCurrency, formatRole } from "@/lib/formatters";
 import {
+  canAccessAdvancedReports,
   canAccessAttendance,
   canAccessExpenses,
+  canAccessFinanceSummary,
   formatPlanTier,
 } from "@/lib/plans";
 import type { DashboardSnapshot, ShopMembership } from "@/lib/types";
@@ -155,6 +157,8 @@ export default async function HomePage() {
   const dashboardSnapshot = activeShop ? await getDashboardSnapshot(activeShop.shop.id) : null;
   const stats = buildInventoryStats(items);
   const quickActions = buildQuickActions(activeShop);
+  const canUseAdvancedReports = canAccessAdvancedReports(activeShop);
+  const canUseFinanceSummary = canAccessFinanceSummary(activeShop);
   const attentionCard = buildAttentionCard(
     dashboardSnapshot,
     activeShop?.shop.currency_code ?? "INR",
@@ -199,15 +203,27 @@ export default async function HomePage() {
             />
             <MetricCard
               label="Customer dues"
-              value={formatCurrency(totalOutstanding, activeShop.shop.currency_code)}
-              detail={`${dashboardSnapshot?.active_credit_customers_count ?? 0} active credit accounts`}
+              value={
+                canUseFinanceSummary
+                  ? formatCurrency(totalOutstanding, activeShop.shop.currency_code)
+                  : `${dashboardSnapshot?.active_credit_customers_count ?? 0}`
+              }
+              detail={
+                canUseFinanceSummary
+                  ? `${dashboardSnapshot?.active_credit_customers_count ?? 0} active credit accounts`
+                  : "Accounts that still need balance follow-up"
+              }
               accent="blue"
               icon="DUE"
             />
             <MetricCard
               label="Sales recorded"
               value={(dashboardSnapshot?.sales_count ?? 0).toString()}
-              detail={`${formatCurrency(grossRevenue, activeShop.shop.currency_code)} gross revenue`}
+              detail={
+                canUseAdvancedReports
+                  ? `${formatCurrency(grossRevenue, activeShop.shop.currency_code)} gross revenue`
+                  : "Receipt flow stays simple on lighter plans"
+              }
               accent="green"
               icon="SAL"
             />

@@ -128,13 +128,13 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 14),
                 _PlanSection(
-                  title: 'Included now',
-                  lines: _includedNow(shop),
+                  title: _currentPlanSectionTitle(shop),
+                  lines: _currentPlanSectionLines(shop),
                 ),
                 const SizedBox(height: 12),
                 _PlanSection(
-                  title: 'Unlock next',
-                  lines: _unlockNext(shop),
+                  title: _nextPlanSectionTitle(shop),
+                  lines: _nextPlanSectionLines(shop),
                 ),
                 if (session?.isOwnerLike ?? false) ...<Widget>[
                   const SizedBox(height: 12),
@@ -565,44 +565,70 @@ String _planBody(ShopInfo shop) {
   }
 }
 
-List<String> _includedNow(ShopInfo shop) {
-  final lines = <String>[
-    'POS, stock lookup, customer accounts, and receipt history',
-  ];
-  if (shop.supportsExpenses) {
-    lines.add('Expenses for daily outgoing spend');
+String _currentPlanSectionTitle(ShopInfo shop) {
+  switch (shop.normalizedPlanTier) {
+    case 'starter':
+      return 'Starter now';
+    case 'pro':
+      return 'Pro now';
+    default:
+      return 'Growth now';
   }
-  if (shop.supportsAttendance) {
-    lines.add('Attendance for staffing visibility');
-  }
-  if (shop.supportsSupplierDirectory) {
-    lines.add('Supplier-ready data path for future operations');
-  }
-  if (shop.supportsAdvancedReports) {
-    lines.add('Deeper customer and sales insight');
-  }
-  if (shop.supportsFinanceSummary) {
-    lines.add('Finance and owner summary rollups');
-  }
-  return lines;
 }
 
-List<String> _unlockNext(ShopInfo shop) {
+List<String> _currentPlanSectionLines(ShopInfo shop) {
   switch (shop.normalizedPlanTier) {
     case 'starter':
       return const <String>[
-        'Growth unlocks expenses and attendance',
-        'Growth adds light supplier operations without clutter',
+        'POS and barcode selling',
+        'Inventory and low-stock watch',
+        'Customer balances and receipt history',
       ];
     case 'pro':
       return const <String>[
-        'This workspace already has the highest curated plan',
-        'Keep deeper tools limited to the right owners and admins',
+        'Finance and advanced reporting',
+        'Advanced owner and admin controls',
+        'The full curated Business Hub stack',
       ];
     default:
       return const <String>[
-        'Pro unlocks deeper reporting and finance summaries',
-        'Pro opens stronger admin and support surfaces when needed',
+        'Everything in Starter',
+        'Expenses and attendance',
+        'Supplier-ready store operations',
+      ];
+  }
+}
+
+String _nextPlanSectionTitle(ShopInfo shop) {
+  switch (shop.normalizedPlanTier) {
+    case 'starter':
+      return 'Growth next';
+    case 'pro':
+      return 'Keep it curated';
+    default:
+      return 'Pro next';
+  }
+}
+
+List<String> _nextPlanSectionLines(ShopInfo shop) {
+  switch (shop.normalizedPlanTier) {
+    case 'starter':
+      return const <String>[
+        'Expenses and attendance',
+        'Light supplier workflows',
+        'More operational control without ERP clutter',
+      ];
+    case 'pro':
+      return const <String>[
+        'Limit deep tools to owners and admins',
+        'Keep daily screens simple for staff',
+        'Avoid exposing raw ERP complexity',
+      ];
+    default:
+      return const <String>[
+        'Finance and owner summary rollups',
+        'Advanced customer and sales insight',
+        'Stronger admin and support controls',
       ];
   }
 }
@@ -636,17 +662,17 @@ String _buildPlanSummaryText(ShopInfo shop, MobileSession? session) {
     ..writeln('Current plan: ${shop.planLabel}')
     ..writeln('Operator role: ${session?.displayRoleLabel ?? 'UNKNOWN'}')
     ..writeln()
-    ..writeln('Included now:');
+    ..writeln('${_currentPlanSectionTitle(shop)}:');
 
-  for (final line in _includedNow(shop)) {
+  for (final line in _currentPlanSectionLines(shop)) {
     buffer.writeln('- $line');
   }
 
   buffer
     ..writeln()
-    ..writeln('Unlock next:');
+    ..writeln('${_nextPlanSectionTitle(shop)}:');
 
-  for (final line in _unlockNext(shop)) {
+  for (final line in _nextPlanSectionLines(shop)) {
     buffer.writeln('- $line');
   }
 
@@ -661,17 +687,17 @@ String _buildUpgradeBriefText(ShopInfo shop, MobileSession? session) {
     ..writeln('Requested next plan: ${_nextPlanLabel(shop)}')
     ..writeln('Operator role: ${session?.displayRoleLabel ?? 'UNKNOWN'}')
     ..writeln()
-    ..writeln('Included now:');
+    ..writeln('${_currentPlanSectionTitle(shop)}:');
 
-  for (final line in _includedNow(shop)) {
+  for (final line in _currentPlanSectionLines(shop)) {
     buffer.writeln('- $line');
   }
 
   buffer
     ..writeln()
-    ..writeln('Why upgrade next:');
+    ..writeln('${_nextPlanSectionTitle(shop)}:');
 
-  for (final line in _unlockNext(shop)) {
+  for (final line in _nextPlanSectionLines(shop)) {
     buffer.writeln('- $line');
   }
 

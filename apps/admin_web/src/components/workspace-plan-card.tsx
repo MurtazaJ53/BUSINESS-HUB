@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import {
   formatPlanTier,
-  getPlanIncludedNow,
+  getPlanCompareSnapshot,
   getPlanUnlockNext,
 } from "@/lib/plans";
 import type { BusinessHubPlanTier } from "@/lib/types";
@@ -41,7 +41,7 @@ function getPlanAction(planTier: BusinessHubPlanTier) {
 }
 
 function buildPlanBrief(shopName: string, planTier: BusinessHubPlanTier) {
-  const includedNow = getPlanIncludedNow(planTier);
+  const compare = getPlanCompareSnapshot(planTier);
   const unlockNext = getPlanUnlockNext(planTier);
   const action = getPlanAction(planTier);
 
@@ -51,10 +51,13 @@ function buildPlanBrief(shopName: string, planTier: BusinessHubPlanTier) {
     `Current plan: ${formatPlanTier(planTier)}`,
     `Recommended next plan: ${action.targetPlan}`,
     "",
-    "Included now:",
-    ...includedNow.map((line) => `- ${line}`),
+    `${compare.currentLabel}:`,
+    ...compare.currentLines.map((line) => `- ${line}`),
     "",
-    "Unlock next:",
+    `${compare.nextLabel}:`,
+    ...compare.nextLines.map((line) => `- ${line}`),
+    "",
+    "Upgrade posture:",
     `- ${unlockNext.title}`,
     `- ${unlockNext.body}`,
   ].join("\n");
@@ -64,7 +67,7 @@ export function WorkspacePlanCard({
   shopName,
   planTier,
 }: WorkspacePlanCardProps) {
-  const includedNow = getPlanIncludedNow(planTier);
+  const compare = getPlanCompareSnapshot(planTier);
   const unlockNext = getPlanUnlockNext(planTier);
   const action = getPlanAction(planTier);
   const [copied, setCopied] = useState(false);
@@ -95,19 +98,24 @@ export function WorkspacePlanCard({
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <div className="surface-muted rounded-[22px] px-4 py-4">
-          <p className="eyebrow">Included now</p>
+          <p className="eyebrow">{compare.currentLabel}</p>
           <ul className="mt-4 space-y-3 text-sm leading-6 text-[var(--text-secondary)]">
-            {includedNow.map((line) => (
+            {compare.currentLines.map((line) => (
               <li key={line}>- {line}</li>
             ))}
           </ul>
         </div>
         <div className="surface-muted rounded-[22px] px-4 py-4">
-          <p className="eyebrow">Unlock next</p>
+          <p className="eyebrow">{compare.nextLabel}</p>
           <h3 className="mt-3 text-lg font-bold text-[var(--text-primary)]">
             {unlockNext.title}
           </h3>
-          <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
+          <ul className="mt-4 space-y-3 text-sm leading-6 text-[var(--text-secondary)]">
+            {compare.nextLines.map((line) => (
+              <li key={line}>- {line}</li>
+            ))}
+          </ul>
+          <p className="mt-4 text-sm leading-6 text-[var(--text-secondary)]">
             {unlockNext.body}
           </p>
         </div>
