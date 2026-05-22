@@ -208,3 +208,36 @@ class CustomerApiTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("event_type", response.json())
+
+    def test_customer_summary_hides_lifetime_spend_for_growth_plan(self):
+        self.shop.settings_json = {"plan_tier": "growth"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+        Customer.objects.create(
+            shop=self.shop,
+            name="Ayaan Retail",
+            balance=Decimal("320.00"),
+            total_spent=Decimal("1400.00"),
+        )
+
+        response = self.client.get(f"/api/v1/shops/{self.shop.id}/customers/summary/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["total_customers"], 1)
+        self.assertEqual(response.data["active_credit_customers"], 1)
+        self.assertEqual(response.data["total_outstanding_balance"], "320.00")
+        self.assertIsNone(response.data["total_lifetime_spend"])
+
+    def test_customer_summary_keeps_lifetime_spend_for_pro_plan(self):
+        self.shop.settings_json = {"plan_tier": "pro"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+        Customer.objects.create(
+            shop=self.shop,
+            name="Ayaan Retail",
+            balance=Decimal("320.00"),
+            total_spent=Decimal("1400.00"),
+        )
+
+        response = self.client.get(f"/api/v1/shops/{self.shop.id}/customers/summary/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["total_lifetime_spend"], "1400.00")

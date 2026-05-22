@@ -4,14 +4,14 @@ import { CustomerTable } from "@/components/customer-table";
 import { EmptyState } from "@/components/empty-state";
 import { MetricCard } from "@/components/metric-card";
 import {
-  buildCustomerStats,
   getCustomers,
+  getCustomerSummary,
   getSession,
   getShopDomainState,
   resolveActiveShop,
 } from "@/lib/admin-api";
 import { formatCurrency } from "@/lib/formatters";
-import { canAccessAdvancedReports, canAccessFinanceSummary, formatPlanTier } from "@/lib/plans";
+import { canAccessAdvancedReports, formatPlanTier } from "@/lib/plans";
 
 function buildCustomerModeCopy(
   domainState: Awaited<ReturnType<typeof getShopDomainState>>,
@@ -51,14 +51,15 @@ function buildCustomerModeCopy(
 export default async function CustomersPage() {
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
-  const customers = activeShop ? await getCustomers(activeShop.shop.id) : [];
-  const domainState = activeShop
-    ? await getShopDomainState(activeShop.shop.id, "customers")
-    : null;
-  const stats = buildCustomerStats(customers);
+  const [customers, customerSummary, domainState] = activeShop
+    ? await Promise.all([
+        getCustomers(activeShop.shop.id),
+        getCustomerSummary(activeShop.shop.id),
+        getShopDomainState(activeShop.shop.id, "customers"),
+      ])
+    : [[], null, null];
   const customerMode = domainState ? buildCustomerModeCopy(domainState) : null;
   const canUseAdvancedReports = canAccessAdvancedReports(activeShop);
-  const canUseFinanceSummary = canAccessFinanceSummary(activeShop);
   const highCreditCustomers = customers
     .filter((customer) => Number(customer.balance) > 0)
     .sort((left, right) => Number(right.balance) - Number(left.balance))
@@ -82,28 +83,31 @@ export default async function CustomersPage() {
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label="Customers active"
-              value={stats.totalCustomers.toString()}
+              value={(customerSummary?.total_customers ?? customers.length).toString()}
               detail="Customer accounts currently visible in this store"
               icon="CUS"
             />
             <MetricCard
               label="Accounts with due"
-              value={stats.activeCredits.toString()}
+              value={(customerSummary?.active_credit_customers ?? 0).toString()}
               detail="Customers who still have an open balance"
               accent="rose"
               icon="DUE"
             />
             <MetricCard
               label="Outstanding balance"
-              value={formatCurrency(stats.totalOutstanding, activeShop.shop.currency_code)}
+              value={formatCurrency(Number(customerSummary?.total_outstanding_balance ?? 0), activeShop.shop.currency_code)}
               detail="Open dues across active customer accounts"
               accent="blue"
               icon="BAL"
             />
-            {canUseFinanceSummary ? (
+            {canUseAdvancedReports ? (
               <MetricCard
                 label="Lifetime spend"
-                value={formatCurrency(stats.totalLifetimeSpend, activeShop.shop.currency_code)}
+                value={formatCurrency(
+                  Number(customerSummary?.total_lifetime_spend ?? 0),
+                  activeShop.shop.currency_code,
+                )}
                 detail="Total customer value captured in this store"
                 accent="green"
                 icon="LTV"

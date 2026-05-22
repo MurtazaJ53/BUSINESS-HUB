@@ -4,9 +4,9 @@ import { EmptyState } from "@/components/empty-state";
 import { MetricCard } from "@/components/metric-card";
 import { SalesTable } from "@/components/sales-table";
 import {
-  buildSalesStats,
   getShopDomainState,
   getSales,
+  getSalesSummary,
   getSession,
   resolveActiveShop,
 } from "@/lib/admin-api";
@@ -16,13 +16,13 @@ import { canAccessAdvancedReports, canAccessFinanceSummary, formatPlanTier } fro
 export default async function SalesPage() {
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
-  const [sales, domainState] = activeShop
+  const [sales, salesSummary, domainState] = activeShop
     ? await Promise.all([
         getSales(activeShop.shop.id),
+        getSalesSummary(activeShop.shop.id),
         getShopDomainState(activeShop.shop.id, "sales"),
       ])
-    : [[], null];
-  const stats = buildSalesStats(sales);
+    : [[], null, null];
   const canUseAdvancedReports = canAccessAdvancedReports(activeShop);
   const canUseFinanceSummary = canAccessFinanceSummary(activeShop);
   const creditHeavy = sales
@@ -48,13 +48,13 @@ export default async function SalesPage() {
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label="Receipts captured"
-              value={stats.totalSales.toString()}
+              value={(salesSummary?.total_sales ?? sales.length).toString()}
               detail="Sales currently recorded for this store"
               icon="ORD"
             />
             <MetricCard
               label="Gross revenue"
-              value={formatCurrency(stats.grossRevenue, activeShop.shop.currency_code)}
+              value={formatCurrency(Number(salesSummary?.gross_revenue ?? 0), activeShop.shop.currency_code)}
               detail="Total receipt value before refunds or later adjustments"
               accent="green"
               icon="REV"
@@ -62,7 +62,10 @@ export default async function SalesPage() {
             {canUseFinanceSummary ? (
               <MetricCard
                 label="Outstanding due"
-                value={formatCurrency(stats.outstandingRevenue, activeShop.shop.currency_code)}
+                value={formatCurrency(
+                  Number(salesSummary?.outstanding_revenue ?? 0),
+                  activeShop.shop.currency_code,
+                )}
                 detail="Credit exposure still open on recorded sales"
                 accent="rose"
                 icon="DUE"
@@ -79,7 +82,10 @@ export default async function SalesPage() {
             {canUseAdvancedReports ? (
               <MetricCard
                 label="Average ticket"
-                value={formatCurrency(stats.averageTicket, activeShop.shop.currency_code)}
+                value={formatCurrency(
+                  Number(salesSummary?.average_ticket ?? 0),
+                  activeShop.shop.currency_code,
+                )}
                 detail="Average sale value across captured receipts"
                 accent="blue"
                 icon="AVG"

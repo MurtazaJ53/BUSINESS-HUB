@@ -9,6 +9,17 @@ from rest_framework import serializers
 from platform_apps.customers.models import Customer, CustomerLedgerEntry
 
 
+class CustomerSummarySerializer(serializers.Serializer):
+    total_customers = serializers.IntegerField()
+    active_credit_customers = serializers.IntegerField()
+    total_outstanding_balance = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_lifetime_spend = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        allow_null=True,
+    )
+
+
 class CustomerSerializer(serializers.ModelSerializer):
     opening_balance = serializers.DecimalField(
         max_digits=12,

@@ -1,14 +1,24 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
+from django.db.models import Count, Sum
+from django.db.models.functions import Coalesce
 from django.db.models import Q
 from rest_framework import exceptions, generics, permissions
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from platform_apps.common.migration import MigrationDomain
 from platform_apps.common.migration_guards import assert_postgres_primary_write_enabled
 from platform_apps.customers.models import Customer, CustomerLedgerEntry
-from platform_apps.customers.serializers import CustomerLedgerEntrySerializer, CustomerSerializer
+from platform_apps.customers.serializers import (
+    CustomerLedgerEntrySerializer,
+    CustomerSerializer,
+    CustomerSummarySerializer,
+)
 from platform_apps.shops.models import ShopMembership
-from platform_apps.shops.permissions import get_membership_or_403
+from platform_apps.shops.permissions import get_membership_or_403, has_feature_enabled
 
 
 class ShopScopedMixin:
@@ -141,3 +151,31 @@ class CustomerLedgerListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
             domain=MigrationDomain.CUSTOMER_LEDGER,
         )
         serializer.save()
+
+
+class CustomerSummaryView(ShopScopedMixin, APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, shop_id):
+        membership = self.get_membership()
+        queryset = Customer.objects.filter(shop=membership.shop, tombstone=False)
+        aggregates = queryset.aggregate(
+            total_customers=Count("id"),
+            active_credit_customers=Count("id", filter=Q(balance__gt=0)),
+            total_outstanding_balance=Coalesce(Sum("balance"), Decimal("0.00")),
+            total_lifetime_spend=Coalesce(Sum("total_spent"), Decimal("0.00")),
+        )
+
+        payload = {
+            "total_customers": aggregates["total_customers"] or 0,
+            "active_credit_customers": aggregates["active_credit_customers"] or 0,
+            "total_outstanding_balance": aggregates["total_outstanding_balance"] or Decimal("0.00"),
+            "total_lifetime_spend": (
+                aggregates["total_lifetime_spend"] or Decimal("0.00")
+                if has_feature_enabled(membership, "advanced_reports")
+                else None
+            ),
+        }
+
+        serializer = CustomerSummarySerializer(payload)
+        return Response(serializer.data)

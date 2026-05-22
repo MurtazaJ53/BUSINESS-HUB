@@ -12,6 +12,21 @@ from platform_apps.payments.models import SalePayment
 from platform_apps.sales.models import Sale, SaleItem
 
 
+class SaleSummarySerializer(serializers.Serializer):
+    total_sales = serializers.IntegerField()
+    gross_revenue = serializers.DecimalField(max_digits=12, decimal_places=2)
+    outstanding_revenue = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        allow_null=True,
+    )
+    average_ticket = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        allow_null=True,
+    )
+
+
 class SaleItemSerializer(serializers.ModelSerializer):
     inventory_item_id = serializers.UUIDField(required=False, allow_null=True)
     name = serializers.CharField(source="name_snapshot", required=False, allow_blank=True)

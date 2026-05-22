@@ -6,6 +6,7 @@ import type {
   AttendanceSession,
   AttendanceStats,
   Customer,
+  CustomerSummaryPayload,
   CustomerStats,
   DashboardSnapshot,
   Expense,
@@ -45,6 +46,7 @@ import type {
   PaymentStats,
   Sale,
   SalePaymentRecord,
+  SalesSummaryPayload,
   SalesStats,
   SessionPayload,
   ShopDomainState,
@@ -171,6 +173,10 @@ export const getCustomers = cache(async (shopId: string, query?: string): Promis
   });
 });
 
+export const getCustomerSummary = cache(async (shopId: string): Promise<CustomerSummaryPayload> => {
+  return apiFetch<CustomerSummaryPayload>(`/shops/${shopId}/customers/summary/`);
+});
+
 export const getExpenses = cache(async (shopId: string, query?: string): Promise<Expense[]> => {
   return apiFetch<Expense[]>(`/shops/${shopId}/expenses/`, {
     query: {
@@ -205,6 +211,10 @@ export const getSales = cache(
     });
   },
 );
+
+export const getSalesSummary = cache(async (shopId: string): Promise<SalesSummaryPayload> => {
+  return apiFetch<SalesSummaryPayload>(`/shops/${shopId}/sales/summary/`);
+});
 
 export const getPayments = cache(
   async (

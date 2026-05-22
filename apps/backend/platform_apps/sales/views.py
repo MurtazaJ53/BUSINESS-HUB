@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django.db import transaction
 from django.db.models import Q
+from django.db.models import Count, Sum
 from django.db.models import Prefetch
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from platform_apps.common.migration import MigrationDomain
 from platform_apps.common.migration_guards import (
@@ -16,9 +21,13 @@ from platform_apps.payments.models import SalePayment
 from platform_apps.projections.services import refresh_shop_dashboard_projection
 from platform_apps.sales.models import Sale, SaleItem
 from platform_apps.sales.models import SaleCommandReceipt
-from platform_apps.sales.serializers import SaleCommandCreateSerializer, SaleSerializer
+from platform_apps.sales.serializers import (
+    SaleCommandCreateSerializer,
+    SaleSerializer,
+    SaleSummarySerializer,
+)
 from platform_apps.shops.models import ShopMembership
-from platform_apps.shops.permissions import get_membership_or_403
+from platform_apps.shops.permissions import get_membership_or_403, has_feature_enabled
 
 
 class ShopScopedMixin:
@@ -116,6 +125,39 @@ class SaleDetailView(ShopScopedMixin, generics.RetrieveAPIView):
                 Prefetch("payments", queryset=SalePayment.objects.order_by("created_at")),
             )
         )
+
+
+class SaleSummaryView(ShopScopedMixin, APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, shop_id):
+        membership = self.get_membership()
+        queryset = Sale.objects.filter(shop=membership.shop, tombstone=False)
+        aggregates = queryset.aggregate(
+            total_sales=Count("id"),
+            gross_revenue=Coalesce(Sum("total_amount"), Decimal("0.00")),
+            outstanding_revenue=Coalesce(Sum("amount_due"), Decimal("0.00")),
+        )
+
+        total_sales = aggregates["total_sales"] or 0
+        gross_revenue = aggregates["gross_revenue"] or Decimal("0.00")
+        payload = {
+            "total_sales": total_sales,
+            "gross_revenue": gross_revenue,
+            "outstanding_revenue": (
+                aggregates["outstanding_revenue"] or Decimal("0.00")
+                if has_feature_enabled(membership, "finance_summary")
+                else None
+            ),
+            "average_ticket": (
+                (gross_revenue / total_sales).quantize(Decimal("0.01"))
+                if total_sales and has_feature_enabled(membership, "advanced_reports")
+                else None
+            ),
+        }
+
+        serializer = SaleSummarySerializer(payload)
+        return Response(serializer.data)
 
 
 def _get_sale_queryset_for_shop(*, shop_id: str):

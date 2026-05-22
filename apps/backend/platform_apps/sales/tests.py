@@ -131,6 +131,55 @@ class SalesApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 1)
 
+    def test_sales_summary_hides_advanced_fields_for_growth_plan(self):
+        self.shop.settings_json = {"plan_tier": "growth"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+        Sale.objects.create(
+            shop=self.shop,
+            actor_user=self.user,
+            receipt_number="S-GROWTH0001",
+            subtotal_amount=Decimal("500.00"),
+            total_amount=Decimal("500.00"),
+            amount_received=Decimal("350.00"),
+            amount_due=Decimal("150.00"),
+            payment_mode=Sale.PaymentMode.SPLIT,
+            customer_name_snapshot="Walk-in",
+            sale_date=timezone.localdate(),
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get(f"/api/v1/shops/{self.shop.id}/sales/summary/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["total_sales"], 1)
+        self.assertEqual(response.data["gross_revenue"], "500.00")
+        self.assertIsNone(response.data["outstanding_revenue"])
+        self.assertIsNone(response.data["average_ticket"])
+
+    def test_sales_summary_keeps_advanced_fields_for_pro_plan(self):
+        self.shop.settings_json = {"plan_tier": "pro"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+        Sale.objects.create(
+            shop=self.shop,
+            actor_user=self.user,
+            receipt_number="S-PRO0001",
+            subtotal_amount=Decimal("500.00"),
+            total_amount=Decimal("500.00"),
+            amount_received=Decimal("350.00"),
+            amount_due=Decimal("150.00"),
+            payment_mode=Sale.PaymentMode.SPLIT,
+            customer_name_snapshot="Walk-in",
+            sale_date=timezone.localdate(),
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get(f"/api/v1/shops/{self.shop.id}/sales/summary/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["gross_revenue"], "500.00")
+        self.assertEqual(response.data["outstanding_revenue"], "150.00")
+        self.assertEqual(response.data["average_ticket"], "500.00")
+
     def _create_postgres_primary_control(self, domain: str, *, epoch: int = 4):
         return MigrationDomainControl.objects.create(
             shop=self.shop,

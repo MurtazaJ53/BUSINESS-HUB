@@ -142,6 +142,13 @@ export type CustomerStats = {
   totalLifetimeSpend: number;
 };
 
+export type CustomerSummaryPayload = {
+  total_customers: number;
+  active_credit_customers: number;
+  total_outstanding_balance: string;
+  total_lifetime_spend: string | null;
+};
+
 export type Expense = {
   id: string;
   category: string;
@@ -251,6 +258,13 @@ export type SalesStats = {
   grossRevenue: number;
   outstandingRevenue: number;
   averageTicket: number;
+};
+
+export type SalesSummaryPayload = {
+  total_sales: number;
+  gross_revenue: string;
+  outstanding_revenue: string | null;
+  average_ticket: string | null;
 };
 
 export type PaymentStats = {
