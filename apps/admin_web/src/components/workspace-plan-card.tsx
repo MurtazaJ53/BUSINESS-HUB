@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import {
@@ -12,6 +13,7 @@ import type { BusinessHubPlanTier } from "@/lib/types";
 type WorkspacePlanCardProps = {
   shopName: string;
   planTier: BusinessHubPlanTier;
+  detailHref?: string;
 };
 
 function getPlanAction(planTier: BusinessHubPlanTier) {
@@ -66,6 +68,7 @@ function buildPlanBrief(shopName: string, planTier: BusinessHubPlanTier) {
 export function WorkspacePlanCard({
   shopName,
   planTier,
+  detailHref,
 }: WorkspacePlanCardProps) {
   const compare = getPlanCompareSnapshot(planTier);
   const unlockNext = getPlanUnlockNext(planTier);
@@ -143,6 +146,16 @@ export function WorkspacePlanCard({
               : "Copy the brief so the owner can request the next plan cleanly."}
           </span>
         </div>
+        {detailHref ? (
+          <div className="mt-4">
+            <Link
+              href={detailHref}
+              className="inline-flex items-center rounded-full border border-[rgba(152,164,189,0.14)] bg-[rgba(255,255,255,0.04)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[rgba(255,255,255,0.08)]"
+            >
+              Open full plan compare
+            </Link>
+          </div>
+        ) : null}
       </div>
     </div>
   );

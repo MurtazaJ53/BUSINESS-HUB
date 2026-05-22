@@ -287,6 +287,7 @@ export default async function HomePage() {
                 <WorkspacePlanCard
                   shopName={activeShop.shop.name}
                   planTier={activeShop.shop.plan_tier}
+                  detailHref={canManageWorkspace(activeShop.role) ? "/plan" : undefined}
                 />
               ) : null}
 

@@ -1,5 +1,11 @@
 import type { BusinessHubPlanTier, ShopMembership } from "@/lib/types";
 
+export const orderedPlanTiers: readonly BusinessHubPlanTier[] = [
+  "starter",
+  "growth",
+  "pro",
+] as const;
+
 export type ShopFeatureKey =
   | "expenses"
   | "attendance"
@@ -194,6 +200,29 @@ export function getPlanUnlockNext(planTier: BusinessHubPlanTier): {
       return {
         title: "Pro already includes the full curated stack",
         body: "Keep the workspace focused and only expose deeper controls to the right owners and admins.",
+      };
+  }
+}
+
+export function getPlanAudience(planTier: BusinessHubPlanTier): {
+  title: string;
+  body: string;
+} {
+  switch (planTier) {
+    case "starter":
+      return {
+        title: "Best for focused counter operations",
+        body: "Use Starter when the shop mainly needs selling, stock lookup, customer balances, and simple day-to-day flow without operational extras.",
+      };
+    case "growth":
+      return {
+        title: "Best for active store management",
+        body: "Use Growth when the owner needs expenses, attendance, and supplier-aware store operations but still wants a curated product instead of a heavy ERP workspace.",
+      };
+    case "pro":
+      return {
+        title: "Best for deeper owner control",
+        body: "Use Pro when the owner needs richer finance summaries, advanced reporting, and stronger admin/support controls while still hiding raw ERP complexity from staff.",
       };
   }
 }
