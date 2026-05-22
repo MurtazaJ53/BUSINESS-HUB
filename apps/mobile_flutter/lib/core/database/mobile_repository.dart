@@ -498,7 +498,9 @@ class InventoryRepository {
         i.stock,
         i.source_meta,
         i.created_at,
-        ${includeCost ? 'COALESCE(ip.cost_price, 0)' : 'NULL'} AS cost_price
+        ${includeCost ? 'COALESCE(ip.cost_price, 0)' : 'NULL'} AS cost_price,
+        ip.supplier_id,
+        ip.last_purchase_date
       FROM inventory i
       LEFT JOIN inventory_private ip ON ip.id = i.id AND ip.tombstone = 0
       WHERE ${where.join(' AND ')}
@@ -542,7 +544,9 @@ class InventoryRepository {
           i.stock,
           i.source_meta,
           i.created_at,
-          ${includeCost ? 'COALESCE(ip.cost_price, 0)' : 'NULL'} AS cost_price
+          ${includeCost ? 'COALESCE(ip.cost_price, 0)' : 'NULL'} AS cost_price,
+          ip.supplier_id,
+          ip.last_purchase_date
         FROM inventory i
         LEFT JOIN inventory_private ip ON ip.id = i.id AND ip.tombstone = 0
         WHERE i.tombstone = 0
@@ -627,6 +631,8 @@ class InventoryRepository {
         row.read<int>('created_at'),
       ),
       costPrice: row.readNullable<double>('cost_price'),
+      supplierId: row.readNullable<String>('supplier_id'),
+      lastPurchaseDate: row.readNullable<String>('last_purchase_date'),
     );
   }
 

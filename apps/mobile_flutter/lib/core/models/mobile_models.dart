@@ -348,6 +348,8 @@ class InventoryCatalogItem {
     this.description,
     this.sourceMeta,
     this.costPrice,
+    this.supplierId,
+    this.lastPurchaseDate,
   });
 
   final String id;
@@ -362,6 +364,8 @@ class InventoryCatalogItem {
   final String? description;
   final String? sourceMeta;
   final double? costPrice;
+  final String? supplierId;
+  final String? lastPurchaseDate;
 
   double get marginPerUnit => price - (costPrice ?? 0);
 }

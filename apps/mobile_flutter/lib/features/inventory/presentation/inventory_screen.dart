@@ -43,6 +43,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   Future<void> _showInventoryDetailSheet(
     BuildContext context,
     InventoryCatalogItem item,
+    ShopInfo shop,
+    dynamic session,
   ) {
     final compact = MediaQuery.sizeOf(context).width < 420;
     final stockAccent = item.stock <= 5
@@ -83,6 +85,14 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         ),
       );
     }
+    final showSupplierInfo =
+        (session?.canViewCost ?? false) &&
+        shop.supportsSupplierDirectory &&
+        (item.supplierId ?? '').trim().isNotEmpty;
+    final showPurchaseInfo =
+        (session?.canViewCost ?? false) &&
+        shop.supportsPurchaseWorkflow &&
+        (item.lastPurchaseDate ?? '').trim().isNotEmpty;
 
     return showModalBottomSheet<void>(
       context: context,
@@ -166,6 +176,27 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     ),
                   ),
                 ],
+                if (showSupplierInfo || showPurchaseInfo) ...<Widget>[
+                  const SizedBox(height: 12),
+                  MobileSheetSection(
+                    title: 'Procurement view',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        if (showSupplierInfo)
+                          _InventoryDetailLine(
+                            label: 'Supplier reference',
+                            value: item.supplierId!,
+                          ),
+                        if (showPurchaseInfo)
+                          _InventoryDetailLine(
+                            label: 'Last purchase',
+                            value: item.lastPurchaseDate!,
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 Row(
                   children: <Widget>[
@@ -190,6 +221,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   Widget build(BuildContext context) {
     final session = ref.watch(mobileSessionProvider).asData?.value;
     final syncStatus = ref.watch(syncStatusProvider);
+    final shop =
+        ref.watch(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
     final filter = InventoryCatalogFilter(
       search: _search,
       category: _selectedCategory,
@@ -437,7 +470,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         padding: const EdgeInsets.only(bottom: 12),
                         child: _InventoryRow(
                           item: item,
-                          onTap: () => _showInventoryDetailSheet(context, item),
+                          onTap: () => _showInventoryDetailSheet(
+                            context,
+                            item,
+                            shop,
+                            session,
+                          ),
                         ),
                       ),
                     ),

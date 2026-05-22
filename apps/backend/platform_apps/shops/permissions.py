@@ -39,9 +39,12 @@ def get_membership_or_403(user, shop_id, minimum_role: str = ShopMembership.Role
     return membership
 
 
+def has_feature_enabled(membership: ShopMembership, feature_key: str) -> bool:
+    return membership.shop.enabled_features.get(feature_key) is True
+
+
 def ensure_feature_enabled_or_403(membership: ShopMembership, feature_key: str) -> None:
-    features = membership.shop.enabled_features
-    if features.get(feature_key) is True:
+    if has_feature_enabled(membership, feature_key):
         return
 
     plan_label = normalize_plan_tier(membership.shop.plan_tier).title()

@@ -14,7 +14,11 @@ from platform_apps.common.migration_guards import assert_postgres_primary_write_
 from platform_apps.inventory.models import InventoryItem, InventoryStockLedger
 from platform_apps.inventory.serializers import InventoryAdjustmentSerializer, InventoryItemSerializer
 from platform_apps.shops.models import ShopMembership
-from platform_apps.shops.permissions import ROLE_ORDER, get_membership_or_403
+from platform_apps.shops.permissions import (
+    ROLE_ORDER,
+    get_membership_or_403,
+    has_feature_enabled,
+)
 
 
 class ShopScopedMixin:
@@ -31,6 +35,20 @@ class ShopScopedMixin:
 
     def can_view_costs(self) -> bool:
         return ROLE_ORDER[self.get_membership().role] >= ROLE_ORDER[ShopMembership.Role.ADMIN]
+
+    def can_view_supplier_directory(self) -> bool:
+        membership = self.get_membership()
+        return (
+            ROLE_ORDER[membership.role] >= ROLE_ORDER[ShopMembership.Role.ADMIN]
+            and has_feature_enabled(membership, "supplier_directory")
+        )
+
+    def can_view_purchase_workflow(self) -> bool:
+        membership = self.get_membership()
+        return (
+            ROLE_ORDER[membership.role] >= ROLE_ORDER[ShopMembership.Role.ADMIN]
+            and has_feature_enabled(membership, "purchase_workflow")
+        )
 
     def assert_inventory_postgres_write_enabled(self) -> None:
         assert_postgres_primary_write_enabled(
@@ -73,6 +91,8 @@ class InventoryItemListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
                 "shop": self.get_membership().shop,
                 "actor": self.request.user,
                 "can_view_costs": self.can_view_costs(),
+                "can_view_supplier_directory": self.can_view_supplier_directory(),
+                "can_view_purchase_workflow": self.can_view_purchase_workflow(),
             }
         )
         return context
@@ -103,6 +123,8 @@ class InventoryItemDetailView(ShopScopedMixin, generics.RetrieveUpdateDestroyAPI
                 "shop": self.get_membership().shop,
                 "actor": self.request.user,
                 "can_view_costs": self.can_view_costs(),
+                "can_view_supplier_directory": self.can_view_supplier_directory(),
+                "can_view_purchase_workflow": self.can_view_purchase_workflow(),
             }
         )
         return context

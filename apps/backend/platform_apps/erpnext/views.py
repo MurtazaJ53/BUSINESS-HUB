@@ -26,7 +26,11 @@ from platform_apps.erpnext.serializers import (
 from platform_apps.erpnext.services import ERPNextConfigurationError, ERPNextIntegrationService
 from platform_apps.erpnext.tasks import run_erpnext_cycle_task
 from platform_apps.shops.models import ShopMembership
-from platform_apps.shops.permissions import get_membership_or_403
+from platform_apps.shops.permissions import (
+    ensure_feature_enabled_or_403,
+    get_membership_or_403,
+    has_feature_enabled,
+)
 
 
 class ShopScopedMixin:
@@ -40,6 +44,16 @@ class ShopScopedMixin:
                 self.minimum_role,
             )
         return self._membership_cache
+
+
+class ShopFeatureScopedMixin(ShopScopedMixin):
+    required_feature: str | None = None
+
+    def get_membership(self):
+        membership = super().get_membership()
+        if self.required_feature:
+            ensure_feature_enabled_or_403(membership, self.required_feature)
+        return membership
 
 
 class ERPNextMetaView(APIView):
@@ -213,8 +227,9 @@ class ERPNextStockSyncView(ERPNextShopActionView):
         return Response({"action": self.action_name, "status": "ok", **payload})
 
 
-class ERPNextSupplierSyncView(ERPNextShopActionView):
+class ERPNextSupplierSyncView(ShopFeatureScopedMixin, ERPNextShopActionView):
     action_name = "sync_suppliers"
+    required_feature = "supplier_directory"
 
     def action_response(self, request, *args, **kwargs):
         membership = self.get_membership()
@@ -225,8 +240,9 @@ class ERPNextSupplierSyncView(ERPNextShopActionView):
         return Response({"action": self.action_name, "status": "ok", **payload})
 
 
-class ERPNextPurchaseSyncView(ERPNextShopActionView):
+class ERPNextPurchaseSyncView(ShopFeatureScopedMixin, ERPNextShopActionView):
     action_name = "sync_purchases"
+    required_feature = "purchase_workflow"
 
     def action_response(self, request, *args, **kwargs):
         membership = self.get_membership()
@@ -237,8 +253,9 @@ class ERPNextPurchaseSyncView(ERPNextShopActionView):
         return Response({"action": self.action_name, "status": "ok", **payload})
 
 
-class ERPNextSupplierPaymentSyncView(ERPNextShopActionView):
+class ERPNextSupplierPaymentSyncView(ShopFeatureScopedMixin, ERPNextShopActionView):
     action_name = "sync_supplier_payments"
+    required_feature = "purchase_workflow"
 
     def action_response(self, request, *args, **kwargs):
         membership = self.get_membership()
@@ -282,10 +299,16 @@ class ERPNextRunCycleView(ShopScopedMixin, generics.GenericAPIView):
         membership = self.get_membership()
         serializer = self.get_serializer(data=request.data or {})
         serializer.is_valid(raise_exception=True)
+        payload = dict(serializer.validated_data)
+        if not has_feature_enabled(membership, "supplier_directory"):
+            payload["sync_suppliers"] = False
+        if not has_feature_enabled(membership, "purchase_workflow"):
+            payload["sync_purchases"] = False
+            payload["sync_supplier_payments"] = False
         try:
             payload = ERPNextIntegrationService().run_cycle(
                 shop=membership.shop,
-                **serializer.validated_data,
+                **payload,
             )
         except ERPNextConfigurationError as exc:
             return Response({"overall_status": "blocked", "detail": str(exc)}, status=409)
@@ -301,7 +324,12 @@ class ERPNextEnqueueCycleView(ShopScopedMixin, generics.GenericAPIView):
         membership = self.get_membership()
         serializer = self.get_serializer(data=request.data or {})
         serializer.is_valid(raise_exception=True)
-        payload = serializer.validated_data
+        payload = dict(serializer.validated_data)
+        if not has_feature_enabled(membership, "supplier_directory"):
+            payload["sync_suppliers"] = False
+        if not has_feature_enabled(membership, "purchase_workflow"):
+            payload["sync_purchases"] = False
+            payload["sync_supplier_payments"] = False
         task = run_erpnext_cycle_task.delay(shop_id=str(membership.shop.id), **payload)
         return Response(
             {
@@ -315,11 +343,12 @@ class ERPNextEnqueueCycleView(ShopScopedMixin, generics.GenericAPIView):
         )
 
 
-class ERPNextSupplierMirrorListView(ShopScopedMixin, generics.ListAPIView):
+class ERPNextSupplierMirrorListView(ShopFeatureScopedMixin, generics.ListAPIView):
     serializer_class = ERPNextSupplierMirrorSerializer
     permission_classes = [permissions.IsAuthenticated]
     minimum_role = ShopMembership.Role.ADMIN
     pagination_class = None
+    required_feature = "supplier_directory"
 
     def get_queryset(self):
         membership = self.get_membership()
@@ -338,11 +367,12 @@ class ERPNextSupplierMirrorListView(ShopScopedMixin, generics.ListAPIView):
         return queryset
 
 
-class ERPNextPurchaseMirrorListView(ShopScopedMixin, generics.ListAPIView):
+class ERPNextPurchaseMirrorListView(ShopFeatureScopedMixin, generics.ListAPIView):
     serializer_class = ERPNextPurchaseMirrorSerializer
     permission_classes = [permissions.IsAuthenticated]
     minimum_role = ShopMembership.Role.ADMIN
     pagination_class = None
+    required_feature = "purchase_workflow"
 
     def get_queryset(self):
         membership = self.get_membership()
@@ -366,11 +396,12 @@ class ERPNextPurchaseMirrorListView(ShopScopedMixin, generics.ListAPIView):
         return queryset
 
 
-class ERPNextSupplierPaymentMirrorListView(ShopScopedMixin, generics.ListAPIView):
+class ERPNextSupplierPaymentMirrorListView(ShopFeatureScopedMixin, generics.ListAPIView):
     serializer_class = ERPNextSupplierPaymentMirrorSerializer
     permission_classes = [permissions.IsAuthenticated]
     minimum_role = ShopMembership.Role.ADMIN
     pagination_class = None
+    required_feature = "purchase_workflow"
 
     def get_queryset(self):
         membership = self.get_membership()

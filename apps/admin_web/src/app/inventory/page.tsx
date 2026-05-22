@@ -11,6 +11,10 @@ import {
   resolveActiveShop,
 } from "@/lib/admin-api";
 import { formatCurrency } from "@/lib/formatters";
+import {
+  canAccessPurchaseWorkflow,
+  canAccessSupplierDirectory,
+} from "@/lib/plans";
 
 function buildInventoryModeCopy(
   domainState: Awaited<ReturnType<typeof getShopDomainState>>,
@@ -56,6 +60,8 @@ export default async function InventoryPage() {
     : null;
   const stats = buildInventoryStats(items);
   const inventoryMode = domainState ? buildInventoryModeCopy(domainState) : null;
+  const showSupplierColumn = canAccessSupplierDirectory(activeShop);
+  const showPurchaseColumn = canAccessPurchaseWorkflow(activeShop);
   const lowStockItems = items
     .filter((item) => item.stock_on_hand <= 5)
     .sort((left, right) => left.stock_on_hand - right.stock_on_hand)
@@ -177,6 +183,8 @@ export default async function InventoryPage() {
                   <InventoryTable
                     items={items}
                     currencyCode={activeShop.shop.currency_code}
+                    showSupplierColumn={showSupplierColumn}
+                    showPurchaseColumn={showPurchaseColumn}
                   />
                 </div>
               </section>
@@ -219,6 +227,12 @@ export default async function InventoryPage() {
                   <li>- Check whether a product is still available before the next sale.</li>
                   <li>- Review low-stock items before they become stock-outs.</li>
                   <li>- Confirm pricing and status without opening technical inventory tools.</li>
+                  {showSupplierColumn ? (
+                    <li>- Review supplier-linked products without exposing a full purchase system.</li>
+                  ) : null}
+                  {showPurchaseColumn ? (
+                    <li>- Track last purchase visibility only on workspaces that have deeper procurement enabled.</li>
+                  ) : null}
                 </ul>
               </section>
             </div>

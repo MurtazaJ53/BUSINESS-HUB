@@ -86,6 +86,14 @@ export function canAccessFinanceSummary(activeShop: ShopMembership | null): bool
   return hasShopFeature(activeShop, "finance_summary");
 }
 
+export function canAccessSupplierDirectory(activeShop: ShopMembership | null): boolean {
+  return hasShopFeature(activeShop, "supplier_directory");
+}
+
+export function canAccessPurchaseWorkflow(activeShop: ShopMembership | null): boolean {
+  return hasShopFeature(activeShop, "purchase_workflow");
+}
+
 export function getPlanIncludedNow(planTier: BusinessHubPlanTier): string[] {
   switch (planTier) {
     case "starter":

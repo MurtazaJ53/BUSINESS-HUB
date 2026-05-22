@@ -4,9 +4,17 @@ import type { InventoryItem } from "@/lib/types";
 type InventoryTableProps = {
   items: InventoryItem[];
   currencyCode?: string;
+  showSupplierColumn?: boolean;
+  showPurchaseColumn?: boolean;
 };
 
-export function InventoryTable({ items, currencyCode = "INR" }: InventoryTableProps) {
+export function InventoryTable({
+  items,
+  currencyCode = "INR",
+  showSupplierColumn = false,
+  showPurchaseColumn = false,
+}: InventoryTableProps) {
+  const columnCount = 6 + (showSupplierColumn ? 1 : 0) + (showPurchaseColumn ? 1 : 0);
   return (
     <div className="panel-soft overflow-hidden rounded-[28px]">
       <div className="overflow-x-auto">
@@ -18,6 +26,12 @@ export function InventoryTable({ items, currencyCode = "INR" }: InventoryTablePr
               <th className="px-5 py-4 font-medium">SKU</th>
               <th className="px-5 py-4 font-medium">Stock</th>
               <th className="px-5 py-4 font-medium">Sell price</th>
+              {showSupplierColumn ? (
+                <th className="px-5 py-4 font-medium">Supplier</th>
+              ) : null}
+              {showPurchaseColumn ? (
+                <th className="px-5 py-4 font-medium">Last buy</th>
+              ) : null}
               <th className="px-5 py-4 font-medium">Status</th>
             </tr>
           </thead>
@@ -53,6 +67,16 @@ export function InventoryTable({ items, currencyCode = "INR" }: InventoryTablePr
                     <td className="px-5 py-4 text-sm text-[var(--text-primary)]">
                       {formatCurrency(Number(item.sell_price), currencyCode)}
                     </td>
+                    {showSupplierColumn ? (
+                      <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
+                        {item.supplier_id || "Not linked"}
+                      </td>
+                    ) : null}
+                    {showPurchaseColumn ? (
+                      <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
+                        {item.last_purchase_date || "Not tracked"}
+                      </td>
+                    ) : null}
                     <td className="px-5 py-4">
                       <span className="rounded-full border border-[rgba(152,164,189,0.12)] bg-[rgba(13,18,28,0.8)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
                         {item.status}
@@ -64,7 +88,7 @@ export function InventoryTable({ items, currencyCode = "INR" }: InventoryTablePr
             ) : (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={columnCount}
                   className="px-5 py-10 text-center text-sm text-[var(--text-secondary)]"
                 >
                   No products are available for this store yet.

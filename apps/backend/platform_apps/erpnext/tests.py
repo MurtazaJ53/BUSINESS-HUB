@@ -91,6 +91,10 @@ class ERPNextApiTests(TestCase):
             },
         )
 
+    def _set_plan_tier(self, plan_tier: str):
+        self.shop.settings_json = {"plan_tier": plan_tier}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+
     def test_meta_reports_configuration_state(self):
         response = self.client.get("/api/v1/erpnext/meta/")
 
@@ -381,7 +385,19 @@ class ERPNextApiTests(TestCase):
             ).exists()
         )
 
+    def test_sync_suppliers_is_blocked_on_starter_plan(self):
+        self._set_plan_tier("starter")
+
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/erpnext/sync-suppliers/",
+            {"limit": 10},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+
     def test_sync_purchases_imports_purchase_mirror(self):
+        self._set_plan_tier("pro")
         self.binding.purchase_sync_enabled = True
         self.binding.save(update_fields=["purchase_sync_enabled", "updated_at"])
         supplier_client = FakeERPNextClient(
@@ -553,7 +569,20 @@ class ERPNextApiTests(TestCase):
             ).exists()
         )
 
+    def test_sync_purchases_is_blocked_on_growth_plan(self):
+        self.binding.purchase_sync_enabled = True
+        self.binding.save(update_fields=["purchase_sync_enabled", "updated_at"])
+
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/erpnext/sync-purchases/",
+            {"limit": 10},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+
     def test_sync_supplier_payments_imports_supplier_payment_mirror(self):
+        self._set_plan_tier("pro")
         self.binding.purchase_sync_enabled = True
         self.binding.save(update_fields=["purchase_sync_enabled", "updated_at"])
         supplier_client = FakeERPNextClient(
@@ -794,6 +823,25 @@ class ERPNextApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["overall_status"], "ok")
 
+    def test_run_cycle_disables_purchase_steps_when_plan_does_not_allow_them(self):
+        with patch(
+            "platform_apps.erpnext.views.ERPNextIntegrationService.run_cycle",
+            return_value={"overall_status": "ok", "steps": []},
+        ) as mocked_run_cycle:
+            response = self.client.post(
+                f"/api/v1/shops/{self.shop.id}/erpnext/run-cycle/",
+                {"limit": 25},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        mocked_run_cycle.assert_called_once()
+        self.assertTrue(mocked_run_cycle.call_args.kwargs["sync_suppliers"])
+        self.assertFalse(mocked_run_cycle.call_args.kwargs["sync_purchases"])
+        self.assertFalse(
+            mocked_run_cycle.call_args.kwargs["sync_supplier_payments"]
+        )
+
     def test_enqueue_cycle_returns_task_stub(self):
         with patch(
             "platform_apps.erpnext.views.run_erpnext_cycle_task.delay",
@@ -854,6 +902,7 @@ class ERPNextApiTests(TestCase):
         self.assertTrue(payload["reachable"])
 
     def test_mock_mode_run_cycle_syncs_and_pushes(self):
+        self._set_plan_tier("pro")
         self.binding.purchase_sync_enabled = True
         self.binding.save(update_fields=["purchase_sync_enabled", "updated_at"])
 

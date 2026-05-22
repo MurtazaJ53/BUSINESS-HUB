@@ -59,6 +59,42 @@ class InventoryItemSerializer(serializers.ModelSerializer):
     def _can_view_costs(self) -> bool:
         return bool(self.context.get("can_view_costs"))
 
+    def _can_view_supplier_directory(self) -> bool:
+        return bool(self.context.get("can_view_supplier_directory"))
+
+    def _can_view_purchase_workflow(self) -> bool:
+        return bool(self.context.get("can_view_purchase_workflow"))
+
+    def validate(self, attrs):
+        supplier_id = attrs.get("supplier_id_input")
+        last_purchase_date = attrs.get("last_purchase_date_input")
+
+        if (
+            supplier_id not in (None, "")
+            and not self._can_view_supplier_directory()
+        ):
+            raise serializers.ValidationError(
+                {
+                    "private_supplier_id": (
+                        "Supplier directory is not enabled for this workspace plan."
+                    )
+                }
+            )
+
+        if (
+            last_purchase_date is not None
+            and not self._can_view_purchase_workflow()
+        ):
+            raise serializers.ValidationError(
+                {
+                    "private_last_purchase_date": (
+                        "Purchase workflow is not enabled for this workspace plan."
+                    )
+                }
+            )
+
+        return attrs
+
     def get_cost_price(self, obj):
         if not self._can_view_costs():
             return None
@@ -66,13 +102,13 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         return private.cost_price if private and not private.tombstone else None
 
     def get_supplier_id(self, obj):
-        if not self._can_view_costs():
+        if not self._can_view_supplier_directory():
             return None
         private = getattr(obj, "private", None)
         return private.supplier_id if private and not private.tombstone else None
 
     def get_last_purchase_date(self, obj):
-        if not self._can_view_costs():
+        if not self._can_view_purchase_workflow():
             return None
         private = getattr(obj, "private", None)
         return private.last_purchase_date if private and not private.tombstone else None
@@ -88,12 +124,24 @@ class InventoryItemSerializer(serializers.ModelSerializer):
 
         item = InventoryItem.objects.create(shop=shop, **validated_data)
 
-        if self._can_view_costs() and any(value is not None and value != "" for value in [cost_price, supplier_id, last_purchase_date]):
+        if (
+            self._can_view_costs()
+            and any(
+                value is not None and value != ""
+                for value in [cost_price, supplier_id, last_purchase_date]
+            )
+        ):
             InventoryItemPrivate.objects.create(
                 item=item,
                 cost_price=cost_price if cost_price is not None else Decimal("0.00"),
-                supplier_id=supplier_id,
-                last_purchase_date=last_purchase_date,
+                supplier_id=(
+                    supplier_id if self._can_view_supplier_directory() else ""
+                ),
+                last_purchase_date=(
+                    last_purchase_date
+                    if self._can_view_purchase_workflow()
+                    else None
+                ),
                 source_system=validated_data.get("source_system", ""),
                 source_shop_id=validated_data.get("source_shop_id", ""),
             )
@@ -132,10 +180,13 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             if cost_price is not None:
                 private.cost_price = cost_price
                 updated = True
-            if supplier_id is not None:
+            if supplier_id is not None and self._can_view_supplier_directory():
                 private.supplier_id = supplier_id
                 updated = True
-            if last_purchase_date is not None:
+            if (
+                last_purchase_date is not None
+                and self._can_view_purchase_workflow()
+            ):
                 private.last_purchase_date = last_purchase_date
                 updated = True
             if updated:
