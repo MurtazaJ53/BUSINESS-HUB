@@ -29,5 +29,10 @@ class ShopDashboardSnapshotView(APIView):
         if snapshot is None:
             snapshot = refresh_shop_dashboard_projection(membership.shop)
 
-        serializer = ShopDashboardSnapshotSerializer(snapshot)
+        serializer = ShopDashboardSnapshotSerializer(
+            snapshot,
+            context={
+                "membership": membership,
+            },
+        )
         return Response(serializer.data)

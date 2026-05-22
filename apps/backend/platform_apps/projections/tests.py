@@ -156,3 +156,39 @@ class ProjectionRefreshTests(TestCase):
         self.assertEqual(response.data["inventory_items_count"], 3)
         self.assertEqual(len(response.data["low_stock_preview"]), 1)
         self.assertEqual(response.data["low_stock_preview"][0]["item_name"], "Blue Tee")
+
+    def test_dashboard_snapshot_api_redacts_advanced_finance_fields_for_starter_plan(self):
+        self.shop.settings_json = {
+            "plan_tier": "starter",
+        }
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+        self._seed_domain_data()
+
+        response = self.client.get(f"/api/v1/shops/{self.shop.id}/projections/dashboard/?refresh=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.data["projected_sell_value"])
+        self.assertIsNone(response.data["total_lifetime_spend"])
+        self.assertIsNone(response.data["total_outstanding_balance"])
+        self.assertIsNone(response.data["gross_revenue"])
+        self.assertIsNone(response.data["outstanding_revenue"])
+        self.assertIsNone(response.data["total_collected"])
+        self.assertEqual(response.data["sales_count"], 1)
+        self.assertEqual(response.data["active_credit_customers_count"], 1)
+
+    def test_dashboard_snapshot_api_keeps_finance_fields_for_pro_plan(self):
+        self.shop.settings_json = {
+            "plan_tier": "pro",
+        }
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+        self._seed_domain_data()
+
+        response = self.client.get(f"/api/v1/shops/{self.shop.id}/projections/dashboard/?refresh=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["projected_sell_value"], "7790.00")
+        self.assertEqual(response.data["total_lifetime_spend"], "650.00")
+        self.assertEqual(response.data["total_outstanding_balance"], "80.00")
+        self.assertEqual(response.data["gross_revenue"], "650.00")
+        self.assertEqual(response.data["outstanding_revenue"], "150.00")
+        self.assertEqual(response.data["total_collected"], "500.00")

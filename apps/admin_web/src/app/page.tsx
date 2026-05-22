@@ -72,7 +72,16 @@ function buildQuickActions(activeShop: ShopMembership | null): QuickAction[] {
   return actions.slice(0, 4);
 }
 
-function buildAttentionCard(snapshot: DashboardSnapshot | null, currencyCode = "INR") {
+function buildAttentionCard(
+  snapshot: DashboardSnapshot | null,
+  options: {
+    currencyCode?: string;
+    canUseFinanceSummary?: boolean;
+  } = {},
+) {
+  const currencyCode = options.currencyCode ?? "INR";
+  const canUseFinanceSummary = options.canUseFinanceSummary ?? false;
+
   if (!snapshot) {
     return {
       title: "Connect a workspace to begin",
@@ -93,10 +102,20 @@ function buildAttentionCard(snapshot: DashboardSnapshot | null, currencyCode = "
     };
   }
 
-  if (Number(snapshot.total_outstanding_balance) > 0) {
+  if (canUseFinanceSummary && Number(snapshot.total_outstanding_balance ?? 0) > 0) {
     return {
       title: "Customer dues need follow-up",
       body: `Outstanding balances are now at ${formatCurrency(Number(snapshot.total_outstanding_balance), currencyCode)}.`,
+      ctaLabel: "Open customers",
+      href: "/customers",
+      tone: "text-[var(--accent)] border-[rgba(71,176,255,0.18)] bg-[rgba(11,24,41,0.72)]",
+    };
+  }
+
+  if (!canUseFinanceSummary && snapshot.active_credit_customers_count > 0) {
+    return {
+      title: "Customer follow-up is waiting",
+      body: `${snapshot.active_credit_customers_count} customer accounts still need balance follow-up.`,
       ctaLabel: "Open customers",
       href: "/customers",
       tone: "text-[var(--accent)] border-[rgba(71,176,255,0.18)] bg-[rgba(11,24,41,0.72)]",
@@ -161,7 +180,10 @@ export default async function HomePage() {
   const canUseFinanceSummary = canAccessFinanceSummary(activeShop);
   const attentionCard = buildAttentionCard(
     dashboardSnapshot,
-    activeShop?.shop.currency_code ?? "INR",
+    {
+      currencyCode: activeShop?.shop.currency_code ?? "INR",
+      canUseFinanceSummary,
+    },
   );
   const planGuidance = buildPlanGuidance(activeShop);
   const lowStockPreview = dashboardSnapshot?.low_stock_preview ?? [];
