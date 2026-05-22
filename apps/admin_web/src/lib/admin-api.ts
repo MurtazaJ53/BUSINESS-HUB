@@ -44,6 +44,7 @@ import type {
   MigrationShadowSummary,
   MigrationStats,
   PaymentStats,
+  PaymentSummaryPayload,
   Sale,
   SalePaymentRecord,
   SalesSummaryPayload,
@@ -230,6 +231,10 @@ export const getPayments = cache(
     });
   },
 );
+
+export const getPaymentSummary = cache(async (shopId: string): Promise<PaymentSummaryPayload> => {
+  return apiFetch<PaymentSummaryPayload>(`/shops/${shopId}/payments/summary/`);
+});
 
 export const getMigrationControls = cache(async (): Promise<MigrationDomainControl[]> => {
   return apiFetch<MigrationDomainControl[]>("/migration/domains/");

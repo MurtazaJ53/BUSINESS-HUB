@@ -4,24 +4,27 @@ import { EmptyState } from "@/components/empty-state";
 import { MetricCard } from "@/components/metric-card";
 import { PaymentsTable } from "@/components/payments-table";
 import {
-  buildPaymentStats,
   getPayments,
+  getPaymentSummary,
   getSession,
   getShopDomainState,
   resolveActiveShop,
 } from "@/lib/admin-api";
 import { formatCurrency } from "@/lib/formatters";
+import { canAccessAdvancedReports, canAccessFinanceSummary, formatPlanTier } from "@/lib/plans";
 
 export default async function PaymentsPage() {
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
-  const [payments, domainState] = activeShop
+  const [payments, paymentSummary, domainState] = activeShop
     ? await Promise.all([
         getPayments(activeShop.shop.id),
+        getPaymentSummary(activeShop.shop.id),
         getShopDomainState(activeShop.shop.id, "payments"),
       ])
-    : [[], null];
-  const stats = buildPaymentStats(payments);
+    : [[], null, null];
+  const canUseAdvancedReports = canAccessAdvancedReports(activeShop);
+  const canUseFinanceSummary = canAccessFinanceSummary(activeShop);
   const recentHighValue = [...payments]
     .sort((left, right) => Number(right.amount) - Number(left.amount))
     .slice(0, 6);
@@ -44,31 +47,64 @@ export default async function PaymentsPage() {
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label="Payments captured"
-              value={stats.paymentCount.toString()}
+              value={(paymentSummary?.payment_count ?? payments.length).toString()}
               detail="Payment records currently visible in this store"
               icon="PAY"
             />
-            <MetricCard
-              label="Collected value"
-              value={formatCurrency(stats.totalCollected, activeShop.shop.currency_code)}
-              detail="Total amount collected across recorded payment entries"
-              accent="green"
-              icon="COL"
-            />
-            <MetricCard
-              label="Credit entries"
-              value={stats.creditCount.toString()}
-              detail="Payments that still leave due open on the receipt"
-              accent="rose"
-              icon="CRD"
-            />
-            <MetricCard
-              label="Digital mix"
-              value={stats.digitalShareCount.toString()}
-              detail="UPI, bank, and card payment count"
-              accent="blue"
-              icon="DIG"
-            />
+            {canUseFinanceSummary ? (
+              <MetricCard
+                label="Collected value"
+                value={formatCurrency(
+                  Number(paymentSummary?.total_collected ?? 0),
+                  activeShop.shop.currency_code,
+                )}
+                detail="Total amount collected across recorded payment entries"
+                accent="green"
+                icon="COL"
+              />
+            ) : (
+              <MetricCard
+                label="Plan insight"
+                value={`${formatPlanTier(activeShop.shop.plan_tier)} plan`}
+                detail="Collections totals unlock on Pro."
+                accent="blue"
+                icon="PLN"
+              />
+            )}
+            {canUseFinanceSummary ? (
+              <MetricCard
+                label="Credit entries"
+                value={`${paymentSummary?.credit_count ?? 0}`}
+                detail="Payments that still leave due open on the receipt"
+                accent="rose"
+                icon="CRD"
+              />
+            ) : (
+              <MetricCard
+                label="Settlement mode"
+                value="Simple review"
+                detail="Credit rollups stay hidden on lighter plans."
+                accent="rose"
+                icon="LGT"
+              />
+            )}
+            {canUseAdvancedReports ? (
+              <MetricCard
+                label="Digital mix"
+                value={`${paymentSummary?.digital_payment_count ?? 0}`}
+                detail="UPI, bank, and card payment count"
+                accent="blue"
+                icon="DIG"
+              />
+            ) : (
+              <MetricCard
+                label="Method review"
+                value="List view"
+                detail="Detailed payment-mix rollups unlock on Pro."
+                accent="blue"
+                icon="DIG"
+              />
+            )}
           </section>
 
           <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)]">
@@ -108,34 +144,45 @@ export default async function PaymentsPage() {
                 />
               ) : null}
 
-              <section className="panel-soft rounded-[28px] px-6 py-6">
-                <p className="eyebrow">Collections watch</p>
-                <h2 className="mt-3 text-2xl font-bold">Highest captured payments</h2>
-                <div className="mt-5 space-y-3">
-                  {recentHighValue.length ? (
-                    recentHighValue.map((payment) => (
-                      <div
-                        key={payment.id}
-                        className="surface-muted flex items-center justify-between rounded-[20px] px-4 py-4"
-                      >
-                        <div>
-                          <p className="font-semibold">{payment.receipt_number}</p>
-                          <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                            {(payment.customer_name || "Walk-in") + " | " + payment.payment_method}
-                          </p>
+              {canUseFinanceSummary ? (
+                <section className="panel-soft rounded-[28px] px-6 py-6">
+                  <p className="eyebrow">Collections watch</p>
+                  <h2 className="mt-3 text-2xl font-bold">Highest captured payments</h2>
+                  <div className="mt-5 space-y-3">
+                    {recentHighValue.length ? (
+                      recentHighValue.map((payment) => (
+                        <div
+                          key={payment.id}
+                          className="surface-muted flex items-center justify-between rounded-[20px] px-4 py-4"
+                        >
+                          <div>
+                            <p className="font-semibold">{payment.receipt_number}</p>
+                            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                              {(payment.customer_name || "Walk-in") + " | " + payment.payment_method}
+                            </p>
+                          </div>
+                          <span className="rounded-full border border-[rgba(58,215,162,0.18)] px-3 py-1 text-sm font-semibold text-[var(--success)]">
+                            {formatCurrency(Number(payment.amount || 0), activeShop.shop.currency_code)}
+                          </span>
                         </div>
-                        <span className="rounded-full border border-[rgba(58,215,162,0.18)] px-3 py-1 text-sm font-semibold text-[var(--success)]">
-                          {formatCurrency(Number(payment.amount || 0), activeShop.shop.currency_code)}
-                        </span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-[var(--text-secondary)]">
-                      No payment activity is available for this store yet.
-                    </p>
-                  )}
-                </div>
-              </section>
+                      ))
+                    ) : (
+                      <p className="text-sm text-[var(--text-secondary)]">
+                        No payment activity is available for this store yet.
+                      </p>
+                    )}
+                  </div>
+                </section>
+              ) : (
+                <section className="panel-soft rounded-[28px] px-6 py-6">
+                  <p className="eyebrow">Upgrade path</p>
+                  <h2 className="mt-3 text-2xl font-bold">Collections watch stays hidden</h2>
+                  <p className="mt-5 text-sm leading-7 text-[var(--text-secondary)]">
+                    This workspace still lets owners review payment records, but richer collection
+                    totals and ranked payment watch surfaces stay behind Pro.
+                  </p>
+                </section>
+              )}
 
               <section className="panel-soft rounded-[28px] px-6 py-6">
                 <p className="eyebrow">Use this page for</p>

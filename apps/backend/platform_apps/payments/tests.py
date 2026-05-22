@@ -83,6 +83,30 @@ class PaymentsApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 1)
 
+    def test_payment_summary_hides_finance_fields_for_growth_plan(self):
+        self.shop.settings_json = {"plan_tier": "growth"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+
+        response = self.client.get(f"/api/v1/shops/{self.shop.id}/payments/summary/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["payment_count"], 1)
+        self.assertIsNone(response.data["total_collected"])
+        self.assertIsNone(response.data["credit_count"])
+        self.assertIsNone(response.data["digital_payment_count"])
+
+    def test_payment_summary_keeps_finance_fields_for_pro_plan(self):
+        self.shop.settings_json = {"plan_tier": "pro"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+
+        response = self.client.get(f"/api/v1/shops/{self.shop.id}/payments/summary/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["payment_count"], 1)
+        self.assertEqual(response.data["total_collected"], "500.00")
+        self.assertEqual(response.data["credit_count"], 0)
+        self.assertEqual(response.data["digital_payment_count"], 0)
+
     def _create_postgres_primary_control(self, domain: str, *, epoch: int = 4):
         return MigrationDomainControl.objects.create(
             shop=self.shop,

@@ -3,10 +3,12 @@ from __future__ import annotations
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import Count, Q, Sum
 from django.utils import timezone
 from rest_framework import generics, permissions
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from platform_apps.common.migration import MigrationDomain
 from platform_apps.common.migration_guards import (
@@ -16,11 +18,15 @@ from platform_apps.common.migration_guards import (
 from platform_apps.customers.models import CustomerLedgerEntry
 from platform_apps.payments.models import SalePayment
 from platform_apps.payments.models import SalePaymentCommandReceipt
-from platform_apps.payments.serializers import SalePaymentCommandCreateSerializer, SalePaymentSerializer
+from platform_apps.payments.serializers import (
+    SalePaymentCommandCreateSerializer,
+    SalePaymentSerializer,
+    SalePaymentSummarySerializer,
+)
 from platform_apps.projections.services import refresh_shop_dashboard_projection
 from platform_apps.sales.models import Sale
 from platform_apps.shops.models import ShopMembership
-from platform_apps.shops.permissions import get_membership_or_403
+from platform_apps.shops.permissions import get_membership_or_403, has_feature_enabled
 
 
 class ShopScopedMixin:
@@ -62,6 +68,54 @@ class SalePaymentListView(ShopScopedMixin, generics.ListAPIView):
         if date_to:
             queryset = queryset.filter(sale__sale_date__lte=date_to)
         return queryset
+
+
+class SalePaymentSummaryView(ShopScopedMixin, APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, shop_id):
+        membership = self.get_membership()
+        queryset = SalePayment.objects.filter(
+            shop=membership.shop,
+            sale__tombstone=False,
+        )
+        aggregates = queryset.aggregate(
+            payment_count=Count("id"),
+            total_collected=Sum("amount"),
+            credit_count=Count("id", filter=Q(payment_method=SalePayment.PaymentMethod.CREDIT)),
+            digital_payment_count=Count(
+                "id",
+                filter=Q(
+                    payment_method__in=[
+                        SalePayment.PaymentMethod.UPI,
+                        SalePayment.PaymentMethod.BANK,
+                        SalePayment.PaymentMethod.CARD,
+                    ]
+                ),
+            ),
+        )
+
+        payload = {
+            "payment_count": aggregates["payment_count"] or 0,
+            "total_collected": (
+                aggregates["total_collected"] or Decimal("0.00")
+                if has_feature_enabled(membership, "finance_summary")
+                else None
+            ),
+            "credit_count": (
+                aggregates["credit_count"] or 0
+                if has_feature_enabled(membership, "finance_summary")
+                else None
+            ),
+            "digital_payment_count": (
+                aggregates["digital_payment_count"] or 0
+                if has_feature_enabled(membership, "advanced_reports")
+                else None
+            ),
+        }
+
+        serializer = SalePaymentSummarySerializer(payload)
+        return Response(serializer.data)
 
 
 class SalePaymentCommandIngestionView(ShopScopedMixin, generics.GenericAPIView):

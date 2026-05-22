@@ -274,6 +274,13 @@ export type PaymentStats = {
   digitalShareCount: number;
 };
 
+export type PaymentSummaryPayload = {
+  payment_count: number;
+  total_collected: string | null;
+  credit_count: number | null;
+  digital_payment_count: number | null;
+};
+
 export type MigrationDomainControl = {
   id: string;
   shop: string;

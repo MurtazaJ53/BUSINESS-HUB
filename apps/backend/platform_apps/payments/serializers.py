@@ -5,6 +5,17 @@ from rest_framework import serializers
 from platform_apps.payments.models import SalePayment
 
 
+class SalePaymentSummarySerializer(serializers.Serializer):
+    payment_count = serializers.IntegerField()
+    total_collected = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        allow_null=True,
+    )
+    credit_count = serializers.IntegerField(allow_null=True)
+    digital_payment_count = serializers.IntegerField(allow_null=True)
+
+
 class SalePaymentSerializer(serializers.ModelSerializer):
     actor_name = serializers.SerializerMethodField()
     receipt_number = serializers.CharField(source="sale.receipt_number", read_only=True)

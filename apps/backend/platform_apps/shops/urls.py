@@ -14,6 +14,7 @@ from platform_apps.inventory.views import (
     InventoryItemListCreateView,
 )
 from platform_apps.payments.views import SalePaymentCommandIngestionView, SalePaymentListView
+from platform_apps.payments.views import SalePaymentSummaryView
 from platform_apps.projections.views import ShopDashboardSnapshotView
 from platform_apps.sales.views import SaleCommandIngestionView, SaleDetailView, SaleListCreateView
 from platform_apps.sales.views import SaleSummaryView
@@ -41,6 +42,7 @@ urlpatterns = [
     path("<uuid:shop_id>/inventory/", InventoryItemListCreateView.as_view(), name="inventory-list"),
     path("<uuid:shop_id>/inventory/<uuid:item_id>/", InventoryItemDetailView.as_view(), name="inventory-detail"),
     path("<uuid:shop_id>/payments/", SalePaymentListView.as_view(), name="payment-list"),
+    path("<uuid:shop_id>/payments/summary/", SalePaymentSummaryView.as_view(), name="payment-summary"),
     path(
         "<uuid:shop_id>/payments/commands/",
         SalePaymentCommandIngestionView.as_view(),
