@@ -3,7 +3,9 @@ import { EmptyState } from "@/components/empty-state";
 import { MetricCard } from "@/components/metric-card";
 import { getSession, getWorkspaceAuditEvents, resolveActiveShop } from "@/lib/admin-api";
 import { formatDateTime, formatRole } from "@/lib/formatters";
+import { getAdminWebMfaPosture } from "@/lib/mfa";
 import { canManageWorkspace } from "@/lib/roles";
+import { MfaGateCard } from "@/components/mfa-gate-card";
 import type { WorkspaceAuditEventPayload } from "@/lib/types";
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -30,8 +32,9 @@ export default async function AuditPage({ searchParams }: AuditPageProps) {
   const activeShop = resolveActiveShop(session);
   const role = activeShop?.role ?? null;
   const canUseAudit = canManageWorkspace(role);
+  const mfaPosture = await getAdminWebMfaPosture(session.user, canUseAudit);
   const events =
-    activeShop && canUseAudit
+    activeShop && canUseAudit && mfaPosture.verified
       ? await getWorkspaceAuditEvents(activeShop.shop.id, {
           q: q || undefined,
           category: category || undefined,
@@ -52,6 +55,8 @@ export default async function AuditPage({ searchParams }: AuditPageProps) {
           title="No workspace selected"
           body="Choose an active shop membership before reviewing audit activity for a store."
         />
+      ) : canUseAudit && !mfaPosture.verified ? (
+        <MfaGateCard href="/security?returnTo=/audit" enabled={mfaPosture.enabled} title="Workspace audit trail" />
       ) : !canUseAudit ? (
         <EmptyState
           title="Audit review is owner and admin only"

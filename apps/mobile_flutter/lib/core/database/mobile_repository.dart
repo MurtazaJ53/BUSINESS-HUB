@@ -30,6 +30,7 @@ class ShopRepository {
   final BusinessHubDatabase _db;
   static const String _pilotEvidenceTrackerKey = 'pilot_evidence_tracker';
   static const String _appInstanceIdKey = 'app_instance_id';
+  static const String _mfaVerifiedUntilKey = 'mfa_verified_until';
 
   Stream<ShopInfo> watchShopInfo() {
     final query = (_db.select(
@@ -273,6 +274,25 @@ class ShopRepository {
     await savePilotEvidenceTracker(next);
   }
 
+  Stream<DateTime?> watchMfaVerifiedUntil() {
+    final query =
+        (_db.select(_db.shopSettingsEntries)
+              ..where((tbl) => tbl.key.equals(_mfaVerifiedUntilKey)))
+            .watchSingleOrNull();
+    return query.map((row) => _decodeStoredDateTime(row?.value));
+  }
+
+  Future<void> saveMfaVerifiedUntil(DateTime? value) async {
+    if (value == null) {
+      await (_db.delete(
+        _db.shopSettingsEntries,
+      )..where((tbl) => tbl.key.equals(_mfaVerifiedUntilKey))).go();
+      return;
+    }
+
+    await _saveShopSetting(_mfaVerifiedUntilKey, value.toIso8601String());
+  }
+
   Future<String> ensureAppInstanceId() async {
     final existing = await _readShopSetting(_appInstanceIdKey);
     if (existing != null && existing.trim().isNotEmpty) {
@@ -326,6 +346,13 @@ class ShopRepository {
             updatedAt: DateTime.now().millisecondsSinceEpoch,
           ),
         );
+  }
+
+  DateTime? _decodeStoredDateTime(String? rawValue) {
+    if (rawValue == null || rawValue.trim().isEmpty) {
+      return null;
+    }
+    return DateTime.tryParse(rawValue.trim())?.toLocal();
   }
 }
 

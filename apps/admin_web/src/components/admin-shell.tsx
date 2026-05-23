@@ -12,6 +12,7 @@ type AdminShellProps = {
   activeRoute:
     | "overview"
     | "team"
+    | "security"
     | "sessions"
     | "audit"
     | "plan"
@@ -65,6 +66,13 @@ const navItems: readonly NavItem[] = [
     href: "/sales",
     glyph: "SAL",
     group: "core",
+  },
+  {
+    key: "security",
+    label: "Security",
+    href: "/security",
+    glyph: "MFA",
+    group: "operations",
   },
   {
     key: "team",
@@ -147,6 +155,10 @@ function getSectionedNav(
     }
 
     if (item.group === "operations") {
+      if (item.key === "security") {
+        return session.user.is_platform_admin || canManageWorkspace(workspaceRole);
+      }
+
       if (!canManageWorkspace(workspaceRole)) {
         return false;
       }

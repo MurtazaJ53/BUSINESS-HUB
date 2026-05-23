@@ -1,8 +1,10 @@
 import { AdminShell } from "@/components/admin-shell";
 import { EmptyState } from "@/components/empty-state";
+import { MfaGateCard } from "@/components/mfa-gate-card";
 import { WorkspacePlanCard } from "@/components/workspace-plan-card";
 import { requestPlanUpgradeAction } from "@/app/plan/actions";
 import { getSession, getShopPlanRequests, resolveActiveShop } from "@/lib/admin-api";
+import { getAdminWebMfaPosture } from "@/lib/mfa";
 import {
   formatPlanTier,
   getPlanAudience,
@@ -115,8 +117,10 @@ export default async function PlanPage({ searchParams }: PlanPageProps) {
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
   const role = activeShop?.role ?? null;
+  const canUsePlan = canManageWorkspace(role);
+  const mfaPosture = await getAdminWebMfaPosture(session.user, canUsePlan);
   const planRequests =
-    activeShop && canManageWorkspace(role)
+    activeShop && canUsePlan && mfaPosture.verified
       ? await getShopPlanRequests(activeShop.shop.id)
       : [];
   const actionBanner = buildActionBanner(resolvedSearchParams);
@@ -134,6 +138,12 @@ export default async function PlanPage({ searchParams }: PlanPageProps) {
         <EmptyState
           title="No workspace selected"
           body="Choose or add a shop membership before reviewing plan posture and upgrade guidance."
+        />
+      ) : canUsePlan && !mfaPosture.verified ? (
+        <MfaGateCard
+          href="/security?returnTo=/plan"
+          enabled={mfaPosture.enabled}
+          title="Workspace plan"
         />
       ) : !canManageWorkspace(role) ? (
         <EmptyState

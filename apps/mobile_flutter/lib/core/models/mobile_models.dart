@@ -87,6 +87,42 @@ class WorkspaceAccessSessionHeartbeatResult {
   final DateTime? wipeAcknowledgedAt;
 }
 
+class UserMfaStatus {
+  const UserMfaStatus({
+    required this.totpEnabled,
+    required this.totpPendingEnrollment,
+    required this.enabledAt,
+    required this.lastVerifiedAt,
+    required this.issuerLabel,
+    required this.accountLabel,
+    required this.challengeWindowSeconds,
+    required this.pendingManualSecret,
+    required this.pendingOtpauthUri,
+  });
+
+  final bool totpEnabled;
+  final bool totpPendingEnrollment;
+  final DateTime? enabledAt;
+  final DateTime? lastVerifiedAt;
+  final String issuerLabel;
+  final String accountLabel;
+  final int challengeWindowSeconds;
+  final String pendingManualSecret;
+  final String pendingOtpauthUri;
+}
+
+class UserMfaVerifyResult {
+  const UserMfaVerifyResult({
+    required this.status,
+    required this.verifiedAt,
+    required this.verifiedUntil,
+  });
+
+  final UserMfaStatus status;
+  final DateTime verifiedAt;
+  final DateTime verifiedUntil;
+}
+
 String _normalizePlanTier(String value) {
   final normalized = value.trim().toLowerCase();
   if (normalized == 'starter' || normalized == 'pro') {

@@ -47,6 +47,7 @@ import type {
   SalePaymentRecord,
   SalesSummaryPayload,
   SessionPayload,
+  UserMfaStatusPayload,
   ShopDomainState,
   ShopMembership,
   ShopPlanRequestPayload,
@@ -143,6 +144,10 @@ export async function apiMutation<T>(path: string, options: MutationOptions = {}
 
 export const getSession = cache(async (): Promise<SessionPayload> => {
   return apiFetch<SessionPayload>("/session/");
+});
+
+export const getUserMfaStatus = cache(async (): Promise<UserMfaStatusPayload> => {
+  return apiFetch<UserMfaStatusPayload>("/session/mfa/");
 });
 
 export const getMemberships = cache(async (): Promise<ShopMembership[]> => {

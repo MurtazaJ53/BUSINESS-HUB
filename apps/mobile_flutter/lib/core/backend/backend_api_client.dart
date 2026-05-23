@@ -77,6 +77,18 @@ class WorkspaceSessionHeartbeatPayload {
   };
 }
 
+class UserMfaVerifyPayload {
+  const UserMfaVerifyPayload({required this.purpose, required this.code});
+
+  final String purpose;
+  final String code;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'purpose': purpose,
+    'code': code,
+  };
+}
+
 class BackendApiClient {
   BackendApiClient({required this.baseUrl});
 
@@ -293,6 +305,57 @@ class BackendApiClient {
     );
   }
 
+  Future<UserMfaStatus> getUserMfaStatus({required User user}) async {
+    final decoded = await _request(
+      user: user,
+      method: 'GET',
+      path: '/session/mfa/',
+    );
+    return _mapUserMfaStatus(decoded);
+  }
+
+  Future<UserMfaStatus> beginUserMfaEnrollment({required User user}) async {
+    final decoded = await _request(
+      user: user,
+      method: 'POST',
+      path: '/session/mfa/enroll/',
+      body: const <String, dynamic>{},
+    );
+    return _mapUserMfaStatus(decoded);
+  }
+
+  Future<UserMfaVerifyResult> verifyUserMfaCode({
+    required User user,
+    required UserMfaVerifyPayload payload,
+  }) async {
+    final decoded = await _request(
+      user: user,
+      method: 'POST',
+      path: '/session/mfa/verify/',
+      body: payload.toJson(),
+    );
+    return UserMfaVerifyResult(
+      status: _mapUserMfaStatus(
+        Map<String, dynamic>.from(decoded['status'] as Map<String, dynamic>),
+      ),
+      verifiedAt: _asDateTime(decoded['verified_at']),
+      verifiedUntil: _asDateTime(decoded['verified_until']),
+    );
+  }
+
+  Future<UserMfaStatus> disableUserMfa({
+    required User user,
+    required String code,
+  }) async {
+    final decoded = await _request(
+      user: user,
+      method: 'POST',
+      path: '/session/mfa/disable/',
+      body: <String, dynamic>{'code': code},
+    );
+    return _mapUserMfaStatus(decoded);
+  }
+
   Future<void> acknowledgeWorkspaceSessionWipe({
     required User user,
     required String shopId,
@@ -418,6 +481,22 @@ class BackendApiClient {
       balance: _asDouble(row['balance']),
       status: (row['status'] ?? 'active').toString(),
       notes: _nullableText(row['notes']),
+    );
+  }
+
+  UserMfaStatus _mapUserMfaStatus(Map<String, dynamic> row) {
+    return UserMfaStatus(
+      totpEnabled: row['totp_enabled'] == true,
+      totpPendingEnrollment: row['totp_pending_enrollment'] == true,
+      enabledAt: _asNullableDateTime(row['enabled_at']),
+      lastVerifiedAt: _asNullableDateTime(row['last_verified_at']),
+      issuerLabel: (row['issuer_label'] ?? 'Business Hub').toString(),
+      accountLabel: (row['account_label'] ?? '').toString(),
+      challengeWindowSeconds: row['challenge_window_seconds'] is num
+          ? (row['challenge_window_seconds'] as num).toInt()
+          : int.tryParse('${row['challenge_window_seconds']}') ?? 0,
+      pendingManualSecret: (row['pending_manual_secret'] ?? '').toString(),
+      pendingOtpauthUri: (row['pending_otpauth_uri'] ?? '').toString(),
     );
   }
 }

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSession } from "@/lib/admin-api";
+import { getAdminWebMfaPosture } from "@/lib/mfa";
 import type { ShopMembership } from "@/lib/types";
 
 function canManageWorkspace(role: ShopMembership["role"]) {
@@ -12,6 +13,14 @@ export async function requirePlatformAdminAccess(contextLabel: string) {
 
   if (!session.user.is_platform_admin) {
     throw new Error(`${contextLabel} requires a platform-admin account.`);
+  }
+
+  const mfaPosture = await getAdminWebMfaPosture(session.user, true);
+  if (!mfaPosture.enabled) {
+    throw new Error(`${contextLabel} requires MFA setup in Security before continuing.`);
+  }
+  if (!mfaPosture.verified) {
+    throw new Error(`${contextLabel} requires fresh MFA verification in Security before continuing.`);
   }
 
   return session;
@@ -46,6 +55,14 @@ export async function requireWorkspaceManagerAccess(
     throw new Error(`${contextLabel} requires an owner or admin workspace role.`);
   }
 
+  const mfaPosture = await getAdminWebMfaPosture(session.user, true);
+  if (!mfaPosture.enabled) {
+    throw new Error(`${contextLabel} requires MFA setup in Security before continuing.`);
+  }
+  if (!mfaPosture.verified) {
+    throw new Error(`${contextLabel} requires fresh MFA verification in Security before continuing.`);
+  }
+
   return { session, membership };
 }
 
@@ -62,6 +79,14 @@ export async function requireWorkspaceOwnerAccess(
 
   if (membership.role !== "owner") {
     throw new Error(`${contextLabel} requires the current workspace owner role.`);
+  }
+
+  const mfaPosture = await getAdminWebMfaPosture(session.user, true);
+  if (!mfaPosture.enabled) {
+    throw new Error(`${contextLabel} requires MFA setup in Security before continuing.`);
+  }
+  if (!mfaPosture.verified) {
+    throw new Error(`${contextLabel} requires fresh MFA verification in Security before continuing.`);
   }
 
   return { session, membership };

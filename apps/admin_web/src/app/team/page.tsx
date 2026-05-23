@@ -1,11 +1,13 @@
 import { AdminShell } from "@/components/admin-shell";
 import { EmptyState } from "@/components/empty-state";
+import { MfaGateCard } from "@/components/mfa-gate-card";
 import {
   inviteWorkspaceMemberAction,
   transferWorkspaceOwnershipAction,
   updateWorkspaceMemberAction,
 } from "@/app/team/actions";
 import { getSession, getWorkspaceTeamMembers, resolveActiveShop } from "@/lib/admin-api";
+import { getAdminWebMfaPosture } from "@/lib/mfa";
 import { canManageWorkspace, canTransferWorkspaceOwnership } from "@/lib/roles";
 import type { WorkspaceTeamMemberPayload } from "@/lib/types";
 
@@ -105,7 +107,8 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
   const role = activeShop?.role ?? null;
   const canUseTeam = canManageWorkspace(role);
   const canTransferOwnership = canTransferWorkspaceOwnership(role);
-  const members = activeShop && canUseTeam ? await getWorkspaceTeamMembers(activeShop.shop.id) : [];
+  const mfaPosture = await getAdminWebMfaPosture(session.user, canUseTeam);
+  const members = activeShop && canUseTeam && mfaPosture.verified ? await getWorkspaceTeamMembers(activeShop.shop.id) : [];
   const banner = buildActionBanner(resolvedSearchParams);
   const stats = buildTeamStats(members);
   const ownershipCandidates = getOwnershipCandidates(members);
@@ -137,6 +140,8 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
               title="Team management is owner and admin only"
               body="Daily users should stay focused on selling and operations. Workspace member control stays limited to owners and admins."
             />
+          ) : !mfaPosture.verified ? (
+            <MfaGateCard href="/security?returnTo=/team" enabled={mfaPosture.enabled} title="Workspace team" />
           ) : (
             <>
 

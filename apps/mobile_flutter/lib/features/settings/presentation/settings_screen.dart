@@ -204,22 +204,26 @@ class SettingsScreen extends ConsumerWidget {
                       if (stacked) {
                         return Column(
                           children: actions
-                              .expand((widget) => <Widget>[
-                                    widget,
-                                    if (widget != actions.last)
-                                      const SizedBox(height: 10),
-                                  ])
+                              .expand(
+                                (widget) => <Widget>[
+                                  widget,
+                                  if (widget != actions.last)
+                                    const SizedBox(height: 10),
+                                ],
+                              )
                               .toList(growable: false),
                         );
                       }
 
                       return Row(
                         children: actions
-                            .expand((widget) => <Widget>[
-                                  widget,
-                                  if (widget != actions.last)
-                                    const SizedBox(width: 10),
-                                ])
+                            .expand(
+                              (widget) => <Widget>[
+                                widget,
+                                if (widget != actions.last)
+                                  const SizedBox(width: 10),
+                              ],
+                            )
                             .toList(growable: false),
                       );
                     },
@@ -229,6 +233,37 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 18),
+          if (session?.isOwnerLike ?? false) ...<Widget>[
+            MobilePanel(
+              title: 'Security',
+              action: MobileTag(
+                label: 'Owner/admin gate',
+                icon: Icons.verified_user_rounded,
+                accent: const Color(0xFF38BDF8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    'Protect Workspace plan, Advanced ops, and other sensitive control surfaces with an authenticator app.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.72),
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  FilledButton.tonalIcon(
+                    onPressed: () {
+                      context.push('/settings/security');
+                    },
+                    icon: const Icon(Icons.security_rounded),
+                    label: const Text('Open security'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+          ],
           MobilePanel(
             title: profile.syncPanelTitle,
             action: MobileTag(
@@ -427,22 +462,25 @@ class SettingsScreen extends ConsumerWidget {
                 if (stacked) {
                   return Column(
                     children: actions
-                        .expand((widget) => <Widget>[
-                              widget,
-                              if (widget != actions.last)
-                                const SizedBox(height: 10),
-                            ])
+                        .expand(
+                          (widget) => <Widget>[
+                            widget,
+                            if (widget != actions.last)
+                              const SizedBox(height: 10),
+                          ],
+                        )
                         .toList(growable: false),
                   );
                 }
 
                 return Row(
                   children: actions
-                      .expand((widget) => <Widget>[
-                            widget,
-                            if (widget != actions.last)
-                              const SizedBox(width: 10),
-                          ])
+                      .expand(
+                        (widget) => <Widget>[
+                          widget,
+                          if (widget != actions.last) const SizedBox(width: 10),
+                        ],
+                      )
                       .toList(growable: false),
                 );
               },
@@ -719,10 +757,7 @@ String _buildUpgradeBriefText(ShopInfo shop, MobileSession? session) {
 }
 
 class _PlanSection extends StatelessWidget {
-  const _PlanSection({
-    required this.title,
-    required this.lines,
-  });
+  const _PlanSection({required this.title, required this.lines});
 
   final String title;
   final List<String> lines;

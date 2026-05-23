@@ -1,5 +1,6 @@
 import { AdminShell } from "@/components/admin-shell";
 import { EmptyState } from "@/components/empty-state";
+import { MfaGateCard } from "@/components/mfa-gate-card";
 import { MigrationActivityTable } from "@/components/migration-activity-table";
 import { MigrationBridgeReceiptsTable } from "@/components/migration-bridge-receipts-table";
 import { MigrationGoLiveCheckpointTable } from "@/components/migration-go-live-checkpoint-table";
@@ -50,6 +51,7 @@ import {
   getSession,
   resolveActiveShop,
 } from "@/lib/admin-api";
+import { getAdminWebMfaPosture } from "@/lib/mfa";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -189,6 +191,7 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
   const resolvedSearchParams = (await searchParams) ?? {};
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
+  const mfaPosture = await getAdminWebMfaPosture(session.user, session.user.is_platform_admin);
 
   if (!session.user.is_platform_admin) {
     return (
@@ -204,6 +207,21 @@ export default async function MigrationPage({ searchParams }: MigrationPageProps
           title="Platform admin required"
           body="Migration domain ownership, shadow verification, and reconciliation controls are only available to platform-admin accounts."
         />
+      </AdminShell>
+    );
+  }
+
+  if (!mfaPosture.verified) {
+    return (
+      <AdminShell
+        session={session}
+        activeShop={activeShop}
+        activeRoute="migration"
+        surfaceMode="internal"
+        title="Migration Control"
+        subtitle="This control plane is restricted to platform-admin operators."
+      >
+        <MfaGateCard href="/security?returnTo=/migration" enabled={mfaPosture.enabled} title="Migration control" />
       </AdminShell>
     );
   }

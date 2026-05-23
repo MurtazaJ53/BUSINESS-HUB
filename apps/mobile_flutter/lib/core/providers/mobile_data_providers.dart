@@ -18,6 +18,11 @@ final pendingOutboxCountProvider = StreamProvider<int>((ref) {
   return salesRepository.watchPendingOutboxCount();
 });
 
+final mobileMfaVerifiedUntilProvider = StreamProvider<DateTime?>((ref) {
+  final shopRepository = ref.watch(shopRepositoryProvider);
+  return shopRepository.watchMfaVerifiedUntil();
+});
+
 final dashboardOverviewProvider =
     StreamProvider.family<DashboardOverview, bool>((ref, includeCost) {
       final inventoryRepository = ref.watch(inventoryRepositoryProvider);

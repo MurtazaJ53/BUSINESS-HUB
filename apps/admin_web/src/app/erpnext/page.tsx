@@ -1,6 +1,7 @@
 import { AdminShell } from "@/components/admin-shell";
 import { EmptyState } from "@/components/empty-state";
 import { MetricCard } from "@/components/metric-card";
+import { MfaGateCard } from "@/components/mfa-gate-card";
 import {
   enqueueCycleAction,
   pushPaymentsAction,
@@ -28,6 +29,7 @@ import {
   resolveActiveShop,
 } from "@/lib/admin-api";
 import { formatCurrency } from "@/lib/formatters";
+import { getAdminWebMfaPosture } from "@/lib/mfa";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -102,6 +104,7 @@ export default async function ERPNextPage({ searchParams }: ERPNextPageProps) {
   const resolvedSearchParams = (await searchParams) ?? {};
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
+  const mfaPosture = await getAdminWebMfaPosture(session.user, session.user.is_platform_admin);
   const actionBanner = buildActionBanner(resolvedSearchParams);
 
   if (!session.user.is_platform_admin) {
@@ -118,6 +121,21 @@ export default async function ERPNextPage({ searchParams }: ERPNextPageProps) {
           title="Platform admin required"
           body="ERPNext bindings, sync actions, and recurring engine controls are only available to platform-admin accounts."
         />
+      </AdminShell>
+    );
+  }
+
+  if (!mfaPosture.verified) {
+    return (
+      <AdminShell
+        session={session}
+        activeShop={activeShop}
+        activeRoute="erpnext"
+        surfaceMode="internal"
+        title="ERPNext Control"
+        subtitle="This control plane is restricted to platform-admin operators."
+      >
+        <MfaGateCard href="/security?returnTo=/erpnext" enabled={mfaPosture.enabled} title="ERPNext control" />
       </AdminShell>
     );
   }

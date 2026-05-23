@@ -43,7 +43,14 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(mobileSessionProvider).asData?.value;
-    final shop = ref.watch(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
+    final shop =
+        ref.watch(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
+    final verifiedUntil = ref
+        .watch(mobileMfaVerifiedUntilProvider)
+        .asData
+        ?.value;
+    final hasFreshSecurityWindow =
+        verifiedUntil != null && verifiedUntil.isAfter(DateTime.now());
     if (!shop.supportsAdvancedOps) {
       return MobileStandaloneScaffold(
         title: 'Advanced ops',
@@ -76,14 +83,60 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
         ),
       );
     }
+    if ((session?.isOwnerLike ?? false) && !hasFreshSecurityWindow) {
+      return MobileStandaloneScaffold(
+        title: 'Advanced ops',
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
+          children: <Widget>[
+            MobileScreenLead(
+              title: 'Security verification required',
+              subtitle:
+                  'Advanced ops now stays behind MFA on mobile. Verify the current owner/admin authenticator code from Security, then return here.',
+              icon: Icons.security_rounded,
+              accent: const Color(0xFF38BDF8),
+              primaryTag: const MobileTag(
+                label: 'MFA required',
+                icon: Icons.lock_clock_rounded,
+                accent: Color(0xFFF59E0B),
+              ),
+            ),
+            const SizedBox(height: 18),
+            MobilePanel(
+              title: 'Open security first',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    'Recovery, rollout, and deep support tooling can affect the whole workspace. Business Hub now requires a fresh MFA window before this surface opens.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.72),
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  FilledButton.tonalIcon(
+                    onPressed: () {
+                      context.push('/settings/security');
+                    },
+                    icon: const Icon(Icons.verified_user_rounded),
+                    label: const Text('Open security'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     final backendApiClient = ref.watch(backendApiClientProvider);
     final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
     final syncStatus = ref.watch(syncStatusProvider.select((status) => status));
     final runtimeInfoAsync = ref.watch(appRuntimeInfoProvider);
     final evidenceTrackerAsync = ref.watch(pilotEvidenceTrackerProvider);
-    final evidenceTracker = evidenceTrackerAsync.asData?.value ??
-        const PilotEvidenceTrackerState();
+    final evidenceTracker =
+        evidenceTrackerAsync.asData?.value ?? const PilotEvidenceTrackerState();
     final evidenceTrackerController = ref.watch(
       pilotEvidenceTrackerControllerProvider,
     );
@@ -98,8 +151,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
           DomainControlState.legacy('sales'),
           DomainControlState.legacy('payments'),
         ];
-    final pending =
-        ref.watch(pendingOutboxCountProvider).asData?.value ?? 0;
+    final pending = ref.watch(pendingOutboxCountProvider).asData?.value ?? 0;
     final attentionEntries =
         ref.watch(outboxAttentionEntriesProvider).asData?.value ??
         const <CommerceOutboxAttentionEntry>[];
@@ -121,11 +173,14 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
       runtimeInfo: runtimeInfo,
       session: session,
     );
-    if (evidenceTrackerAsync.asData != null && !evidenceTracker.hasSessionContext) {
+    if (evidenceTrackerAsync.asData != null &&
+        !evidenceTracker.hasSessionContext) {
       if (!_queuedEvidenceSessionEnsure) {
         _queuedEvidenceSessionEnsure = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          evidenceTrackerController.ensureSession(suggestedEvidenceSessionLabel);
+          evidenceTrackerController.ensureSession(
+            suggestedEvidenceSessionLabel,
+          );
         });
       }
     } else {
@@ -216,448 +271,607 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
     }
 
     return MobileStandaloneScaffold(
-          title: 'Advanced ops',
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
-            children: <Widget>[
-            MobileScreenLead(
-              title: 'Advanced ops',
-              subtitle:
-                  'Operator packs, rollout evidence, recovery, and migration-facing tools live here so the daily settings screen stays fast.',
-              icon: Icons.settings_rounded,
+      title: 'Advanced ops',
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
+        children: <Widget>[
+          MobileScreenLead(
+            title: 'Advanced ops',
+            subtitle:
+                'Operator packs, rollout evidence, recovery, and migration-facing tools live here so the daily settings screen stays fast.',
+            icon: Icons.settings_rounded,
+            accent: const Color(0xFFA78BFA),
+            primaryTag: MobileTag(
+              label: session?.displayRoleLabel ?? 'GUEST',
+              icon: Icons.badge_rounded,
               accent: const Color(0xFFA78BFA),
-              primaryTag: MobileTag(
-                label: session?.displayRoleLabel ?? 'GUEST',
-                icon: Icons.badge_rounded,
-                accent: const Color(0xFFA78BFA),
-              ),
-              secondaryTag: MobileTag(
-                label: syncStatus == MobileSyncStatus.syncing
-                    ? 'Syncing config'
-                    : 'Config stable',
-                icon: syncStatus == MobileSyncStatus.syncing
-                    ? Icons.sync_rounded
-                    : Icons.verified_rounded,
-                accent: syncStatus == MobileSyncStatus.error
-                    ? const Color(0xFFFB7185)
-                    : const Color(0xFF22C55E),
-              ),
             ),
-            const SizedBox(height: 18),
-            MobilePanel(
-              title: 'Workspace identity',
-              action: MobileTag(
-                label:
-                    session != null &&
-                        session.isOwnerLike
-                    ? 'CONTROL EDIT'
-                    : 'VIEW ONLY',
-                icon:
-                    session != null &&
-                        session.isOwnerLike
-                    ? Icons.edit_rounded
-                    : Icons.lock_outline_rounded,
-                accent:
-                    session != null &&
-                        session.isOwnerLike
-                    ? const Color(0xFF14B8A6)
-                    : const Color(0xFFA78BFA),
-              ),
-              child: Column(
-                children: <Widget>[
-                  _SettingsRow(
-                    label: 'Workspace',
-                    value: shop.name,
-                    icon: Icons.storefront_rounded,
-                  ),
-                  _SettingsRow(
-                    label: 'Tagline',
-                    value: shop.tagline,
-                    icon: Icons.auto_awesome_rounded,
-                  ),
-                  _SettingsRow(
-                    label: 'Operator',
-                    value: session != null && session.email.isNotEmpty
-                        ? session.email
-                        : 'Not signed in',
-                    icon: Icons.person_rounded,
-                  ),
-                  _SettingsRow(
-                    label: 'Shop ID',
-                    value: session?.shopId ?? 'No workspace bound',
-                    icon: Icons.key_rounded,
-                  ),
-                  _SettingsRow(
-                    label: 'Backend API',
-                    value: backendApiClient.baseUrl,
-                    icon: Icons.cloud_outlined,
-                  ),
-                  if (session != null && session.isOwnerLike) ...<Widget>[
-                    const SizedBox(height: 6),
-                    FilledButton.tonalIcon(
-                      onPressed: () async {
-                        final changed = await _showWorkspaceSettingsDialog(
-                          context,
-                          currentShop: shop,
-                          session: session,
-                          syncCoordinator: syncCoordinator,
-                        );
-                        if (changed != true || !context.mounted) {
-                          return;
-                        }
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Workspace settings saved and queued to the live shop document.',
-                            ),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.edit_note_rounded),
-                      label: const Text('Edit workspace settings'),
-                    ),
-                  ],
-                ],
-              ),
+            secondaryTag: MobileTag(
+              label: syncStatus == MobileSyncStatus.syncing
+                  ? 'Syncing config'
+                  : 'Config stable',
+              icon: syncStatus == MobileSyncStatus.syncing
+                  ? Icons.sync_rounded
+                  : Icons.verified_rounded,
+              accent: syncStatus == MobileSyncStatus.error
+                  ? const Color(0xFFFB7185)
+                  : const Color(0xFF22C55E),
             ),
-            const SizedBox(height: 18),
-            MobilePanel(
-                      title: 'Mobile runtime',
-                      action: MobileTag(
-                        label: pending > 0 ? '$pending queued' : 'Queue clear',
-                        icon: pending > 0
-                            ? Icons.cloud_upload_rounded
-                            : Icons.check_circle_rounded,
-                        accent: pending > 0
-                            ? const Color(0xFFF59E0B)
-                            : const Color(0xFF22C55E),
-                      ),
-                      child: Column(
-                        children: <Widget>[
-                          _SettingsRow(
-                            label: 'Sync posture',
-                            value: syncStatus.name.toUpperCase(),
-                            icon: Icons.sync_alt_rounded,
-                          ),
-                          _SettingsRow(
-                            label: 'Queued commerce commands',
-                            value: '$pending',
-                            icon: Icons.outbox_rounded,
-                          ),
-                          _SettingsRow(
-                            label: 'Queued receipt value',
-                            value: formatCurrency(history.queuedRevenue),
-                            icon: Icons.currency_rupee_rounded,
-                          ),
-                          _SettingsRow(
-                            label: 'Failed receipts',
-                            value: '${history.failedSales}',
-                            icon: Icons.error_outline_rounded,
-                          ),
-                          _SettingsRow(
-                            label: 'Last receipt sync',
-                            value: history.lastSyncedAt == null
-                                ? 'Unknown'
-                                : formatCompactDate(history.lastSyncedAt!),
-                            icon: Icons.schedule_rounded,
-                          ),
-                          _SettingsRow(
-                            label: 'Operator role',
-                            value: session?.displayRoleLabel ?? 'UNKNOWN',
-                            icon: Icons.admin_panel_settings_rounded,
-                          ),
-                          _SettingsRow(
-                            label: 'Role focus',
-                            value:
-                                session?.roleSummary ??
-                                'Role scope is still loading.',
-                            icon: Icons.rule_folder_rounded,
-                          ),
-                          _SettingsRow(
-                            label: 'Cost visibility',
-                            value: session?.canViewCost == true
-                                ? 'Enabled'
-                                : 'Restricted',
-                            icon: Icons.visibility_rounded,
-                          ),
-                          const SizedBox(height: 6),
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              final stacked = constraints.maxWidth < 430;
-                              final buttons = <Widget>[
-                                Expanded(
-                                  child: FilledButton.tonalIcon(
-                                    onPressed: () async {
-                                      await syncCoordinator.refresh();
-                                      if (!context.mounted) {
-                                        return;
-                                      }
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Workspace refresh requested.',
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    icon: const Icon(Icons.refresh_rounded),
-                                    label: const Text('Refresh workspace'),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: FilledButton.tonalIcon(
-                                    onPressed: pending > 0
-                                        ? () async {
-                                            final result = await syncCoordinator
-                                                .flushCommerceOutbox();
-                                            if (!context.mounted) {
-                                              return;
-                                            }
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  result.message ??
-                                                      'Outbox flush requested.',
-                                                ),
-                                              ),
-                                            );
-                                          }
-                                        : null,
-                                    icon: const Icon(
-                                      Icons.cloud_upload_rounded,
-                                    ),
-                                    label: const Text('Flush outbox'),
-                                  ),
-                                ),
-                              ];
-
-                              if (stacked) {
-                                return Column(
-                                  children: <Widget>[
-                                    buttons[0],
-                                    const SizedBox(height: 10),
-                                    buttons[1],
-                                  ],
-                                );
-                              }
-
-                              return Row(
-                                children: <Widget>[
-                                  buttons[0],
-                                  const SizedBox(width: 10),
-                                  buttons[1],
-                                ],
-                              );
-                            },
-                          ),
-                        ],
-                      ),
+          ),
+          const SizedBox(height: 18),
+          MobilePanel(
+            title: 'Workspace identity',
+            action: MobileTag(
+              label: session != null && session.isOwnerLike
+                  ? 'CONTROL EDIT'
+                  : 'VIEW ONLY',
+              icon: session != null && session.isOwnerLike
+                  ? Icons.edit_rounded
+                  : Icons.lock_outline_rounded,
+              accent: session != null && session.isOwnerLike
+                  ? const Color(0xFF14B8A6)
+                  : const Color(0xFFA78BFA),
             ),
-            const SizedBox(height: 18),
-            MobilePanel(
-              title: 'App and account',
-              action: MobileTag(
-                label: _showAdvancedTools ? 'ADVANCED OPEN' : 'SIMPLE MODE',
-                icon: _showAdvancedTools
-                    ? Icons.admin_panel_settings_rounded
-                    : Icons.favorite_rounded,
-                accent: _showAdvancedTools
-                    ? const Color(0xFFA78BFA)
-                    : const Color(0xFF22C55E),
-              ),
-              child: Column(
-                children: <Widget>[
-                  _SettingsRow(
-                    label: 'Signed in as',
-                    value: session != null && session.email.isNotEmpty
-                        ? session.email
-                        : 'Unknown operator',
-                    icon: Icons.person_rounded,
-                  ),
-                  _SettingsRow(
-                    label: 'Version',
-                    value: runtimeInfoAsync.asData?.value.versionLabel ??
-                        'Loading app info',
-                    icon: Icons.new_releases_rounded,
-                  ),
-                  _SettingsRow(
-                    label: 'Release channel',
-                    value: runtimeInfoAsync.asData?.value.releaseFingerprint ??
-                        'Resolving release data',
-                    icon: Icons.flag_rounded,
-                  ),
-                  _SettingsRow(
-                    label: 'Support mode',
-                    value: _showAdvancedTools
-                        ? 'Advanced tools visible'
-                        : 'Daily-use view only',
-                    icon: _showAdvancedTools
-                        ? Icons.construction_rounded
-                        : Icons.check_circle_rounded,
-                  ),
+            child: Column(
+              children: <Widget>[
+                _SettingsRow(
+                  label: 'Workspace',
+                  value: shop.name,
+                  icon: Icons.storefront_rounded,
+                ),
+                _SettingsRow(
+                  label: 'Tagline',
+                  value: shop.tagline,
+                  icon: Icons.auto_awesome_rounded,
+                ),
+                _SettingsRow(
+                  label: 'Operator',
+                  value: session != null && session.email.isNotEmpty
+                      ? session.email
+                      : 'Not signed in',
+                  icon: Icons.person_rounded,
+                ),
+                _SettingsRow(
+                  label: 'Shop ID',
+                  value: session?.shopId ?? 'No workspace bound',
+                  icon: Icons.key_rounded,
+                ),
+                _SettingsRow(
+                  label: 'Backend API',
+                  value: backendApiClient.baseUrl,
+                  icon: Icons.cloud_outlined,
+                ),
+                if (session != null && session.isOwnerLike) ...<Widget>[
                   const SizedBox(height: 6),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final stacked = constraints.maxWidth < 430;
-                      final buttons = <Widget>[
-                        Expanded(
-                          child: FilledButton.tonalIcon(
-                            onPressed: () {
-                              setState(() {
-                                _showAdvancedTools = !_showAdvancedTools;
-                              });
-                            },
-                            icon: Icon(
-                              _showAdvancedTools
-                                  ? Icons.visibility_off_rounded
-                                  : Icons.tune_rounded,
-                            ),
-                            label: Text(
-                              _showAdvancedTools
-                                  ? 'Hide advanced tools'
-                                  : 'Show advanced tools',
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: FilledButton.tonalIcon(
-                            onPressed: () async {
-                              await FirebaseAuth.instance.signOut();
-                              if (!context.mounted) {
-                                return;
-                              }
-                              context.go('/');
-                            },
-                            icon: const Icon(Icons.logout_rounded),
-                            label: const Text('Sign out'),
-                          ),
-                        ),
-                      ];
-
-                      if (stacked) {
-                        return Column(
-                          children: <Widget>[
-                            buttons[0],
-                            const SizedBox(height: 10),
-                            buttons[1],
-                          ],
-                        );
+                  FilledButton.tonalIcon(
+                    onPressed: () async {
+                      final changed = await _showWorkspaceSettingsDialog(
+                        context,
+                        currentShop: shop,
+                        session: session,
+                        syncCoordinator: syncCoordinator,
+                      );
+                      if (changed != true || !context.mounted) {
+                        return;
                       }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Workspace settings saved and queued to the live shop document.',
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.edit_note_rounded),
+                    label: const Text('Edit workspace settings'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          MobilePanel(
+            title: 'Mobile runtime',
+            action: MobileTag(
+              label: pending > 0 ? '$pending queued' : 'Queue clear',
+              icon: pending > 0
+                  ? Icons.cloud_upload_rounded
+                  : Icons.check_circle_rounded,
+              accent: pending > 0
+                  ? const Color(0xFFF59E0B)
+                  : const Color(0xFF22C55E),
+            ),
+            child: Column(
+              children: <Widget>[
+                _SettingsRow(
+                  label: 'Sync posture',
+                  value: syncStatus.name.toUpperCase(),
+                  icon: Icons.sync_alt_rounded,
+                ),
+                _SettingsRow(
+                  label: 'Queued commerce commands',
+                  value: '$pending',
+                  icon: Icons.outbox_rounded,
+                ),
+                _SettingsRow(
+                  label: 'Queued receipt value',
+                  value: formatCurrency(history.queuedRevenue),
+                  icon: Icons.currency_rupee_rounded,
+                ),
+                _SettingsRow(
+                  label: 'Failed receipts',
+                  value: '${history.failedSales}',
+                  icon: Icons.error_outline_rounded,
+                ),
+                _SettingsRow(
+                  label: 'Last receipt sync',
+                  value: history.lastSyncedAt == null
+                      ? 'Unknown'
+                      : formatCompactDate(history.lastSyncedAt!),
+                  icon: Icons.schedule_rounded,
+                ),
+                _SettingsRow(
+                  label: 'Operator role',
+                  value: session?.displayRoleLabel ?? 'UNKNOWN',
+                  icon: Icons.admin_panel_settings_rounded,
+                ),
+                _SettingsRow(
+                  label: 'Role focus',
+                  value: session?.roleSummary ?? 'Role scope is still loading.',
+                  icon: Icons.rule_folder_rounded,
+                ),
+                _SettingsRow(
+                  label: 'Cost visibility',
+                  value: session?.canViewCost == true
+                      ? 'Enabled'
+                      : 'Restricted',
+                  icon: Icons.visibility_rounded,
+                ),
+                const SizedBox(height: 6),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final stacked = constraints.maxWidth < 430;
+                    final buttons = <Widget>[
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: () async {
+                            await syncCoordinator.refresh();
+                            if (!context.mounted) {
+                              return;
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Workspace refresh requested.'),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Refresh workspace'),
+                        ),
+                      ),
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: pending > 0
+                              ? () async {
+                                  final result = await syncCoordinator
+                                      .flushCommerceOutbox();
+                                  if (!context.mounted) {
+                                    return;
+                                  }
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        result.message ??
+                                            'Outbox flush requested.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              : null,
+                          icon: const Icon(Icons.cloud_upload_rounded),
+                          label: const Text('Flush outbox'),
+                        ),
+                      ),
+                    ];
 
-                      return Row(
+                    if (stacked) {
+                      return Column(
                         children: <Widget>[
                           buttons[0],
-                          const SizedBox(width: 10),
+                          const SizedBox(height: 10),
                           buttons[1],
                         ],
                       );
-                    },
+                    }
+
+                    return Row(
+                      children: <Widget>[
+                        buttons[0],
+                        const SizedBox(width: 10),
+                        buttons[1],
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          MobilePanel(
+            title: 'App and account',
+            action: MobileTag(
+              label: _showAdvancedTools ? 'ADVANCED OPEN' : 'SIMPLE MODE',
+              icon: _showAdvancedTools
+                  ? Icons.admin_panel_settings_rounded
+                  : Icons.favorite_rounded,
+              accent: _showAdvancedTools
+                  ? const Color(0xFFA78BFA)
+                  : const Color(0xFF22C55E),
+            ),
+            child: Column(
+              children: <Widget>[
+                _SettingsRow(
+                  label: 'Signed in as',
+                  value: session != null && session.email.isNotEmpty
+                      ? session.email
+                      : 'Unknown operator',
+                  icon: Icons.person_rounded,
+                ),
+                _SettingsRow(
+                  label: 'Version',
+                  value:
+                      runtimeInfoAsync.asData?.value.versionLabel ??
+                      'Loading app info',
+                  icon: Icons.new_releases_rounded,
+                ),
+                _SettingsRow(
+                  label: 'Release channel',
+                  value:
+                      runtimeInfoAsync.asData?.value.releaseFingerprint ??
+                      'Resolving release data',
+                  icon: Icons.flag_rounded,
+                ),
+                _SettingsRow(
+                  label: 'Support mode',
+                  value: _showAdvancedTools
+                      ? 'Advanced tools visible'
+                      : 'Daily-use view only',
+                  icon: _showAdvancedTools
+                      ? Icons.construction_rounded
+                      : Icons.check_circle_rounded,
+                ),
+                const SizedBox(height: 6),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final stacked = constraints.maxWidth < 430;
+                    final buttons = <Widget>[
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: () {
+                            setState(() {
+                              _showAdvancedTools = !_showAdvancedTools;
+                            });
+                          },
+                          icon: Icon(
+                            _showAdvancedTools
+                                ? Icons.visibility_off_rounded
+                                : Icons.tune_rounded,
+                          ),
+                          label: Text(
+                            _showAdvancedTools
+                                ? 'Hide advanced tools'
+                                : 'Show advanced tools',
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: () async {
+                            await FirebaseAuth.instance.signOut();
+                            if (!context.mounted) {
+                              return;
+                            }
+                            context.go('/');
+                          },
+                          icon: const Icon(Icons.logout_rounded),
+                          label: const Text('Sign out'),
+                        ),
+                      ),
+                    ];
+
+                    if (stacked) {
+                      return Column(
+                        children: <Widget>[
+                          buttons[0],
+                          const SizedBox(height: 10),
+                          buttons[1],
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: <Widget>[
+                        buttons[0],
+                        const SizedBox(width: 10),
+                        buttons[1],
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          MobilePanel(
+            title: 'Advanced operator tools',
+            action: MobileTag(
+              label: _showAdvancedTools ? 'VISIBLE' : 'HIDDEN',
+              icon: _showAdvancedTools
+                  ? Icons.visibility_rounded
+                  : Icons.visibility_off_rounded,
+              accent: _showAdvancedTools
+                  ? const Color(0xFFA78BFA)
+                  : const Color(0xFF64748B),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'These rollout, evidence, recovery, and migration tools are still here for admin work, but they stay hidden during normal shop use so the screen stays cleaner.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.68),
+                    fontWeight: FontWeight.w600,
+                    height: 1.45,
                   ),
-                ],
+                ),
+              ],
+            ),
+          ),
+          if (_showAdvancedTools) ...<Widget>[
+            const SizedBox(height: 18),
+            MobilePanel(
+              title: 'Domain cutover map',
+              action: MobileTag(
+                label:
+                    '${domainStates.where((state) => state.isPostgresPrimary).length} primary',
+                icon: Icons.schema_rounded,
+                accent: const Color(0xFF38BDF8),
+              ),
+              child: Column(
+                children: domainStates
+                    .map(
+                      (state) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _DomainSettingsRow(state: state),
+                      ),
+                    )
+                    .toList(growable: false),
               ),
             ),
             const SizedBox(height: 18),
             MobilePanel(
-              title: 'Advanced operator tools',
+              title: 'Pilot handoff snapshot',
               action: MobileTag(
-                label: _showAdvancedTools ? 'VISIBLE' : 'HIDDEN',
-                icon: _showAdvancedTools
-                    ? Icons.visibility_rounded
-                    : Icons.visibility_off_rounded,
-                accent: _showAdvancedTools
-                    ? const Color(0xFFA78BFA)
-                    : const Color(0xFF64748B),
+                label: diagnostics == null ? 'Loading' : 'Copy ready',
+                icon: diagnostics == null
+                    ? Icons.sync_rounded
+                    : Icons.assignment_turned_in_rounded,
+                accent: diagnostics == null
+                    ? const Color(0xFFF59E0B)
+                    : const Color(0xFF22C55E),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    'These rollout, evidence, recovery, and migration tools are still here for admin work, but they stay hidden during normal shop use so the screen stays cleaner.',
+                    'Use this before a pilot handoff or floor smoke run. It captures the installed build identity, workspace, queue health, and domain posture in one copyable block for release notes, QA, or operator chat.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.68),
-                          fontWeight: FontWeight.w600,
-                          height: 1.45,
-                        ),
+                      color: Colors.white.withValues(alpha: 0.68),
+                      fontWeight: FontWeight.w600,
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  _SettingsRow(
+                    label: 'Release fingerprint',
+                    value:
+                        runtimeInfo?.releaseFingerprint ??
+                        'Loading runtime metadata',
+                    icon: Icons.flag_rounded,
+                  ),
+                  _SettingsRow(
+                    label: 'Pilot posture',
+                    value:
+                        diagnostics?.primaryDomainCountLabel ??
+                        'Resolving domain states',
+                    icon: Icons.fact_check_rounded,
+                  ),
+                  _SettingsRow(
+                    label: 'Last receipt sync',
+                    value: diagnostics?.lastReceiptSyncLabel ?? 'Unknown',
+                    icon: Icons.history_toggle_off_rounded,
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: diagnostics == null
+                        ? null
+                        : () async {
+                            await Clipboard.setData(
+                              ClipboardData(
+                                text: diagnostics.toMultilineText(),
+                              ),
+                            );
+                            await markEvidenceCaptured('pilot_snapshot');
+                            if (!context.mounted) {
+                              return;
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Pilot launch snapshot copied. Paste it into the rollout thread or QA sheet.',
+                                ),
+                              ),
+                            );
+                          },
+                    icon: const Icon(Icons.copy_all_rounded),
+                    label: const Text('Copy pilot snapshot'),
                   ),
                 ],
               ),
             ),
-            if (_showAdvancedTools) ...<Widget>[
-              const SizedBox(height: 18),
-              MobilePanel(
-                title: 'Domain cutover map',
-                action: MobileTag(
-                  label:
-                      '${domainStates.where((state) => state.isPostgresPrimary).length} primary',
-                  icon: Icons.schema_rounded,
-                  accent: const Color(0xFF38BDF8),
-                ),
-                child: Column(
-                  children: domainStates
-                      .map(
-                        (state) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _DomainSettingsRow(state: state),
-                        ),
-                      )
-                      .toList(growable: false),
-                ),
-              ),
-              const SizedBox(height: 18),
-              MobilePanel(
-                          title: 'Pilot handoff snapshot',
-                          action: MobileTag(
-                            label: diagnostics == null ? 'Loading' : 'Copy ready',
-                            icon: diagnostics == null
-                                ? Icons.sync_rounded
-                                : Icons.assignment_turned_in_rounded,
-                            accent: diagnostics == null
-                                ? const Color(0xFFF59E0B)
-                                : const Color(0xFF22C55E),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(
-                                'Use this before a pilot handoff or floor smoke run. It captures the installed build identity, workspace, queue health, and domain posture in one copyable block for release notes, QA, or operator chat.',
-                                style: Theme.of(
-                                  context,
-                                ).textTheme.bodySmall?.copyWith(
-                                  color: Colors.white.withValues(alpha: 0.68),
-                                  fontWeight: FontWeight.w600,
-                                  height: 1.45,
-                                ),
+            const SizedBox(height: 18),
+            Column(
+              children: <Widget>[
+                MobilePanel(
+                  title: 'Operator action center',
+                  action: MobileTag(
+                    label: actionPlan == null
+                        ? 'Loading'
+                        : actionPlan.actionLabel.toUpperCase(),
+                    icon: actionPlan == null
+                        ? Icons.sync_rounded
+                        : actionPlan.isIncidentAction
+                        ? Icons.crisis_alert_rounded
+                        : actionPlan.isRecoveryAction
+                        ? Icons.build_circle_rounded
+                        : actionPlan.isSmokeAction
+                        ? Icons.playlist_add_check_circle_rounded
+                        : Icons.assignment_turned_in_rounded,
+                    accent: actionPlan == null
+                        ? const Color(0xFFF59E0B)
+                        : actionPlan.isIncidentAction
+                        ? const Color(0xFFFB7185)
+                        : actionPlan.isRecoveryAction
+                        ? const Color(0xFFF59E0B)
+                        : const Color(0xFF22C55E),
+                  ),
+                  child: actionPlan == null
+                      ? const MobileEmptyState(
+                          icon: Icons.sync_rounded,
+                          title: 'Preparing operator action plan',
+                          body:
+                              'The device is still resolving readiness, recovery, and queue posture.',
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              actionPlan.summary,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.68),
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.45,
+                                  ),
+                            ),
+                            const SizedBox(height: 14),
+                            ...actionPlan.reasons.map(
+                              (reason) => _ReadinessNoteRow(
+                                message: reason,
+                                tone: actionPlan.isIncidentAction
+                                    ? const Color(0xFFFB7185)
+                                    : actionPlan.isRecoveryAction
+                                    ? const Color(0xFFF59E0B)
+                                    : const Color(0xFF22C55E),
                               ),
-                              const SizedBox(height: 14),
-                              _SettingsRow(
-                                label: 'Release fingerprint',
-                                value: runtimeInfo?.releaseFingerprint ??
-                                    'Loading runtime metadata',
-                                icon: Icons.flag_rounded,
-                              ),
-                              _SettingsRow(
-                                label: 'Pilot posture',
-                                value: diagnostics?.primaryDomainCountLabel ??
-                                    'Resolving domain states',
-                                icon: Icons.fact_check_rounded,
-                              ),
-                              _SettingsRow(
-                                label: 'Last receipt sync',
-                                value: diagnostics?.lastReceiptSyncLabel ??
-                                    'Unknown',
-                                icon: Icons.history_toggle_off_rounded,
-                              ),
-                              FilledButton.tonalIcon(
-                                onPressed: diagnostics == null
-                                    ? null
-                                    : () async {
+                            ),
+                            const SizedBox(height: 14),
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                final stacked = constraints.maxWidth < 430;
+                                final buttons = <Widget>[
+                                  Expanded(
+                                    child: FilledButton.tonalIcon(
+                                      onPressed: () async {
+                                        if (actionPlan.isIncidentAction) {
+                                          final report =
+                                              await _showPilotIncidentEscalationDialog(
+                                                context,
+                                                diagnosticsSnapshot:
+                                                    diagnostics!,
+                                                readinessReport:
+                                                    readinessReport!,
+                                                recoveryReport: recoveryReport!,
+                                              );
+                                          if (report == null) {
+                                            return;
+                                          }
+                                          await markEvidenceCaptured(
+                                            'incident_escalation',
+                                          );
+                                          if (!context.mounted) {
+                                            return;
+                                          }
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Incident escalation pack copied with decision ${report.escalationDecisionLabel}.',
+                                              ),
+                                            ),
+                                          );
+                                          return;
+                                        }
+
+                                        if (actionPlan.isRecoveryAction) {
+                                          await Clipboard.setData(
+                                            ClipboardData(
+                                              text: recoveryReport!
+                                                  .toMultilineText(),
+                                            ),
+                                          );
+                                          await markEvidenceCaptured(
+                                            'recovery_report',
+                                          );
+                                          if (!context.mounted) {
+                                            return;
+                                          }
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Recovery report copied for the next operator action.',
+                                              ),
+                                            ),
+                                          );
+                                          return;
+                                        }
+
+                                        if (actionPlan.isSmokeAction) {
+                                          final report =
+                                              await _showPilotSmokeChecklistDialog(
+                                                context,
+                                                diagnosticsSnapshot:
+                                                    diagnostics!,
+                                                readinessReport:
+                                                    readinessReport!,
+                                              );
+                                          if (report == null) {
+                                            return;
+                                          }
+                                          await markEvidenceCaptured(
+                                            'smoke_report',
+                                          );
+                                          if (!context.mounted) {
+                                            return;
+                                          }
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Pilot smoke report copied with verdict ${report.verdictLabel}.',
+                                              ),
+                                            ),
+                                          );
+                                          return;
+                                        }
+
                                         await Clipboard.setData(
                                           ClipboardData(
-                                            text: diagnostics.toMultilineText(),
+                                            text: diagnostics!
+                                                .toMultilineText(),
                                           ),
                                         );
                                         await markEvidenceCaptured(
@@ -671,1933 +885,1455 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                                         ).showSnackBar(
                                           const SnackBar(
                                             content: Text(
-                                              'Pilot launch snapshot copied. Paste it into the rollout thread or QA sheet.',
+                                              'Pilot snapshot copied for the next operator step.',
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      icon: Icon(
+                                        actionPlan.isIncidentAction
+                                            ? Icons.crisis_alert_rounded
+                                            : actionPlan.isRecoveryAction
+                                            ? Icons.health_and_safety_rounded
+                                            : actionPlan.isSmokeAction
+                                            ? Icons.assignment_turned_in_rounded
+                                            : Icons.copy_all_rounded,
+                                      ),
+                                      label: Text(actionPlan.actionLabel),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: FilledButton.tonalIcon(
+                                      onPressed: () async {
+                                        await Clipboard.setData(
+                                          ClipboardData(
+                                            text: actionPlan.toMultilineText(),
+                                          ),
+                                        );
+                                        await markEvidenceCaptured(
+                                          'operator_action_brief',
+                                        );
+                                        if (!context.mounted) {
+                                          return;
+                                        }
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Operator action brief copied.',
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      icon: const Icon(Icons.copy_all_rounded),
+                                      label: const Text('Copy action brief'),
+                                    ),
+                                  ),
+                                ];
+
+                                if (stacked) {
+                                  return Column(
+                                    children: <Widget>[
+                                      buttons[0],
+                                      const SizedBox(height: 10),
+                                      buttons[1],
+                                    ],
+                                  );
+                                }
+
+                                return Row(
+                                  children: <Widget>[
+                                    buttons[0],
+                                    const SizedBox(width: 10),
+                                    buttons[1],
+                                  ],
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                ),
+                const SizedBox(height: 18),
+                MobilePanel(
+                  title: 'Evidence tracker',
+                  action: MobileTag(
+                    label: evidenceTrackerAsync.asData == null
+                        ? 'Loading'
+                        : evidenceTracker.statusLabel,
+                    icon: evidenceTrackerAsync.asData == null
+                        ? Icons.sync_rounded
+                        : evidenceTracker.isCoreComplete
+                        ? Icons.task_alt_rounded
+                        : Icons.assignment_late_rounded,
+                    accent: evidenceTrackerAsync.asData == null
+                        ? const Color(0xFFF59E0B)
+                        : evidenceTracker.isCoreComplete
+                        ? const Color(0xFF22C55E)
+                        : const Color(0xFFF59E0B),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'This tracker records which operator evidence exports have already been captured on this device for the current workspace, and it survives app restarts so the team can see what is still missing before handoff.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.68),
+                          fontWeight: FontWeight.w600,
+                          height: 1.45,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      _SettingsRow(
+                        label: 'Evidence session',
+                        value:
+                            evidenceTracker.sessionLabel ??
+                            suggestedEvidenceSessionLabel,
+                        icon: Icons.bookmark_added_rounded,
+                      ),
+                      _SettingsRow(
+                        label: 'Session started',
+                        value: evidenceTracker.sessionStartedAt == null
+                            ? 'Not started yet'
+                            : formatCompactDate(
+                                evidenceTracker.sessionStartedAt!,
+                              ),
+                        icon: Icons.play_circle_rounded,
+                      ),
+                      _SettingsRow(
+                        label: 'Core exports',
+                        value: evidenceTracker.completionLabel,
+                        icon: Icons.fact_check_rounded,
+                      ),
+                      _SettingsRow(
+                        label: 'Optional exports',
+                        value:
+                            '${evidenceTracker.capturedOptionalCount} / ${evidenceTracker.totalOptionalCount} captured',
+                        icon: Icons.library_add_check_rounded,
+                      ),
+                      _SettingsRow(
+                        label: 'Latest capture',
+                        value: evidenceTracker.latestCapturedArtifact == null
+                            ? 'No evidence copied yet'
+                            : '${evidenceTracker.latestCapturedArtifact!.label} at ${evidenceTracker.latestCapturedAt!.toUtc().toIso8601String()}',
+                        icon: Icons.history_edu_rounded,
+                      ),
+                      _SettingsRow(
+                        label: 'Archived sessions',
+                        value:
+                            '${evidenceTracker.archivedSessions.length} saved',
+                        icon: Icons.archive_rounded,
+                      ),
+                      _SettingsRow(
+                        label: 'Archive posture',
+                        value: evidenceTracker.archiveTrendLabel,
+                        icon: Icons.insights_rounded,
+                      ),
+                      _SettingsRow(
+                        label: 'Archive summary',
+                        value: evidenceTracker.archiveInsightSummary,
+                        icon: Icons.monitor_heart_rounded,
+                      ),
+                      Text(
+                        evidenceTracker.archiveOperationalGuidance,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: !evidenceTracker.hasArchivedSessions
+                              ? const Color(0xFF38BDF8)
+                              : evidenceTracker.recentArchiveShowsAttention
+                              ? const Color(0xFFF59E0B)
+                              : const Color(0xFF22C55E),
+                          fontWeight: FontWeight.w700,
+                          height: 1.45,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      FilledButton.tonalIcon(
+                        onPressed: evidenceTrackerAsync.asData == null
+                            ? null
+                            : () async {
+                                await Clipboard.setData(
+                                  ClipboardData(
+                                    text: evidenceTracker
+                                        .toArchiveInsightsText(),
+                                  ),
+                                );
+                                if (!context.mounted) {
+                                  return;
+                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Archive insights copied for the rollout lead.',
+                                    ),
+                                  ),
+                                );
+                              },
+                        icon: const Icon(Icons.insights_rounded),
+                        label: const Text('Copy archive insights'),
+                      ),
+                      if (evidenceTracker.hasArchivedSessions) ...<Widget>[
+                        const SizedBox(height: 14),
+                        Text(
+                          'Recent archived sessions:',
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(
+                                color: const Color(0xFF38BDF8),
+                                fontWeight: FontWeight.w900,
+                              ),
+                        ),
+                        const SizedBox(height: 10),
+                        ...evidenceTracker.archivedSessions
+                            .take(3)
+                            .map(
+                              (entry) => _ReadinessNoteRow(
+                                message: entry.summaryLine,
+                                tone: const Color(0xFF38BDF8),
+                              ),
+                            ),
+                        const SizedBox(height: 14),
+                        FilledButton.tonalIcon(
+                          onPressed: () async {
+                            final archived =
+                                evidenceTracker.latestArchivedSession;
+                            if (archived == null) {
+                              return;
+                            }
+                            await Clipboard.setData(
+                              ClipboardData(text: archived.toMultilineText()),
+                            );
+                            if (!context.mounted) {
+                              return;
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Latest archived session copied: ${archived.sessionLabel}.',
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.history_toggle_off_rounded),
+                          label: const Text('Copy latest archived session'),
+                        ),
+                        const SizedBox(height: 10),
+                        FilledButton.tonalIcon(
+                          onPressed: () async {
+                            await Clipboard.setData(
+                              ClipboardData(
+                                text: evidenceTracker.toArchivePackText(),
+                              ),
+                            );
+                            if (!context.mounted) {
+                              return;
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Full evidence archive pack copied.',
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.inventory_2_rounded),
+                          label: const Text('Copy full archive pack'),
+                        ),
+                        const SizedBox(height: 10),
+                        FilledButton.tonalIcon(
+                          onPressed: () async {
+                            await evidenceTrackerController.clearArchive();
+                            if (!context.mounted) {
+                              return;
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Archived evidence sessions cleared. Active session kept.',
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.auto_delete_rounded),
+                          label: const Text('Clear archived sessions'),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+                      if (evidenceTracker
+                          .missingCoreArtifacts
+                          .isNotEmpty) ...<Widget>[
+                        Text(
+                          'Still missing before handoff:',
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(
+                                color: const Color(0xFFF59E0B),
+                                fontWeight: FontWeight.w900,
+                              ),
+                        ),
+                        const SizedBox(height: 10),
+                        ...evidenceTracker.missingCoreArtifacts.map(
+                          (artifact) => _ReadinessNoteRow(
+                            message: artifact.label,
+                            tone: const Color(0xFFF59E0B),
+                          ),
+                        ),
+                      ] else ...<Widget>[
+                        Text(
+                          'All core handoff artifacts have been captured on this device.',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: const Color(0xFF22C55E),
+                                fontWeight: FontWeight.w700,
+                                height: 1.45,
+                              ),
+                        ),
+                      ],
+                      const SizedBox(height: 14),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final stacked = constraints.maxWidth < 430;
+                          final buttons = <Widget>[
+                            Expanded(
+                              child: FilledButton.tonalIcon(
+                                onPressed: () async {
+                                  await Clipboard.setData(
+                                    ClipboardData(
+                                      text: evidenceTracker.toMultilineText(),
+                                    ),
+                                  );
+                                  if (!context.mounted) {
+                                    return;
+                                  }
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Evidence tracker copied for the rollout record.',
+                                      ),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.copy_all_rounded),
+                                label: const Text('Copy evidence tracker'),
+                              ),
+                            ),
+                            Expanded(
+                              child: FilledButton.tonalIcon(
+                                onPressed: evidenceTrackerAsync.asData == null
+                                    ? null
+                                    : () async {
+                                        final sessionLabel =
+                                            await _showEvidenceSessionDialog(
+                                              context,
+                                              currentLabel:
+                                                  evidenceTracker.sessionLabel,
+                                              suggestedLabel:
+                                                  suggestedEvidenceSessionLabel,
+                                            );
+                                        if (sessionLabel == null) {
+                                          return;
+                                        }
+                                        await evidenceTrackerController
+                                            .startFreshSession(sessionLabel);
+                                        if (!context.mounted) {
+                                          return;
+                                        }
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Started a fresh evidence session: $sessionLabel',
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                icon: const Icon(Icons.restart_alt_rounded),
+                                label: const Text('Fresh session'),
+                              ),
+                            ),
+                          ];
+
+                          if (stacked) {
+                            return Column(
+                              children: <Widget>[
+                                buttons[0],
+                                const SizedBox(height: 10),
+                                buttons[1],
+                              ],
+                            );
+                          }
+
+                          return Row(
+                            children: <Widget>[
+                              buttons[0],
+                              const SizedBox(width: 10),
+                              buttons[1],
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                MobilePanel(
+                  title: 'Pilot readiness signoff',
+                  action: MobileTag(
+                    label: readinessReport == null
+                        ? 'Loading'
+                        : readinessReport.statusLabel,
+                    icon: readinessReport == null
+                        ? Icons.sync_rounded
+                        : readinessReport.isReadyForShift
+                        ? Icons.verified_rounded
+                        : readinessReport.shouldMonitor
+                        ? Icons.visibility_rounded
+                        : Icons.block_rounded,
+                    accent: readinessReport == null
+                        ? const Color(0xFFF59E0B)
+                        : readinessReport.isReadyForShift
+                        ? const Color(0xFF22C55E)
+                        : readinessReport.shouldMonitor
+                        ? const Color(0xFFF59E0B)
+                        : const Color(0xFFFB7185),
+                  ),
+                  child: readinessReport == null
+                      ? const MobileEmptyState(
+                          icon: Icons.sync_rounded,
+                          title: 'Building readiness verdict',
+                          body:
+                              'The mobile shell is collecting the launch snapshot and queue posture for signoff.',
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              readinessReport.summary,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.68),
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.45,
+                                  ),
+                            ),
+                            if (readinessReport
+                                .blockers
+                                .isNotEmpty) ...<Widget>[
+                              const SizedBox(height: 14),
+                              Text(
+                                'Blockers',
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(
+                                      color: const Color(0xFFFB7185),
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                              ),
+                              const SizedBox(height: 10),
+                              ...readinessReport.blockers.map(
+                                (item) => _ReadinessNoteRow(
+                                  message: item,
+                                  tone: const Color(0xFFFB7185),
+                                ),
+                              ),
+                            ],
+                            if (readinessReport
+                                .warnings
+                                .isNotEmpty) ...<Widget>[
+                              const SizedBox(height: 14),
+                              Text(
+                                'Warnings',
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(
+                                      color: const Color(0xFFF59E0B),
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                              ),
+                              const SizedBox(height: 10),
+                              ...readinessReport.warnings.map(
+                                (item) => _ReadinessNoteRow(
+                                  message: item,
+                                  tone: const Color(0xFFF59E0B),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 14),
+                            FilledButton.tonalIcon(
+                              onPressed: () async {
+                                await Clipboard.setData(
+                                  ClipboardData(
+                                    text: readinessReport.toMultilineText(),
+                                  ),
+                                );
+                                await markEvidenceCaptured('readiness_signoff');
+                                if (!context.mounted) {
+                                  return;
+                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Pilot readiness signoff copied for rollout approval.',
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.copy_all_rounded),
+                              label: const Text('Copy readiness signoff'),
+                            ),
+                            const SizedBox(height: 10),
+                            FilledButton.tonalIcon(
+                              onPressed: handoffReport == null
+                                  ? null
+                                  : () async {
+                                      await Clipboard.setData(
+                                        ClipboardData(
+                                          text: handoffReport.toMultilineText(),
+                                        ),
+                                      );
+                                      await markEvidenceCaptured(
+                                        'handoff_pack',
+                                      );
+                                      if (!context.mounted) {
+                                        return;
+                                      }
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Full pilot handoff pack copied for release evidence.',
+                                          ),
+                                        ),
+                                      );
+                                    },
+                              icon: const Icon(Icons.assignment_rounded),
+                              label: const Text('Copy full handoff pack'),
+                            ),
+                          ],
+                        ),
+                ),
+                const SizedBox(height: 18),
+                MobilePanel(
+                  title: 'Pilot smoke execution',
+                  action: MobileTag(
+                    label: readinessReport == null ? 'Loading' : 'Floor check',
+                    icon: readinessReport == null
+                        ? Icons.sync_rounded
+                        : Icons.playlist_add_check_circle_rounded,
+                    accent: readinessReport == null
+                        ? const Color(0xFFF59E0B)
+                        : const Color(0xFF38BDF8),
+                  ),
+                  child: diagnostics == null || readinessReport == null
+                      ? const MobileEmptyState(
+                          icon: Icons.sync_rounded,
+                          title: 'Preparing smoke execution',
+                          body:
+                              'The launch snapshot and readiness posture are still loading for this device.',
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              'Run the floor smoke checklist from the device itself and copy the resulting evidence block into the rollout log. This keeps the final operator decision tied to the exact installed release and workspace binding.',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.68),
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.45,
+                                  ),
+                            ),
+                            const SizedBox(height: 14),
+                            _SettingsRow(
+                              label: 'Release target',
+                              value:
+                                  '${diagnostics.runtimeInfo.releaseTag} | ${diagnostics.runtimeInfo.rolloutScopeLabel}',
+                              icon: Icons.route_rounded,
+                            ),
+                            _SettingsRow(
+                              label: 'Readiness gate',
+                              value: readinessReport.statusLabel,
+                              icon: Icons.fact_check_rounded,
+                            ),
+                            FilledButton.tonalIcon(
+                              onPressed: () async {
+                                final smokeReport =
+                                    await _showPilotSmokeChecklistDialog(
+                                      context,
+                                      diagnosticsSnapshot: diagnostics,
+                                      readinessReport: readinessReport,
+                                    );
+                                if (smokeReport == null) {
+                                  return;
+                                }
+                                await markEvidenceCaptured('smoke_report');
+                                if (!context.mounted) {
+                                  return;
+                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Pilot smoke report copied with verdict ${smokeReport.verdictLabel}.',
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.assignment_turned_in_rounded,
+                              ),
+                              label: const Text('Run smoke checklist'),
+                            ),
+                          ],
+                        ),
+                ),
+                const SizedBox(height: 18),
+                MobilePanel(
+                  title: 'Recovery desk',
+                  action: MobileTag(
+                    label: attentionEntries.isEmpty
+                        ? 'Stable'
+                        : '${attentionEntries.length} attention',
+                    icon: attentionEntries.isEmpty
+                        ? Icons.health_and_safety_rounded
+                        : Icons.build_circle_rounded,
+                    accent: attentionEntries.isEmpty
+                        ? const Color(0xFF22C55E)
+                        : const Color(0xFFFB7185),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'Use this when a pilot device has replay trouble. It shows the highest-risk queued or failed commerce commands, lets you retry one receipt at a time, and creates a recovery report you can hand to support or QA.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.68),
+                          fontWeight: FontWeight.w600,
+                          height: 1.45,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      if (attentionEntries.isEmpty)
+                        const MobileEmptyState(
+                          icon: Icons.health_and_safety_rounded,
+                          title: 'No recovery work is waiting',
+                          body:
+                              'Queued and failed commerce commands are clear on this device right now.',
+                        )
+                      else
+                        ...attentionEntries.map(
+                          (entry) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _OutboxAttentionRow(
+                              entry: entry,
+                              onRetry: () async {
+                                final result = await syncCoordinator
+                                    .retryCommerceCommand(entry.commandId);
+                                if (!context.mounted) {
+                                  return;
+                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      result.message ??
+                                          'Retry requested for ${entry.commandId}.',
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 6),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final stacked = constraints.maxWidth < 430;
+                          final buttons = <Widget>[
+                            Expanded(
+                              child: FilledButton.tonalIcon(
+                                onPressed: attentionEntries.isEmpty
+                                    ? null
+                                    : () async {
+                                        final result = await syncCoordinator
+                                            .flushCommerceOutbox();
+                                        if (!context.mounted) {
+                                          return;
+                                        }
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              result.message ??
+                                                  'Recovery replay requested.',
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                icon: const Icon(Icons.cloud_sync_rounded),
+                                label: const Text('Retry all attention items'),
+                              ),
+                            ),
+                            Expanded(
+                              child: FilledButton.tonalIcon(
+                                onPressed: recoveryReport == null
+                                    ? null
+                                    : () async {
+                                        await Clipboard.setData(
+                                          ClipboardData(
+                                            text: recoveryReport
+                                                .toMultilineText(),
+                                          ),
+                                        );
+                                        await markEvidenceCaptured(
+                                          'recovery_report',
+                                        );
+                                        if (!context.mounted) {
+                                          return;
+                                        }
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Pilot recovery report copied for support handoff.',
                                             ),
                                           ),
                                         );
                                       },
                                 icon: const Icon(Icons.copy_all_rounded),
-                                label: const Text('Copy pilot snapshot'),
+                                label: const Text('Copy recovery report'),
                               ),
-                            ],
-                          ),
-                        ),
-              const SizedBox(height: 18),
-            Column(
-                              children: <Widget>[
-                                MobilePanel(
-                                  title: 'Operator action center',
-                                  action: MobileTag(
-                                    label: actionPlan == null
-                                        ? 'Loading'
-                                        : actionPlan.actionLabel.toUpperCase(),
-                                    icon: actionPlan == null
-                                        ? Icons.sync_rounded
-                                        : actionPlan.isIncidentAction
-                                        ? Icons.crisis_alert_rounded
-                                        : actionPlan.isRecoveryAction
-                                        ? Icons.build_circle_rounded
-                                        : actionPlan.isSmokeAction
-                                        ? Icons.playlist_add_check_circle_rounded
-                                        : Icons.assignment_turned_in_rounded,
-                                    accent: actionPlan == null
-                                        ? const Color(0xFFF59E0B)
-                                        : actionPlan.isIncidentAction
-                                        ? const Color(0xFFFB7185)
-                                        : actionPlan.isRecoveryAction
-                                        ? const Color(0xFFF59E0B)
-                                        : const Color(0xFF22C55E),
-                                  ),
-                                  child: actionPlan == null
-                                      ? const MobileEmptyState(
-                                          icon: Icons.sync_rounded,
-                                          title: 'Preparing operator action plan',
-                                          body:
-                                              'The device is still resolving readiness, recovery, and queue posture.',
-                                        )
-                                      : Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: <Widget>[
-                                            Text(
-                                              actionPlan.summary,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall
-                                                  ?.copyWith(
-                                                    color: Colors.white
-                                                        .withValues(
-                                                          alpha: 0.68,
-                                                        ),
-                                                    fontWeight: FontWeight.w600,
-                                                    height: 1.45,
-                                                  ),
-                                            ),
-                                            const SizedBox(height: 14),
-                                            ...actionPlan.reasons.map(
-                                              (reason) => _ReadinessNoteRow(
-                                                message: reason,
-                                                tone: actionPlan.isIncidentAction
-                                                    ? const Color(0xFFFB7185)
-                                                    : actionPlan.isRecoveryAction
-                                                    ? const Color(0xFFF59E0B)
-                                                    : const Color(0xFF22C55E),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 14),
-                                            LayoutBuilder(
-                                              builder: (context, constraints) {
-                                                final stacked =
-                                                    constraints.maxWidth < 430;
-                                                final buttons = <Widget>[
-                                                  Expanded(
-                                                    child: FilledButton.tonalIcon(
-                                                      onPressed: () async {
-                                                        if (actionPlan
-                                                            .isIncidentAction) {
-                                                          final report =
-                                                              await _showPilotIncidentEscalationDialog(
-                                                                context,
-                                                                diagnosticsSnapshot:
-                                                                    diagnostics!,
-                                                                readinessReport:
-                                                                    readinessReport!,
-                                                                recoveryReport:
-                                                                    recoveryReport!,
-                                                              );
-                                                          if (report == null) {
-                                                            return;
-                                                          }
-                                                          await markEvidenceCaptured(
-                                                            'incident_escalation',
-                                                          );
-                                                          if (!context.mounted) {
-                                                            return;
-                                                          }
-                                                          ScaffoldMessenger.of(
-                                                            context,
-                                                          ).showSnackBar(
-                                                            SnackBar(
-                                                              content: Text(
-                                                                'Incident escalation pack copied with decision ${report.escalationDecisionLabel}.',
-                                                              ),
-                                                            ),
-                                                          );
-                                                          return;
-                                                        }
-
-                                                        if (actionPlan
-                                                            .isRecoveryAction) {
-                                                          await Clipboard.setData(
-                                                            ClipboardData(
-                                                              text: recoveryReport!
-                                                                  .toMultilineText(),
-                                                            ),
-                                                          );
-                                                          await markEvidenceCaptured(
-                                                            'recovery_report',
-                                                          );
-                                                          if (!context.mounted) {
-                                                            return;
-                                                          }
-                                                          ScaffoldMessenger.of(
-                                                            context,
-                                                          ).showSnackBar(
-                                                            const SnackBar(
-                                                              content: Text(
-                                                                'Recovery report copied for the next operator action.',
-                                                              ),
-                                                            ),
-                                                          );
-                                                          return;
-                                                        }
-
-                                                        if (actionPlan
-                                                            .isSmokeAction) {
-                                                          final report =
-                                                              await _showPilotSmokeChecklistDialog(
-                                                                context,
-                                                                diagnosticsSnapshot:
-                                                                    diagnostics!,
-                                                                readinessReport:
-                                                                    readinessReport!,
-                                                              );
-                                                          if (report == null) {
-                                                            return;
-                                                          }
-                                                          await markEvidenceCaptured(
-                                                            'smoke_report',
-                                                          );
-                                                          if (!context.mounted) {
-                                                            return;
-                                                          }
-                                                          ScaffoldMessenger.of(
-                                                            context,
-                                                          ).showSnackBar(
-                                                            SnackBar(
-                                                              content: Text(
-                                                                'Pilot smoke report copied with verdict ${report.verdictLabel}.',
-                                                              ),
-                                                            ),
-                                                          );
-                                                          return;
-                                                        }
-
-                                                        await Clipboard.setData(
-                                                          ClipboardData(
-                                                            text: diagnostics!
-                                                                .toMultilineText(),
-                                                          ),
-                                                        );
-                                                        await markEvidenceCaptured(
-                                                          'pilot_snapshot',
-                                                        );
-                                                        if (!context.mounted) {
-                                                          return;
-                                                        }
-                                                        ScaffoldMessenger.of(
-                                                          context,
-                                                        ).showSnackBar(
-                                                          const SnackBar(
-                                                            content: Text(
-                                                              'Pilot snapshot copied for the next operator step.',
-                                                            ),
-                                                          ),
-                                                        );
-                                                      },
-                                                      icon: Icon(
-                                                        actionPlan
-                                                                .isIncidentAction
-                                                            ? Icons
-                                                                  .crisis_alert_rounded
-                                                            : actionPlan
-                                                                  .isRecoveryAction
-                                                            ? Icons
-                                                                  .health_and_safety_rounded
-                                                            : actionPlan
-                                                                  .isSmokeAction
-                                                            ? Icons
-                                                                  .assignment_turned_in_rounded
-                                                            : Icons
-                                                                  .copy_all_rounded,
-                                                      ),
-                                                      label: Text(
-                                                        actionPlan.actionLabel,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  Expanded(
-                                                    child: FilledButton.tonalIcon(
-                                                      onPressed: () async {
-                                                        await Clipboard.setData(
-                                                          ClipboardData(
-                                                            text: actionPlan
-                                                                .toMultilineText(),
-                                                          ),
-                                                        );
-                                                        await markEvidenceCaptured(
-                                                          'operator_action_brief',
-                                                        );
-                                                        if (!context.mounted) {
-                                                          return;
-                                                        }
-                                                        ScaffoldMessenger.of(
-                                                          context,
-                                                        ).showSnackBar(
-                                                          const SnackBar(
-                                                            content: Text(
-                                                              'Operator action brief copied.',
-                                                            ),
-                                                          ),
-                                                        );
-                                                      },
-                                                      icon: const Icon(
-                                                        Icons.copy_all_rounded,
-                                                      ),
-                                                      label: const Text(
-                                                        'Copy action brief',
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ];
-
-                                                if (stacked) {
-                                                  return Column(
-                                                    children: <Widget>[
-                                                      buttons[0],
-                                                      const SizedBox(height: 10),
-                                                      buttons[1],
-                                                    ],
-                                                  );
-                                                }
-
-                                                return Row(
-                                                  children: <Widget>[
-                                                    buttons[0],
-                                                    const SizedBox(width: 10),
-                                                    buttons[1],
-                                                  ],
-                                                );
-                                              },
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                                const SizedBox(height: 18),
-                                MobilePanel(
-                                  title: 'Evidence tracker',
-                                  action: MobileTag(
-                                    label: evidenceTrackerAsync.asData == null
-                                        ? 'Loading'
-                                        : evidenceTracker.statusLabel,
-                                    icon: evidenceTrackerAsync.asData == null
-                                        ? Icons.sync_rounded
-                                        : evidenceTracker.isCoreComplete
-                                        ? Icons.task_alt_rounded
-                                        : Icons.assignment_late_rounded,
-                                    accent: evidenceTrackerAsync.asData == null
-                                        ? const Color(0xFFF59E0B)
-                                        : evidenceTracker.isCoreComplete
-                                        ? const Color(0xFF22C55E)
-                                        : const Color(0xFFF59E0B),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: <Widget>[
-                                      Text(
-                                        'This tracker records which operator evidence exports have already been captured on this device for the current workspace, and it survives app restarts so the team can see what is still missing before handoff.',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.copyWith(
-                                              color: Colors.white.withValues(
-                                                alpha: 0.68,
-                                              ),
-                                              fontWeight: FontWeight.w600,
-                                              height: 1.45,
-                                            ),
-                                      ),
-                                      const SizedBox(height: 14),
-                                      _SettingsRow(
-                                        label: 'Evidence session',
-                                        value: evidenceTracker.sessionLabel ??
-                                            suggestedEvidenceSessionLabel,
-                                        icon: Icons.bookmark_added_rounded,
-                                      ),
-                                      _SettingsRow(
-                                        label: 'Session started',
-                                        value:
-                                            evidenceTracker.sessionStartedAt ==
-                                                null
-                                            ? 'Not started yet'
-                                            : formatCompactDate(
-                                                evidenceTracker
-                                                    .sessionStartedAt!,
-                                              ),
-                                        icon: Icons.play_circle_rounded,
-                                      ),
-                                      _SettingsRow(
-                                        label: 'Core exports',
-                                        value: evidenceTracker.completionLabel,
-                                        icon: Icons.fact_check_rounded,
-                                      ),
-                                      _SettingsRow(
-                                        label: 'Optional exports',
-                                        value:
-                                            '${evidenceTracker.capturedOptionalCount} / ${evidenceTracker.totalOptionalCount} captured',
-                                        icon: Icons.library_add_check_rounded,
-                                      ),
-                                      _SettingsRow(
-                                        label: 'Latest capture',
-                                        value:
-                                            evidenceTracker.latestCapturedArtifact ==
-                                                null
-                                            ? 'No evidence copied yet'
-                                            : '${evidenceTracker.latestCapturedArtifact!.label} at ${evidenceTracker.latestCapturedAt!.toUtc().toIso8601String()}',
-                                        icon: Icons.history_edu_rounded,
-                                      ),
-                                      _SettingsRow(
-                                        label: 'Archived sessions',
-                                        value:
-                                            '${evidenceTracker.archivedSessions.length} saved',
-                                        icon: Icons.archive_rounded,
-                                      ),
-                                      _SettingsRow(
-                                        label: 'Archive posture',
-                                        value: evidenceTracker.archiveTrendLabel,
-                                        icon: Icons.insights_rounded,
-                                      ),
-                                      _SettingsRow(
-                                        label: 'Archive summary',
-                                        value:
-                                            evidenceTracker.archiveInsightSummary,
-                                        icon: Icons.monitor_heart_rounded,
-                                      ),
-                                      Text(
-                                        evidenceTracker
-                                            .archiveOperationalGuidance,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.copyWith(
-                                              color: !evidenceTracker
-                                                      .hasArchivedSessions
-                                                  ? const Color(0xFF38BDF8)
-                                                  : evidenceTracker
-                                                          .recentArchiveShowsAttention
-                                                  ? const Color(0xFFF59E0B)
-                                                  : const Color(0xFF22C55E),
-                                              fontWeight: FontWeight.w700,
-                                              height: 1.45,
-                                            ),
-                                      ),
-                                      const SizedBox(height: 14),
-                                      FilledButton.tonalIcon(
-                                        onPressed:
-                                            evidenceTrackerAsync.asData == null
-                                            ? null
-                                            : () async {
-                                                await Clipboard.setData(
-                                                  ClipboardData(
-                                                    text: evidenceTracker
-                                                        .toArchiveInsightsText(),
-                                                  ),
-                                                );
-                                                if (!context.mounted) {
-                                                  return;
-                                                }
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text(
-                                                      'Archive insights copied for the rollout lead.',
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                        icon: const Icon(
-                                          Icons.insights_rounded,
-                                        ),
-                                        label: const Text(
-                                          'Copy archive insights',
-                                        ),
-                                      ),
-                                      if (evidenceTracker.hasArchivedSessions)
-                                        ...<Widget>[
-                                          const SizedBox(height: 14),
-                                          Text(
-                                            'Recent archived sessions:',
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .labelLarge
-                                                ?.copyWith(
-                                                  color: const Color(
-                                                    0xFF38BDF8,
-                                                  ),
-                                                  fontWeight: FontWeight.w900,
-                                                ),
-                                          ),
-                                          const SizedBox(height: 10),
-                                          ...evidenceTracker.archivedSessions
-                                              .take(3)
-                                              .map(
-                                                (entry) => _ReadinessNoteRow(
-                                                  message: entry.summaryLine,
-                                                  tone: const Color(
-                                                    0xFF38BDF8,
-                                                  ),
-                                                ),
-                                              ),
-                                          const SizedBox(height: 14),
-                                          FilledButton.tonalIcon(
-                                            onPressed: () async {
-                                              final archived =
-                                                  evidenceTracker
-                                                      .latestArchivedSession;
-                                              if (archived == null) {
-                                                return;
-                                              }
-                                              await Clipboard.setData(
-                                                ClipboardData(
-                                                  text: archived
-                                                      .toMultilineText(),
-                                                ),
-                                              );
-                                              if (!context.mounted) {
-                                                return;
-                                              }
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                SnackBar(
-                                                  content: Text(
-                                                    'Latest archived session copied: ${archived.sessionLabel}.',
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                            icon: const Icon(
-                                              Icons.history_toggle_off_rounded,
-                                            ),
-                                            label: const Text(
-                                              'Copy latest archived session',
-                                            ),
-                                          ),
-                                          const SizedBox(height: 10),
-                                          FilledButton.tonalIcon(
-                                            onPressed: () async {
-                                              await Clipboard.setData(
-                                                ClipboardData(
-                                                  text: evidenceTracker
-                                                      .toArchivePackText(),
-                                                ),
-                                              );
-                                              if (!context.mounted) {
-                                                return;
-                                              }
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                    'Full evidence archive pack copied.',
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                            icon: const Icon(
-                                              Icons.inventory_2_rounded,
-                                            ),
-                                            label: const Text(
-                                              'Copy full archive pack',
-                                            ),
-                                          ),
-                                          const SizedBox(height: 10),
-                                          FilledButton.tonalIcon(
-                                            onPressed: () async {
-                                              await evidenceTrackerController
-                                                  .clearArchive();
-                                              if (!context.mounted) {
-                                                return;
-                                              }
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                    'Archived evidence sessions cleared. Active session kept.',
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                            icon: const Icon(
-                                              Icons.auto_delete_rounded,
-                                            ),
-                                            label: const Text(
-                                              'Clear archived sessions',
-                                            ),
-                                          ),
-                                          const SizedBox(height: 14),
-                                        ],
-                                      if (evidenceTracker.missingCoreArtifacts
-                                          .isNotEmpty) ...<Widget>[
-                                        Text(
-                                          'Still missing before handoff:',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .labelLarge
-                                              ?.copyWith(
-                                                color: const Color(0xFFF59E0B),
-                                                fontWeight: FontWeight.w900,
-                                              ),
-                                        ),
-                                        const SizedBox(height: 10),
-                                        ...evidenceTracker.missingCoreArtifacts.map(
-                                          (artifact) => _ReadinessNoteRow(
-                                            message: artifact.label,
-                                            tone: const Color(0xFFF59E0B),
-                                          ),
-                                        ),
-                                      ] else ...<Widget>[
-                                        Text(
-                                          'All core handoff artifacts have been captured on this device.',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodySmall
-                                              ?.copyWith(
-                                                color: const Color(0xFF22C55E),
-                                                fontWeight: FontWeight.w700,
-                                                height: 1.45,
-                                              ),
-                                        ),
-                                      ],
-                                      const SizedBox(height: 14),
-                                      LayoutBuilder(
-                                        builder: (context, constraints) {
-                                          final stacked =
-                                              constraints.maxWidth < 430;
-                                          final buttons = <Widget>[
-                                            Expanded(
-                                              child: FilledButton.tonalIcon(
-                                                onPressed: () async {
-                                                  await Clipboard.setData(
-                                                    ClipboardData(
-                                                      text: evidenceTracker
-                                                          .toMultilineText(),
-                                                    ),
-                                                  );
-                                                  if (!context.mounted) {
-                                                    return;
-                                                  }
-                                                  ScaffoldMessenger.of(
-                                                    context,
-                                                  ).showSnackBar(
-                                                    const SnackBar(
-                                                      content: Text(
-                                                        'Evidence tracker copied for the rollout record.',
-                                                      ),
-                                                    ),
-                                                  );
-                                                },
-                                                icon: const Icon(
-                                                  Icons.copy_all_rounded,
-                                                ),
-                                                label: const Text(
-                                                  'Copy evidence tracker',
-                                                ),
-                                              ),
-                                            ),
-                                            Expanded(
-                                              child: FilledButton.tonalIcon(
-                                                onPressed:
-                                                    evidenceTrackerAsync.asData ==
-                                                        null
-                                                    ? null
-                                                    : () async {
-                                                        final sessionLabel =
-                                                            await _showEvidenceSessionDialog(
-                                                              context,
-                                                              currentLabel:
-                                                                  evidenceTracker
-                                                                      .sessionLabel,
-                                                              suggestedLabel:
-                                                                  suggestedEvidenceSessionLabel,
-                                                            );
-                                                        if (sessionLabel ==
-                                                            null) {
-                                                          return;
-                                                        }
-                                                        await evidenceTrackerController
-                                                            .startFreshSession(
-                                                              sessionLabel,
-                                                            );
-                                                        if (!context.mounted) {
-                                                          return;
-                                                        }
-                                                        ScaffoldMessenger.of(
-                                                          context,
-                                                        ).showSnackBar(
-                                                          SnackBar(
-                                                            content: Text(
-                                                              'Started a fresh evidence session: $sessionLabel',
-                                                            ),
-                                                          ),
-                                                        );
-                                                      },
-                                                icon: const Icon(
-                                                  Icons.restart_alt_rounded,
-                                                ),
-                                                label:
-                                                    const Text('Fresh session'),
-                                              ),
-                                            ),
-                                          ];
-
-                                          if (stacked) {
-                                            return Column(
-                                              children: <Widget>[
-                                                buttons[0],
-                                                const SizedBox(height: 10),
-                                                buttons[1],
-                                              ],
-                                            );
-                                          }
-
-                                          return Row(
-                                            children: <Widget>[
-                                              buttons[0],
-                                              const SizedBox(width: 10),
-                                              buttons[1],
-                                            ],
-                                          );
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 18),
-                                MobilePanel(
-                                  title: 'Pilot readiness signoff',
-                                  action: MobileTag(
-                                    label: readinessReport == null
-                                        ? 'Loading'
-                                        : readinessReport.statusLabel,
-                                    icon: readinessReport == null
-                                        ? Icons.sync_rounded
-                                        : readinessReport.isReadyForShift
-                                        ? Icons.verified_rounded
-                                        : readinessReport.shouldMonitor
-                                        ? Icons.visibility_rounded
-                                        : Icons.block_rounded,
-                                    accent: readinessReport == null
-                                        ? const Color(0xFFF59E0B)
-                                        : readinessReport.isReadyForShift
-                                        ? const Color(0xFF22C55E)
-                                        : readinessReport.shouldMonitor
-                                        ? const Color(0xFFF59E0B)
-                                        : const Color(0xFFFB7185),
-                                  ),
-                                  child: readinessReport == null
-                                      ? const MobileEmptyState(
-                                          icon: Icons.sync_rounded,
-                                          title: 'Building readiness verdict',
-                                          body:
-                                              'The mobile shell is collecting the launch snapshot and queue posture for signoff.',
-                                        )
-                                      : Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: <Widget>[
-                                            Text(
-                                              readinessReport.summary,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall
-                                                  ?.copyWith(
-                                                    color: Colors.white
-                                                        .withValues(
-                                                          alpha: 0.68,
-                                                        ),
-                                                    fontWeight: FontWeight.w600,
-                                                    height: 1.45,
-                                                  ),
-                                            ),
-                                            if (readinessReport.blockers
-                                                .isNotEmpty) ...<Widget>[
-                                              const SizedBox(height: 14),
-                                              Text(
-                                                'Blockers',
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .titleSmall
-                                                    ?.copyWith(
-                                                      color: const Color(
-                                                        0xFFFB7185,
-                                                      ),
-                                                      fontWeight:
-                                                          FontWeight.w900,
-                                                    ),
-                                              ),
-                                              const SizedBox(height: 10),
-                                              ...readinessReport.blockers.map(
-                                                (item) =>
-                                                    _ReadinessNoteRow(
-                                                      message: item,
-                                                      tone: const Color(
-                                                        0xFFFB7185,
-                                                      ),
-                                                    ),
-                                              ),
-                                            ],
-                                            if (readinessReport.warnings
-                                                .isNotEmpty) ...<Widget>[
-                                              const SizedBox(height: 14),
-                                              Text(
-                                                'Warnings',
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .titleSmall
-                                                    ?.copyWith(
-                                                      color: const Color(
-                                                        0xFFF59E0B,
-                                                      ),
-                                                      fontWeight:
-                                                          FontWeight.w900,
-                                                    ),
-                                              ),
-                                              const SizedBox(height: 10),
-                                              ...readinessReport.warnings.map(
-                                                (item) =>
-                                                    _ReadinessNoteRow(
-                                                      message: item,
-                                                      tone: const Color(
-                                                        0xFFF59E0B,
-                                                      ),
-                                                    ),
-                                              ),
-                                            ],
-                                            const SizedBox(height: 14),
-                                            FilledButton.tonalIcon(
-                                              onPressed: () async {
-                                                await Clipboard.setData(
-                                                  ClipboardData(
-                                                    text: readinessReport
-                                                        .toMultilineText(),
-                                                  ),
-                                                );
-                                                await markEvidenceCaptured(
-                                                  'readiness_signoff',
-                                                );
-                                                if (!context.mounted) {
-                                                  return;
-                                                }
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text(
-                                                      'Pilot readiness signoff copied for rollout approval.',
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                              icon: const Icon(
-                                                Icons.copy_all_rounded,
-                                              ),
-                                              label: const Text(
-                                                'Copy readiness signoff',
-                                              ),
-                                            ),
-                                            const SizedBox(height: 10),
-                                            FilledButton.tonalIcon(
-                                              onPressed: handoffReport == null
-                                                  ? null
-                                                  : () async {
-                                                      await Clipboard.setData(
-                                                        ClipboardData(
-                                                          text: handoffReport
-                                                              .toMultilineText(),
-                                                        ),
-                                                      );
-                                                      await markEvidenceCaptured(
-                                                        'handoff_pack',
-                                                      );
-                                                      if (!context.mounted) {
-                                                        return;
-                                                      }
-                                                      ScaffoldMessenger.of(
-                                                        context,
-                                                      ).showSnackBar(
-                                                        const SnackBar(
-                                                          content: Text(
-                                                            'Full pilot handoff pack copied for release evidence.',
-                                                          ),
-                                                        ),
-                                                      );
-                                                    },
-                                              icon: const Icon(
-                                                Icons.assignment_rounded,
-                                              ),
-                                              label: const Text(
-                                                'Copy full handoff pack',
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                                const SizedBox(height: 18),
-                                MobilePanel(
-                                  title: 'Pilot smoke execution',
-                                  action: MobileTag(
-                                    label: readinessReport == null
-                                        ? 'Loading'
-                                        : 'Floor check',
-                                    icon: readinessReport == null
-                                        ? Icons.sync_rounded
-                                        : Icons.playlist_add_check_circle_rounded,
-                                    accent: readinessReport == null
-                                        ? const Color(0xFFF59E0B)
-                                        : const Color(0xFF38BDF8),
-                                  ),
-                                  child: diagnostics == null ||
-                                          readinessReport == null
-                                      ? const MobileEmptyState(
-                                          icon: Icons.sync_rounded,
-                                          title: 'Preparing smoke execution',
-                                          body:
-                                              'The launch snapshot and readiness posture are still loading for this device.',
-                                        )
-                                      : Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: <Widget>[
-                                            Text(
-                                              'Run the floor smoke checklist from the device itself and copy the resulting evidence block into the rollout log. This keeps the final operator decision tied to the exact installed release and workspace binding.',
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall
-                                                  ?.copyWith(
-                                                    color: Colors.white
-                                                        .withValues(
-                                                          alpha: 0.68,
-                                                        ),
-                                                    fontWeight: FontWeight.w600,
-                                                    height: 1.45,
-                                                  ),
-                                            ),
-                                            const SizedBox(height: 14),
-                                            _SettingsRow(
-                                              label: 'Release target',
-                                              value:
-                                                  '${diagnostics.runtimeInfo.releaseTag} | ${diagnostics.runtimeInfo.rolloutScopeLabel}',
-                                              icon: Icons.route_rounded,
-                                            ),
-                                            _SettingsRow(
-                                              label: 'Readiness gate',
-                                              value:
-                                                  readinessReport.statusLabel,
-                                              icon: Icons.fact_check_rounded,
-                                            ),
-                                            FilledButton.tonalIcon(
-                                              onPressed: () async {
-                                                final smokeReport =
-                                                    await _showPilotSmokeChecklistDialog(
-                                                      context,
-                                                      diagnosticsSnapshot:
-                                                          diagnostics,
-                                                      readinessReport:
-                                                          readinessReport,
-                                                    );
-                                                if (smokeReport == null) {
-                                                  return;
-                                                }
-                                                await markEvidenceCaptured(
-                                                  'smoke_report',
-                                                );
-                                                if (!context.mounted) {
-                                                  return;
-                                                }
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      'Pilot smoke report copied with verdict ${smokeReport.verdictLabel}.',
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                              icon: const Icon(
-                                                Icons.assignment_turned_in_rounded,
-                                              ),
-                                              label: const Text(
-                                                'Run smoke checklist',
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                                const SizedBox(height: 18),
-                                MobilePanel(
-                                  title: 'Recovery desk',
-                                  action: MobileTag(
-                                    label: attentionEntries.isEmpty
-                                        ? 'Stable'
-                                        : '${attentionEntries.length} attention',
-                                    icon: attentionEntries.isEmpty
-                                        ? Icons.health_and_safety_rounded
-                                        : Icons.build_circle_rounded,
-                                    accent: attentionEntries.isEmpty
-                                        ? const Color(0xFF22C55E)
-                                        : const Color(0xFFFB7185),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: <Widget>[
-                                      Text(
-                                        'Use this when a pilot device has replay trouble. It shows the highest-risk queued or failed commerce commands, lets you retry one receipt at a time, and creates a recovery report you can hand to support or QA.',
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.bodySmall?.copyWith(
-                                          color: Colors.white.withValues(
-                                            alpha: 0.68,
-                                          ),
-                                          fontWeight: FontWeight.w600,
-                                          height: 1.45,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 14),
-                                      if (attentionEntries.isEmpty)
-                                        const MobileEmptyState(
-                                          icon: Icons.health_and_safety_rounded,
-                                          title:
-                                              'No recovery work is waiting',
-                                          body:
-                                              'Queued and failed commerce commands are clear on this device right now.',
-                                        )
-                                      else
-                                        ...attentionEntries.map(
-                                          (entry) => Padding(
-                                            padding: const EdgeInsets.only(
-                                              bottom: 12,
-                                            ),
-                                            child: _OutboxAttentionRow(
-                                              entry: entry,
-                                              onRetry: () async {
-                                                final result =
-                                                    await syncCoordinator
-                                                        .retryCommerceCommand(
-                                                          entry.commandId,
-                                                        );
-                                                if (!context.mounted) {
-                                                  return;
-                                                }
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      result.message ??
-                                                          'Retry requested for ${entry.commandId}.',
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                        ),
-                                      const SizedBox(height: 6),
-                                      LayoutBuilder(
-                                        builder: (context, constraints) {
-                                          final stacked =
-                                              constraints.maxWidth < 430;
-                                          final buttons = <Widget>[
-                                            Expanded(
-                                              child: FilledButton.tonalIcon(
-                                                onPressed:
-                                                    attentionEntries.isEmpty
-                                                    ? null
-                                                    : () async {
-                                                        final result =
-                                                            await syncCoordinator
-                                                                .flushCommerceOutbox();
-                                                        if (!context.mounted) {
-                                                          return;
-                                                        }
-                                                        ScaffoldMessenger.of(
-                                                          context,
-                                                        ).showSnackBar(
-                                                          SnackBar(
-                                                            content: Text(
-                                                              result.message ??
-                                                                  'Recovery replay requested.',
-                                                            ),
-                                                          ),
-                                                        );
-                                                      },
-                                                icon: const Icon(
-                                                  Icons.cloud_sync_rounded,
-                                                ),
-                                                label: const Text(
-                                                  'Retry all attention items',
-                                                ),
-                                              ),
-                                            ),
-                                            Expanded(
-                                              child: FilledButton.tonalIcon(
-                                                onPressed:
-                                                    recoveryReport == null
-                                                    ? null
-                                                    : () async {
-                                                        await Clipboard.setData(
-                                                          ClipboardData(
-                                                            text:
-                                                                recoveryReport
-                                                                    .toMultilineText(),
-                                                          ),
-                                                        );
-                                                        await markEvidenceCaptured(
-                                                          'recovery_report',
-                                                        );
-                                                        if (!context.mounted) {
-                                                          return;
-                                                        }
-                                                        ScaffoldMessenger.of(
-                                                          context,
-                                                        ).showSnackBar(
-                                                          const SnackBar(
-                                                            content: Text(
-                                                              'Pilot recovery report copied for support handoff.',
-                                                            ),
-                                                          ),
-                                                        );
-                                                      },
-                                                icon: const Icon(
-                                                  Icons.copy_all_rounded,
-                                                ),
-                                                label: const Text(
-                                                  'Copy recovery report',
-                                                ),
-                                              ),
-                                            ),
-                                          ];
-
-                                          if (stacked) {
-                                            return Column(
-                                              children: <Widget>[
-                                                buttons[0],
-                                                const SizedBox(height: 10),
-                                                buttons[1],
-                                              ],
-                                            );
-                                          }
-
-                                          return Row(
-                                            children: <Widget>[
-                                              buttons[0],
-                                              const SizedBox(width: 10),
-                                              buttons[1],
-                                            ],
-                                          );
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 18),
-                                MobilePanel(
-                                  title: 'Shift closeout',
-                                  action: MobileTag(
-                                    label: diagnostics == null ||
-                                            readinessReport == null ||
-                                            recoveryReport == null
-                                        ? 'Loading'
-                                        : 'End of shift',
-                                    icon: diagnostics == null ||
-                                            readinessReport == null ||
-                                            recoveryReport == null
-                                        ? Icons.sync_rounded
-                                        : Icons.assignment_late_rounded,
-                                    accent: diagnostics == null ||
-                                            readinessReport == null ||
-                                            recoveryReport == null
-                                        ? const Color(0xFFF59E0B)
-                                        : const Color(0xFFA78BFA),
-                                  ),
-                                  child: diagnostics == null ||
-                                          readinessReport == null ||
-                                          recoveryReport == null
-                                      ? const MobileEmptyState(
-                                          icon: Icons.sync_rounded,
-                                          title: 'Preparing shift closeout',
-                                          body:
-                                              'The device is still resolving readiness and recovery posture for this closeout report.',
-                                        )
-                                      : Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: <Widget>[
-                                            Text(
-                                              'Use this at the end of a real pilot shift. It captures whether checkout, replay, and customer-ledger behavior stayed healthy, and creates the final operator-side handoff note for the next shift or rollout lead.',
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall
-                                                  ?.copyWith(
-                                                    color: Colors.white
-                                                        .withValues(
-                                                          alpha: 0.68,
-                                                        ),
-                                                    fontWeight: FontWeight.w600,
-                                                    height: 1.45,
-                                                  ),
-                                            ),
-                                            const SizedBox(height: 14),
-                                            _SettingsRow(
-                                              label: 'Queue posture',
-                                              value: diagnostics
-                                                          .pendingOutboxCount >
-                                                      0
-                                                  ? '${diagnostics.pendingOutboxCount} command(s) still queued'
-                                                  : 'Queue clear',
-                                              icon: Icons.outbox_rounded,
-                                            ),
-                                            _SettingsRow(
-                                              label: 'Recovery attention',
-                                              value: attentionEntries.isEmpty
-                                                  ? 'No active recovery items'
-                                                  : '${attentionEntries.length} attention item(s)',
-                                              icon: Icons.health_and_safety_rounded,
-                                            ),
-                                            FilledButton.tonalIcon(
-                                              onPressed: () async {
-                                                final closeoutReport =
-                                                    await _showPilotShiftCloseoutDialog(
-                                                      context,
-                                                      diagnosticsSnapshot:
-                                                          diagnostics,
-                                                      readinessReport:
-                                                          readinessReport,
-                                                      recoveryReport:
-                                                          recoveryReport,
-                                                    );
-                                                if (closeoutReport == null) {
-                                                  return;
-                                                }
-                                                await markEvidenceCaptured(
-                                                  'shift_closeout',
-                                                );
-                                                if (!context.mounted) {
-                                                  return;
-                                                }
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      'Shift closeout copied with decision ${closeoutReport.decisionLabel}.',
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                              icon: const Icon(
-                                                Icons.assignment_turned_in_rounded,
-                                              ),
-                                              label: const Text(
-                                                'Run shift closeout',
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                                const SizedBox(height: 18),
-                                MobilePanel(
-                                  title: 'Rollout decision summary',
-                                  action: MobileTag(
-                                    label: rolloutDecisionSummary == null
-                                        ? 'Loading'
-                                        : rolloutDecisionSummary.verdictLabel,
-                                    icon: rolloutDecisionSummary == null
-                                        ? Icons.sync_rounded
-                                        : rolloutDecisionSummary
-                                                  .shouldRollbackAndEscalate
-                                        ? Icons.crisis_alert_rounded
-                                        : rolloutDecisionSummary
-                                                  .shouldInvestigateBeforeExpand
-                                        ? Icons.troubleshoot_rounded
-                                        : rolloutDecisionSummary
-                                                  .shouldHoldAndMonitor
-                                        ? Icons.visibility_rounded
-                                        : Icons.trending_up_rounded,
-                                    accent: rolloutDecisionSummary == null
-                                        ? const Color(0xFFF59E0B)
-                                        : rolloutDecisionSummary
-                                                  .shouldRollbackAndEscalate
-                                        ? const Color(0xFFFB7185)
-                                        : rolloutDecisionSummary
-                                                  .shouldInvestigateBeforeExpand
-                                        ? const Color(0xFFF59E0B)
-                                        : rolloutDecisionSummary
-                                                  .shouldHoldAndMonitor
-                                        ? const Color(0xFF38BDF8)
-                                        : const Color(0xFF22C55E),
-                                  ),
-                                  child: rolloutDecisionSummary == null
-                                      ? const MobileEmptyState(
-                                          icon: Icons.sync_rounded,
-                                          title: 'Preparing rollout decision summary',
-                                          body:
-                                              'The device is still combining readiness, recovery, action, and archive posture into a rollout verdict.',
-                                        )
-                                      : Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: <Widget>[
-                                            Text(
-                                              rolloutDecisionSummary.summary,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall
-                                                  ?.copyWith(
-                                                    color: Colors.white
-                                                        .withValues(
-                                                          alpha: 0.68,
-                                                        ),
-                                                    fontWeight: FontWeight.w600,
-                                                    height: 1.45,
-                                                  ),
-                                            ),
-                                            const SizedBox(height: 14),
-                                            _SettingsRow(
-                                              label: 'Verdict',
-                                              value: rolloutDecisionSummary
-                                                  .verdictLabel,
-                                              icon: Icons.gavel_rounded,
-                                            ),
-                                            _SettingsRow(
-                                              label: 'Recommended next action',
-                                              value: actionPlan!.actionLabel,
-                                              icon: Icons.route_rounded,
-                                            ),
-                                            _SettingsRow(
-                                              label: 'Archive posture',
-                                              value: evidenceTracker
-                                                  .archiveTrendLabel,
-                                              icon: Icons.insights_rounded,
-                                            ),
-                                            ...rolloutDecisionSummary.reasons.map(
-                                              (reason) => _ReadinessNoteRow(
-                                                message: reason,
-                                                tone: rolloutDecisionSummary
-                                                        .shouldRollbackAndEscalate
-                                                    ? const Color(0xFFFB7185)
-                                                    : rolloutDecisionSummary
-                                                              .shouldInvestigateBeforeExpand
-                                                    ? const Color(0xFFF59E0B)
-                                                    : rolloutDecisionSummary
-                                                              .shouldHoldAndMonitor
-                                                    ? const Color(0xFF38BDF8)
-                                                    : const Color(0xFF22C55E),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 14),
-                                            FilledButton.tonalIcon(
-                                              onPressed: () async {
-                                                await Clipboard.setData(
-                                                  ClipboardData(
-                                                    text:
-                                                        rolloutDecisionSummary
-                                                            .toMultilineText(),
-                                                  ),
-                                                );
-                                                await markEvidenceCaptured(
-                                                  'rollout_decision_summary',
-                                                );
-                                                if (!context.mounted) {
-                                                  return;
-                                                }
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      'Rollout decision summary copied with verdict ${rolloutDecisionSummary.verdictLabel}.',
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                              icon: const Icon(
-                                                Icons.assignment_turned_in_rounded,
-                                              ),
-                                              label: const Text(
-                                                'Copy decision summary',
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                                const SizedBox(height: 18),
-                                MobilePanel(
-                                  title: 'Wave closeout readiness',
-                                  action: MobileTag(
-                                    label: waveCloseoutReadiness == null
-                                        ? 'Loading'
-                                        : waveCloseoutReadiness.statusLabel,
-                                    icon: waveCloseoutReadiness == null
-                                        ? Icons.sync_rounded
-                                        : waveCloseoutReadiness.shouldNotClose
-                                        ? Icons.block_rounded
-                                        : waveCloseoutReadiness
-                                                  .shouldCaptureMoreEvidence
-                                        ? Icons.assignment_late_rounded
-                                        : waveCloseoutReadiness
-                                                  .isCloseoutWithMonitoring
-                                        ? Icons.visibility_rounded
-                                        : Icons.task_alt_rounded,
-                                    accent: waveCloseoutReadiness == null
-                                        ? const Color(0xFFF59E0B)
-                                        : waveCloseoutReadiness.shouldNotClose
-                                        ? const Color(0xFFFB7185)
-                                        : waveCloseoutReadiness
-                                                  .shouldCaptureMoreEvidence
-                                        ? const Color(0xFFF59E0B)
-                                        : waveCloseoutReadiness
-                                                  .isCloseoutWithMonitoring
-                                        ? const Color(0xFF38BDF8)
-                                        : const Color(0xFF22C55E),
-                                  ),
-                                  child: waveCloseoutReadiness == null
-                                      ? const MobileEmptyState(
-                                          icon: Icons.sync_rounded,
-                                          title: 'Preparing wave closeout readiness',
-                                          body:
-                                              'The device is still evaluating whether this rollout wave can be closed cleanly.',
-                                        )
-                                      : Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: <Widget>[
-                                            Text(
-                                              waveCloseoutReadiness.summary,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall
-                                                  ?.copyWith(
-                                                    color: Colors.white
-                                                        .withValues(
-                                                          alpha: 0.68,
-                                                        ),
-                                                    fontWeight: FontWeight.w600,
-                                                    height: 1.45,
-                                                  ),
-                                            ),
-                                            const SizedBox(height: 14),
-                                            _SettingsRow(
-                                              label: 'Closeout status',
-                                              value: waveCloseoutReadiness
-                                                  .statusLabel,
-                                              icon: Icons.playlist_add_check_rounded,
-                                            ),
-                                            _SettingsRow(
-                                              label: 'Required artifacts',
-                                              value: waveCloseoutReadiness
-                                                  .closeoutArtifactsLabel,
-                                              icon: Icons.fact_check_rounded,
-                                            ),
-                                            _SettingsRow(
-                                              label: 'Decision posture',
-                                              value: rolloutDecisionSummary!
-                                                  .verdictLabel,
-                                              icon: Icons.gavel_rounded,
-                                            ),
-                                            ...waveCloseoutReadiness.reasons.map(
-                                              (reason) => _ReadinessNoteRow(
-                                                message: reason,
-                                                tone: waveCloseoutReadiness
-                                                        .shouldNotClose
-                                                    ? const Color(0xFFFB7185)
-                                                    : waveCloseoutReadiness
-                                                              .shouldCaptureMoreEvidence
-                                                    ? const Color(0xFFF59E0B)
-                                                    : waveCloseoutReadiness
-                                                              .isCloseoutWithMonitoring
-                                                    ? const Color(0xFF38BDF8)
-                                                    : const Color(0xFF22C55E),
-                                              ),
-                                            ),
-                                            if (waveCloseoutReadiness
-                                                .missingCloseoutArtifacts
-                                                .isNotEmpty) ...<Widget>[
-                                              const SizedBox(height: 14),
-                                              Text(
-                                                'Still missing for closeout:',
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .labelLarge
-                                                    ?.copyWith(
-                                                      color: const Color(
-                                                        0xFFF59E0B,
-                                                      ),
-                                                      fontWeight:
-                                                          FontWeight.w900,
-                                                    ),
-                                              ),
-                                              const SizedBox(height: 10),
-                                              ...waveCloseoutReadiness
-                                                  .missingCloseoutArtifacts
-                                                  .map(
-                                                    (artifact) =>
-                                                        _ReadinessNoteRow(
-                                                      message: artifact.label,
-                                                      tone: const Color(
-                                                        0xFFF59E0B,
-                                                      ),
-                                                    ),
-                                                  ),
-                                            ],
-                                            const SizedBox(height: 14),
-                                            FilledButton.tonalIcon(
-                                              onPressed: () async {
-                                                await Clipboard.setData(
-                                                  ClipboardData(
-                                                    text:
-                                                        waveCloseoutReadiness
-                                                            .toMultilineText(),
-                                                  ),
-                                                );
-                                                await markEvidenceCaptured(
-                                                  'wave_closeout_readiness',
-                                                );
-                                                if (!context.mounted) {
-                                                  return;
-                                                }
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      'Wave closeout readiness copied with status ${waveCloseoutReadiness.statusLabel}.',
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                              icon: const Icon(
-                                                Icons.assignment_turned_in_rounded,
-                                              ),
-                                              label: const Text(
-                                                'Copy wave closeout readiness',
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                                const SizedBox(height: 18),
-                                MobilePanel(
-                                  title: 'Wave signoff pack',
-                                  action: MobileTag(
-                                    label: waveSignoffPack == null
-                                        ? 'Loading'
-                                        : waveSignoffPack.signoffStatusLabel,
-                                    icon: waveSignoffPack == null
-                                        ? Icons.sync_rounded
-                                        : waveSignoffPack.isSignoffBlocked
-                                        ? Icons.block_rounded
-                                        : waveSignoffPack.isSignoffIncomplete
-                                        ? Icons.assignment_late_rounded
-                                        : waveSignoffPack
-                                                  .isSignoffWithMonitoring
-                                        ? Icons.visibility_rounded
-                                        : Icons.verified_rounded,
-                                    accent: waveSignoffPack == null
-                                        ? const Color(0xFFF59E0B)
-                                        : waveSignoffPack.isSignoffBlocked
-                                        ? const Color(0xFFFB7185)
-                                        : waveSignoffPack.isSignoffIncomplete
-                                        ? const Color(0xFFF59E0B)
-                                        : waveSignoffPack
-                                                  .isSignoffWithMonitoring
-                                        ? const Color(0xFF38BDF8)
-                                        : const Color(0xFF22C55E),
-                                  ),
-                                  child: waveSignoffPack == null
-                                      ? const MobileEmptyState(
-                                          icon: Icons.sync_rounded,
-                                          title: 'Preparing wave signoff pack',
-                                          body:
-                                              'The device is still combining closeout, decision, and evidence posture into the final wave handoff package.',
-                                        )
-                                      : Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: <Widget>[
-                                            Text(
-                                              waveSignoffPack.summary,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall
-                                                  ?.copyWith(
-                                                    color: Colors.white
-                                                        .withValues(
-                                                          alpha: 0.68,
-                                                        ),
-                                                    fontWeight: FontWeight.w600,
-                                                    height: 1.45,
-                                                  ),
-                                            ),
-                                            const SizedBox(height: 14),
-                                            _SettingsRow(
-                                              label: 'Signoff status',
-                                              value: waveSignoffPack
-                                                  .signoffStatusLabel,
-                                              icon: Icons.verified_user_rounded,
-                                            ),
-                                            _SettingsRow(
-                                              label: 'Closeout posture',
-                                              value: waveCloseoutReadiness!
-                                                  .statusLabel,
-                                              icon: Icons.playlist_add_check_rounded,
-                                            ),
-                                            _SettingsRow(
-                                              label: 'Decision posture',
-                                              value: rolloutDecisionSummary!
-                                                  .verdictLabel,
-                                              icon: Icons.gavel_rounded,
-                                            ),
-                                            ...waveSignoffPack.reasons.map(
-                                              (reason) => _ReadinessNoteRow(
-                                                message: reason,
-                                                tone: waveSignoffPack
-                                                        .isSignoffBlocked
-                                                    ? const Color(0xFFFB7185)
-                                                    : waveSignoffPack
-                                                              .isSignoffIncomplete
-                                                    ? const Color(0xFFF59E0B)
-                                                    : waveSignoffPack
-                                                              .isSignoffWithMonitoring
-                                                    ? const Color(0xFF38BDF8)
-                                                    : const Color(0xFF22C55E),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 14),
-                                            FilledButton.tonalIcon(
-                                              onPressed: () async {
-                                                await Clipboard.setData(
-                                                  ClipboardData(
-                                                    text: waveSignoffPack
-                                                        .toMultilineText(),
-                                                  ),
-                                                );
-                                                await markEvidenceCaptured(
-                                                  'wave_signoff_pack',
-                                                );
-                                                if (!context.mounted) {
-                                                  return;
-                                                }
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      'Wave signoff pack copied with status ${waveSignoffPack.signoffStatusLabel}.',
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                              icon: const Icon(
-                                                Icons.assignment_turned_in_rounded,
-                                              ),
-                                              label: const Text(
-                                                'Copy wave signoff pack',
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                                const SizedBox(height: 18),
-                                MobilePanel(
-                                  title: 'Wave archive pack',
-                                  action: MobileTag(
-                                    label: waveArchivePack == null
-                                        ? 'Loading'
-                                        : waveArchivePack.archiveStatusLabel,
-                                    icon: waveArchivePack == null
-                                        ? Icons.sync_rounded
-                                        : waveArchivePack.isArchiveBlocked
-                                        ? Icons.block_rounded
-                                        : waveArchivePack.isArchiveIncomplete
-                                        ? Icons.assignment_late_rounded
-                                        : waveArchivePack.isArchiveWithAttention
-                                        ? Icons.archive_rounded
-                                        : Icons.inventory_2_rounded,
-                                    accent: waveArchivePack == null
-                                        ? const Color(0xFFF59E0B)
-                                        : waveArchivePack.isArchiveBlocked
-                                        ? const Color(0xFFFB7185)
-                                        : waveArchivePack.isArchiveIncomplete
-                                        ? const Color(0xFFF59E0B)
-                                        : waveArchivePack.isArchiveWithAttention
-                                        ? const Color(0xFF38BDF8)
-                                        : const Color(0xFF22C55E),
-                                  ),
-                                  child: waveArchivePack == null
-                                      ? const MobileEmptyState(
-                                          icon: Icons.sync_rounded,
-                                          title: 'Preparing wave archive pack',
-                                          body:
-                                              'The device is still combining final signoff with the evidence archive for permanent rollout records.',
-                                        )
-                                      : Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: <Widget>[
-                                            Text(
-                                              waveArchivePack.summary,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall
-                                                  ?.copyWith(
-                                                    color: Colors.white
-                                                        .withValues(
-                                                          alpha: 0.68,
-                                                        ),
-                                                    fontWeight: FontWeight.w600,
-                                                    height: 1.45,
-                                                  ),
-                                            ),
-                                            const SizedBox(height: 14),
-                                            _SettingsRow(
-                                              label: 'Archive status',
-                                              value: waveArchivePack
-                                                  .archiveStatusLabel,
-                                              icon: Icons.archive_rounded,
-                                            ),
-                                            _SettingsRow(
-                                              label: 'Signoff posture',
-                                              value: waveArchivePack
-                                                  .waveSignoffPack
-                                                  .signoffStatusLabel,
-                                              icon: Icons.verified_user_rounded,
-                                            ),
-                                            _SettingsRow(
-                                              label: 'Archived sessions',
-                                              value:
-                                                  '${evidenceTracker.archivedSessions.length} saved',
-                                              icon: Icons.history_edu_rounded,
-                                            ),
-                                            ...waveArchivePack.reasons.map(
-                                              (reason) => _ReadinessNoteRow(
-                                                message: reason,
-                                                tone: waveArchivePack
-                                                        .isArchiveBlocked
-                                                    ? const Color(0xFFFB7185)
-                                                    : waveArchivePack
-                                                              .isArchiveIncomplete
-                                                    ? const Color(0xFFF59E0B)
-                                                    : waveArchivePack
-                                                              .isArchiveWithAttention
-                                                    ? const Color(0xFF38BDF8)
-                                                    : const Color(0xFF22C55E),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 14),
-                                            FilledButton.tonalIcon(
-                                              onPressed: () async {
-                                                await Clipboard.setData(
-                                                  ClipboardData(
-                                                    text: waveArchivePack
-                                                        .toMultilineText(),
-                                                  ),
-                                                );
-                                                await markEvidenceCaptured(
-                                                  'wave_archive_pack',
-                                                );
-                                                if (!context.mounted) {
-                                                  return;
-                                                }
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      'Wave archive pack copied with status ${waveArchivePack.archiveStatusLabel}.',
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                              icon: const Icon(
-                                                Icons.inventory_2_rounded,
-                                              ),
-                                              label: const Text(
-                                                'Copy wave archive pack',
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                                const SizedBox(height: 18),
-                                MobilePanel(
-                                  title: 'Rollout evidence pack',
-                                  action: MobileTag(
-                                    label: diagnostics == null ||
-                                            readinessReport == null ||
-                                            recoveryReport == null
-                                        ? 'Loading'
-                                        : 'Wave record',
-                                    icon: diagnostics == null ||
-                                            readinessReport == null ||
-                                            recoveryReport == null
-                                        ? Icons.sync_rounded
-                                        : Icons.library_books_rounded,
-                                    accent: diagnostics == null ||
-                                            readinessReport == null ||
-                                            recoveryReport == null
-                                        ? const Color(0xFFF59E0B)
-                                        : const Color(0xFF38BDF8),
-                                  ),
-                                  child: diagnostics == null ||
-                                          readinessReport == null ||
-                                          recoveryReport == null
-                                      ? const MobileEmptyState(
-                                          icon: Icons.sync_rounded,
-                                          title: 'Preparing rollout evidence',
-                                          body:
-                                              'The device is still resolving the core reports needed for the consolidated rollout record.',
-                                        )
-                                      : Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: <Widget>[
-                                            Text(
-                                              'Use this when a rollout lead wants one final copied pack for the wave record. It consolidates the current readiness, snapshot, and recovery posture, then lets the operator summarize smoke and closeout outcomes in one export.',
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall
-                                                  ?.copyWith(
-                                                    color: Colors.white
-                                                        .withValues(
-                                                          alpha: 0.68,
-                                                        ),
-                                                    fontWeight: FontWeight.w600,
-                                                    height: 1.45,
-                                                  ),
-                                            ),
-                                            const SizedBox(height: 14),
-                                            _SettingsRow(
-                                              label: 'Release target',
-                                              value:
-                                                  '${diagnostics.runtimeInfo.releaseTag} | ${diagnostics.runtimeInfo.rolloutScopeLabel}',
-                                              icon: Icons.route_rounded,
-                                            ),
-                                            _SettingsRow(
-                                              label: 'Recovery posture',
-                                              value:
-                                                  '${recoveryReport.attentionEntries.length} open attention item(s)',
-                                              icon: Icons.health_and_safety_rounded,
-                                            ),
-                                            FilledButton.tonalIcon(
-                                              onPressed: () async {
-                                                final evidenceReport =
-                                                    await _showPilotRolloutEvidenceDialog(
-                                                      context,
-                                                      diagnosticsSnapshot:
-                                                          diagnostics,
-                                                      readinessReport:
-                                                          readinessReport,
-                                                      recoveryReport:
-                                                          recoveryReport,
-                                                    );
-                                                if (evidenceReport == null) {
-                                                  return;
-                                                }
-                                                await markEvidenceCaptured(
-                                                  'rollout_evidence',
-                                                );
-                                                if (!context.mounted) {
-                                                  return;
-                                                }
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      'Rollout evidence pack copied with recommendation ${evidenceReport.recommendationLabel}.',
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                              icon: const Icon(
-                                                Icons.assignment_rounded,
-                                              ),
-                                              label: const Text(
-                                                'Build evidence pack',
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                                const SizedBox(height: 18),
-                                MobilePanel(
-                                  title: 'Incident escalation pack',
-                                  action: MobileTag(
-                                    label: diagnostics == null ||
-                                            readinessReport == null ||
-                                            recoveryReport == null
-                                        ? 'Loading'
-                                        : 'Escalation',
-                                    icon: diagnostics == null ||
-                                            readinessReport == null ||
-                                            recoveryReport == null
-                                        ? Icons.sync_rounded
-                                        : Icons.crisis_alert_rounded,
-                                    accent: diagnostics == null ||
-                                            readinessReport == null ||
-                                            recoveryReport == null
-                                        ? const Color(0xFFF59E0B)
-                                        : const Color(0xFFFB7185),
-                                  ),
-                                  child: diagnostics == null ||
-                                          readinessReport == null ||
-                                          recoveryReport == null
-                                      ? const MobileEmptyState(
-                                          icon: Icons.sync_rounded,
-                                          title: 'Preparing escalation pack',
-                                          body:
-                                              'The device is still collecting the reports needed for a structured incident export.',
-                                        )
-                                      : Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: <Widget>[
-                                            Text(
-                                              'Use this when the rollout lead, support, or engineering needs one structured incident record directly from the affected device. It turns the current readiness, snapshot, and recovery state into a support-ready escalation pack.',
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall
-                                                  ?.copyWith(
-                                                    color: Colors.white
-                                                        .withValues(
-                                                          alpha: 0.68,
-                                                        ),
-                                                    fontWeight: FontWeight.w600,
-                                                    height: 1.45,
-                                                  ),
-                                            ),
-                                            const SizedBox(height: 14),
-                                            _SettingsRow(
-                                              label: 'Failure posture',
-                                              value:
-                                                  '${recoveryReport.attentionEntries.length} recovery item(s) | ${diagnostics.historyOverview.failedSales} failed receipt(s)',
-                                              icon: Icons.error_outline_rounded,
-                                            ),
-                                            FilledButton.tonalIcon(
-                                              onPressed: () async {
-                                                final escalationReport =
-                                                    await _showPilotIncidentEscalationDialog(
-                                                      context,
-                                                      diagnosticsSnapshot:
-                                                          diagnostics,
-                                                      readinessReport:
-                                                          readinessReport,
-                                                      recoveryReport:
-                                                          recoveryReport,
-                                                    );
-                                                if (escalationReport == null) {
-                                                  return;
-                                                }
-                                                await markEvidenceCaptured(
-                                                  'incident_escalation',
-                                                );
-                                                if (!context.mounted) {
-                                                  return;
-                                                }
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      'Incident escalation pack copied with decision ${escalationReport.escalationDecisionLabel}.',
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                              icon: const Icon(
-                                                Icons.copy_all_rounded,
-                                              ),
-                                              label: const Text(
-                                                'Build escalation pack',
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                              ],
                             ),
-            ],
-            ],
-          ),
-        );
+                          ];
+
+                          if (stacked) {
+                            return Column(
+                              children: <Widget>[
+                                buttons[0],
+                                const SizedBox(height: 10),
+                                buttons[1],
+                              ],
+                            );
+                          }
+
+                          return Row(
+                            children: <Widget>[
+                              buttons[0],
+                              const SizedBox(width: 10),
+                              buttons[1],
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                MobilePanel(
+                  title: 'Shift closeout',
+                  action: MobileTag(
+                    label:
+                        diagnostics == null ||
+                            readinessReport == null ||
+                            recoveryReport == null
+                        ? 'Loading'
+                        : 'End of shift',
+                    icon:
+                        diagnostics == null ||
+                            readinessReport == null ||
+                            recoveryReport == null
+                        ? Icons.sync_rounded
+                        : Icons.assignment_late_rounded,
+                    accent:
+                        diagnostics == null ||
+                            readinessReport == null ||
+                            recoveryReport == null
+                        ? const Color(0xFFF59E0B)
+                        : const Color(0xFFA78BFA),
+                  ),
+                  child:
+                      diagnostics == null ||
+                          readinessReport == null ||
+                          recoveryReport == null
+                      ? const MobileEmptyState(
+                          icon: Icons.sync_rounded,
+                          title: 'Preparing shift closeout',
+                          body:
+                              'The device is still resolving readiness and recovery posture for this closeout report.',
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              'Use this at the end of a real pilot shift. It captures whether checkout, replay, and customer-ledger behavior stayed healthy, and creates the final operator-side handoff note for the next shift or rollout lead.',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.68),
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.45,
+                                  ),
+                            ),
+                            const SizedBox(height: 14),
+                            _SettingsRow(
+                              label: 'Queue posture',
+                              value: diagnostics.pendingOutboxCount > 0
+                                  ? '${diagnostics.pendingOutboxCount} command(s) still queued'
+                                  : 'Queue clear',
+                              icon: Icons.outbox_rounded,
+                            ),
+                            _SettingsRow(
+                              label: 'Recovery attention',
+                              value: attentionEntries.isEmpty
+                                  ? 'No active recovery items'
+                                  : '${attentionEntries.length} attention item(s)',
+                              icon: Icons.health_and_safety_rounded,
+                            ),
+                            FilledButton.tonalIcon(
+                              onPressed: () async {
+                                final closeoutReport =
+                                    await _showPilotShiftCloseoutDialog(
+                                      context,
+                                      diagnosticsSnapshot: diagnostics,
+                                      readinessReport: readinessReport,
+                                      recoveryReport: recoveryReport,
+                                    );
+                                if (closeoutReport == null) {
+                                  return;
+                                }
+                                await markEvidenceCaptured('shift_closeout');
+                                if (!context.mounted) {
+                                  return;
+                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Shift closeout copied with decision ${closeoutReport.decisionLabel}.',
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.assignment_turned_in_rounded,
+                              ),
+                              label: const Text('Run shift closeout'),
+                            ),
+                          ],
+                        ),
+                ),
+                const SizedBox(height: 18),
+                MobilePanel(
+                  title: 'Rollout decision summary',
+                  action: MobileTag(
+                    label: rolloutDecisionSummary == null
+                        ? 'Loading'
+                        : rolloutDecisionSummary.verdictLabel,
+                    icon: rolloutDecisionSummary == null
+                        ? Icons.sync_rounded
+                        : rolloutDecisionSummary.shouldRollbackAndEscalate
+                        ? Icons.crisis_alert_rounded
+                        : rolloutDecisionSummary.shouldInvestigateBeforeExpand
+                        ? Icons.troubleshoot_rounded
+                        : rolloutDecisionSummary.shouldHoldAndMonitor
+                        ? Icons.visibility_rounded
+                        : Icons.trending_up_rounded,
+                    accent: rolloutDecisionSummary == null
+                        ? const Color(0xFFF59E0B)
+                        : rolloutDecisionSummary.shouldRollbackAndEscalate
+                        ? const Color(0xFFFB7185)
+                        : rolloutDecisionSummary.shouldInvestigateBeforeExpand
+                        ? const Color(0xFFF59E0B)
+                        : rolloutDecisionSummary.shouldHoldAndMonitor
+                        ? const Color(0xFF38BDF8)
+                        : const Color(0xFF22C55E),
+                  ),
+                  child: rolloutDecisionSummary == null
+                      ? const MobileEmptyState(
+                          icon: Icons.sync_rounded,
+                          title: 'Preparing rollout decision summary',
+                          body:
+                              'The device is still combining readiness, recovery, action, and archive posture into a rollout verdict.',
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              rolloutDecisionSummary.summary,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.68),
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.45,
+                                  ),
+                            ),
+                            const SizedBox(height: 14),
+                            _SettingsRow(
+                              label: 'Verdict',
+                              value: rolloutDecisionSummary.verdictLabel,
+                              icon: Icons.gavel_rounded,
+                            ),
+                            _SettingsRow(
+                              label: 'Recommended next action',
+                              value: actionPlan!.actionLabel,
+                              icon: Icons.route_rounded,
+                            ),
+                            _SettingsRow(
+                              label: 'Archive posture',
+                              value: evidenceTracker.archiveTrendLabel,
+                              icon: Icons.insights_rounded,
+                            ),
+                            ...rolloutDecisionSummary.reasons.map(
+                              (reason) => _ReadinessNoteRow(
+                                message: reason,
+                                tone:
+                                    rolloutDecisionSummary
+                                        .shouldRollbackAndEscalate
+                                    ? const Color(0xFFFB7185)
+                                    : rolloutDecisionSummary
+                                          .shouldInvestigateBeforeExpand
+                                    ? const Color(0xFFF59E0B)
+                                    : rolloutDecisionSummary
+                                          .shouldHoldAndMonitor
+                                    ? const Color(0xFF38BDF8)
+                                    : const Color(0xFF22C55E),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            FilledButton.tonalIcon(
+                              onPressed: () async {
+                                await Clipboard.setData(
+                                  ClipboardData(
+                                    text: rolloutDecisionSummary
+                                        .toMultilineText(),
+                                  ),
+                                );
+                                await markEvidenceCaptured(
+                                  'rollout_decision_summary',
+                                );
+                                if (!context.mounted) {
+                                  return;
+                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Rollout decision summary copied with verdict ${rolloutDecisionSummary.verdictLabel}.',
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.assignment_turned_in_rounded,
+                              ),
+                              label: const Text('Copy decision summary'),
+                            ),
+                          ],
+                        ),
+                ),
+                const SizedBox(height: 18),
+                MobilePanel(
+                  title: 'Wave closeout readiness',
+                  action: MobileTag(
+                    label: waveCloseoutReadiness == null
+                        ? 'Loading'
+                        : waveCloseoutReadiness.statusLabel,
+                    icon: waveCloseoutReadiness == null
+                        ? Icons.sync_rounded
+                        : waveCloseoutReadiness.shouldNotClose
+                        ? Icons.block_rounded
+                        : waveCloseoutReadiness.shouldCaptureMoreEvidence
+                        ? Icons.assignment_late_rounded
+                        : waveCloseoutReadiness.isCloseoutWithMonitoring
+                        ? Icons.visibility_rounded
+                        : Icons.task_alt_rounded,
+                    accent: waveCloseoutReadiness == null
+                        ? const Color(0xFFF59E0B)
+                        : waveCloseoutReadiness.shouldNotClose
+                        ? const Color(0xFFFB7185)
+                        : waveCloseoutReadiness.shouldCaptureMoreEvidence
+                        ? const Color(0xFFF59E0B)
+                        : waveCloseoutReadiness.isCloseoutWithMonitoring
+                        ? const Color(0xFF38BDF8)
+                        : const Color(0xFF22C55E),
+                  ),
+                  child: waveCloseoutReadiness == null
+                      ? const MobileEmptyState(
+                          icon: Icons.sync_rounded,
+                          title: 'Preparing wave closeout readiness',
+                          body:
+                              'The device is still evaluating whether this rollout wave can be closed cleanly.',
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              waveCloseoutReadiness.summary,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.68),
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.45,
+                                  ),
+                            ),
+                            const SizedBox(height: 14),
+                            _SettingsRow(
+                              label: 'Closeout status',
+                              value: waveCloseoutReadiness.statusLabel,
+                              icon: Icons.playlist_add_check_rounded,
+                            ),
+                            _SettingsRow(
+                              label: 'Required artifacts',
+                              value:
+                                  waveCloseoutReadiness.closeoutArtifactsLabel,
+                              icon: Icons.fact_check_rounded,
+                            ),
+                            _SettingsRow(
+                              label: 'Decision posture',
+                              value: rolloutDecisionSummary!.verdictLabel,
+                              icon: Icons.gavel_rounded,
+                            ),
+                            ...waveCloseoutReadiness.reasons.map(
+                              (reason) => _ReadinessNoteRow(
+                                message: reason,
+                                tone: waveCloseoutReadiness.shouldNotClose
+                                    ? const Color(0xFFFB7185)
+                                    : waveCloseoutReadiness
+                                          .shouldCaptureMoreEvidence
+                                    ? const Color(0xFFF59E0B)
+                                    : waveCloseoutReadiness
+                                          .isCloseoutWithMonitoring
+                                    ? const Color(0xFF38BDF8)
+                                    : const Color(0xFF22C55E),
+                              ),
+                            ),
+                            if (waveCloseoutReadiness
+                                .missingCloseoutArtifacts
+                                .isNotEmpty) ...<Widget>[
+                              const SizedBox(height: 14),
+                              Text(
+                                'Still missing for closeout:',
+                                style: Theme.of(context).textTheme.labelLarge
+                                    ?.copyWith(
+                                      color: const Color(0xFFF59E0B),
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                              ),
+                              const SizedBox(height: 10),
+                              ...waveCloseoutReadiness.missingCloseoutArtifacts
+                                  .map(
+                                    (artifact) => _ReadinessNoteRow(
+                                      message: artifact.label,
+                                      tone: const Color(0xFFF59E0B),
+                                    ),
+                                  ),
+                            ],
+                            const SizedBox(height: 14),
+                            FilledButton.tonalIcon(
+                              onPressed: () async {
+                                await Clipboard.setData(
+                                  ClipboardData(
+                                    text: waveCloseoutReadiness
+                                        .toMultilineText(),
+                                  ),
+                                );
+                                await markEvidenceCaptured(
+                                  'wave_closeout_readiness',
+                                );
+                                if (!context.mounted) {
+                                  return;
+                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Wave closeout readiness copied with status ${waveCloseoutReadiness.statusLabel}.',
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.assignment_turned_in_rounded,
+                              ),
+                              label: const Text('Copy wave closeout readiness'),
+                            ),
+                          ],
+                        ),
+                ),
+                const SizedBox(height: 18),
+                MobilePanel(
+                  title: 'Wave signoff pack',
+                  action: MobileTag(
+                    label: waveSignoffPack == null
+                        ? 'Loading'
+                        : waveSignoffPack.signoffStatusLabel,
+                    icon: waveSignoffPack == null
+                        ? Icons.sync_rounded
+                        : waveSignoffPack.isSignoffBlocked
+                        ? Icons.block_rounded
+                        : waveSignoffPack.isSignoffIncomplete
+                        ? Icons.assignment_late_rounded
+                        : waveSignoffPack.isSignoffWithMonitoring
+                        ? Icons.visibility_rounded
+                        : Icons.verified_rounded,
+                    accent: waveSignoffPack == null
+                        ? const Color(0xFFF59E0B)
+                        : waveSignoffPack.isSignoffBlocked
+                        ? const Color(0xFFFB7185)
+                        : waveSignoffPack.isSignoffIncomplete
+                        ? const Color(0xFFF59E0B)
+                        : waveSignoffPack.isSignoffWithMonitoring
+                        ? const Color(0xFF38BDF8)
+                        : const Color(0xFF22C55E),
+                  ),
+                  child: waveSignoffPack == null
+                      ? const MobileEmptyState(
+                          icon: Icons.sync_rounded,
+                          title: 'Preparing wave signoff pack',
+                          body:
+                              'The device is still combining closeout, decision, and evidence posture into the final wave handoff package.',
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              waveSignoffPack.summary,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.68),
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.45,
+                                  ),
+                            ),
+                            const SizedBox(height: 14),
+                            _SettingsRow(
+                              label: 'Signoff status',
+                              value: waveSignoffPack.signoffStatusLabel,
+                              icon: Icons.verified_user_rounded,
+                            ),
+                            _SettingsRow(
+                              label: 'Closeout posture',
+                              value: waveCloseoutReadiness!.statusLabel,
+                              icon: Icons.playlist_add_check_rounded,
+                            ),
+                            _SettingsRow(
+                              label: 'Decision posture',
+                              value: rolloutDecisionSummary!.verdictLabel,
+                              icon: Icons.gavel_rounded,
+                            ),
+                            ...waveSignoffPack.reasons.map(
+                              (reason) => _ReadinessNoteRow(
+                                message: reason,
+                                tone: waveSignoffPack.isSignoffBlocked
+                                    ? const Color(0xFFFB7185)
+                                    : waveSignoffPack.isSignoffIncomplete
+                                    ? const Color(0xFFF59E0B)
+                                    : waveSignoffPack.isSignoffWithMonitoring
+                                    ? const Color(0xFF38BDF8)
+                                    : const Color(0xFF22C55E),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            FilledButton.tonalIcon(
+                              onPressed: () async {
+                                await Clipboard.setData(
+                                  ClipboardData(
+                                    text: waveSignoffPack.toMultilineText(),
+                                  ),
+                                );
+                                await markEvidenceCaptured('wave_signoff_pack');
+                                if (!context.mounted) {
+                                  return;
+                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Wave signoff pack copied with status ${waveSignoffPack.signoffStatusLabel}.',
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.assignment_turned_in_rounded,
+                              ),
+                              label: const Text('Copy wave signoff pack'),
+                            ),
+                          ],
+                        ),
+                ),
+                const SizedBox(height: 18),
+                MobilePanel(
+                  title: 'Wave archive pack',
+                  action: MobileTag(
+                    label: waveArchivePack == null
+                        ? 'Loading'
+                        : waveArchivePack.archiveStatusLabel,
+                    icon: waveArchivePack == null
+                        ? Icons.sync_rounded
+                        : waveArchivePack.isArchiveBlocked
+                        ? Icons.block_rounded
+                        : waveArchivePack.isArchiveIncomplete
+                        ? Icons.assignment_late_rounded
+                        : waveArchivePack.isArchiveWithAttention
+                        ? Icons.archive_rounded
+                        : Icons.inventory_2_rounded,
+                    accent: waveArchivePack == null
+                        ? const Color(0xFFF59E0B)
+                        : waveArchivePack.isArchiveBlocked
+                        ? const Color(0xFFFB7185)
+                        : waveArchivePack.isArchiveIncomplete
+                        ? const Color(0xFFF59E0B)
+                        : waveArchivePack.isArchiveWithAttention
+                        ? const Color(0xFF38BDF8)
+                        : const Color(0xFF22C55E),
+                  ),
+                  child: waveArchivePack == null
+                      ? const MobileEmptyState(
+                          icon: Icons.sync_rounded,
+                          title: 'Preparing wave archive pack',
+                          body:
+                              'The device is still combining final signoff with the evidence archive for permanent rollout records.',
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              waveArchivePack.summary,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.68),
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.45,
+                                  ),
+                            ),
+                            const SizedBox(height: 14),
+                            _SettingsRow(
+                              label: 'Archive status',
+                              value: waveArchivePack.archiveStatusLabel,
+                              icon: Icons.archive_rounded,
+                            ),
+                            _SettingsRow(
+                              label: 'Signoff posture',
+                              value: waveArchivePack
+                                  .waveSignoffPack
+                                  .signoffStatusLabel,
+                              icon: Icons.verified_user_rounded,
+                            ),
+                            _SettingsRow(
+                              label: 'Archived sessions',
+                              value:
+                                  '${evidenceTracker.archivedSessions.length} saved',
+                              icon: Icons.history_edu_rounded,
+                            ),
+                            ...waveArchivePack.reasons.map(
+                              (reason) => _ReadinessNoteRow(
+                                message: reason,
+                                tone: waveArchivePack.isArchiveBlocked
+                                    ? const Color(0xFFFB7185)
+                                    : waveArchivePack.isArchiveIncomplete
+                                    ? const Color(0xFFF59E0B)
+                                    : waveArchivePack.isArchiveWithAttention
+                                    ? const Color(0xFF38BDF8)
+                                    : const Color(0xFF22C55E),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            FilledButton.tonalIcon(
+                              onPressed: () async {
+                                await Clipboard.setData(
+                                  ClipboardData(
+                                    text: waveArchivePack.toMultilineText(),
+                                  ),
+                                );
+                                await markEvidenceCaptured('wave_archive_pack');
+                                if (!context.mounted) {
+                                  return;
+                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Wave archive pack copied with status ${waveArchivePack.archiveStatusLabel}.',
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.inventory_2_rounded),
+                              label: const Text('Copy wave archive pack'),
+                            ),
+                          ],
+                        ),
+                ),
+                const SizedBox(height: 18),
+                MobilePanel(
+                  title: 'Rollout evidence pack',
+                  action: MobileTag(
+                    label:
+                        diagnostics == null ||
+                            readinessReport == null ||
+                            recoveryReport == null
+                        ? 'Loading'
+                        : 'Wave record',
+                    icon:
+                        diagnostics == null ||
+                            readinessReport == null ||
+                            recoveryReport == null
+                        ? Icons.sync_rounded
+                        : Icons.library_books_rounded,
+                    accent:
+                        diagnostics == null ||
+                            readinessReport == null ||
+                            recoveryReport == null
+                        ? const Color(0xFFF59E0B)
+                        : const Color(0xFF38BDF8),
+                  ),
+                  child:
+                      diagnostics == null ||
+                          readinessReport == null ||
+                          recoveryReport == null
+                      ? const MobileEmptyState(
+                          icon: Icons.sync_rounded,
+                          title: 'Preparing rollout evidence',
+                          body:
+                              'The device is still resolving the core reports needed for the consolidated rollout record.',
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              'Use this when a rollout lead wants one final copied pack for the wave record. It consolidates the current readiness, snapshot, and recovery posture, then lets the operator summarize smoke and closeout outcomes in one export.',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.68),
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.45,
+                                  ),
+                            ),
+                            const SizedBox(height: 14),
+                            _SettingsRow(
+                              label: 'Release target',
+                              value:
+                                  '${diagnostics.runtimeInfo.releaseTag} | ${diagnostics.runtimeInfo.rolloutScopeLabel}',
+                              icon: Icons.route_rounded,
+                            ),
+                            _SettingsRow(
+                              label: 'Recovery posture',
+                              value:
+                                  '${recoveryReport.attentionEntries.length} open attention item(s)',
+                              icon: Icons.health_and_safety_rounded,
+                            ),
+                            FilledButton.tonalIcon(
+                              onPressed: () async {
+                                final evidenceReport =
+                                    await _showPilotRolloutEvidenceDialog(
+                                      context,
+                                      diagnosticsSnapshot: diagnostics,
+                                      readinessReport: readinessReport,
+                                      recoveryReport: recoveryReport,
+                                    );
+                                if (evidenceReport == null) {
+                                  return;
+                                }
+                                await markEvidenceCaptured('rollout_evidence');
+                                if (!context.mounted) {
+                                  return;
+                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Rollout evidence pack copied with recommendation ${evidenceReport.recommendationLabel}.',
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.assignment_rounded),
+                              label: const Text('Build evidence pack'),
+                            ),
+                          ],
+                        ),
+                ),
+                const SizedBox(height: 18),
+                MobilePanel(
+                  title: 'Incident escalation pack',
+                  action: MobileTag(
+                    label:
+                        diagnostics == null ||
+                            readinessReport == null ||
+                            recoveryReport == null
+                        ? 'Loading'
+                        : 'Escalation',
+                    icon:
+                        diagnostics == null ||
+                            readinessReport == null ||
+                            recoveryReport == null
+                        ? Icons.sync_rounded
+                        : Icons.crisis_alert_rounded,
+                    accent:
+                        diagnostics == null ||
+                            readinessReport == null ||
+                            recoveryReport == null
+                        ? const Color(0xFFF59E0B)
+                        : const Color(0xFFFB7185),
+                  ),
+                  child:
+                      diagnostics == null ||
+                          readinessReport == null ||
+                          recoveryReport == null
+                      ? const MobileEmptyState(
+                          icon: Icons.sync_rounded,
+                          title: 'Preparing escalation pack',
+                          body:
+                              'The device is still collecting the reports needed for a structured incident export.',
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              'Use this when the rollout lead, support, or engineering needs one structured incident record directly from the affected device. It turns the current readiness, snapshot, and recovery state into a support-ready escalation pack.',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.68),
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.45,
+                                  ),
+                            ),
+                            const SizedBox(height: 14),
+                            _SettingsRow(
+                              label: 'Failure posture',
+                              value:
+                                  '${recoveryReport.attentionEntries.length} recovery item(s) | ${diagnostics.historyOverview.failedSales} failed receipt(s)',
+                              icon: Icons.error_outline_rounded,
+                            ),
+                            FilledButton.tonalIcon(
+                              onPressed: () async {
+                                final escalationReport =
+                                    await _showPilotIncidentEscalationDialog(
+                                      context,
+                                      diagnosticsSnapshot: diagnostics,
+                                      readinessReport: readinessReport,
+                                      recoveryReport: recoveryReport,
+                                    );
+                                if (escalationReport == null) {
+                                  return;
+                                }
+                                await markEvidenceCaptured(
+                                  'incident_escalation',
+                                );
+                                if (!context.mounted) {
+                                  return;
+                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Incident escalation pack copied with decision ${escalationReport.escalationDecisionLabel}.',
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.copy_all_rounded),
+                              label: const Text('Build escalation pack'),
+                            ),
+                          ],
+                        ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Future<PilotSmokeReport?> _showPilotSmokeChecklistDialog(
@@ -2983,8 +2719,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
     var rolloutRecommendation =
         closeoutDecision == 'ESCALATE INCIDENT' || smokeVerdict == 'BLOCKED'
         ? 'rollback_wave'
-        : smokeVerdict == 'MONITOR' ||
-              closeoutDecision == 'MONITOR NEXT SHIFT'
+        : smokeVerdict == 'MONITOR' || closeoutDecision == 'MONITOR NEXT SHIFT'
         ? 'hold_wave'
         : 'advance_wave';
 
@@ -3254,7 +2989,8 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
     required PilotRecoveryReport recoveryReport,
   }) async {
     final notesController = TextEditingController();
-    var severity = recoveryReport.attentionEntries.any((entry) => entry.isFailed)
+    var severity =
+        recoveryReport.attentionEntries.any((entry) => entry.isFailed)
         ? 'sev2'
         : 'sev3';
     var impactScope = 'single_device';
@@ -3769,7 +3505,9 @@ class _PilotSmokeCheckCard extends StatelessWidget {
                 Text(
                   label,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: selected ? tone : Colors.white.withValues(alpha: 0.8),
+                    color: selected
+                        ? tone
+                        : Colors.white.withValues(alpha: 0.8),
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -3861,12 +3599,8 @@ class _CloseoutToggleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tone = value
-        ? (dangerWhenTrue
-              ? const Color(0xFFFB7185)
-              : const Color(0xFF22C55E))
-        : (dangerWhenTrue
-              ? const Color(0xFF22C55E)
-              : const Color(0xFFF59E0B));
+        ? (dangerWhenTrue ? const Color(0xFFFB7185) : const Color(0xFF22C55E))
+        : (dangerWhenTrue ? const Color(0xFF22C55E) : const Color(0xFFF59E0B));
 
     final labelText = value ? trueLabel : falseLabel;
 
@@ -3902,11 +3636,7 @@ class _CloseoutToggleCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            Switch(
-              value: value,
-              onChanged: onChanged,
-              activeThumbColor: tone,
-            ),
+            Switch(value: value, onChanged: onChanged, activeThumbColor: tone),
           ],
         ),
       ),
@@ -3961,12 +3691,10 @@ class _OutboxAttentionRow extends StatelessWidget {
         : entry.isSyncing
         ? const Color(0xFF38BDF8)
         : const Color(0xFFF59E0B);
-    final customerLabel =
-        entry.customerName?.trim().isNotEmpty == true
+    final customerLabel = entry.customerName?.trim().isNotEmpty == true
         ? entry.customerName!.trim()
         : 'Walk-in customer';
-    final errorLabel =
-        entry.lastError?.trim().isNotEmpty == true
+    final errorLabel = entry.lastError?.trim().isNotEmpty == true
         ? entry.lastError!.trim()
         : 'No error detail captured';
 
@@ -4005,9 +3733,9 @@ class _OutboxAttentionRow extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               '$customerLabel | ${formatCurrency(entry.total)}',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 6),
             Text(

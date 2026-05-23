@@ -1,9 +1,11 @@
 import { AdminShell } from "@/components/admin-shell";
 import { EmptyState } from "@/components/empty-state";
 import { MetricCard } from "@/components/metric-card";
+import { MfaGateCard } from "@/components/mfa-gate-card";
 import { updateWorkspaceSessionAction } from "@/app/sessions/actions";
 import { getSession, getWorkspaceAccessSessions, resolveActiveShop } from "@/lib/admin-api";
 import { formatDateTime } from "@/lib/formatters";
+import { getAdminWebMfaPosture } from "@/lib/mfa";
 import { canManageWorkspace } from "@/lib/roles";
 import type { WorkspaceAccessSessionPayload } from "@/lib/types";
 
@@ -77,7 +79,8 @@ export default async function SessionsPage({ searchParams }: SessionsPageProps) 
   const activeShop = resolveActiveShop(session);
   const role = activeShop?.role ?? null;
   const canUseSessions = canManageWorkspace(role);
-  const sessions = activeShop && canUseSessions ? await getWorkspaceAccessSessions(activeShop.shop.id) : [];
+  const mfaPosture = await getAdminWebMfaPosture(session.user, canUseSessions);
+  const sessions = activeShop && canUseSessions && mfaPosture.verified ? await getWorkspaceAccessSessions(activeShop.shop.id) : [];
   const banner = buildActionBanner(resolvedSearchParams);
 
   return (
@@ -93,6 +96,8 @@ export default async function SessionsPage({ searchParams }: SessionsPageProps) 
           title="No workspace selected"
           body="Choose an active shop membership before reviewing mobile device sessions for a store."
         />
+      ) : canUseSessions && !mfaPosture.verified ? (
+        <MfaGateCard href="/security?returnTo=/sessions" enabled={mfaPosture.enabled} title="Workspace sessions" />
       ) : !canUseSessions ? (
         <EmptyState
           title="Session control is owner and admin only"

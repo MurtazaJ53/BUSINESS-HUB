@@ -15,6 +15,10 @@
   --success: #3ad7a2;
   --warning: #ff8a6a;
   --glow: 0 0 0 1px rgba(89, 172, 255, 0.16), 0 22px 56px rgba(8, 18, 30, 0.34);
+  --font-geist-sans:
+    "Segoe UI", "Aptos", "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-geist-mono:
+    "Cascadia Code", "Aptos Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 @theme inline {

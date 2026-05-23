@@ -2,6 +2,7 @@ import { AdminShell } from "@/components/admin-shell";
 import { DomainPilotSignoffCard } from "@/components/domain-pilot-signoff-card";
 import { EmptyState } from "@/components/empty-state";
 import { MetricCard } from "@/components/metric-card";
+import { MfaGateCard } from "@/components/mfa-gate-card";
 import { PaymentsTable } from "@/components/payments-table";
 import {
   getPayments,
@@ -11,6 +12,7 @@ import {
   resolveActiveShop,
 } from "@/lib/admin-api";
 import { formatCurrency } from "@/lib/formatters";
+import { getAdminWebMfaPosture } from "@/lib/mfa";
 import { canAccessAdvancedReports, canAccessFinanceSummary, formatPlanTier } from "@/lib/plans";
 import { canAccessPaymentsWorkspace } from "@/lib/roles";
 
@@ -19,7 +21,9 @@ export default async function PaymentsPage() {
   const activeShop = resolveActiveShop(session);
   const role = activeShop?.role ?? null;
   const canUsePaymentsWorkspace = canAccessPaymentsWorkspace(role);
+  const mfaPosture = await getAdminWebMfaPosture(session.user, canUsePaymentsWorkspace);
   const [payments, paymentSummary, domainState] = activeShop && canUsePaymentsWorkspace
+    && mfaPosture.verified
     ? await Promise.all([
         getPayments(activeShop.shop.id),
         getPaymentSummary(activeShop.shop.id),
@@ -50,6 +54,8 @@ export default async function PaymentsPage() {
           title="Payments review is owner and admin only"
           body="Daily users should stay focused on selling and operations. Collections review and payment summary surfaces are intentionally limited to workspace owners and admins."
         />
+      ) : !mfaPosture.verified ? (
+        <MfaGateCard href="/security?returnTo=/payments" enabled={mfaPosture.enabled} title="Payments overview" />
       ) : (
         <div className="space-y-8">
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

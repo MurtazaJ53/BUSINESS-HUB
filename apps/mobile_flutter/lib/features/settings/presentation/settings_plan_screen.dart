@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/models/mobile_models.dart';
 import '../../../core/models/mobile_session.dart';
@@ -16,6 +17,12 @@ class SettingsPlanScreen extends ConsumerWidget {
     final session = ref.watch(mobileSessionProvider).asData?.value;
     final shop =
         ref.watch(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
+    final verifiedUntil = ref
+        .watch(mobileMfaVerifiedUntilProvider)
+        .asData
+        ?.value;
+    final hasFreshSecurityWindow =
+        verifiedUntil != null && verifiedUntil.isAfter(DateTime.now());
 
     return MobileStandaloneScaffold(
       title: 'Workspace plan',
@@ -48,6 +55,30 @@ class SettingsPlanScreen extends ConsumerWidget {
                 title: 'Plan compare is owner and admin only',
                 body:
                     'Daily users should stay focused on selling and operations. Workspace plan comparison stays limited to owners and admins.',
+              ),
+            )
+          else if (!hasFreshSecurityWindow)
+            MobilePanel(
+              title: 'Security check required',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    'Verify MFA from Security before opening Workspace plan on mobile. This keeps owner/admin business controls behind a real second factor.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.72),
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  FilledButton.tonalIcon(
+                    onPressed: () {
+                      context.push('/settings/security');
+                    },
+                    icon: const Icon(Icons.security_rounded),
+                    label: const Text('Open security'),
+                  ),
+                ],
               ),
             )
           else ...<Widget>[
@@ -195,22 +226,26 @@ class SettingsPlanScreen extends ConsumerWidget {
                       if (stacked) {
                         return Column(
                           children: actions
-                              .expand((widget) => <Widget>[
-                                    widget,
-                                    if (widget != actions.last)
-                                      const SizedBox(height: 10),
-                                  ])
+                              .expand(
+                                (widget) => <Widget>[
+                                  widget,
+                                  if (widget != actions.last)
+                                    const SizedBox(height: 10),
+                                ],
+                              )
                               .toList(growable: false),
                         );
                       }
 
                       return Row(
                         children: actions
-                            .expand((widget) => <Widget>[
-                                  widget,
-                                  if (widget != actions.last)
-                                    const SizedBox(width: 10),
-                                ])
+                            .expand(
+                              (widget) => <Widget>[
+                                widget,
+                                if (widget != actions.last)
+                                  const SizedBox(width: 10),
+                              ],
+                            )
                             .toList(growable: false),
                       );
                     },
@@ -226,10 +261,7 @@ class SettingsPlanScreen extends ConsumerWidget {
 }
 
 class _PlanSectionCard extends StatelessWidget {
-  const _PlanSectionCard({
-    required this.title,
-    required this.lines,
-  });
+  const _PlanSectionCard({required this.title, required this.lines});
 
   final String title;
   final List<String> lines;
@@ -303,20 +335,20 @@ class _PlanTierCard extends StatelessWidget {
     };
     final lines = switch (planTier) {
       'starter' => const <String>[
-          'POS and barcode selling',
-          'Inventory and low-stock watch',
-          'Customer balances and receipts',
-        ],
+        'POS and barcode selling',
+        'Inventory and low-stock watch',
+        'Customer balances and receipts',
+      ],
       'pro' => const <String>[
-          'Finance and advanced reporting',
-          'Deeper owner/admin controls',
-          'The full curated Business Hub stack',
-        ],
+        'Finance and advanced reporting',
+        'Deeper owner/admin controls',
+        'The full curated Business Hub stack',
+      ],
       _ => const <String>[
-          'Everything in Starter',
-          'Expenses and attendance',
-          'Supplier directory basics',
-        ],
+        'Everything in Starter',
+        'Expenses and attendance',
+        'Supplier directory basics',
+      ],
     };
 
     return DecoratedBox(
@@ -341,9 +373,9 @@ class _PlanTierCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w900,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 8),
             Text(
@@ -403,20 +435,20 @@ String _currentPlanSectionTitle(ShopInfo shop) {
 List<String> _currentPlanSectionLines(ShopInfo shop) {
   return switch (shop.normalizedPlanTier) {
     'starter' => const <String>[
-        'POS and barcode selling',
-        'Inventory and low-stock watch',
-        'Customer balances and receipt history',
-      ],
+      'POS and barcode selling',
+      'Inventory and low-stock watch',
+      'Customer balances and receipt history',
+    ],
     'pro' => const <String>[
-        'Finance and advanced reporting',
-        'Advanced owner and admin controls',
-        'The full curated Business Hub stack',
-      ],
+      'Finance and advanced reporting',
+      'Advanced owner and admin controls',
+      'The full curated Business Hub stack',
+    ],
     _ => const <String>[
-        'Everything in Starter',
-        'Expenses and attendance',
-        'Supplier-ready store operations',
-      ],
+      'Everything in Starter',
+      'Expenses and attendance',
+      'Supplier-ready store operations',
+    ],
   };
 }
 
@@ -431,20 +463,20 @@ String _nextPlanSectionTitle(ShopInfo shop) {
 List<String> _nextPlanSectionLines(ShopInfo shop) {
   return switch (shop.normalizedPlanTier) {
     'starter' => const <String>[
-        'Expenses and attendance',
-        'Light supplier workflows',
-        'More operational control without ERP clutter',
-      ],
+      'Expenses and attendance',
+      'Light supplier workflows',
+      'More operational control without ERP clutter',
+    ],
     'pro' => const <String>[
-        'Limit deep tools to owners and admins',
-        'Keep daily screens simple for staff',
-        'Avoid exposing raw ERP complexity',
-      ],
+      'Limit deep tools to owners and admins',
+      'Keep daily screens simple for staff',
+      'Avoid exposing raw ERP complexity',
+    ],
     _ => const <String>[
-        'Finance and owner summary rollups',
-        'Advanced customer and sales insight',
-        'Stronger admin and support controls',
-      ],
+      'Finance and owner summary rollups',
+      'Advanced customer and sales insight',
+      'Stronger admin and support controls',
+    ],
   };
 }
 
@@ -467,20 +499,20 @@ String _nextPlanLabel(ShopInfo shop) {
 List<String> _upgradeSignals(ShopInfo shop) {
   return switch (shop.normalizedPlanTier) {
     'starter' => const <String>[
-        'Upgrade when the shop needs expenses and attendance inside the same product.',
-        'Upgrade when supplier-aware stock operations matter more than a lean-only counter flow.',
-        'Upgrade when owners want more operational control without raw ERP clutter.',
-      ],
+      'Upgrade when the shop needs expenses and attendance inside the same product.',
+      'Upgrade when supplier-aware stock operations matter more than a lean-only counter flow.',
+      'Upgrade when owners want more operational control without raw ERP clutter.',
+    ],
     'pro' => const <String>[
-        'Keep Pro limited to the right owners and admins.',
-        'Keep staff on simple daily-work surfaces, not deep management tools.',
-        'Use the higher plan to stay curated, not to expose every possible system detail.',
-      ],
+      'Keep Pro limited to the right owners and admins.',
+      'Keep staff on simple daily-work surfaces, not deep management tools.',
+      'Use the higher plan to stay curated, not to expose every possible system detail.',
+    ],
     _ => const <String>[
-        'Upgrade when owners need finance-heavy rollups instead of only simple operations.',
-        'Upgrade when customer and sales analysis needs to be deeper than list-level review.',
-        'Upgrade when advanced support or admin controls need to be available for the workspace.',
-      ],
+      'Upgrade when owners need finance-heavy rollups instead of only simple operations.',
+      'Upgrade when customer and sales analysis needs to be deeper than list-level review.',
+      'Upgrade when advanced support or admin controls need to be available for the workspace.',
+    ],
   };
 }
 

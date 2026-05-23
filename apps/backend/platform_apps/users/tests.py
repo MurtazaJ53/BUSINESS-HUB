@@ -8,6 +8,7 @@ from rest_framework.test import APIClient
 from platform_apps.shops.models import Shop, ShopMembership
 from platform_apps.shops.roles import normalize_membership_role
 from platform_apps.users.authentication import bootstrap_memberships_from_firestore
+from platform_apps.users.mfa import generate_totp_code
 from platform_apps.users.models import PlatformUser
 
 
@@ -32,6 +33,7 @@ class SessionBootstrapTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["user"]["email"], "murtaza@example.com")
+        self.assertFalse(response.json()["user"]["mfa_totp_enabled"])
         self.assertEqual(len(response.json()["memberships"]), 1)
         membership = response.json()["memberships"][0]
         self.assertEqual(membership["role_label"], "Owner")
@@ -111,3 +113,93 @@ class SessionBootstrapTests(TestCase):
         self.assertEqual(membership.status, ShopMembership.Status.ACTIVE)
         self.assertEqual(membership.phone, "+91-9999999999")
         self.assertEqual(shop.owner_user_id, user.id)
+
+
+class SessionMfaTests(TestCase):
+    def setUp(self):
+        self.user = PlatformUser.objects.create_user(
+            email="owner@example.com",
+            full_name="Owner",
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_enroll_status_and_verify_flow(self):
+        initial = self.client.get("/api/v1/session/mfa/")
+        self.assertEqual(initial.status_code, 200)
+        self.assertFalse(initial.json()["totp_enabled"])
+        self.assertFalse(initial.json()["totp_pending_enrollment"])
+
+        enroll_response = self.client.post("/api/v1/session/mfa/enroll/", {}, format="json")
+        self.assertEqual(enroll_response.status_code, 200)
+        payload = enroll_response.json()
+        self.assertFalse(payload["totp_enabled"])
+        self.assertTrue(payload["totp_pending_enrollment"])
+        self.assertTrue(payload["pending_manual_secret"])
+        self.assertTrue(payload["pending_otpauth_uri"].startswith("otpauth://totp/"))
+
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.mfa_totp_pending_secret)
+        valid_code = generate_totp_code(self.user.mfa_totp_pending_secret)
+
+        verify_response = self.client.post(
+            "/api/v1/session/mfa/verify/",
+            {"purpose": "enroll", "code": valid_code},
+            format="json",
+        )
+        self.assertEqual(verify_response.status_code, 200)
+        verify_payload = verify_response.json()
+        self.assertTrue(verify_payload["status"]["totp_enabled"])
+        self.assertFalse(verify_payload["status"]["totp_pending_enrollment"])
+        self.assertTrue(verify_payload["verified_until"])
+
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.mfa_totp_enabled)
+        self.assertFalse(self.user.mfa_totp_pending_secret)
+        self.assertIsNotNone(self.user.mfa_totp_enabled_at)
+        self.assertIsNotNone(self.user.mfa_totp_last_verified_at)
+
+    def test_challenge_and_disable_flow(self):
+        self.client.post("/api/v1/session/mfa/enroll/", {}, format="json")
+        self.user.refresh_from_db()
+        enroll_code = generate_totp_code(self.user.mfa_totp_pending_secret)
+        self.client.post(
+            "/api/v1/session/mfa/verify/",
+            {"purpose": "enroll", "code": enroll_code},
+            format="json",
+        )
+
+        self.user.refresh_from_db()
+        challenge_code = generate_totp_code(self.user.mfa_totp_secret)
+        challenge_response = self.client.post(
+            "/api/v1/session/mfa/verify/",
+            {"purpose": "challenge", "code": challenge_code},
+            format="json",
+        )
+        self.assertEqual(challenge_response.status_code, 200)
+        self.assertTrue(challenge_response.json()["status"]["totp_enabled"])
+
+        disable_code = generate_totp_code(self.user.mfa_totp_secret)
+        disable_response = self.client.post(
+            "/api/v1/session/mfa/disable/",
+            {"code": disable_code},
+            format="json",
+        )
+        self.assertEqual(disable_response.status_code, 200)
+        self.assertFalse(disable_response.json()["totp_enabled"])
+
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.mfa_totp_secret)
+        self.assertFalse(self.user.mfa_totp_pending_secret)
+        self.assertIsNone(self.user.mfa_totp_enabled_at)
+        self.assertIsNone(self.user.mfa_totp_last_verified_at)
+
+    def test_invalid_code_is_rejected(self):
+        self.client.post("/api/v1/session/mfa/enroll/", {}, format="json")
+        response = self.client.post(
+            "/api/v1/session/mfa/verify/",
+            {"purpose": "enroll", "code": "000000"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("code", response.json())

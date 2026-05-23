@@ -7,6 +7,27 @@ export type SessionUser = {
   firebase_uid: string;
   timezone: string;
   is_platform_admin: boolean;
+  mfa_totp_enabled: boolean;
+  mfa_totp_enabled_at: string | null;
+  mfa_totp_last_verified_at: string | null;
+};
+
+export type UserMfaStatusPayload = {
+  totp_enabled: boolean;
+  totp_pending_enrollment: boolean;
+  enabled_at: string | null;
+  last_verified_at: string | null;
+  issuer_label: string;
+  account_label: string;
+  challenge_window_seconds: number;
+  pending_manual_secret: string;
+  pending_otpauth_uri: string;
+};
+
+export type UserMfaVerifyPayload = {
+  status: UserMfaStatusPayload;
+  verified_at: string;
+  verified_until: string;
 };
 
 export type ShopMembership = {
