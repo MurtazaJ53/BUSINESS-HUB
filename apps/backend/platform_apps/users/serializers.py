@@ -3,6 +3,11 @@ from __future__ import annotations
 from rest_framework import serializers
 
 from platform_apps.shops.models import ShopMembership
+from platform_apps.shops.roles import (
+    get_membership_role_label,
+    get_membership_role_product_profile,
+    get_membership_role_summary,
+)
 from platform_apps.users.models import PlatformUser
 
 
@@ -27,10 +32,32 @@ class MembershipShopSerializer(serializers.Serializer):
 
 class SessionMembershipSerializer(serializers.ModelSerializer):
     shop = serializers.SerializerMethodField()
+    role_label = serializers.SerializerMethodField()
+    role_summary = serializers.SerializerMethodField()
+    role_profile = serializers.SerializerMethodField()
 
     class Meta:
         model = ShopMembership
-        fields = ("id", "role", "status", "permissions_version", "permissions_json", "shop")
+        fields = (
+            "id",
+            "role",
+            "role_label",
+            "role_summary",
+            "role_profile",
+            "status",
+            "permissions_version",
+            "permissions_json",
+            "shop",
+        )
 
     def get_shop(self, obj):
         return MembershipShopSerializer(obj.shop).data
+
+    def get_role_label(self, obj):
+        return get_membership_role_label(obj.role)
+
+    def get_role_summary(self, obj):
+        return get_membership_role_summary(obj.role)
+
+    def get_role_profile(self, obj):
+        return get_membership_role_product_profile(obj.role)

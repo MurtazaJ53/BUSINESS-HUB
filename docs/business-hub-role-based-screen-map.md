@@ -23,6 +23,46 @@ This is the next hard gate after:
 - Support Admin
 - Platform Admin
 
+## Backend role mapping
+
+The product language and the backend role enum are related, but they are not written the same way everywhere.
+
+### Backend workspace roles
+
+- `viewer`
+- `staff`
+- `admin`
+- `owner`
+
+### Product-facing interpretation
+
+- `staff`:
+  day-to-day operator access
+  closest to cashier / floor staff
+- `admin`:
+  store-management access
+  closest to manager / store admin
+- `owner`:
+  business-control access
+  closest to workspace owner
+- `viewer`:
+  read-only lookup and oversight
+
+### Important rule
+
+Role answers:
+
+- who can do the action
+
+Plan answers:
+
+- which product surfaces and deeper capabilities are enabled for that workspace
+
+So:
+
+- an owner on `Starter` still does not get `Pro` capabilities
+- a staff user on `Pro` still does not get owner/admin-only surfaces
+
 ## Surface types
 
 ### Mobile

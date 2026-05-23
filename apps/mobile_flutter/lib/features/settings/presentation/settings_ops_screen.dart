@@ -227,7 +227,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
               icon: Icons.settings_rounded,
               accent: const Color(0xFFA78BFA),
               primaryTag: MobileTag(
-                label: session?.role?.toUpperCase() ?? 'GUEST',
+                label: session?.displayRoleLabel ?? 'GUEST',
                 icon: Icons.badge_rounded,
                 accent: const Color(0xFFA78BFA),
               ),
@@ -249,17 +249,17 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
               action: MobileTag(
                 label:
                     session != null &&
-                        (session.isAdmin || session.isElevatedAdmin)
-                    ? 'ADMIN EDIT'
+                        session.isOwnerLike
+                    ? 'CONTROL EDIT'
                     : 'VIEW ONLY',
                 icon:
                     session != null &&
-                        (session.isAdmin || session.isElevatedAdmin)
+                        session.isOwnerLike
                     ? Icons.edit_rounded
                     : Icons.lock_outline_rounded,
                 accent:
                     session != null &&
-                        (session.isAdmin || session.isElevatedAdmin)
+                        session.isOwnerLike
                     ? const Color(0xFF14B8A6)
                     : const Color(0xFFA78BFA),
               ),
@@ -292,8 +292,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                     value: backendApiClient.baseUrl,
                     icon: Icons.cloud_outlined,
                   ),
-                  if (session != null &&
-                      (session.isAdmin || session.isElevatedAdmin)) ...<Widget>[
+                  if (session != null && session.isOwnerLike) ...<Widget>[
                     const SizedBox(height: 6),
                     FilledButton.tonalIcon(
                       onPressed: () async {
@@ -364,8 +363,15 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                           ),
                           _SettingsRow(
                             label: 'Operator role',
-                            value: session?.role?.toUpperCase() ?? 'UNKNOWN',
+                            value: session?.displayRoleLabel ?? 'UNKNOWN',
                             icon: Icons.admin_panel_settings_rounded,
+                          ),
+                          _SettingsRow(
+                            label: 'Role focus',
+                            value:
+                                session?.roleSummary ??
+                                'Role scope is still loading.',
+                            icon: Icons.rule_folder_rounded,
                           ),
                           _SettingsRow(
                             label: 'Cost visibility',

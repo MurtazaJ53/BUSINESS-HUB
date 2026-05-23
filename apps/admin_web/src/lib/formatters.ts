@@ -17,5 +17,16 @@ export function formatCurrency(amount: number, currencyCode = "INR") {
 }
 
 export function formatRole(role: string) {
-  return role.charAt(0).toUpperCase() + role.slice(1);
+  switch (role.trim().toLowerCase()) {
+    case "owner":
+      return "Owner";
+    case "admin":
+      return "Store admin";
+    case "staff":
+      return "Staff operator";
+    case "viewer":
+      return "Read-only viewer";
+    default:
+      return role.charAt(0).toUpperCase() + role.slice(1);
+  }
 }

@@ -94,6 +94,11 @@ class SettingsScreen extends ConsumerWidget {
                   icon: Icons.admin_panel_settings_rounded,
                 ),
                 _SettingsRow(
+                  label: 'Access focus',
+                  value: session?.roleSummary ?? 'Role scope is still loading',
+                  icon: Icons.rule_folder_rounded,
+                ),
+                _SettingsRow(
                   label: 'Plan',
                   value: '${shop.planLabel} plan',
                   icon: Icons.workspace_premium_rounded,

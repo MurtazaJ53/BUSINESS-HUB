@@ -170,7 +170,8 @@ export function AdminShell({
 }: AdminShellProps) {
   const navSections = getSectionedNav(session, activeShop);
   const workspaceRole = getWorkspaceRole(activeShop);
-  const workspaceRoleLabel = workspaceRole ? formatRole(workspaceRole) : "Unassigned";
+  const workspaceRoleLabel = activeShop?.role_label ?? (workspaceRole ? formatRole(workspaceRole) : "Unassigned");
+  const workspaceRoleSummary = activeShop?.role_summary ?? "Choose a workspace to see role scope.";
   const isInternal = surfaceMode === "internal";
   const workspacePlanLabel = activeShop ? formatPlanTier(activeShop.shop.plan_tier) : "Growth";
 
@@ -240,6 +241,9 @@ export function AdminShell({
                   {workspacePlanLabel} plan
                 </span>
               </div>
+              <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
+                {workspaceRoleSummary}
+              </p>
             </div>
 
             <div className="mt-auto space-y-3 pt-6">

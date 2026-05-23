@@ -4,6 +4,11 @@ from rest_framework import serializers
 
 from platform_apps.shops.models import ShopMembership, ShopPlanRequest
 from platform_apps.shops.plans import PLAN_TIERS, normalize_plan_tier
+from platform_apps.shops.roles import (
+    get_membership_role_label,
+    get_membership_role_product_profile,
+    get_membership_role_summary,
+)
 
 
 class ShopMembershipListSerializer(serializers.ModelSerializer):
@@ -17,12 +22,18 @@ class ShopMembershipListSerializer(serializers.ModelSerializer):
         source="shop.enabled_features",
         child=serializers.BooleanField(),
     )
+    role_label = serializers.SerializerMethodField()
+    role_summary = serializers.SerializerMethodField()
+    role_profile = serializers.SerializerMethodField()
 
     class Meta:
         model = ShopMembership
         fields = (
             "id",
             "role",
+            "role_label",
+            "role_summary",
+            "role_profile",
             "status",
             "permissions_version",
             "permissions_json",
@@ -34,6 +45,15 @@ class ShopMembershipListSerializer(serializers.ModelSerializer):
             "shop_plan_tier",
             "shop_enabled_features",
         )
+
+    def get_role_label(self, obj):
+        return get_membership_role_label(obj.role)
+
+    def get_role_summary(self, obj):
+        return get_membership_role_summary(obj.role)
+
+    def get_role_profile(self, obj):
+        return get_membership_role_product_profile(obj.role)
 
 
 class ShopDomainStateSerializer(serializers.Serializer):

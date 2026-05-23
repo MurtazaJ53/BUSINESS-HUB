@@ -12,6 +12,9 @@ export type SessionUser = {
 export type ShopMembership = {
   id: string;
   role: "owner" | "admin" | "staff" | "viewer";
+  role_label: string;
+  role_summary: string;
+  role_profile: "owner_control" | "store_admin" | "daily_operator" | "read_only";
   status: "active" | "invited" | "disabled";
   permissions_version: number;
   permissions_json: Record<string, unknown>;

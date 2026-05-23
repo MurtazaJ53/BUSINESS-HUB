@@ -9,7 +9,7 @@ import {
   getSession,
   resolveActiveShop,
 } from "@/lib/admin-api";
-import { formatCurrency, formatRole } from "@/lib/formatters";
+import { formatCurrency } from "@/lib/formatters";
 import {
   canAccessAdvancedReports,
   canAccessAttendance,
@@ -361,7 +361,10 @@ export default async function HomePage() {
                           <div>
                             <p className="font-semibold">{membership.shop.name}</p>
                             <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                              {formatRole(membership.role)} | {membership.status}
+                              {membership.role_label} | {membership.status}
+                            </p>
+                            <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+                              {membership.role_summary}
                             </p>
                           </div>
                           {isCurrent ? (

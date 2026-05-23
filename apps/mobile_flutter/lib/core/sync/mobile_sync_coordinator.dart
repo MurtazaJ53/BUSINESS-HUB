@@ -236,9 +236,9 @@ class MobileSyncCoordinator {
         'No active workspace is attached to this mobile session.',
       );
     }
-    if (!(session.isAdmin || session.isElevatedAdmin)) {
+    if (!session.isOwnerLike) {
       throw StateError(
-        'Only workspace admins can change mobile workspace settings.',
+        'Only workspace owners and admins can change mobile workspace settings.',
       );
     }
 
@@ -596,9 +596,11 @@ class MobileSyncCoordinator {
     MobileSession session,
     String shopId,
   ) async {
-    if (!(session.isAdmin || session.isElevatedAdmin)) {
+    if (!session.isOwnerLike) {
       return;
     }
+
+    final roleValue = session.isOwner ? 'owner' : 'admin';
 
     final timestamp = DateTime.now();
     final isoTimestamp = timestamp.toIso8601String();
@@ -608,7 +610,7 @@ class MobileSyncCoordinator {
       await _firestore.doc('users/${session.uid}').set({
         'email': session.email,
         'shopId': shopId,
-        'role': 'admin',
+        'role': roleValue,
         'updatedAt': isoTimestamp,
       }, SetOptions(merge: true));
     } catch (error) {
@@ -625,7 +627,7 @@ class MobileSyncCoordinator {
                 : 'Admin'),
         'email': session.email,
         'phone': '-',
-        'role': 'admin',
+        'role': roleValue,
         'status': 'active',
         'joinedAt': isoTimestamp,
         'permissions': _adminPermissionTemplate,

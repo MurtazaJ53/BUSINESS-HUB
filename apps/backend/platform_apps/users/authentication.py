@@ -13,6 +13,7 @@ from firebase_admin import credentials, firestore
 from rest_framework import authentication, exceptions
 
 from platform_apps.shops.models import Shop, ShopMembership
+from platform_apps.shops.roles import normalize_membership_role
 
 
 User = get_user_model()
@@ -43,7 +44,7 @@ def get_firebase_app():
 
 
 def bootstrap_memberships_from_firestore(user: User) -> None:
-    if not user.firebase_uid or user.memberships.filter(status=ShopMembership.Status.ACTIVE).exists():
+    if not user.firebase_uid:
         return
 
     app = get_firebase_app()
@@ -63,9 +64,11 @@ def bootstrap_memberships_from_firestore(user: User) -> None:
     shop_doc = db.collection("shops").document(shop_source_id).get()
     shop_payload = shop_doc.to_dict() if shop_doc.exists else {}
 
-    role = str(user_payload.get("role") or ShopMembership.Role.STAFF).lower()
-    if role not in ShopMembership.Role.values:
-        role = ShopMembership.Role.STAFF
+    is_shop_owner = str(shop_payload.get("ownerId") or "") == user.firebase_uid
+    role = normalize_membership_role(
+        user_payload.get("role"),
+        is_shop_owner=is_shop_owner,
+    )
 
     base_slug = slugify(shop_payload.get("name") or shop_source_id)[:36] or "shop"
     slug_candidate = f"{base_slug}-{str(shop_source_id)[:8]}".lower()
@@ -78,17 +81,17 @@ def bootstrap_memberships_from_firestore(user: User) -> None:
             "legal_name": shop_payload.get("legalName") or "",
             "invite_code": shop_payload.get("inviteCode") or "",
             "settings_json": shop_payload.get("settings") or {},
-            "owner_user": user if str(shop_payload.get("ownerId") or "") == user.firebase_uid else None,
+            "owner_user": user if is_shop_owner else None,
             "source_shop_id": str(shop_source_id),
             "source_path": f"shops/{shop_source_id}",
         },
     )
 
-    if shop.owner_user_id is None and str(shop_payload.get("ownerId") or "") == user.firebase_uid:
+    if shop.owner_user_id is None and is_shop_owner:
         shop.owner_user = user
         shop.save(update_fields=["owner_user", "updated_at"])
 
-    ShopMembership.objects.get_or_create(
+    membership, created = ShopMembership.objects.get_or_create(
         user=user,
         shop=shop,
         defaults={
@@ -103,6 +106,33 @@ def bootstrap_memberships_from_firestore(user: User) -> None:
             "source_path": f"shops/{shop_source_id}/staff/{user.firebase_uid}",
         },
     )
+
+    if not created:
+        updated_fields: list[str] = []
+        next_status = ShopMembership.Status.ACTIVE
+        next_email = user.email or ""
+        next_phone = user_payload.get("phone") or ""
+        next_permissions = user_payload.get("permissions") or {}
+
+        if membership.role != role:
+            membership.role = role
+            updated_fields.append("role")
+        if membership.status != next_status:
+            membership.status = next_status
+            updated_fields.append("status")
+        if membership.email != next_email:
+            membership.email = next_email
+            updated_fields.append("email")
+        if membership.phone != next_phone:
+            membership.phone = next_phone
+            updated_fields.append("phone")
+        if membership.permissions_json != next_permissions:
+            membership.permissions_json = next_permissions
+            updated_fields.append("permissions_json")
+
+        if updated_fields:
+            updated_fields.append("updated_at")
+            membership.save(update_fields=updated_fields)
 
 
 def _sync_user_from_claims(claims: dict) -> User:

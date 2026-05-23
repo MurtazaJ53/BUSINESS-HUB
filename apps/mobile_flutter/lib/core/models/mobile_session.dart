@@ -22,19 +22,35 @@ class MobileSession {
   bool get isSignedIn => true;
   bool get hasShop => shopId != null && shopId!.isNotEmpty;
   String get normalizedRole => (role ?? '').trim().toLowerCase();
+  bool get isOwner => normalizedRole == 'owner' || isElevatedAdmin;
   bool get isAdmin => normalizedRole == 'admin';
   bool get isManager => normalizedRole == 'manager';
+  bool get isViewer => normalizedRole == 'viewer';
+  bool get isReadOnly => isViewer;
   bool get isCashierLike =>
       normalizedRole == 'cashier' ||
       normalizedRole == 'staff' ||
-      (!isElevatedAdmin && !isManager && !isAdmin);
-  bool get isOwnerLike => isElevatedAdmin || isAdmin;
+      (normalizedRole.isEmpty && !isElevatedAdmin && !isManager && !isAdmin);
+  bool get isOwnerLike => isOwner || isAdmin;
   bool get canViewCost => isOwnerLike;
   bool get canAccessAdvancedOps => isOwnerLike;
   bool get landsOnPosByDefault => isCashierLike;
   String get defaultRoute => landsOnPosByDefault ? '/pos' : '/dashboard';
+  String get roleProfileKey {
+    if (isOwner) {
+      return 'owner_control';
+    }
+    if (isAdmin || isManager) {
+      return 'store_admin';
+    }
+    if (isViewer) {
+      return 'read_only';
+    }
+    return 'daily_operator';
+  }
+
   String get displayRoleLabel {
-    if (isElevatedAdmin) {
+    if (isOwner) {
       return 'OWNER';
     }
     if (isAdmin) {
@@ -49,7 +65,23 @@ class MobileSession {
     if (normalizedRole == 'staff') {
       return 'STAFF';
     }
+    if (isViewer) {
+      return 'VIEWER';
+    }
     return 'OPERATOR';
+  }
+
+  String get roleSummary {
+    if (isOwner) {
+      return 'Business control and workspace decisions.';
+    }
+    if (isAdmin || isManager) {
+      return 'Store management, settings, and operational controls.';
+    }
+    if (isViewer) {
+      return 'Read-only lookup and oversight access.';
+    }
+    return 'Daily sales, stock, and customer work.';
   }
 
   static MobileSession fromClaims(
@@ -69,7 +101,10 @@ class MobileSession {
           ? Map<String, dynamic>.from(claims!['perms'] as Map)
           : fallbackPermissions,
       shopId: claims?['shopId']?.toString() ?? fallbackShopId,
-      isElevatedAdmin: claims?['shopAdmin'] == true || fallbackIsElevatedAdmin,
+      isElevatedAdmin:
+          claims?['shopAdmin'] == true ||
+          claims?['role']?.toString().trim().toLowerCase() == 'owner' ||
+          fallbackIsElevatedAdmin,
     );
   }
 }

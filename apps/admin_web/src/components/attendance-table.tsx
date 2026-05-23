@@ -1,3 +1,4 @@
+import { formatRole } from "@/lib/formatters";
 import type { AttendanceSession } from "@/lib/types";
 
 type AttendanceTableProps = {
@@ -36,7 +37,7 @@ export function AttendanceTable({ sessions }: AttendanceTableProps) {
                     <td className="px-5 py-4">
                       <p className="text-base font-semibold">{session.member_name}</p>
                       <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                        {session.member_role}
+                        {formatRole(session.member_role)}
                       </p>
                     </td>
                     <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">

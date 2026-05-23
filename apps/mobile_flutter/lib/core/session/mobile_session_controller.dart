@@ -99,7 +99,9 @@ Future<_RecoveredWorkspaceContext?> _recoverWorkspaceContext(
               ? Map<String, dynamic>.from(staffData['permissions'] as Map)
               : null,
           isElevatedAdmin:
-              (staffData['role']?.toString() ?? '').toLowerCase() == 'admin',
+              <String>{'admin', 'owner'}.contains(
+                (staffData['role']?.toString() ?? '').toLowerCase(),
+              ),
         );
       }
     }
@@ -122,13 +124,13 @@ Future<_RecoveredWorkspaceContext?> _recoverWorkspaceContext(
     await firestore.doc('users/${user.uid}').set({
       'email': user.email,
       'shopId': shopId,
-      'role': 'admin',
+      'role': 'owner',
       'updatedAt': DateTime.now().toIso8601String(),
     }, SetOptions(merge: true));
 
     return _RecoveredWorkspaceContext(
       shopId: shopId,
-      role: 'admin',
+      role: 'owner',
       isElevatedAdmin: true,
     );
   } catch (_) {
