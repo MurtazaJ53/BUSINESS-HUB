@@ -1,12 +1,18 @@
 import { AdminShell } from "@/components/admin-shell";
 import { EmptyState } from "@/components/empty-state";
 import { MetricCard } from "@/components/metric-card";
+import { PasskeyControlPanel } from "@/components/passkey-control-panel";
 import {
   beginMfaEnrollmentAction,
   disableMfaAction,
   verifyMfaCodeAction,
 } from "@/app/security/actions";
-import { getSession, getUserMfaStatus, resolveActiveShop } from "@/lib/admin-api";
+import {
+  getSession,
+  getUserMfaStatus,
+  getUserPasskeys,
+  resolveActiveShop,
+} from "@/lib/admin-api";
 import { getAdminWebMfaPosture } from "@/lib/mfa";
 import { canManageWorkspace } from "@/lib/roles";
 
@@ -80,6 +86,7 @@ export default async function SecurityPage({ searchParams }: SecurityPageProps) 
   const canUseSecurity =
     session.user.is_platform_admin || canManageWorkspace(activeShop?.role ?? null);
   const mfaStatus = canUseSecurity ? await getUserMfaStatus() : null;
+  const passkeys = canUseSecurity ? await getUserPasskeys() : [];
   const mfaPosture = canUseSecurity
     ? await getAdminWebMfaPosture(session.user, true)
     : { required: false, enabled: false, verified: false };
@@ -112,8 +119,14 @@ export default async function SecurityPage({ searchParams }: SecurityPageProps) 
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label="MFA posture"
-              value={mfaStatus.totp_enabled ? "Enabled" : mfaStatus.totp_pending_enrollment ? "Pending" : "Not set"}
-              detail="Authenticator-based second factor for owner/admin surfaces"
+              value={
+                mfaStatus.totp_enabled || mfaStatus.passkey_enabled
+                  ? "Enabled"
+                  : mfaStatus.totp_pending_enrollment
+                    ? "Pending"
+                    : "Not set"
+              }
+              detail="TOTP and passkeys both count as second-factor protection"
               icon="MFA"
             />
             <MetricCard
@@ -124,11 +137,11 @@ export default async function SecurityPage({ searchParams }: SecurityPageProps) 
               icon="CHK"
             />
             <MetricCard
-              label="Account"
-              value={mfaStatus.account_label}
-              detail={mfaStatus.issuer_label}
+              label="Passkeys"
+              value={mfaStatus.passkey_count.toString()}
+              detail={mfaStatus.passkey_enabled ? "Registered device factors" : "No registered passkeys yet"}
               accent="blue"
-              icon="USR"
+              icon="KEY"
             />
             <MetricCard
               label="Window"
@@ -255,6 +268,11 @@ export default async function SecurityPage({ searchParams }: SecurityPageProps) 
                   </form>
                 </section>
               ) : null}
+
+              <PasskeyControlPanel
+                initialPasskeys={passkeys}
+                returnTo={returnTo}
+              />
             </div>
 
             <div className="space-y-6">
@@ -292,6 +310,12 @@ export default async function SecurityPage({ searchParams }: SecurityPageProps) 
                     <p className="eyebrow">Secure window</p>
                     <p className="mt-2 text-base font-semibold text-[var(--text-primary)]">
                       {mfaPosture.verified ? "Open right now" : "Needs verification"}
+                    </p>
+                  </div>
+                  <div className="surface-muted rounded-[20px] px-4 py-4">
+                    <p className="eyebrow">Last passkey verification</p>
+                    <p className="mt-2 text-base font-semibold text-[var(--text-primary)]">
+                      {mfaStatus.passkey_last_verified_at || "No passkey verification yet"}
                     </p>
                   </div>
                 </div>

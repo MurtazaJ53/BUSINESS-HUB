@@ -10,6 +10,12 @@ from platform_apps.users.authentication import bootstrap_memberships_from_firest
 from platform_apps.users.serializers import (
     SessionMembershipSerializer,
     SessionUserSerializer,
+    UserPasskeyAssertionBeginSerializer,
+    UserPasskeyAssertionFinishSerializer,
+    UserPasskeyCredentialSerializer,
+    UserPasskeyDeleteSerializer,
+    UserPasskeyRegistrationBeginSerializer,
+    UserPasskeyRegistrationFinishSerializer,
     UserMfaDisableSerializer,
     UserMfaEnrollSerializer,
     UserMfaStatusSerializer,
@@ -94,3 +100,84 @@ class SessionMfaDisableView(APIView):
         serializer.is_valid(raise_exception=True)
         payload = serializer.save(user=request.user)
         return Response(UserMfaStatusSerializer(payload).data, status=status.HTTP_200_OK)
+
+
+class SessionPasskeyListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        credentials = request.user.passkeys.filter(is_active=True).order_by(
+            "-last_verified_at",
+            "-updated_at",
+        )
+        return Response(UserPasskeyCredentialSerializer(credentials, many=True).data)
+
+
+class SessionPasskeyRegistrationBeginView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = UserPasskeyRegistrationBeginSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.save(user=request.user))
+
+
+class SessionPasskeyRegistrationFinishView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = UserPasskeyRegistrationFinishSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        credential = serializer.save(user=request.user)
+        return Response(
+            {
+                "credential": UserPasskeyCredentialSerializer(credential).data,
+                "status": UserMfaStatusSerializer(
+                    build_user_mfa_status_payload(request.user)
+                ).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class SessionPasskeyAssertionBeginView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = UserPasskeyAssertionBeginSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.save(user=request.user))
+
+
+class SessionPasskeyAssertionFinishView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = UserPasskeyAssertionFinishSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        result = serializer.save(user=request.user)
+        return Response(
+            {
+                "credential": UserPasskeyCredentialSerializer(result["credential"]).data,
+                "status": UserMfaStatusSerializer(result["status"]).data,
+                "verified_at": result["verified_at"],
+                "verified_until": result["verified_until"],
+            }
+        )
+
+
+class SessionPasskeyDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, passkey_id):
+        serializer = UserPasskeyDeleteSerializer(data={"passkey_id": passkey_id})
+        serializer.is_valid(raise_exception=True)
+        credential = serializer.save(user=request.user)
+        return Response(
+            {
+                "credential": UserPasskeyCredentialSerializer(credential).data,
+                "status": UserMfaStatusSerializer(
+                    build_user_mfa_status_payload(request.user)
+                ).data,
+            }
+        )

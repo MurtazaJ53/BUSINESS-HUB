@@ -10,6 +10,9 @@ export type SessionUser = {
   mfa_totp_enabled: boolean;
   mfa_totp_enabled_at: string | null;
   mfa_totp_last_verified_at: string | null;
+  passkey_enabled: boolean;
+  passkey_count: number;
+  mfa_security_stamp: string;
 };
 
 export type UserMfaStatusPayload = {
@@ -17,11 +20,74 @@ export type UserMfaStatusPayload = {
   totp_pending_enrollment: boolean;
   enabled_at: string | null;
   last_verified_at: string | null;
+  passkey_enabled: boolean;
+  passkey_count: number;
+  passkey_last_verified_at: string | null;
+  security_stamp: string;
   issuer_label: string;
   account_label: string;
   challenge_window_seconds: number;
   pending_manual_secret: string;
   pending_otpauth_uri: string;
+};
+
+export type UserPasskeyCredentialPayload = {
+  id: string;
+  label: string;
+  credential_id: string;
+  cose_algorithm: number;
+  sign_count: number;
+  transports_json: string[];
+  aaguid: string;
+  last_verified_at: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type UserPasskeyBeginPayload = {
+  challenge_token: string;
+  options: {
+    challenge: string;
+    rp?: {
+      id: string;
+      name: string;
+    };
+    user?: {
+      id: string;
+      name: string;
+      displayName: string;
+    };
+    pubKeyCredParams?: Array<{
+      type: "public-key";
+      alg: number;
+    }>;
+    timeout?: number;
+    attestation?: "none" | string;
+    authenticatorSelection?: {
+      residentKey?: "preferred" | "required" | "discouraged";
+      userVerification?: "preferred" | "required" | "discouraged";
+    };
+    excludeCredentials?: Array<{
+      type: "public-key";
+      id: string;
+      transports?: string[];
+    }>;
+    rpId?: string;
+    userVerification?: "preferred" | "required" | "discouraged";
+    allowCredentials?: Array<{
+      type: "public-key";
+      id: string;
+      transports?: string[];
+    }>;
+  };
+};
+
+export type UserPasskeyVerifyPayload = {
+  credential: UserPasskeyCredentialPayload;
+  status: UserMfaStatusPayload;
+  verified_at: string;
+  verified_until: string;
 };
 
 export type UserMfaVerifyPayload = {

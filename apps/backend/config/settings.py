@@ -30,6 +30,15 @@ ENVIRONMENT = os.getenv("DJANGO_ENV", "development")
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", ["localhost", "127.0.0.1", "testserver"])
 CORS_ALLOWED_ORIGINS = env_list("DJANGO_CORS_ALLOWED_ORIGINS")
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
+BUSINESS_HUB_WEBAUTHN_RP_ID = os.getenv("BUSINESS_HUB_WEBAUTHN_RP_ID", "").strip()
+BUSINESS_HUB_WEBAUTHN_RP_NAME = os.getenv(
+    "BUSINESS_HUB_WEBAUTHN_RP_NAME",
+    "Business Hub",
+).strip()
+BUSINESS_HUB_WEBAUTHN_ALLOWED_ORIGINS = env_list(
+    "BUSINESS_HUB_WEBAUTHN_ALLOWED_ORIGINS",
+    CORS_ALLOWED_ORIGINS or ["http://localhost:3000", "http://127.0.0.1:3000"],
+)
 
 INSTALLED_APPS = [
     "django.contrib.admin",

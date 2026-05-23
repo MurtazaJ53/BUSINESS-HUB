@@ -38,6 +38,12 @@ Phase 1 backend foundation for the Business Hub target platform.
 - `/api/v1/shops/<shop_id>/payments/`
 - `/api/v1/shops/<shop_id>/payments/commands/`
 - `/api/v1/shops/<shop_id>/projections/dashboard/`
+- `/api/v1/session/mfa/`
+- `/api/v1/session/passkeys/`
+- `/api/v1/session/passkeys/register/begin/`
+- `/api/v1/session/passkeys/register/finish/`
+- `/api/v1/session/passkeys/verify/begin/`
+- `/api/v1/session/passkeys/verify/finish/`
 - `/api/v1/erpnext/meta/`
 - `/api/v1/erpnext/health/`
 - `/api/v1/shops/<shop_id>/erpnext/binding/`
@@ -81,6 +87,18 @@ Phase 1 backend foundation for the Business Hub target platform.
 - Session/basic auth for Django admin and direct API use
 - Firebase bearer token auth when Firebase credentials are configured
 - `X-Dev-User-Email` header fallback in debug mode for local API development
+
+## Owner/admin security controls
+
+Sensitive owner/admin surfaces can now use either:
+- TOTP authenticator MFA
+- passkey / WebAuthn verification
+
+For local passkey testing, configure:
+
+- `BUSINESS_HUB_WEBAUTHN_RP_ID`
+- `BUSINESS_HUB_WEBAUTHN_RP_NAME`
+- `BUSINESS_HUB_WEBAUTHN_ALLOWED_ORIGINS`
 
 ## Local infrastructure
 

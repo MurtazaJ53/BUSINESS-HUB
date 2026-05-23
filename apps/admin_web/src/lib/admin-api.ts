@@ -48,6 +48,7 @@ import type {
   SalesSummaryPayload,
   SessionPayload,
   UserMfaStatusPayload,
+  UserPasskeyCredentialPayload,
   WorkspacePulseSnapshot,
   WorkspacePulseSignal,
   ShopDomainState,
@@ -93,7 +94,7 @@ function buildHeaders() {
   return headers;
 }
 
-async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T> {
+export async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T> {
   const url = new URL(`${API_BASE_URL}${path}`);
   if (options.query) {
     for (const [key, value] of Object.entries(options.query)) {
@@ -150,6 +151,10 @@ export const getSession = cache(async (): Promise<SessionPayload> => {
 
 export const getUserMfaStatus = cache(async (): Promise<UserMfaStatusPayload> => {
   return apiFetch<UserMfaStatusPayload>("/session/mfa/");
+});
+
+export const getUserPasskeys = cache(async (): Promise<UserPasskeyCredentialPayload[]> => {
+  return apiFetch<UserPasskeyCredentialPayload[]>("/session/passkeys/");
 });
 
 export const getMemberships = cache(async (): Promise<ShopMembership[]> => {

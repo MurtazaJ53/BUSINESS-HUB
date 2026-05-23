@@ -25,7 +25,7 @@ function getMfaCookieSecret() {
 
 function createSignature(userId: string, enabledAt: string, verifiedUntil: string) {
   return createHmac("sha256", getMfaCookieSecret())
-    .update(`v1:${userId}:${enabledAt}:${verifiedUntil}`)
+    .update(`v2:${userId}:${enabledAt}:${verifiedUntil}`)
     .digest("hex");
 }
 
@@ -34,10 +34,14 @@ export async function getAdminWebMfaPosture(
   required: boolean,
 ): Promise<AdminWebMfaPosture> {
   if (!required) {
-    return { required: false, enabled: user.mfa_totp_enabled, verified: true };
+    return {
+      required: false,
+      enabled: user.mfa_totp_enabled || user.passkey_enabled,
+      verified: true,
+    };
   }
 
-  if (!user.mfa_totp_enabled || !user.mfa_totp_enabled_at) {
+  if (!user.mfa_totp_enabled && !user.passkey_enabled) {
     return { required: true, enabled: false, verified: false };
   }
 
@@ -52,7 +56,7 @@ export async function getAdminWebMfaPosture(
     return { required: true, enabled: true, verified: false };
   }
 
-  if (userId !== user.id || enabledAt !== user.mfa_totp_enabled_at) {
+  if (userId !== user.id || enabledAt !== user.mfa_security_stamp) {
     return { required: true, enabled: true, verified: false };
   }
 
@@ -74,14 +78,14 @@ export async function getAdminWebMfaPosture(
 
 export async function setAdminWebMfaCookie(options: {
   userId: string;
-  enabledAt: string;
+  securityStamp: string;
   verifiedUntil: string;
 }) {
   const cookieStore = await cookies();
-  const signature = createSignature(options.userId, options.enabledAt, options.verifiedUntil);
+  const signature = createSignature(options.userId, options.securityStamp, options.verifiedUntil);
   cookieStore.set(
     MFA_COOKIE_NAME,
-    `${options.userId}${MFA_COOKIE_SEPARATOR}${options.enabledAt}${MFA_COOKIE_SEPARATOR}${options.verifiedUntil}${MFA_COOKIE_SEPARATOR}${signature}`,
+    `${options.userId}${MFA_COOKIE_SEPARATOR}${options.securityStamp}${MFA_COOKIE_SEPARATOR}${options.verifiedUntil}${MFA_COOKIE_SEPARATOR}${signature}`,
     {
       httpOnly: true,
       sameSite: "lax",

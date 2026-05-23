@@ -55,12 +55,12 @@ export async function verifyMfaCodeAction(formData: FormData) {
       body: { purpose, code },
     });
     const session = await getSession();
-    if (!session.user.mfa_totp_enabled_at && !result.status.enabled_at) {
-      throw new Error("MFA verification completed without an enabled timestamp.");
+    if (!result.status.security_stamp) {
+      throw new Error("MFA verification completed without a security stamp.");
     }
     await setAdminWebMfaCookie({
       userId: session.user.id,
-      enabledAt: result.status.enabled_at || session.user.mfa_totp_enabled_at || result.verified_at,
+      securityStamp: result.status.security_stamp,
       verifiedUntil: result.verified_until,
     });
     revalidatePath("/security");

@@ -8,12 +8,16 @@ It covers:
 - MFA for sensitive owner/admin surfaces
 - workspace session control and remote wipe
 - workspace audit review
+- passkey / WebAuthn enrollment and verification
 
 ## Current security controls
 
 ### 1. MFA for owner/admin controls
 
 Business Hub now requires MFA before sensitive owner/admin surfaces can open.
+Owner/admin users can satisfy that requirement with either:
+- TOTP authenticator codes
+- passkeys / WebAuthn
 
 Protected surfaces include:
 - Workspace plan
@@ -57,10 +61,18 @@ Audited areas currently include:
 ### Security setup
 
 1. Open `Security`.
-2. Start MFA setup.
-3. Add the secret to an authenticator app.
-4. Verify the first code.
-5. Re-open any protected surface and refresh the MFA window when needed.
+2. Choose one of these setup paths:
+   - enroll TOTP with an authenticator app
+   - register a passkey on the current browser/device
+3. Complete the first verification step.
+4. Re-open any protected surface and refresh the MFA window when needed.
+
+### Passkey setup notes
+
+- Set `BUSINESS_HUB_WEBAUTHN_RP_ID` to the effective relying-party host for the admin web deployment.
+- Set `BUSINESS_HUB_WEBAUTHN_ALLOWED_ORIGINS` to the exact HTTPS origins that will open the passkey flow.
+- Use the default local values only for localhost development.
+- Owners/admins can register multiple passkeys and remove old ones from `Security`.
 
 ### Sessions response
 
@@ -84,6 +96,7 @@ Use `Audit` when:
 
 On mobile, owner/admin users can:
 - enroll MFA
+- register or verify a passkey-backed secure-access window through the backend session
 - refresh the secure-access window
 - disable MFA when replacing the authenticator
 
@@ -107,7 +120,7 @@ That currently applies to:
 The current security layer is strong, but it is not the final enterprise endpoint yet.
 
 Still pending:
-- WebAuthn / passkey MFA
+- full WebAuthn resident-key / platform-specific trust policy controls
 - anomaly detection on audit and finance events
 - automatic security-task generation
 - device trust scoring
