@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { formatRole } from "@/lib/formatters";
 import { canAccessAttendance, canAccessExpenses, formatPlanTier } from "@/lib/plans";
+import { canAccessPaymentsWorkspace, canManageWorkspace } from "@/lib/roles";
 import type { SessionPayload, ShopMembership } from "@/lib/types";
 
 type AdminShellProps = {
@@ -106,10 +107,6 @@ const navItems: readonly NavItem[] = [
   },
 ] as const;
 
-function canSeeOperations(role: ShopMembership["role"] | null) {
-  return role === "owner" || role === "admin";
-}
-
 function getWorkspaceRole(activeShop: ShopMembership | null) {
   return activeShop?.role ?? null;
 }
@@ -126,8 +123,12 @@ function getSectionedNav(
     }
 
     if (item.group === "operations") {
-      if (!canSeeOperations(workspaceRole)) {
+      if (!canManageWorkspace(workspaceRole)) {
         return false;
+      }
+
+      if (item.key === "payments") {
+        return canAccessPaymentsWorkspace(workspaceRole);
       }
 
       if (item.key === "expenses") {

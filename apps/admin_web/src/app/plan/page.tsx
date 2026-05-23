@@ -10,11 +10,8 @@ import {
   getPlanUnlockNext,
   orderedPlanTiers,
 } from "@/lib/plans";
+import { canManageWorkspace } from "@/lib/roles";
 import type { BusinessHubPlanTier } from "@/lib/types";
-
-function canManageWorkspace(role: "owner" | "admin" | "staff" | "viewer" | null) {
-  return role === "owner" || role === "admin";
-}
 
 function getNextPlanLabel(planTier: BusinessHubPlanTier): string {
   switch (planTier) {

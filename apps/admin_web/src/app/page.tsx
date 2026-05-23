@@ -17,6 +17,7 @@ import {
   canAccessFinanceSummary,
   formatPlanTier,
 } from "@/lib/plans";
+import { canManageWorkspace } from "@/lib/roles";
 import type { DashboardSnapshot, ShopMembership } from "@/lib/types";
 
 type QuickAction = {
@@ -24,10 +25,6 @@ type QuickAction = {
   body: string;
   href: string;
 };
-
-function canManageWorkspace(role: ShopMembership["role"] | null) {
-  return role === "owner" || role === "admin";
-}
 
 function buildQuickActions(activeShop: ShopMembership | null): QuickAction[] {
   const role = activeShop?.role ?? null;

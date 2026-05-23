@@ -12,11 +12,14 @@ import {
 } from "@/lib/admin-api";
 import { formatCurrency } from "@/lib/formatters";
 import { canAccessAdvancedReports, canAccessFinanceSummary, formatPlanTier } from "@/lib/plans";
+import { canAccessPaymentsWorkspace } from "@/lib/roles";
 
 export default async function PaymentsPage() {
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
-  const [payments, paymentSummary, domainState] = activeShop
+  const role = activeShop?.role ?? null;
+  const canUsePaymentsWorkspace = canAccessPaymentsWorkspace(role);
+  const [payments, paymentSummary, domainState] = activeShop && canUsePaymentsWorkspace
     ? await Promise.all([
         getPayments(activeShop.shop.id),
         getPaymentSummary(activeShop.shop.id),
@@ -41,6 +44,11 @@ export default async function PaymentsPage() {
         <EmptyState
           title="No payment workspace available"
           body="This web workspace needs an active shop membership before it can show captured payments and collection history for a store."
+        />
+      ) : !canUsePaymentsWorkspace ? (
+        <EmptyState
+          title="Payments review is owner and admin only"
+          body="Daily users should stay focused on selling and operations. Collections review and payment summary surfaces are intentionally limited to workspace owners and admins."
         />
       ) : (
         <div className="space-y-8">
