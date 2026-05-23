@@ -368,8 +368,18 @@ export type WorkspacePulseSignal = {
   first_detected_at: string;
   last_detected_at: string;
   last_snapshot_refreshed_at: string;
+  assigned_membership_id: string | null;
+  assigned_member_name: string | null;
+  assigned_member_role: "owner" | "admin" | "staff" | "viewer" | null;
+  assigned_at: string | null;
+  assigned_by_name: string | null;
   acknowledged_at: string | null;
   acknowledged_by_name: string | null;
+  is_escalated: boolean;
+  escalated_at: string | null;
+  escalated_by_name: string | null;
+  escalation_note: string;
+  follow_up_note: string;
   resolved_at: string | null;
   resolved_by_name: string | null;
   resolution_note: string;

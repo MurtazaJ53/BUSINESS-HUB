@@ -36,6 +36,7 @@ export async function updatePulseSignalAction(formData: FormData) {
   const action = getRequiredField(formData, "action", "action");
   const title = getOptionalField(formData, "title");
   const note = getOptionalField(formData, "note");
+  const assigneeMembershipId = getOptionalField(formData, "assigneeMembershipId");
   let result: WorkspacePulseSignal | null = null;
 
   try {
@@ -47,6 +48,7 @@ export async function updatePulseSignalAction(formData: FormData) {
         body: {
           action,
           note,
+          assignee_membership_id: assigneeMembershipId || undefined,
         },
       },
     );

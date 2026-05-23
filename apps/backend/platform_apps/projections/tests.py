@@ -29,11 +29,33 @@ class ProjectionRefreshTests(TestCase):
             password="secret",
             full_name="Owner",
         )
+        self.staff_user = PlatformUser.objects.create_user(
+            email="staff@example.com",
+            password="secret",
+            full_name="Staff Member",
+        )
+        self.admin_user = PlatformUser.objects.create_user(
+            email="admin@example.com",
+            password="secret",
+            full_name="Admin Member",
+        )
         self.shop = Shop.objects.create(name="Projection Shop", slug="projection-shop")
         ShopMembership.objects.create(
             user=self.user,
             shop=self.shop,
             role=ShopMembership.Role.OWNER,
+            status=ShopMembership.Status.ACTIVE,
+        )
+        self.staff_membership = ShopMembership.objects.create(
+            user=self.staff_user,
+            shop=self.shop,
+            role=ShopMembership.Role.STAFF,
+            status=ShopMembership.Status.ACTIVE,
+        )
+        self.admin_membership = ShopMembership.objects.create(
+            user=self.admin_user,
+            shop=self.shop,
+            role=ShopMembership.Role.ADMIN,
             status=ShopMembership.Status.ACTIVE,
         )
         self.client = APIClient()
@@ -380,3 +402,113 @@ class ProjectionRefreshTests(TestCase):
         )
         self.assertEqual(resolve_response.status_code, 200)
         self.assertEqual(resolve_response.data["status"], "resolved")
+
+    def test_owner_can_assign_and_escalate_pulse_signal(self):
+        self.shop.settings_json = {"plan_tier": "pro"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+        self._seed_domain_data()
+
+        snapshot = refresh_shop_dashboard_projection(self.shop)
+        pulse = build_shop_pulse_snapshot(
+            self.shop,
+            dashboard_snapshot=snapshot,
+            signal_limit=None,
+        )
+        sync_shop_pulse_signals(self.shop, pulse_snapshot=pulse, now=snapshot.refreshed_at)
+        signal = ShopPulseSignal.objects.filter(shop=self.shop).first()
+        self.assertIsNotNone(signal)
+
+        assign_response = self.client.patch(
+            f"/api/v1/shops/{self.shop.id}/projections/pulse/signals/{signal.id}/",
+            {
+                "action": "assign",
+                "assignee_membership_id": str(self.staff_membership.id),
+                "note": "Store team should verify this before evening shift.",
+            },
+            format="json",
+        )
+        self.assertEqual(assign_response.status_code, 200)
+        self.assertEqual(
+            str(assign_response.data["assigned_membership_id"]),
+            str(self.staff_membership.id),
+        )
+        self.assertEqual(assign_response.data["assigned_member_name"], "Staff Member")
+        self.assertEqual(assign_response.data["status"], "acknowledged")
+
+        escalate_response = self.client.patch(
+            f"/api/v1/shops/{self.shop.id}/projections/pulse/signals/{signal.id}/",
+            {
+                "action": "escalate",
+                "note": "Needs owner follow-up if not fixed before tonight.",
+            },
+            format="json",
+        )
+        self.assertEqual(escalate_response.status_code, 200)
+        self.assertTrue(escalate_response.data["is_escalated"])
+        self.assertEqual(
+            escalate_response.data["escalation_note"],
+            "Needs owner follow-up if not fixed before tonight.",
+        )
+
+        note_response = self.client.patch(
+            f"/api/v1/shops/{self.shop.id}/projections/pulse/signals/{signal.id}/",
+            {
+                "action": "note",
+                "note": "Staff confirmed they are restocking after lunch.",
+            },
+            format="json",
+        )
+        self.assertEqual(note_response.status_code, 200)
+        self.assertEqual(
+            note_response.data["follow_up_note"],
+            "Staff confirmed they are restocking after lunch.",
+        )
+
+    def test_admin_cannot_assign_signal_to_owner_or_other_admin(self):
+        self.shop.settings_json = {"plan_tier": "pro"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+        self._seed_domain_data()
+        snapshot = refresh_shop_dashboard_projection(self.shop)
+        pulse = build_shop_pulse_snapshot(
+            self.shop,
+            dashboard_snapshot=snapshot,
+            signal_limit=None,
+        )
+        sync_shop_pulse_signals(self.shop, pulse_snapshot=pulse, now=snapshot.refreshed_at)
+        signal = ShopPulseSignal.objects.filter(shop=self.shop).first()
+
+        admin_client = APIClient()
+        admin_client.force_authenticate(user=self.admin_user)
+
+        owner_assign_response = admin_client.patch(
+            f"/api/v1/shops/{self.shop.id}/projections/pulse/signals/{signal.id}/",
+            {
+                "action": "assign",
+                "assignee_membership_id": str(
+                    ShopMembership.objects.get(shop=self.shop, user=self.user).id
+                ),
+            },
+            format="json",
+        )
+        self.assertEqual(owner_assign_response.status_code, 400)
+
+        other_admin_user = PlatformUser.objects.create_user(
+            email="second-admin@example.com",
+            password="secret",
+            full_name="Second Admin",
+        )
+        other_admin_membership = ShopMembership.objects.create(
+            user=other_admin_user,
+            shop=self.shop,
+            role=ShopMembership.Role.ADMIN,
+            status=ShopMembership.Status.ACTIVE,
+        )
+        other_admin_response = admin_client.patch(
+            f"/api/v1/shops/{self.shop.id}/projections/pulse/signals/{signal.id}/",
+            {
+                "action": "assign",
+                "assignee_membership_id": str(other_admin_membership.id),
+            },
+            format="json",
+        )
+        self.assertEqual(other_admin_response.status_code, 400)

@@ -146,6 +146,25 @@ def ensure_workspace_access_session_management_or_403(
     raise exceptions.PermissionDenied("Your workspace role cannot manage that device session.")
 
 
+def can_assign_workspace_pulse_signal(
+    actor_membership: ShopMembership,
+    target_membership: ShopMembership,
+) -> bool:
+    if actor_membership.shop_id != target_membership.shop_id:
+        return False
+
+    if target_membership.status != ShopMembership.Status.ACTIVE:
+        return False
+
+    if actor_membership.user_id == target_membership.user_id:
+        return actor_membership.role in {
+            ShopMembership.Role.OWNER,
+            ShopMembership.Role.ADMIN,
+        }
+
+    return can_manage_workspace_membership(actor_membership.role, target_membership.role)
+
+
 def has_feature_enabled(membership: ShopMembership, feature_key: str) -> bool:
     return membership.shop.enabled_features.get(feature_key) is True
 

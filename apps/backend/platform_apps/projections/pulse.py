@@ -558,7 +558,15 @@ def sync_shop_pulse_signals(
         )
 
     return list(
-        ShopPulseSignal.objects.filter(shop=shop).order_by(
+        ShopPulseSignal.objects.filter(shop=shop)
+        .select_related(
+            "assigned_membership__user",
+            "assigned_by_user",
+            "acknowledged_by_user",
+            "escalated_by_user",
+            "resolved_by_user",
+        )
+        .order_by(
             "status",
             "-signal_rank",
             "-last_detected_at",

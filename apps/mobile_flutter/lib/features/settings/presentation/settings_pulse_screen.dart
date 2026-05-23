@@ -334,6 +334,22 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
                                           note: 'Resolved from mobile pulse desk.',
                                         )
                                     : null,
+                                onEscalate: !signal.isEscalated
+                                    ? () => _applySignalAction(
+                                          session: session,
+                                          signal: signal,
+                                          action: 'escalate',
+                                          note: 'Escalated from mobile pulse desk.',
+                                        )
+                                    : null,
+                                onDeescalate: signal.isEscalated
+                                    ? () => _applySignalAction(
+                                          session: session,
+                                          signal: signal,
+                                          action: 'deescalate',
+                                          note: 'Escalation lowered from mobile pulse desk.',
+                                        )
+                                    : null,
                                 onReopen: signal.isResolved
                                     ? () => _applySignalAction(
                                           session: session,
@@ -372,6 +388,15 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
                                 busy: _busySignalId == signal.id,
                                 onAcknowledge: null,
                                 onResolve: null,
+                                onEscalate: null,
+                                onDeescalate: signal.isEscalated
+                                    ? () => _applySignalAction(
+                                          session: session,
+                                          signal: signal,
+                                          action: 'deescalate',
+                                          note: 'Escalation lowered from mobile pulse desk.',
+                                        )
+                                    : null,
                                 onReopen: () => _applySignalAction(
                                   session: session,
                                   signal: signal,
@@ -396,6 +421,8 @@ class _PulseSignalCard extends StatelessWidget {
     required this.busy,
     this.onAcknowledge,
     this.onResolve,
+    this.onEscalate,
+    this.onDeescalate,
     this.onReopen,
   });
 
@@ -403,6 +430,8 @@ class _PulseSignalCard extends StatelessWidget {
   final bool busy;
   final VoidCallback? onAcknowledge;
   final VoidCallback? onResolve;
+  final VoidCallback? onEscalate;
+  final VoidCallback? onDeescalate;
   final VoidCallback? onReopen;
 
   @override
@@ -477,6 +506,19 @@ class _PulseSignalCard extends StatelessWidget {
                   icon: Icons.flag_rounded,
                   accent: _signalLevelColor(signal.signalLevel),
                 ),
+                if (signal.isEscalated)
+                  const MobileTag(
+                    label: 'ESCALATED',
+                    icon: Icons.vertical_align_top_rounded,
+                    accent: Color(0xFFFB7185),
+                  ),
+                if (signal.assignedMemberName != null)
+                  MobileTag(
+                    label:
+                        '${signal.assignedMemberName} • ${_roleLabel(signal.assignedMemberRole)}',
+                    icon: Icons.person_pin_circle_rounded,
+                    accent: const Color(0xFF38BDF8),
+                  ),
                 if (signal.metricValue.isNotEmpty)
                   MobileTag(
                     label: signal.metricValue,
@@ -511,6 +553,28 @@ class _PulseSignalCard extends StatelessWidget {
                 ),
               ),
             ],
+            if (signal.followUpNote.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 8),
+              Text(
+                'Follow-up: ${signal.followUpNote}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.64),
+                  fontWeight: FontWeight.w600,
+                  height: 1.4,
+                ),
+              ),
+            ],
+            if (signal.escalationNote.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 8),
+              Text(
+                'Escalation: ${signal.escalationNote}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.64),
+                  fontWeight: FontWeight.w600,
+                  height: 1.4,
+                ),
+              ),
+            ],
             const SizedBox(height: 14),
             LayoutBuilder(
               builder: (context, constraints) {
@@ -536,6 +600,18 @@ class _PulseSignalCard extends StatelessWidget {
                       onPressed: busy ? null : onResolve,
                       icon: const Icon(Icons.task_alt_rounded),
                       label: const Text('Resolve'),
+                    ),
+                  if (onEscalate != null)
+                    FilledButton.tonalIcon(
+                      onPressed: busy ? null : onEscalate,
+                      icon: const Icon(Icons.vertical_align_top_rounded),
+                      label: const Text('Escalate'),
+                    ),
+                  if (onDeescalate != null)
+                    FilledButton.tonalIcon(
+                      onPressed: busy ? null : onDeescalate,
+                      icon: const Icon(Icons.vertical_align_bottom_rounded),
+                      label: const Text('Lower alert'),
                     ),
                   if (onReopen != null)
                     FilledButton.tonalIcon(
@@ -623,5 +699,18 @@ Color _signalLevelColor(String level) {
       return const Color(0xFF22C55E);
     default:
       return const Color(0xFF38BDF8);
+  }
+}
+
+String _roleLabel(String? role) {
+  switch ((role ?? '').trim().toLowerCase()) {
+    case 'owner':
+      return 'Owner';
+    case 'admin':
+      return 'Admin';
+    case 'viewer':
+      return 'Viewer';
+    default:
+      return 'Staff';
   }
 }

@@ -239,8 +239,18 @@ class WorkspacePulseSignal {
     required this.firstDetectedAt,
     required this.lastDetectedAt,
     required this.lastSnapshotRefreshedAt,
+    required this.assignedMembershipId,
+    required this.assignedMemberName,
+    required this.assignedMemberRole,
+    required this.assignedAt,
+    required this.assignedByName,
     required this.acknowledgedAt,
     required this.acknowledgedByName,
+    required this.isEscalated,
+    required this.escalatedAt,
+    required this.escalatedByName,
+    required this.escalationNote,
+    required this.followUpNote,
     required this.resolvedAt,
     required this.resolvedByName,
     required this.resolutionNote,
@@ -263,8 +273,18 @@ class WorkspacePulseSignal {
   final DateTime firstDetectedAt;
   final DateTime lastDetectedAt;
   final DateTime lastSnapshotRefreshedAt;
+  final String? assignedMembershipId;
+  final String? assignedMemberName;
+  final String? assignedMemberRole;
+  final DateTime? assignedAt;
+  final String? assignedByName;
   final DateTime? acknowledgedAt;
   final String? acknowledgedByName;
+  final bool isEscalated;
+  final DateTime? escalatedAt;
+  final String? escalatedByName;
+  final String escalationNote;
+  final String followUpNote;
   final DateTime? resolvedAt;
   final String? resolvedByName;
   final String resolutionNote;

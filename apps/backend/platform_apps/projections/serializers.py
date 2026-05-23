@@ -7,7 +7,11 @@ from platform_apps.projections.models import (
     ShopLowStockSnapshot,
     ShopPulseSignal,
 )
-from platform_apps.shops.permissions import has_feature_enabled
+from platform_apps.shops.models import ShopMembership
+from platform_apps.shops.permissions import (
+    can_assign_workspace_pulse_signal,
+    has_feature_enabled,
+)
 
 
 class ShopLowStockSnapshotSerializer(serializers.ModelSerializer):
@@ -131,7 +135,11 @@ class ShopPulseSnapshotSerializer(serializers.Serializer):
 
 
 class ShopPulseSignalSerializer(serializers.ModelSerializer):
+    assigned_member_name = serializers.SerializerMethodField()
+    assigned_member_role = serializers.SerializerMethodField()
+    assigned_by_name = serializers.SerializerMethodField()
     acknowledged_by_name = serializers.SerializerMethodField()
+    escalated_by_name = serializers.SerializerMethodField()
     resolved_by_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -153,8 +161,18 @@ class ShopPulseSignalSerializer(serializers.ModelSerializer):
             "first_detected_at",
             "last_detected_at",
             "last_snapshot_refreshed_at",
+            "assigned_membership_id",
+            "assigned_member_name",
+            "assigned_member_role",
+            "assigned_at",
+            "assigned_by_name",
             "acknowledged_at",
             "acknowledged_by_name",
+            "is_escalated",
+            "escalated_at",
+            "escalated_by_name",
+            "escalation_note",
+            "follow_up_note",
             "resolved_at",
             "resolved_by_name",
             "resolution_note",
@@ -163,10 +181,31 @@ class ShopPulseSignalSerializer(serializers.ModelSerializer):
             "updated_at",
         )
 
+    def get_assigned_member_name(self, obj):
+        if obj.assigned_membership is None:
+            return None
+        user = obj.assigned_membership.user
+        return user.full_name or user.email or obj.assigned_membership.email or "Workspace member"
+
+    def get_assigned_member_role(self, obj):
+        if obj.assigned_membership is None:
+            return None
+        return obj.assigned_membership.role
+
+    def get_assigned_by_name(self, obj):
+        if obj.assigned_by_user is None:
+            return None
+        return obj.assigned_by_user.full_name or obj.assigned_by_user.email
+
     def get_acknowledged_by_name(self, obj):
         if obj.acknowledged_by_user is None:
             return None
         return obj.acknowledged_by_user.full_name or obj.acknowledged_by_user.email
+
+    def get_escalated_by_name(self, obj):
+        if obj.escalated_by_user is None:
+            return None
+        return obj.escalated_by_user.full_name or obj.escalated_by_user.email
 
     def get_resolved_by_name(self, obj):
         if obj.resolved_by_user is None:
@@ -175,12 +214,69 @@ class ShopPulseSignalSerializer(serializers.ModelSerializer):
 
 
 class ShopPulseSignalUpdateSerializer(serializers.Serializer):
-    action = serializers.ChoiceField(choices=["acknowledge", "resolve", "reopen"])
+    action = serializers.ChoiceField(
+        choices=[
+            "acknowledge",
+            "resolve",
+            "reopen",
+            "assign",
+            "clear_assignment",
+            "escalate",
+            "deescalate",
+            "note",
+        ]
+    )
     note = serializers.CharField(required=False, allow_blank=True, max_length=500)
+    assignee_membership_id = serializers.UUIDField(required=False)
+
+    def validate(self, attrs):
+        action = attrs["action"]
+        note = attrs.get("note", "").strip()
+        signal = self.context["signal"]
+        actor_membership: ShopMembership = self.context["actor_membership"]
+
+        if action == "assign":
+            assignee_membership_id = attrs.get("assignee_membership_id")
+            if assignee_membership_id is None:
+                raise serializers.ValidationError(
+                    {"assignee_membership_id": "Choose an active workspace member to assign this signal."}
+                )
+            assignee_membership = (
+                ShopMembership.objects.select_related("user")
+                .filter(shop=signal.shop, pk=assignee_membership_id)
+                .first()
+            )
+            if assignee_membership is None:
+                raise serializers.ValidationError(
+                    {"assignee_membership_id": "That workspace member could not be found."}
+                )
+            if not can_assign_workspace_pulse_signal(actor_membership, assignee_membership):
+                raise serializers.ValidationError(
+                    {"assignee_membership_id": "Your workspace role cannot assign this signal to that member."}
+                )
+            attrs["assignee_membership"] = assignee_membership
+
+        if action == "clear_assignment" and signal.assigned_membership_id is None:
+            raise serializers.ValidationError({"action": "This signal is not assigned right now."})
+
+        if action == "escalate" and signal.is_escalated:
+            raise serializers.ValidationError({"action": "This signal is already escalated."})
+
+        if action == "deescalate" and not signal.is_escalated:
+            raise serializers.ValidationError({"action": "This signal is not escalated right now."})
+
+        if action == "note" and not note:
+            raise serializers.ValidationError({"note": "Add a follow-up note before saving."})
+
+        if action == "resolve" and not note:
+            attrs["note"] = "Resolved from pulse control."
+
+        return attrs
 
     def apply(self, *, signal: ShopPulseSignal, actor_user):
         action = self.validated_data["action"]
         note = self.validated_data.get("note", "").strip()
+        assignee_membership = self.validated_data.get("assignee_membership")
 
         from django.utils import timezone
 
@@ -192,8 +288,8 @@ class ShopPulseSignalUpdateSerializer(serializers.Serializer):
             signal.acknowledged_at = current_time
             signal.acknowledged_by_user = actor_user
             if note:
-                signal.resolution_note = note
-                update_fields.append("resolution_note")
+                signal.follow_up_note = note
+                update_fields.append("follow_up_note")
             update_fields.extend(["status", "acknowledged_at", "acknowledged_by_user"])
         elif action == "resolve":
             signal.status = ShopPulseSignal.Status.RESOLVED
@@ -201,6 +297,46 @@ class ShopPulseSignalUpdateSerializer(serializers.Serializer):
             signal.resolved_by_user = actor_user
             signal.resolution_note = note
             update_fields.extend(["status", "resolved_at", "resolved_by_user", "resolution_note"])
+        elif action == "assign":
+            signal.assigned_membership = assignee_membership
+            signal.assigned_at = current_time
+            signal.assigned_by_user = actor_user
+            if signal.status == ShopPulseSignal.Status.OPEN:
+                signal.status = ShopPulseSignal.Status.ACKNOWLEDGED
+                signal.acknowledged_at = current_time
+                signal.acknowledged_by_user = actor_user
+                update_fields.extend(["status", "acknowledged_at", "acknowledged_by_user"])
+            if note:
+                signal.follow_up_note = note
+                update_fields.append("follow_up_note")
+            update_fields.extend(["assigned_membership", "assigned_at", "assigned_by_user"])
+        elif action == "clear_assignment":
+            signal.assigned_membership = None
+            signal.assigned_at = None
+            signal.assigned_by_user = None
+            if note:
+                signal.follow_up_note = note
+                update_fields.append("follow_up_note")
+            update_fields.extend(["assigned_membership", "assigned_at", "assigned_by_user"])
+        elif action == "escalate":
+            signal.is_escalated = True
+            signal.escalated_at = current_time
+            signal.escalated_by_user = actor_user
+            signal.escalation_note = note
+            update_fields.extend(
+                ["is_escalated", "escalated_at", "escalated_by_user", "escalation_note"]
+            )
+        elif action == "deescalate":
+            signal.is_escalated = False
+            signal.escalated_at = None
+            signal.escalated_by_user = None
+            signal.escalation_note = note
+            update_fields.extend(
+                ["is_escalated", "escalated_at", "escalated_by_user", "escalation_note"]
+            )
+        elif action == "note":
+            signal.follow_up_note = note
+            update_fields.append("follow_up_note")
         else:
             signal.status = ShopPulseSignal.Status.OPEN
             signal.acknowledged_at = None
@@ -208,8 +344,8 @@ class ShopPulseSignalUpdateSerializer(serializers.Serializer):
             signal.resolved_at = None
             signal.resolved_by_user = None
             if note:
-                signal.resolution_note = note
-                update_fields.append("resolution_note")
+                signal.follow_up_note = note
+                update_fields.append("follow_up_note")
             update_fields.extend(
                 [
                     "status",

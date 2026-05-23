@@ -9,12 +9,13 @@ import {
   getSession,
   getWorkspacePulse,
   getWorkspacePulseSignals,
+  getWorkspaceTeamMembers,
   resolveActiveShop,
 } from "@/lib/admin-api";
 import { formatDateTime } from "@/lib/formatters";
 import { getAdminWebMfaPosture } from "@/lib/mfa";
 import { canManageWorkspace } from "@/lib/roles";
-import type { WorkspacePulseSignal } from "@/lib/types";
+import type { WorkspacePulseSignal, WorkspaceTeamMemberPayload } from "@/lib/types";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -52,15 +53,26 @@ function buildBanner(searchParams: SearchParams) {
   }
 
   if (status === "success") {
+    const successTitle =
+      action === "resolve"
+        ? "Pulse signal resolved"
+        : action === "reopen"
+          ? "Pulse signal reopened"
+          : action === "assign"
+            ? "Pulse signal assigned"
+            : action === "clear_assignment"
+              ? "Pulse assignment cleared"
+              : action === "escalate"
+                ? "Pulse signal escalated"
+                : action === "deescalate"
+                  ? "Pulse escalation lowered"
+                  : action === "note"
+                    ? "Pulse note saved"
+                    : "Pulse signal acknowledged";
     return {
       accent:
         "border-[rgba(52,211,153,0.18)] bg-[rgba(7,33,25,0.76)] text-[var(--success)]" as const,
-      title:
-        action === "resolve"
-          ? "Pulse signal resolved"
-          : action === "reopen"
-            ? "Pulse signal reopened"
-            : "Pulse signal acknowledged",
+      title: successTitle,
       body: `${title || "The selected pulse signal"} was updated successfully.`,
     };
   }
@@ -73,10 +85,24 @@ function buildBanner(searchParams: SearchParams) {
   };
 }
 
+function pulseRoleLabel(role: string | null) {
+  switch (role) {
+    case "owner":
+      return "Owner";
+    case "admin":
+      return "Admin";
+    case "viewer":
+      return "Viewer";
+    default:
+      return "Staff";
+  }
+}
+
 function renderSignalCard(
   activeShopId: string,
   signal: WorkspacePulseSignal,
   actionsEnabled: boolean,
+  assignableMembers: WorkspaceTeamMemberPayload[],
 ) {
   const levelLabel =
     signal.signal_kind === "anomaly"
@@ -88,6 +114,10 @@ function renderSignalCard(
       : signal.status === "acknowledged"
         ? `Acknowledged ${formatDateTime(signal.acknowledged_at)}`
         : `Last seen ${formatDateTime(signal.last_detected_at)}`;
+  const showWorkflowFields = actionsEnabled;
+  const assignableChoices = assignableMembers.filter(
+    (member) => member.status === "active" && (member.can_manage || member.is_current_user),
+  );
 
   return (
     <article key={signal.id} className="surface-muted rounded-[24px] px-5 py-5">
@@ -104,6 +134,16 @@ function renderSignalCard(
             <span className="rounded-full border border-[rgba(245,158,11,0.18)] bg-[rgba(77,49,9,0.34)] px-3 py-1 text-xs font-medium text-[var(--warning)]">
               {levelLabel}
             </span>
+            {signal.is_escalated ? (
+              <span className="rounded-full border border-[rgba(251,113,133,0.18)] bg-[rgba(40,12,19,0.76)] px-3 py-1 text-xs font-medium text-[var(--warning)]">
+                escalated
+              </span>
+            ) : null}
+            {signal.assigned_member_name ? (
+              <span className="rounded-full border border-[rgba(71,176,255,0.16)] bg-[rgba(11,24,41,0.72)] px-3 py-1 text-xs font-medium text-[var(--accent)]">
+                {signal.assigned_member_name} · {pulseRoleLabel(signal.assigned_member_role)}
+              </span>
+            ) : null}
           </div>
           <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">{signal.body}</p>
           <div className="mt-4 flex flex-wrap gap-3 text-xs text-[var(--text-muted)]">
@@ -111,7 +151,19 @@ function renderSignalCard(
             <span>First seen {formatDateTime(signal.first_detected_at)}</span>
             {signal.metric_value ? <span>Metric {signal.metric_value}</span> : null}
             {signal.count > 0 ? <span>Count {signal.count}</span> : null}
+            {signal.assigned_at ? <span>Assigned {formatDateTime(signal.assigned_at)}</span> : null}
+            {signal.escalated_at ? <span>Escalated {formatDateTime(signal.escalated_at)}</span> : null}
           </div>
+          {signal.follow_up_note ? (
+            <p className="mt-3 text-sm text-[var(--text-secondary)]">
+              Follow-up: {signal.follow_up_note}
+            </p>
+          ) : null}
+          {signal.escalation_note ? (
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">
+              Escalation note: {signal.escalation_note}
+            </p>
+          ) : null}
           {signal.resolution_note ? (
             <p className="mt-3 text-sm text-[var(--text-secondary)]">
               Note: {signal.resolution_note}
@@ -174,6 +226,126 @@ function renderSignalCard(
           ) : null}
         </div>
       </div>
+      {showWorkflowFields ? (
+        <div className="mt-5 grid gap-4 rounded-[22px] border border-[rgba(152,164,189,0.12)] bg-[rgba(8,13,24,0.62)] px-4 py-4 xl:grid-cols-3">
+          <form action={updatePulseSignalAction} className="space-y-3">
+            <input type="hidden" name="shopId" value={activeShopId} />
+            <input type="hidden" name="signalId" value={signal.id} />
+            <input type="hidden" name="action" value="assign" />
+            <input type="hidden" name="title" value={signal.title} />
+            <div>
+              <p className="eyebrow text-[var(--text-muted)]">Assignment</p>
+              <label className="mt-2 block text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                Owner
+              </label>
+              <select
+                name="assigneeMembershipId"
+                defaultValue={signal.assigned_membership_id ?? ""}
+                className="mt-2 w-full rounded-2xl border border-[rgba(152,164,189,0.12)] bg-[rgba(5,10,18,0.88)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none"
+              >
+                <option value="">Choose member</option>
+                {assignableChoices.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.member_name} · {member.role_label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <input
+              type="text"
+              name="note"
+              defaultValue={signal.follow_up_note}
+              placeholder="Add quick assignment note"
+              className="w-full rounded-2xl border border-[rgba(152,164,189,0.12)] bg-[rgba(5,10,18,0.88)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+            />
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                className="flex-1 rounded-full border border-[rgba(71,176,255,0.18)] bg-[rgba(10,36,68,0.82)] px-4 py-2 text-sm font-semibold text-[var(--accent)] transition hover:bg-[rgba(15,47,87,0.88)]"
+              >
+                Save owner
+              </button>
+            </div>
+          </form>
+          {signal.assigned_membership_id ? (
+            <form action={updatePulseSignalAction} className="xl:col-start-1">
+              <input type="hidden" name="shopId" value={activeShopId} />
+              <input type="hidden" name="signalId" value={signal.id} />
+              <input type="hidden" name="action" value="clear_assignment" />
+              <input type="hidden" name="title" value={signal.title} />
+              <button
+                type="submit"
+                className="rounded-full border border-[rgba(152,164,189,0.12)] px-4 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[rgba(255,255,255,0.04)]"
+              >
+                Clear assignment
+              </button>
+            </form>
+          ) : null}
+
+          <form action={updatePulseSignalAction} className="space-y-3">
+            <input type="hidden" name="shopId" value={activeShopId} />
+            <input type="hidden" name="signalId" value={signal.id} />
+            <input
+              type="hidden"
+              name="action"
+              value={signal.is_escalated ? "deescalate" : "escalate"}
+            />
+            <input type="hidden" name="title" value={signal.title} />
+            <div>
+              <p className="eyebrow text-[var(--text-muted)]">Escalation</p>
+              <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                {signal.is_escalated
+                  ? "This signal is currently escalated for stronger owner/admin attention."
+                  : "Escalate when this needs tighter owner/admin follow-through."}
+              </p>
+            </div>
+            <input
+              type="text"
+              name="note"
+              defaultValue={signal.escalation_note}
+              placeholder={
+                signal.is_escalated
+                  ? "Why can this be lowered now?"
+                  : "Why does this need escalation?"
+              }
+              className="w-full rounded-2xl border border-[rgba(152,164,189,0.12)] bg-[rgba(5,10,18,0.88)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+            />
+            <button
+              type="submit"
+              className={`w-full rounded-full px-4 py-2 text-sm font-semibold transition ${
+                signal.is_escalated
+                  ? "border border-[rgba(245,158,11,0.18)] bg-[rgba(77,49,9,0.34)] text-[var(--warning)] hover:bg-[rgba(92,58,10,0.46)]"
+                  : "border border-[rgba(251,113,133,0.18)] bg-[rgba(40,12,19,0.76)] text-[var(--warning)] hover:bg-[rgba(52,16,25,0.82)]"
+              }`}
+            >
+              {signal.is_escalated ? "Lower escalation" : "Escalate signal"}
+            </button>
+          </form>
+
+          <form action={updatePulseSignalAction} className="space-y-3">
+            <input type="hidden" name="shopId" value={activeShopId} />
+            <input type="hidden" name="signalId" value={signal.id} />
+            <input type="hidden" name="action" value="note" />
+            <input type="hidden" name="title" value={signal.title} />
+            <div>
+              <p className="eyebrow text-[var(--text-muted)]">Working note</p>
+              <textarea
+                name="note"
+                defaultValue={signal.follow_up_note}
+                rows={4}
+                placeholder="Leave a progress update for the next owner/admin check."
+                className="mt-2 w-full rounded-2xl border border-[rgba(152,164,189,0.12)] bg-[rgba(5,10,18,0.88)] px-3 py-3 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full rounded-full border border-[rgba(152,164,189,0.12)] bg-[rgba(255,255,255,0.04)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[rgba(255,255,255,0.08)]"
+            >
+              Save note
+            </button>
+          </form>
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -188,6 +360,10 @@ export default async function PulsePage({ searchParams }: PulsePageProps) {
     activeShop && canUsePulse && mfaPosture.verified
       ? await getWorkspacePulse(activeShop.shop.id)
       : null;
+  const teamMembers =
+    activeShop && canUsePulse && mfaPosture.verified
+      ? await getWorkspaceTeamMembers(activeShop.shop.id)
+      : [];
   const signals =
     activeShop && canUsePulse && mfaPosture.verified
       ? await getWorkspacePulseSignals(activeShop.shop.id)
@@ -286,7 +462,7 @@ export default async function PulsePage({ searchParams }: PulsePageProps) {
                 <div className="mt-6 space-y-4">
                   {openSignals.length ? (
                     openSignals.map((signal) =>
-                      renderSignalCard(activeShop.shop.id, signal, true),
+                      renderSignalCard(activeShop.shop.id, signal, true, teamMembers),
                     )
                   ) : (
                     <p className="text-sm text-[var(--text-secondary)]">
@@ -304,7 +480,7 @@ export default async function PulsePage({ searchParams }: PulsePageProps) {
                 <div className="mt-6 space-y-4">
                   {resolvedSignals.length ? (
                     resolvedSignals.slice(0, 6).map((signal) =>
-                      renderSignalCard(activeShop.shop.id, signal, true),
+                      renderSignalCard(activeShop.shop.id, signal, true, teamMembers),
                     )
                   ) : (
                     <p className="text-sm text-[var(--text-secondary)]">

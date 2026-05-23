@@ -456,8 +456,18 @@ class BackendApiClient {
             lastSnapshotRefreshedAt: _asDateTime(
               row['last_snapshot_refreshed_at'],
             ),
+            assignedMembershipId: _nullableText(row['assigned_membership_id']),
+            assignedMemberName: _nullableText(row['assigned_member_name']),
+            assignedMemberRole: _nullableText(row['assigned_member_role']),
+            assignedAt: _asNullableDateTime(row['assigned_at']),
+            assignedByName: _nullableText(row['assigned_by_name']),
             acknowledgedAt: _asNullableDateTime(row['acknowledged_at']),
             acknowledgedByName: _nullableText(row['acknowledged_by_name']),
+            isEscalated: row['is_escalated'] == true,
+            escalatedAt: _asNullableDateTime(row['escalated_at']),
+            escalatedByName: _nullableText(row['escalated_by_name']),
+            escalationNote: (row['escalation_note'] ?? '').toString(),
+            followUpNote: (row['follow_up_note'] ?? '').toString(),
             resolvedAt: _asNullableDateTime(row['resolved_at']),
             resolvedByName: _nullableText(row['resolved_by_name']),
             resolutionNote: (row['resolution_note'] ?? '').toString(),
@@ -475,12 +485,18 @@ class BackendApiClient {
     required String signalId,
     required String action,
     String note = '',
+    String? assigneeMembershipId,
   }) async {
     final decoded = await _request(
       user: user,
       method: 'PATCH',
       path: '/shops/$shopId/projections/pulse/signals/$signalId/',
-      body: <String, dynamic>{'action': action, 'note': note},
+      body: <String, dynamic>{
+        'action': action,
+        'note': note,
+        if (assigneeMembershipId != null && assigneeMembershipId.trim().isNotEmpty)
+          'assignee_membership_id': assigneeMembershipId,
+      },
     );
 
     return WorkspacePulseSignal(
@@ -500,8 +516,18 @@ class BackendApiClient {
       firstDetectedAt: _asDateTime(decoded['first_detected_at']),
       lastDetectedAt: _asDateTime(decoded['last_detected_at']),
       lastSnapshotRefreshedAt: _asDateTime(decoded['last_snapshot_refreshed_at']),
+      assignedMembershipId: _nullableText(decoded['assigned_membership_id']),
+      assignedMemberName: _nullableText(decoded['assigned_member_name']),
+      assignedMemberRole: _nullableText(decoded['assigned_member_role']),
+      assignedAt: _asNullableDateTime(decoded['assigned_at']),
+      assignedByName: _nullableText(decoded['assigned_by_name']),
       acknowledgedAt: _asNullableDateTime(decoded['acknowledged_at']),
       acknowledgedByName: _nullableText(decoded['acknowledged_by_name']),
+      isEscalated: decoded['is_escalated'] == true,
+      escalatedAt: _asNullableDateTime(decoded['escalated_at']),
+      escalatedByName: _nullableText(decoded['escalated_by_name']),
+      escalationNote: (decoded['escalation_note'] ?? '').toString(),
+      followUpNote: (decoded['follow_up_note'] ?? '').toString(),
       resolvedAt: _asNullableDateTime(decoded['resolved_at']),
       resolvedByName: _nullableText(decoded['resolved_by_name']),
       resolutionNote: (decoded['resolution_note'] ?? '').toString(),

@@ -118,19 +118,39 @@ class ShopPulseSignalDetailView(APIView):
     def patch(self, request, shop_id, signal_id):
         membership = get_membership_or_403(request.user, shop_id, ShopMembership.Role.ADMIN)
         signal = (
-            membership.shop.pulse_signals.select_related("acknowledged_by_user", "resolved_by_user")
+            membership.shop.pulse_signals.select_related(
+                "assigned_membership__user",
+                "assigned_by_user",
+                "acknowledged_by_user",
+                "escalated_by_user",
+                "resolved_by_user",
+            )
             .filter(pk=signal_id)
             .first()
         )
         if signal is None:
             raise exceptions.NotFound("Pulse signal not found.")
 
-        serializer = ShopPulseSignalUpdateSerializer(data=request.data or {})
+        serializer = ShopPulseSignalUpdateSerializer(
+            data=request.data or {},
+            context={
+                "signal": signal,
+                "actor_membership": membership,
+            },
+        )
         serializer.is_valid(raise_exception=True)
         action = serializer.validated_data["action"]
         before = {
             "status": signal.status,
+            "assigned_membership_id": signal.assigned_membership_id,
+            "assigned_at": signal.assigned_at,
+            "assigned_by_user_id": signal.assigned_by_user_id,
             "acknowledged_at": signal.acknowledged_at,
+            "is_escalated": signal.is_escalated,
+            "escalated_at": signal.escalated_at,
+            "escalated_by_user_id": signal.escalated_by_user_id,
+            "escalation_note": signal.escalation_note,
+            "follow_up_note": signal.follow_up_note,
             "resolved_at": signal.resolved_at,
             "resolution_note": signal.resolution_note,
         }
@@ -149,7 +169,15 @@ class ShopPulseSignalDetailView(APIView):
             before=before,
             after={
                 "status": signal.status,
+                "assigned_membership_id": signal.assigned_membership_id,
+                "assigned_at": signal.assigned_at,
+                "assigned_by_user_id": signal.assigned_by_user_id,
                 "acknowledged_at": signal.acknowledged_at,
+                "is_escalated": signal.is_escalated,
+                "escalated_at": signal.escalated_at,
+                "escalated_by_user_id": signal.escalated_by_user_id,
+                "escalation_note": signal.escalation_note,
+                "follow_up_note": signal.follow_up_note,
                 "resolved_at": signal.resolved_at,
                 "resolution_note": signal.resolution_note,
             },

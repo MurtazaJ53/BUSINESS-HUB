@@ -100,6 +100,21 @@ class ShopPulseSignal(UUIDStampedModel):
     first_detected_at = models.DateTimeField()
     last_detected_at = models.DateTimeField()
     last_snapshot_refreshed_at = models.DateTimeField()
+    assigned_membership = models.ForeignKey(
+        "shops.ShopMembership",
+        on_delete=models.SET_NULL,
+        related_name="assigned_pulse_signals",
+        blank=True,
+        null=True,
+    )
+    assigned_at = models.DateTimeField(blank=True, null=True)
+    assigned_by_user = models.ForeignKey(
+        "users.PlatformUser",
+        on_delete=models.SET_NULL,
+        related_name="assigned_workspace_pulse_signals",
+        blank=True,
+        null=True,
+    )
     acknowledged_at = models.DateTimeField(blank=True, null=True)
     acknowledged_by_user = models.ForeignKey(
         "users.PlatformUser",
@@ -116,6 +131,17 @@ class ShopPulseSignal(UUIDStampedModel):
         blank=True,
         null=True,
     )
+    is_escalated = models.BooleanField(default=False)
+    escalated_at = models.DateTimeField(blank=True, null=True)
+    escalated_by_user = models.ForeignKey(
+        "users.PlatformUser",
+        on_delete=models.SET_NULL,
+        related_name="escalated_workspace_pulse_signals",
+        blank=True,
+        null=True,
+    )
+    escalation_note = models.TextField(blank=True)
+    follow_up_note = models.TextField(blank=True)
     resolution_note = models.TextField(blank=True)
     metadata_json = models.JSONField(default=dict, blank=True)
 
@@ -131,6 +157,7 @@ class ShopPulseSignal(UUIDStampedModel):
             models.Index(fields=["shop", "status", "signal_kind"]),
             models.Index(fields=["shop", "last_detected_at"]),
             models.Index(fields=["shop", "signal_rank"]),
+            models.Index(fields=["shop", "is_escalated", "status"]),
         ]
 
     def __str__(self) -> str:
