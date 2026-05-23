@@ -232,6 +232,15 @@ class DashboardScreen extends ConsumerWidget {
                             ),
                           ),
                         ),
+                      const SizedBox(height: 4),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: FilledButton.tonalIcon(
+                          onPressed: () => context.push('/settings/pulse'),
+                          icon: const Icon(Icons.monitor_heart_rounded),
+                          label: const Text('Open pulse desk'),
+                        ),
+                      ),
                     ],
                   ),
           ),

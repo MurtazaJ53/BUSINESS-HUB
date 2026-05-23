@@ -422,6 +422,95 @@ class BackendApiClient {
     );
   }
 
+  Future<List<WorkspacePulseSignal>> getWorkspacePulseSignals({
+    required User user,
+    required String shopId,
+    String? status,
+  }) async {
+    final path = status == null || status.trim().isEmpty
+        ? '/shops/$shopId/projections/pulse/signals/'
+        : '/shops/$shopId/projections/pulse/signals/?status=${Uri.encodeQueryComponent(status.trim())}';
+    final decoded = await _requestList(
+      user: user,
+      method: 'GET',
+      path: path,
+    );
+    return decoded
+        .map(
+          (row) => WorkspacePulseSignal(
+            id: (row['id'] ?? '').toString(),
+            signalKind: (row['signal_kind'] ?? '').toString(),
+            code: (row['code'] ?? '').toString(),
+            status: (row['status'] ?? 'open').toString(),
+            signalLevel: (row['signal_level'] ?? '').toString(),
+            signalRank: _asInt(row['signal_rank']),
+            tone: (row['tone'] ?? '').toString(),
+            title: (row['title'] ?? '').toString(),
+            body: (row['body'] ?? '').toString(),
+            route: (row['route'] ?? '/history').toString(),
+            ctaLabel: (row['cta_label'] ?? 'Open').toString(),
+            metricValue: (row['metric_value'] ?? '').toString(),
+            count: _asInt(row['count']),
+            firstDetectedAt: _asDateTime(row['first_detected_at']),
+            lastDetectedAt: _asDateTime(row['last_detected_at']),
+            lastSnapshotRefreshedAt: _asDateTime(
+              row['last_snapshot_refreshed_at'],
+            ),
+            acknowledgedAt: _asNullableDateTime(row['acknowledged_at']),
+            acknowledgedByName: _nullableText(row['acknowledged_by_name']),
+            resolvedAt: _asNullableDateTime(row['resolved_at']),
+            resolvedByName: _nullableText(row['resolved_by_name']),
+            resolutionNote: (row['resolution_note'] ?? '').toString(),
+            metadata: row['metadata_json'] is Map
+                ? Map<String, dynamic>.from(row['metadata_json'] as Map)
+                : const <String, dynamic>{},
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Future<WorkspacePulseSignal> updateWorkspacePulseSignal({
+    required User user,
+    required String shopId,
+    required String signalId,
+    required String action,
+    String note = '',
+  }) async {
+    final decoded = await _request(
+      user: user,
+      method: 'PATCH',
+      path: '/shops/$shopId/projections/pulse/signals/$signalId/',
+      body: <String, dynamic>{'action': action, 'note': note},
+    );
+
+    return WorkspacePulseSignal(
+      id: (decoded['id'] ?? '').toString(),
+      signalKind: (decoded['signal_kind'] ?? '').toString(),
+      code: (decoded['code'] ?? '').toString(),
+      status: (decoded['status'] ?? 'open').toString(),
+      signalLevel: (decoded['signal_level'] ?? '').toString(),
+      signalRank: _asInt(decoded['signal_rank']),
+      tone: (decoded['tone'] ?? '').toString(),
+      title: (decoded['title'] ?? '').toString(),
+      body: (decoded['body'] ?? '').toString(),
+      route: (decoded['route'] ?? '/history').toString(),
+      ctaLabel: (decoded['cta_label'] ?? 'Open').toString(),
+      metricValue: (decoded['metric_value'] ?? '').toString(),
+      count: _asInt(decoded['count']),
+      firstDetectedAt: _asDateTime(decoded['first_detected_at']),
+      lastDetectedAt: _asDateTime(decoded['last_detected_at']),
+      lastSnapshotRefreshedAt: _asDateTime(decoded['last_snapshot_refreshed_at']),
+      acknowledgedAt: _asNullableDateTime(decoded['acknowledged_at']),
+      acknowledgedByName: _nullableText(decoded['acknowledged_by_name']),
+      resolvedAt: _asNullableDateTime(decoded['resolved_at']),
+      resolvedByName: _nullableText(decoded['resolved_by_name']),
+      resolutionNote: (decoded['resolution_note'] ?? '').toString(),
+      metadata: decoded['metadata_json'] is Map
+          ? Map<String, dynamic>.from(decoded['metadata_json'] as Map)
+          : const <String, dynamic>{},
+    );
+  }
+
   Future<void> acknowledgeWorkspaceSessionWipe({
     required User user,
     required String shopId,

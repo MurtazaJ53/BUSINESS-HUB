@@ -22,6 +22,8 @@ class SettingsScreen extends ConsumerWidget {
     final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
     final syncStatus = ref.watch(syncStatusProvider);
     final runtimeInfoAsync = ref.watch(appRuntimeInfoProvider);
+    final pulseAsync = ref.watch(workspacePulseProvider);
+    final pulse = pulseAsync.asData?.value;
     final shop =
         ref.watch(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
     final history =
@@ -234,6 +236,55 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 18),
           if (session?.isOwnerLike ?? false) ...<Widget>[
+            MobilePanel(
+              title: 'Workspace pulse',
+              action: MobileTag(
+                label: pulse == null
+                    ? (pulseAsync.isLoading ? 'Refreshing' : 'Unavailable')
+                    : pulse.stats.criticalAnomalyCount > 0
+                    ? '${pulse.stats.criticalAnomalyCount} critical'
+                    : '${pulse.stats.openTaskCount} tasks',
+                icon: pulse == null
+                    ? Icons.sync_rounded
+                    : pulse.stats.criticalAnomalyCount > 0
+                    ? Icons.crisis_alert_rounded
+                    : Icons.auto_awesome_rounded,
+                accent: pulse == null
+                    ? const Color(0xFF38BDF8)
+                    : pulse.stats.criticalAnomalyCount > 0
+                    ? const Color(0xFFFB7185)
+                    : const Color(0xFF38BDF8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    pulse?.headline.title ?? 'Owner/admin attention desk',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    pulse?.headline.body ??
+                        'Open the pulse desk to acknowledge, resolve, or reopen the latest workspace tasks and anomaly signals.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.72),
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  FilledButton.tonalIcon(
+                    onPressed: () {
+                      context.push('/settings/pulse');
+                    },
+                    icon: const Icon(Icons.monitor_heart_rounded),
+                    label: const Text('Open pulse desk'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
             MobilePanel(
               title: 'Security',
               action: MobileTag(

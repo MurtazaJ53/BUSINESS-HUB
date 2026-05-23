@@ -49,6 +49,7 @@ import type {
   SessionPayload,
   UserMfaStatusPayload,
   WorkspacePulseSnapshot,
+  WorkspacePulseSignal,
   ShopDomainState,
   ShopMembership,
   ShopPlanRequestPayload,
@@ -212,6 +213,14 @@ export const getDashboardSnapshot = cache(async (shopId: string): Promise<Dashbo
 export const getWorkspacePulse = cache(async (shopId: string): Promise<WorkspacePulseSnapshot> => {
   return apiFetch<WorkspacePulseSnapshot>(`/shops/${shopId}/projections/pulse/`);
 });
+
+export const getWorkspacePulseSignals = cache(
+  async (shopId: string, status?: string): Promise<WorkspacePulseSignal[]> => {
+    return apiFetch<WorkspacePulseSignal[]>(`/shops/${shopId}/projections/pulse/signals/`, {
+      query: { status },
+    });
+  },
+);
 
 export const getCustomers = cache(async (shopId: string, query?: string): Promise<Customer[]> => {
   return apiFetch<Customer[]>(`/shops/${shopId}/customers/`, {

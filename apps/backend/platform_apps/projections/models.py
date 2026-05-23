@@ -72,3 +72,66 @@ class ShopLowStockSnapshot(UUIDStampedModel):
 
     def __str__(self) -> str:
         return f"LowStock<{self.item_name}>"
+
+
+class ShopPulseSignal(UUIDStampedModel):
+    class SignalKind(models.TextChoices):
+        TASK = "task", "Task"
+        ANOMALY = "anomaly", "Anomaly"
+
+    class Status(models.TextChoices):
+        OPEN = "open", "Open"
+        ACKNOWLEDGED = "acknowledged", "Acknowledged"
+        RESOLVED = "resolved", "Resolved"
+
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="pulse_signals")
+    signal_kind = models.CharField(max_length=16, choices=SignalKind.choices)
+    code = models.CharField(max_length=64)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.OPEN)
+    signal_level = models.CharField(max_length=16, blank=True)
+    signal_rank = models.PositiveIntegerField(default=0)
+    tone = models.CharField(max_length=16, blank=True)
+    title = models.CharField(max_length=255)
+    body = models.TextField()
+    route = models.CharField(max_length=128, blank=True)
+    cta_label = models.CharField(max_length=64, blank=True)
+    metric_value = models.CharField(max_length=64, blank=True)
+    count = models.PositiveIntegerField(default=0)
+    first_detected_at = models.DateTimeField()
+    last_detected_at = models.DateTimeField()
+    last_snapshot_refreshed_at = models.DateTimeField()
+    acknowledged_at = models.DateTimeField(blank=True, null=True)
+    acknowledged_by_user = models.ForeignKey(
+        "users.PlatformUser",
+        on_delete=models.SET_NULL,
+        related_name="acknowledged_pulse_signals",
+        blank=True,
+        null=True,
+    )
+    resolved_at = models.DateTimeField(blank=True, null=True)
+    resolved_by_user = models.ForeignKey(
+        "users.PlatformUser",
+        on_delete=models.SET_NULL,
+        related_name="resolved_pulse_signals",
+        blank=True,
+        null=True,
+    )
+    resolution_note = models.TextField(blank=True)
+    metadata_json = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["status", "-signal_rank", "-last_detected_at", "title"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["shop", "signal_kind", "code"],
+                name="uniq_shop_pulse_signal",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["shop", "status", "signal_kind"]),
+            models.Index(fields=["shop", "last_detected_at"]),
+            models.Index(fields=["shop", "signal_rank"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.shop.name}:{self.signal_kind}:{self.code}:{self.status}"

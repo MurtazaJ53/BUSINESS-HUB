@@ -221,6 +221,60 @@ class WorkspacePulseSnapshot {
   final List<WorkspacePulseAnomaly> anomalies;
 }
 
+class WorkspacePulseSignal {
+  const WorkspacePulseSignal({
+    required this.id,
+    required this.signalKind,
+    required this.code,
+    required this.status,
+    required this.signalLevel,
+    required this.signalRank,
+    required this.tone,
+    required this.title,
+    required this.body,
+    required this.route,
+    required this.ctaLabel,
+    required this.metricValue,
+    required this.count,
+    required this.firstDetectedAt,
+    required this.lastDetectedAt,
+    required this.lastSnapshotRefreshedAt,
+    required this.acknowledgedAt,
+    required this.acknowledgedByName,
+    required this.resolvedAt,
+    required this.resolvedByName,
+    required this.resolutionNote,
+    this.metadata = const <String, dynamic>{},
+  });
+
+  final String id;
+  final String signalKind;
+  final String code;
+  final String status;
+  final String signalLevel;
+  final int signalRank;
+  final String tone;
+  final String title;
+  final String body;
+  final String route;
+  final String ctaLabel;
+  final String metricValue;
+  final int count;
+  final DateTime firstDetectedAt;
+  final DateTime lastDetectedAt;
+  final DateTime lastSnapshotRefreshedAt;
+  final DateTime? acknowledgedAt;
+  final String? acknowledgedByName;
+  final DateTime? resolvedAt;
+  final String? resolvedByName;
+  final String resolutionNote;
+  final Map<String, dynamic> metadata;
+
+  bool get isResolved => status == 'resolved';
+  bool get isAcknowledged => status == 'acknowledged';
+  bool get isOpen => status == 'open';
+}
+
 String _normalizePlanTier(String value) {
   final normalized = value.trim().toLowerCase();
   if (normalized == 'starter' || normalized == 'pro') {

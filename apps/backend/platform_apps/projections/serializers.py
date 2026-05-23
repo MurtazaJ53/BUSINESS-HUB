@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from platform_apps.projections.models import ShopDashboardSnapshot, ShopLowStockSnapshot
+from platform_apps.projections.models import (
+    ShopDashboardSnapshot,
+    ShopLowStockSnapshot,
+    ShopPulseSignal,
+)
 from platform_apps.shops.permissions import has_feature_enabled
 
 
@@ -124,3 +128,97 @@ class ShopPulseSnapshotSerializer(serializers.Serializer):
     stats = ShopPulseStatsSerializer()
     tasks = ShopPulseTaskSerializer(many=True)
     anomalies = ShopPulseAnomalySerializer(many=True)
+
+
+class ShopPulseSignalSerializer(serializers.ModelSerializer):
+    acknowledged_by_name = serializers.SerializerMethodField()
+    resolved_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ShopPulseSignal
+        fields = (
+            "id",
+            "signal_kind",
+            "code",
+            "status",
+            "signal_level",
+            "signal_rank",
+            "tone",
+            "title",
+            "body",
+            "route",
+            "cta_label",
+            "metric_value",
+            "count",
+            "first_detected_at",
+            "last_detected_at",
+            "last_snapshot_refreshed_at",
+            "acknowledged_at",
+            "acknowledged_by_name",
+            "resolved_at",
+            "resolved_by_name",
+            "resolution_note",
+            "metadata_json",
+            "created_at",
+            "updated_at",
+        )
+
+    def get_acknowledged_by_name(self, obj):
+        if obj.acknowledged_by_user is None:
+            return None
+        return obj.acknowledged_by_user.full_name or obj.acknowledged_by_user.email
+
+    def get_resolved_by_name(self, obj):
+        if obj.resolved_by_user is None:
+            return None
+        return obj.resolved_by_user.full_name or obj.resolved_by_user.email
+
+
+class ShopPulseSignalUpdateSerializer(serializers.Serializer):
+    action = serializers.ChoiceField(choices=["acknowledge", "resolve", "reopen"])
+    note = serializers.CharField(required=False, allow_blank=True, max_length=500)
+
+    def apply(self, *, signal: ShopPulseSignal, actor_user):
+        action = self.validated_data["action"]
+        note = self.validated_data.get("note", "").strip()
+
+        from django.utils import timezone
+
+        current_time = timezone.now()
+        update_fields = ["updated_at"]
+
+        if action == "acknowledge":
+            signal.status = ShopPulseSignal.Status.ACKNOWLEDGED
+            signal.acknowledged_at = current_time
+            signal.acknowledged_by_user = actor_user
+            if note:
+                signal.resolution_note = note
+                update_fields.append("resolution_note")
+            update_fields.extend(["status", "acknowledged_at", "acknowledged_by_user"])
+        elif action == "resolve":
+            signal.status = ShopPulseSignal.Status.RESOLVED
+            signal.resolved_at = current_time
+            signal.resolved_by_user = actor_user
+            signal.resolution_note = note
+            update_fields.extend(["status", "resolved_at", "resolved_by_user", "resolution_note"])
+        else:
+            signal.status = ShopPulseSignal.Status.OPEN
+            signal.acknowledged_at = None
+            signal.acknowledged_by_user = None
+            signal.resolved_at = None
+            signal.resolved_by_user = None
+            if note:
+                signal.resolution_note = note
+                update_fields.append("resolution_note")
+            update_fields.extend(
+                [
+                    "status",
+                    "acknowledged_at",
+                    "acknowledged_by_user",
+                    "resolved_at",
+                    "resolved_by_user",
+                ]
+            )
+
+        signal.save(update_fields=update_fields)
+        return signal

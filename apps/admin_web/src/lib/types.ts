@@ -285,6 +285,33 @@ export type WorkspacePulseSnapshot = {
   anomalies: WorkspacePulseAnomaly[];
 };
 
+export type WorkspacePulseSignal = {
+  id: string;
+  signal_kind: "task" | "anomaly";
+  code: string;
+  status: "open" | "acknowledged" | "resolved";
+  signal_level: string;
+  signal_rank: number;
+  tone: string;
+  title: string;
+  body: string;
+  route: string;
+  cta_label: string;
+  metric_value: string;
+  count: number;
+  first_detected_at: string;
+  last_detected_at: string;
+  last_snapshot_refreshed_at: string;
+  acknowledged_at: string | null;
+  acknowledged_by_name: string | null;
+  resolved_at: string | null;
+  resolved_by_name: string | null;
+  resolution_note: string;
+  metadata_json: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Customer = {
   id: string;
   name: string;

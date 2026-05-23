@@ -37,6 +37,19 @@ final workspacePulseProvider = FutureProvider<WorkspacePulseSnapshot?>((ref) asy
   );
 });
 
+final workspacePulseSignalsProvider =
+    FutureProvider<List<WorkspacePulseSignal>>((ref) async {
+      final session = await ref.watch(mobileSessionProvider.future);
+      if (session == null || !session.isOwnerLike || !session.hasShop) {
+        return const <WorkspacePulseSignal>[];
+      }
+
+      return ref.read(backendApiClientProvider).getWorkspacePulseSignals(
+        user: session.user,
+        shopId: session.shopId!,
+      );
+    });
+
 final dashboardOverviewProvider =
     StreamProvider.family<DashboardOverview, bool>((ref, includeCost) {
       final inventoryRepository = ref.watch(inventoryRepositoryProvider);

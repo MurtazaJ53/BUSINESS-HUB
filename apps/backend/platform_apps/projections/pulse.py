@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from platform_apps.inventory.models import InventoryStockLedger
 from platform_apps.payments.models import SalePayment
-from platform_apps.projections.models import ShopDashboardSnapshot
+from platform_apps.projections.models import ShopDashboardSnapshot, ShopPulseSignal
 from platform_apps.sales.models import Sale
 from platform_apps.shops.models import Shop, ShopPlanRequest, WorkspaceAccessSession
 
@@ -19,6 +19,7 @@ def build_shop_pulse_snapshot(
     *,
     dashboard_snapshot: ShopDashboardSnapshot,
     now=None,
+    signal_limit: int | None = 5,
 ) -> dict[str, object]:
     now = now or timezone.now()
     seven_days_ago = now - timedelta(days=7)
@@ -363,21 +364,15 @@ def build_shop_pulse_snapshot(
         key=lambda item: (-int(item["severity_rank"]), item["title"])
     )
 
+    task_slice = tasks if signal_limit is None else tasks[:signal_limit]
+    anomaly_slice = anomalies if signal_limit is None else anomalies[:signal_limit]
     tasks = [
-        {
-            key: value
-            for key, value in task.items()
-            if key != "priority_rank"
-        }
-        for task in tasks[:5]
+        {key: value for key, value in task.items() if key != "priority_rank"}
+        for task in task_slice
     ]
     anomalies = [
-        {
-            key: value
-            for key, value in anomaly.items()
-            if key != "severity_rank"
-        }
-        for anomaly in anomalies[:5]
+        {key: value for key, value in anomaly.items() if key != "severity_rank"}
+        for anomaly in anomaly_slice
     ]
 
     critical_anomalies = sum(
@@ -429,3 +424,161 @@ def build_shop_pulse_snapshot(
         "tasks": tasks,
         "anomalies": anomalies,
     }
+
+
+def sync_shop_pulse_signals(
+    shop: Shop,
+    *,
+    pulse_snapshot: dict[str, object],
+    now=None,
+) -> list[ShopPulseSignal]:
+    now = now or timezone.now()
+    active_signals: list[tuple[str, str]] = []
+    persisted: list[ShopPulseSignal] = []
+
+    for task in pulse_snapshot.get("tasks", []):
+        task_data = dict(task)
+        code = str(task_data.get("code", "")).strip()
+        if not code:
+            continue
+        active_signals.append((ShopPulseSignal.SignalKind.TASK, code))
+        signal, created = ShopPulseSignal.objects.get_or_create(
+            shop=shop,
+            signal_kind=ShopPulseSignal.SignalKind.TASK,
+            code=code,
+            defaults={
+                "status": ShopPulseSignal.Status.OPEN,
+                "signal_level": str(task_data.get("priority", "medium")),
+                "signal_rank": _pulse_level_rank(str(task_data.get("priority", "medium"))),
+                "tone": str(task_data.get("tone", "info")),
+                "title": str(task_data.get("title", "")),
+                "body": str(task_data.get("body", "")),
+                "route": str(task_data.get("route", "")),
+                "cta_label": str(task_data.get("cta_label", "")),
+                "count": int(task_data.get("count", 0) or 0),
+                "first_detected_at": now,
+                "last_detected_at": now,
+                "last_snapshot_refreshed_at": pulse_snapshot.get("refreshed_at", now),
+                "metadata_json": task_data.get("metadata_json", {}),
+            },
+        )
+        if not created:
+            signal.signal_level = str(task_data.get("priority", signal.signal_level))
+            signal.signal_rank = _pulse_level_rank(signal.signal_level)
+            signal.tone = str(task_data.get("tone", signal.tone))
+            signal.title = str(task_data.get("title", signal.title))
+            signal.body = str(task_data.get("body", signal.body))
+            signal.route = str(task_data.get("route", signal.route))
+            signal.cta_label = str(task_data.get("cta_label", signal.cta_label))
+            signal.count = int(task_data.get("count", signal.count) or 0)
+            signal.last_detected_at = now
+            signal.last_snapshot_refreshed_at = pulse_snapshot.get("refreshed_at", now)
+            signal.metadata_json = task_data.get("metadata_json", {})
+            if signal.status == ShopPulseSignal.Status.RESOLVED:
+                signal.status = ShopPulseSignal.Status.OPEN
+                signal.resolved_at = None
+                signal.resolved_by_user = None
+                signal.resolution_note = ""
+                signal.acknowledged_at = None
+                signal.acknowledged_by_user = None
+            signal.save()
+        persisted.append(signal)
+
+    for anomaly in pulse_snapshot.get("anomalies", []):
+        anomaly_data = dict(anomaly)
+        code = str(anomaly_data.get("code", "")).strip()
+        if not code:
+            continue
+        active_signals.append((ShopPulseSignal.SignalKind.ANOMALY, code))
+        signal, created = ShopPulseSignal.objects.get_or_create(
+            shop=shop,
+            signal_kind=ShopPulseSignal.SignalKind.ANOMALY,
+            code=code,
+            defaults={
+                "status": ShopPulseSignal.Status.OPEN,
+                "signal_level": str(anomaly_data.get("severity", "warning")),
+                "signal_rank": _pulse_level_rank(str(anomaly_data.get("severity", "warning"))),
+                "tone": str(anomaly_data.get("severity", "warning")),
+                "title": str(anomaly_data.get("title", "")),
+                "body": str(anomaly_data.get("body", "")),
+                "route": str(anomaly_data.get("route", "")),
+                "cta_label": str(anomaly_data.get("cta_label", "")),
+                "metric_value": str(anomaly_data.get("metric_value", "")),
+                "first_detected_at": now,
+                "last_detected_at": now,
+                "last_snapshot_refreshed_at": pulse_snapshot.get("refreshed_at", now),
+                "metadata_json": anomaly_data.get("metadata_json", {}),
+            },
+        )
+        if not created:
+            signal.signal_level = str(anomaly_data.get("severity", signal.signal_level))
+            signal.signal_rank = _pulse_level_rank(signal.signal_level)
+            signal.tone = str(anomaly_data.get("severity", signal.tone))
+            signal.title = str(anomaly_data.get("title", signal.title))
+            signal.body = str(anomaly_data.get("body", signal.body))
+            signal.route = str(anomaly_data.get("route", signal.route))
+            signal.cta_label = str(anomaly_data.get("cta_label", signal.cta_label))
+            signal.metric_value = str(anomaly_data.get("metric_value", signal.metric_value))
+            signal.last_detected_at = now
+            signal.last_snapshot_refreshed_at = pulse_snapshot.get("refreshed_at", now)
+            signal.metadata_json = anomaly_data.get("metadata_json", {})
+            if signal.status == ShopPulseSignal.Status.RESOLVED:
+                signal.status = ShopPulseSignal.Status.OPEN
+                signal.resolved_at = None
+                signal.resolved_by_user = None
+                signal.resolution_note = ""
+                signal.acknowledged_at = None
+                signal.acknowledged_by_user = None
+            signal.save()
+        persisted.append(signal)
+
+    active_signal_set = set(active_signals)
+    stale_queryset = ShopPulseSignal.objects.filter(
+        shop=shop,
+        status__in=[ShopPulseSignal.Status.OPEN, ShopPulseSignal.Status.ACKNOWLEDGED],
+    )
+    for signal in stale_queryset:
+        identity = (signal.signal_kind, signal.code)
+        if identity in active_signal_set:
+            continue
+        signal.status = ShopPulseSignal.Status.RESOLVED
+        signal.resolved_at = now
+        signal.resolved_by_user = None
+        signal.resolution_note = "Auto-resolved after the signal cleared from the latest pulse snapshot."
+        signal.last_snapshot_refreshed_at = pulse_snapshot.get("refreshed_at", now)
+        signal.save(
+            update_fields=[
+                "status",
+                "resolved_at",
+                "resolved_by_user",
+                "resolution_note",
+                "last_snapshot_refreshed_at",
+                "updated_at",
+            ]
+        )
+
+    return list(
+        ShopPulseSignal.objects.filter(shop=shop).order_by(
+            "status",
+            "-signal_rank",
+            "-last_detected_at",
+            "title",
+        )
+    )
+
+
+def _pulse_level_rank(level: str) -> int:
+    normalized = level.strip().lower()
+    if normalized == "critical":
+        return 400
+    if normalized == "danger":
+        return 380
+    if normalized == "high":
+        return 320
+    if normalized == "warning":
+        return 260
+    if normalized == "medium":
+        return 200
+    if normalized == "low":
+        return 120
+    return 80

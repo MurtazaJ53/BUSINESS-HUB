@@ -10,8 +10,12 @@ from rest_framework.test import APIClient
 from platform_apps.customers.models import Customer
 from platform_apps.inventory.models import InventoryItem, InventoryStockLedger
 from platform_apps.payments.models import SalePayment
-from platform_apps.projections.models import ShopDashboardSnapshot, ShopLowStockSnapshot
-from platform_apps.projections.pulse import build_shop_pulse_snapshot
+from platform_apps.projections.models import (
+    ShopDashboardSnapshot,
+    ShopLowStockSnapshot,
+    ShopPulseSignal,
+)
+from platform_apps.projections.pulse import build_shop_pulse_snapshot, sync_shop_pulse_signals
 from platform_apps.projections.services import refresh_shop_dashboard_projection
 from platform_apps.sales.models import Sale
 from platform_apps.shops.models import Shop, ShopMembership, ShopPlanRequest, WorkspaceAccessSession
@@ -296,3 +300,83 @@ class ProjectionRefreshTests(TestCase):
         self.assertIn("tasks", response.data)
         self.assertIn("anomalies", response.data)
         self.assertIn("stats", response.data)
+
+    def test_sync_shop_pulse_signals_persists_and_auto_resolves(self):
+        self.shop.settings_json = {"plan_tier": "pro"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+        self._seed_domain_data()
+        snapshot = refresh_shop_dashboard_projection(self.shop)
+
+        pulse = build_shop_pulse_snapshot(
+            self.shop,
+            dashboard_snapshot=snapshot,
+            signal_limit=None,
+        )
+        signals = sync_shop_pulse_signals(
+            self.shop,
+            pulse_snapshot=pulse,
+            now=snapshot.refreshed_at,
+        )
+        self.assertGreaterEqual(len(signals), 2)
+        self.assertTrue(
+            ShopPulseSignal.objects.filter(
+                shop=self.shop,
+                signal_kind=ShopPulseSignal.SignalKind.TASK,
+                code="restock_out_of_stock",
+                status=ShopPulseSignal.Status.OPEN,
+            ).exists()
+        )
+
+        InventoryStockLedger.objects.create(
+            shop=self.shop,
+            item=InventoryItem.objects.get(shop=self.shop, sku="CAP-001"),
+            event_type=InventoryStockLedger.EventType.ADJUSTMENT,
+            quantity_delta=4,
+            occurred_at=timezone.now(),
+        )
+        snapshot = refresh_shop_dashboard_projection(self.shop)
+        pulse = build_shop_pulse_snapshot(
+            self.shop,
+            dashboard_snapshot=snapshot,
+            signal_limit=None,
+        )
+        sync_shop_pulse_signals(
+            self.shop,
+            pulse_snapshot=pulse,
+            now=snapshot.refreshed_at,
+        )
+        resolved_signal = ShopPulseSignal.objects.get(
+            shop=self.shop,
+            signal_kind=ShopPulseSignal.SignalKind.TASK,
+            code="restock_out_of_stock",
+        )
+        self.assertEqual(resolved_signal.status, ShopPulseSignal.Status.RESOLVED)
+        self.assertIn("Auto-resolved", resolved_signal.resolution_note)
+
+    def test_pulse_signal_list_and_update_api(self):
+        self.shop.settings_json = {"plan_tier": "pro"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+        self._seed_domain_data()
+
+        list_response = self.client.get(
+            f"/api/v1/shops/{self.shop.id}/projections/pulse/signals/"
+        )
+        self.assertEqual(list_response.status_code, 200)
+        self.assertGreaterEqual(len(list_response.data), 1)
+
+        signal_id = list_response.data[0]["id"]
+        acknowledge_response = self.client.patch(
+            f"/api/v1/shops/{self.shop.id}/projections/pulse/signals/{signal_id}/",
+            {"action": "acknowledge", "note": "Saw it."},
+            format="json",
+        )
+        self.assertEqual(acknowledge_response.status_code, 200)
+        self.assertEqual(acknowledge_response.data["status"], "acknowledged")
+
+        resolve_response = self.client.patch(
+            f"/api/v1/shops/{self.shop.id}/projections/pulse/signals/{signal_id}/",
+            {"action": "resolve", "note": "Handled."},
+            format="json",
+        )
+        self.assertEqual(resolve_response.status_code, 200)
+        self.assertEqual(resolve_response.data["status"], "resolved")
