@@ -14,9 +14,14 @@ from platform_apps.common.migration import (
 )
 from platform_apps.jobs.readiness import build_pilot_signoff
 from platform_apps.jobs.models import MigrationDomainControl
-from platform_apps.shops.models import ShopMembership
+from platform_apps.shops.models import ShopMembership, ShopPlanRequest
 from platform_apps.shops.permissions import get_membership_or_403
-from platform_apps.shops.serializers import ShopDomainStateSerializer, ShopMembershipListSerializer
+from platform_apps.shops.serializers import (
+    ShopDomainStateSerializer,
+    ShopMembershipListSerializer,
+    ShopPlanRequestCreateSerializer,
+    ShopPlanRequestSerializer,
+)
 
 
 class ShopMembershipListView(ListAPIView):
@@ -92,3 +97,55 @@ class ShopDomainStateView(APIView):
 
         serializer = ShopDomainStateSerializer(payload)
         return Response(serializer.data)
+
+
+class ShopPlanRequestListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_membership(self, shop_id):
+        return get_membership_or_403(self.request.user, shop_id, ShopMembership.Role.ADMIN)
+
+    def get(self, request, shop_id):
+        membership = self.get_membership(shop_id)
+        queryset = (
+            ShopPlanRequest.objects.filter(shop=membership.shop)
+            .select_related("requested_by_user")
+            .order_by("-created_at")
+        )
+        serializer = ShopPlanRequestSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def post(self, request, shop_id):
+        membership = self.get_membership(shop_id)
+        serializer = ShopPlanRequestCreateSerializer(
+            data=request.data,
+            context={"membership": membership},
+        )
+        serializer.is_valid(raise_exception=True)
+
+        requested_plan_tier = serializer.validated_data["requested_plan_tier"]
+        existing = (
+            ShopPlanRequest.objects.filter(
+                shop=membership.shop,
+                requested_by_user=request.user,
+                requested_plan_tier=requested_plan_tier,
+                status__in=[ShopPlanRequest.Status.OPEN, ShopPlanRequest.Status.IN_REVIEW],
+            )
+            .select_related("requested_by_user")
+            .order_by("-created_at")
+            .first()
+        )
+        if existing is not None:
+            response_serializer = ShopPlanRequestSerializer(existing)
+            return Response(response_serializer.data)
+
+        plan_request = ShopPlanRequest.objects.create(
+            shop=membership.shop,
+            requested_by_user=request.user,
+            current_plan_tier=membership.shop.plan_tier,
+            requested_plan_tier=requested_plan_tier,
+            request_note=serializer.validated_data.get("request_note", ""),
+            context_json=serializer.validated_data.get("context_json", {}),
+        )
+        response_serializer = ShopPlanRequestSerializer(plan_request)
+        return Response(response_serializer.data, status=201)

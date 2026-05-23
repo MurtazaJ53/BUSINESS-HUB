@@ -27,6 +27,18 @@ export type ShopMembership = {
   };
 };
 
+export type ShopPlanRequestPayload = {
+  id: string;
+  current_plan_tier: BusinessHubPlanTier;
+  requested_plan_tier: BusinessHubPlanTier;
+  status: "open" | "in_review" | "resolved" | "closed";
+  request_note: string;
+  context_json: Record<string, unknown>;
+  requested_by_name: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type SessionPayload = {
   user: SessionUser;
   memberships: ShopMembership[];

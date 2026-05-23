@@ -14,7 +14,7 @@ from platform_apps.common.migration import (
     MigrationWriteMaster,
 )
 from platform_apps.jobs.models import MigrationControlEvent, MigrationDomainControl, MigrationJobRun
-from platform_apps.shops.models import Shop, ShopMembership
+from platform_apps.shops.models import Shop, ShopMembership, ShopPlanRequest
 from platform_apps.users.models import PlatformUser
 
 
@@ -133,3 +133,121 @@ class ShopDomainStateApiTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
+
+
+class ShopPlanRequestApiTests(TestCase):
+    def setUp(self):
+        self.owner = PlatformUser.objects.create_user(
+            email="owner@example.com",
+            password="secret",
+            full_name="Owner",
+        )
+        self.staff = PlatformUser.objects.create_user(
+            email="staff@example.com",
+            password="secret",
+            full_name="Staff",
+        )
+        self.shop = Shop.objects.create(
+            name="Demo Shop",
+            slug="demo-shop",
+            settings_json={"plan_tier": "starter"},
+        )
+        ShopMembership.objects.create(
+            user=self.owner,
+            shop=self.shop,
+            role=ShopMembership.Role.OWNER,
+            status=ShopMembership.Status.ACTIVE,
+        )
+        ShopMembership.objects.create(
+            user=self.staff,
+            shop=self.shop,
+            role=ShopMembership.Role.STAFF,
+            status=ShopMembership.Status.ACTIVE,
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.owner)
+
+    def test_owner_can_create_plan_request(self):
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/plan-requests/",
+            {
+                "requested_plan_tier": "growth",
+                "request_note": "We need expenses and attendance next.",
+                "context_json": {"source_surface": "admin_web_plan"},
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(ShopPlanRequest.objects.count(), 1)
+        plan_request = ShopPlanRequest.objects.get()
+        self.assertEqual(plan_request.current_plan_tier, "starter")
+        self.assertEqual(plan_request.requested_plan_tier, "growth")
+        self.assertEqual(plan_request.status, ShopPlanRequest.Status.OPEN)
+
+    def test_duplicate_open_request_returns_existing(self):
+        ShopPlanRequest.objects.create(
+            shop=self.shop,
+            requested_by_user=self.owner,
+            current_plan_tier="starter",
+            requested_plan_tier="growth",
+            status=ShopPlanRequest.Status.OPEN,
+        )
+
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/plan-requests/",
+            {
+                "requested_plan_tier": "growth",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ShopPlanRequest.objects.count(), 1)
+
+    def test_staff_cannot_create_plan_request(self):
+        self.client.force_authenticate(user=self.staff)
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/plan-requests/",
+            {
+                "requested_plan_tier": "growth",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_cannot_request_same_or_lower_plan(self):
+        same_response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/plan-requests/",
+            {
+                "requested_plan_tier": "starter",
+            },
+            format="json",
+        )
+        self.assertEqual(same_response.status_code, 400)
+
+        self.shop.settings_json = {"plan_tier": "growth"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+        lower_response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/plan-requests/",
+            {
+                "requested_plan_tier": "starter",
+            },
+            format="json",
+        )
+        self.assertEqual(lower_response.status_code, 400)
+
+    def test_cannot_request_upgrade_when_already_on_pro(self):
+        self.shop.settings_json = {"plan_tier": "pro"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/plan-requests/",
+            {
+                "requested_plan_tier": "pro",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)

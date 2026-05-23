@@ -64,3 +64,26 @@ class ShopMembership(SourceTrackedModel):
 
     def __str__(self) -> str:
         return f"{self.user} -> {self.shop} ({self.role})"
+
+
+class ShopPlanRequest(SourceTrackedModel):
+    class Status(models.TextChoices):
+        OPEN = "open", "Open"
+        IN_REVIEW = "in_review", "In review"
+        RESOLVED = "resolved", "Resolved"
+        CLOSED = "closed", "Closed"
+
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="plan_requests")
+    requested_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="shop_plan_requests",
+    )
+    current_plan_tier = models.CharField(max_length=16)
+    requested_plan_tier = models.CharField(max_length=16)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.OPEN)
+    request_note = models.TextField(blank=True)
+    context_json = models.JSONField(default=dict, blank=True)
+
+    def __str__(self) -> str:
+        return f"{self.shop} upgrade {self.current_plan_tier} -> {self.requested_plan_tier}"

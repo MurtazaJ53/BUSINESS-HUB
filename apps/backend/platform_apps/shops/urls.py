@@ -23,11 +23,16 @@ from platform_apps.payments.views import SalePaymentSummaryView
 from platform_apps.projections.views import ShopDashboardSnapshotView
 from platform_apps.sales.views import SaleCommandIngestionView, SaleDetailView, SaleListCreateView
 from platform_apps.sales.views import SaleSummaryView
-from platform_apps.shops.views import ShopDomainStateView, ShopMembershipListView
+from platform_apps.shops.views import (
+    ShopDomainStateView,
+    ShopMembershipListView,
+    ShopPlanRequestListCreateView,
+)
 
 urlpatterns = [
     path("", ShopMembershipListView.as_view(), name="shop-memberships"),
     path("<uuid:shop_id>/domain-state/<slug:domain>/", ShopDomainStateView.as_view(), name="shop-domain-state"),
+    path("<uuid:shop_id>/plan-requests/", ShopPlanRequestListCreateView.as_view(), name="shop-plan-requests"),
     path("<uuid:shop_id>/customers/", CustomerListCreateView.as_view(), name="customer-list"),
     path("<uuid:shop_id>/customers/summary/", CustomerSummaryView.as_view(), name="customer-summary"),
     path("<uuid:shop_id>/customers/<uuid:customer_id>/", CustomerDetailView.as_view(), name="customer-detail"),

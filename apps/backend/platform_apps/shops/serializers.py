@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from platform_apps.shops.models import ShopMembership
+from platform_apps.shops.models import ShopMembership, ShopPlanRequest
+from platform_apps.shops.plans import PLAN_TIERS, normalize_plan_tier
 
 
 class ShopMembershipListSerializer(serializers.ModelSerializer):
@@ -50,3 +51,53 @@ class ShopDomainStateSerializer(serializers.Serializer):
     pilot_signoff_summary = serializers.CharField(allow_blank=True, allow_null=True)
     pilot_recommended_action = serializers.CharField(allow_blank=True, allow_null=True)
     pilot_latest_verify_result = serializers.CharField(allow_blank=True, allow_null=True)
+
+
+class ShopPlanRequestSerializer(serializers.ModelSerializer):
+    requested_by_name = serializers.CharField(source="requested_by_user.full_name", read_only=True)
+
+    class Meta:
+        model = ShopPlanRequest
+        fields = (
+            "id",
+            "current_plan_tier",
+            "requested_plan_tier",
+            "status",
+            "request_note",
+            "context_json",
+            "requested_by_name",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "current_plan_tier",
+            "status",
+            "context_json",
+            "requested_by_name",
+            "created_at",
+            "updated_at",
+        )
+
+
+class ShopPlanRequestCreateSerializer(serializers.Serializer):
+    requested_plan_tier = serializers.CharField(max_length=16)
+    request_note = serializers.CharField(required=False, allow_blank=True, max_length=2000)
+    context_json = serializers.DictField(required=False)
+
+    def validate_requested_plan_tier(self, value: str) -> str:
+        normalized = normalize_plan_tier(value)
+        membership = self.context["membership"]
+        current_tier = membership.shop.plan_tier
+        tier_order = {tier: index for index, tier in enumerate(PLAN_TIERS)}
+
+        if normalized == current_tier:
+            raise serializers.ValidationError("This workspace is already on that plan.")
+
+        if tier_order[normalized] < tier_order[current_tier]:
+            raise serializers.ValidationError("Plan requests must move upward, not downward.")
+
+        if current_tier == PLAN_TIERS[-1]:
+            raise serializers.ValidationError("This workspace is already on the highest curated plan.")
+
+        return normalized
