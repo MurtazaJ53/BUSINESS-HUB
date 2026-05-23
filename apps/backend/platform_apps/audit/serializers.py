@@ -3,7 +3,7 @@ from __future__ import annotations
 from django.utils import timezone
 from rest_framework import serializers
 
-from platform_apps.audit.models import MigrationReconciliationEvent
+from platform_apps.audit.models import MigrationReconciliationEvent, WorkspaceAuditEvent
 from platform_apps.common.migration import ReconciliationStatus
 
 
@@ -69,3 +69,40 @@ class MigrationReconciliationEventSerializer(serializers.ModelSerializer):
             setattr(instance, field, value)
         instance.save()
         return instance
+
+
+class WorkspaceAuditEventSerializer(serializers.ModelSerializer):
+    shop_name = serializers.CharField(source="shop.name", read_only=True)
+    actor_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WorkspaceAuditEvent
+        fields = (
+            "id",
+            "shop",
+            "shop_name",
+            "actor_user",
+            "actor_name",
+            "actor_role",
+            "category",
+            "event_type",
+            "entity_type",
+            "entity_id",
+            "entity_label",
+            "summary",
+            "source_surface",
+            "before_json",
+            "after_json",
+            "metadata_json",
+            "occurred_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+    def get_actor_name(self, obj):
+        if obj.actor_user_id and obj.actor_user.full_name:
+            return obj.actor_user.full_name
+        if obj.actor_user_id:
+            return obj.actor_user.email
+        return None

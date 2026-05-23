@@ -9,6 +9,11 @@ from rest_framework import exceptions, generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from platform_apps.audit.services import (
+    create_workspace_audit_event,
+    snapshot_customer,
+    snapshot_customer_ledger_entry,
+)
 from platform_apps.common.migration import MigrationDomain
 from platform_apps.common.migration_guards import assert_postgres_primary_write_enabled
 from platform_apps.customers.models import Customer, CustomerLedgerEntry
@@ -65,12 +70,26 @@ class CustomerListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
         return context
 
     def perform_create(self, serializer):
-        get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.STAFF)
+        membership = get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.STAFF)
         assert_postgres_primary_write_enabled(
             shop_id=str(self.kwargs["shop_id"]),
             domain=MigrationDomain.CUSTOMERS,
         )
         serializer.save()
+        customer = serializer.instance
+        create_workspace_audit_event(
+            shop=membership.shop,
+            actor_user=self.request.user,
+            actor_role=membership.role,
+            category="customer",
+            event_type="customer.record.created",
+            entity_type="customer",
+            entity_id=customer.id,
+            entity_label=customer.name,
+            summary=f"Created customer {customer.name}.",
+            source_surface="backend_api",
+            after=snapshot_customer(customer),
+        )
 
 
 class CustomerDetailView(ShopScopedMixin, generics.RetrieveUpdateDestroyAPIView):
@@ -93,15 +112,32 @@ class CustomerDetailView(ShopScopedMixin, generics.RetrieveUpdateDestroyAPIView)
         return context
 
     def perform_update(self, serializer):
-        get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.STAFF)
+        membership = get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.STAFF)
+        before_snapshot = snapshot_customer(serializer.instance)
         assert_postgres_primary_write_enabled(
             shop_id=str(self.kwargs["shop_id"]),
             domain=MigrationDomain.CUSTOMERS,
         )
         serializer.save()
+        customer = serializer.instance
+        create_workspace_audit_event(
+            shop=membership.shop,
+            actor_user=self.request.user,
+            actor_role=membership.role,
+            category="customer",
+            event_type="customer.record.updated",
+            entity_type="customer",
+            entity_id=customer.id,
+            entity_label=customer.name,
+            summary=f"Updated customer {customer.name}.",
+            source_surface="backend_api",
+            before=before_snapshot,
+            after=snapshot_customer(customer),
+        )
 
     def perform_destroy(self, instance):
-        get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.ADMIN)
+        membership = get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.ADMIN)
+        before_snapshot = snapshot_customer(instance)
         assert_postgres_primary_write_enabled(
             shop_id=str(self.kwargs["shop_id"]),
             domain=MigrationDomain.CUSTOMERS,
@@ -109,6 +145,20 @@ class CustomerDetailView(ShopScopedMixin, generics.RetrieveUpdateDestroyAPIView)
         instance.tombstone = True
         instance.status = Customer.Status.ARCHIVED
         instance.save(update_fields=["tombstone", "status", "updated_at"])
+        create_workspace_audit_event(
+            shop=membership.shop,
+            actor_user=self.request.user,
+            actor_role=membership.role,
+            category="customer",
+            event_type="customer.record.archived",
+            entity_type="customer",
+            entity_id=instance.id,
+            entity_label=instance.name,
+            summary=f"Archived customer {instance.name}.",
+            source_surface="backend_api",
+            before=before_snapshot,
+            after=snapshot_customer(instance),
+        )
 
 
 class CustomerLedgerListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
@@ -145,12 +195,27 @@ class CustomerLedgerListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
         return context
 
     def perform_create(self, serializer):
-        get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.STAFF)
+        membership = get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.STAFF)
         assert_postgres_primary_write_enabled(
             shop_id=str(self.kwargs["shop_id"]),
             domain=MigrationDomain.CUSTOMER_LEDGER,
         )
         serializer.save()
+        entry = serializer.instance
+        entry = CustomerLedgerEntry.objects.select_related("customer").get(pk=entry.pk)
+        create_workspace_audit_event(
+            shop=membership.shop,
+            actor_user=self.request.user,
+            actor_role=membership.role,
+            category="customer",
+            event_type="customer.ledger.entry_created",
+            entity_type="customer_ledger_entry",
+            entity_id=entry.id,
+            entity_label=entry.customer.name,
+            summary=f"Created customer ledger entry for {entry.customer.name}.",
+            source_surface="backend_api",
+            after=snapshot_customer_ledger_entry(entry),
+        )
 
 
 class CustomerSummaryView(ShopScopedMixin, APIView):

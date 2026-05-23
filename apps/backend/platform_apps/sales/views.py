@@ -12,6 +12,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from platform_apps.audit.services import create_workspace_audit_event, snapshot_sale
 from platform_apps.common.migration import MigrationDomain
 from platform_apps.common.migration_guards import (
     assert_domain_epoch_current,
@@ -95,7 +96,7 @@ class SaleListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
         return context
 
     def perform_create(self, serializer):
-        get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.STAFF)
+        membership = get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.STAFF)
         guarded_domains = [
             MigrationDomain.SALES,
             MigrationDomain.PAYMENTS,
@@ -108,6 +109,20 @@ class SaleListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
             domains=guarded_domains,
         )
         serializer.save()
+        sale = serializer.instance
+        create_workspace_audit_event(
+            shop=membership.shop,
+            actor_user=self.request.user,
+            actor_role=membership.role,
+            category="sale",
+            event_type="sale.record.created",
+            entity_type="sale",
+            entity_id=sale.id,
+            entity_label=sale.receipt_number,
+            summary=f"Created sale {sale.receipt_number}.",
+            source_surface="backend_api",
+            after=snapshot_sale(sale),
+        )
 
 
 class SaleDetailView(ShopScopedMixin, generics.RetrieveAPIView):
@@ -295,6 +310,25 @@ class SaleCommandIngestionView(ShopScopedMixin, generics.GenericAPIView):
 
         refresh_shop_dashboard_projection(membership.shop)
         sale = _get_sale_queryset_for_shop(shop_id=str(membership.shop_id)).get(pk=sale.id)
+        create_workspace_audit_event(
+            shop=membership.shop,
+            actor_user=request.user,
+            actor_role=membership.role,
+            category="sale",
+            event_type="sale.command.accepted",
+            entity_type="sale_command",
+            entity_id=command_id,
+            entity_label=sale.receipt_number,
+            summary=f"Accepted sale command for {sale.receipt_number}.",
+            source_surface=source_surface,
+            after=snapshot_sale(sale),
+            metadata={
+                "command_id": command_id,
+                "receipt_id": receipt.id,
+                "base_domain_epoch": base_domain_epoch,
+                "duplicate": False,
+            },
+        )
         return Response(
             {
                 "command_id": command_id,

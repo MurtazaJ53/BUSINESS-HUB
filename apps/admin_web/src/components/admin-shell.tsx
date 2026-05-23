@@ -12,6 +12,7 @@ type AdminShellProps = {
   activeRoute:
     | "overview"
     | "team"
+    | "audit"
     | "plan"
     | "inventory"
     | "customers"
@@ -69,6 +70,13 @@ const navItems: readonly NavItem[] = [
     label: "Team",
     href: "/team",
     glyph: "TEM",
+    group: "operations",
+  },
+  {
+    key: "audit",
+    label: "Audit",
+    href: "/audit",
+    glyph: "AUD",
     group: "operations",
   },
   {

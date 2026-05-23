@@ -272,6 +272,7 @@ Do not make admin web the normal cashier workflow.
 
 - dashboard
 - workspace team when the account is truly a store-admin role
+- workspace audit
 - inventory
 - customers
 - sales/history
@@ -294,6 +295,7 @@ Do not make admin web the normal cashier workflow.
 
 - dashboard
 - workspace team
+- workspace audit
 - ownership transfer from the workspace team surface
 - inventory
 - customers

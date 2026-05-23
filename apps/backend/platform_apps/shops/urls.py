@@ -1,5 +1,6 @@
 from django.urls import path
 
+from platform_apps.audit.views import WorkspaceAuditEventListView
 from platform_apps.attendance.views import (
     AttendanceSessionDetailView,
     AttendanceSessionListCreateView,
@@ -38,6 +39,7 @@ urlpatterns = [
     path("<uuid:shop_id>/plan-requests/", ShopPlanRequestListCreateView.as_view(), name="shop-plan-requests"),
     path("<uuid:shop_id>/team/", WorkspaceTeamListCreateView.as_view(), name="workspace-team"),
     path("<uuid:shop_id>/team/<uuid:membership_id>/", WorkspaceTeamDetailView.as_view(), name="workspace-team-detail"),
+    path("<uuid:shop_id>/audit/", WorkspaceAuditEventListView.as_view(), name="workspace-audit"),
     path(
         "<uuid:shop_id>/team/transfer-ownership/",
         WorkspaceOwnershipTransferView.as_view(),

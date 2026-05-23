@@ -204,7 +204,7 @@ class WorkspaceTeamMemberCreateSerializer(serializers.Serializer):
         ensure_workspace_role_assignment_or_403(actor_membership, normalized)
         return normalized
 
-    def create_or_update_membership(self) -> ShopMembership:
+    def create_or_update_membership(self) -> tuple[ShopMembership, bool]:
         actor_membership = self.context["actor_membership"]
         validated = self.validated_data
         email = validated["email"].strip().lower()
@@ -246,7 +246,7 @@ class WorkspaceTeamMemberCreateSerializer(serializers.Serializer):
         )
 
         if membership_created:
-            return membership
+            return membership, True
 
         ensure_workspace_membership_management_or_403(actor_membership, membership)
         updated_fields: list[str] = []
@@ -267,7 +267,7 @@ class WorkspaceTeamMemberCreateSerializer(serializers.Serializer):
             updated_fields.append("updated_at")
             membership.save(update_fields=updated_fields)
 
-        return membership
+        return membership, False
 
 
 class WorkspaceTeamMemberUpdateSerializer(serializers.Serializer):

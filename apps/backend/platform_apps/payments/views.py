@@ -10,6 +10,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from platform_apps.audit.services import create_workspace_audit_event, snapshot_payment
 from platform_apps.common.migration import MigrationDomain
 from platform_apps.common.migration_guards import (
     assert_domain_epoch_current,
@@ -307,6 +308,25 @@ class SalePaymentCommandIngestionView(ShopScopedMixin, generics.GenericAPIView):
 
         refresh_shop_dashboard_projection(membership.shop)
         payment = SalePayment.objects.select_related("sale", "actor_user").get(pk=payment.id)
+        create_workspace_audit_event(
+            shop=membership.shop,
+            actor_user=request.user,
+            actor_role=membership.role,
+            category="payment",
+            event_type="payment.command.accepted",
+            entity_type="sale_payment_command",
+            entity_id=command_id,
+            entity_label=payment.sale.receipt_number,
+            summary=f"Accepted payment command for {payment.sale.receipt_number}.",
+            source_surface=source_surface,
+            after=snapshot_payment(payment),
+            metadata={
+                "command_id": command_id,
+                "receipt_id": receipt.id,
+                "base_domain_epoch": base_domain_epoch,
+                "duplicate": False,
+            },
+        )
         return Response(
             {
                 "command_id": command_id,

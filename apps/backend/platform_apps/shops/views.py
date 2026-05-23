@@ -6,6 +6,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
+from platform_apps.audit.services import create_workspace_audit_event, snapshot_membership
 from platform_apps.common.migration import (
     MigrationBridgeMode,
     MigrationCutoverStatus,
@@ -152,6 +153,27 @@ class ShopPlanRequestListCreateView(APIView):
             request_note=serializer.validated_data.get("request_note", ""),
             context_json=serializer.validated_data.get("context_json", {}),
         )
+        create_workspace_audit_event(
+            shop=membership.shop,
+            actor_user=request.user,
+            actor_role=membership.role,
+            category="workspace",
+            event_type="workspace.plan.requested",
+            entity_type="shop_plan_request",
+            entity_id=plan_request.id,
+            entity_label=membership.shop.name,
+            summary=f"Requested workspace plan change from {plan_request.current_plan_tier} to {plan_request.requested_plan_tier}.",
+            source_surface="admin_web_plan",
+            after={
+                "current_plan_tier": plan_request.current_plan_tier,
+                "requested_plan_tier": plan_request.requested_plan_tier,
+                "status": plan_request.status,
+            },
+            metadata={
+                "request_note": plan_request.request_note,
+                "context_json": plan_request.context_json,
+            },
+        )
         response_serializer = ShopPlanRequestSerializer(plan_request)
         return Response(response_serializer.data, status=201)
 
@@ -183,7 +205,28 @@ class WorkspaceTeamListCreateView(APIView):
             context={"actor_membership": actor_membership},
         )
         serializer.is_valid(raise_exception=True)
-        membership = serializer.create_or_update_membership()
+        membership, created = serializer.create_or_update_membership()
+        create_workspace_audit_event(
+            shop=actor_membership.shop,
+            actor_user=request.user,
+            actor_role=actor_membership.role,
+            category="workspace",
+            event_type=(
+                "workspace.team.member_added"
+                if created
+                else "workspace.team.member_reactivated"
+            ),
+            entity_type="shop_membership",
+            entity_id=membership.id,
+            entity_label=membership.user.full_name or membership.user.email or membership.email,
+            summary=(
+                f"Added {membership.user.email or membership.email} to the workspace as {membership.role}."
+                if created
+                else f"Updated or reactivated {membership.user.email or membership.email} in the workspace."
+            ),
+            source_surface="admin_web_team",
+            after=snapshot_membership(membership),
+        )
         response_serializer = WorkspaceTeamMemberSerializer(
             membership,
             context={"actor_membership": actor_membership},
@@ -210,6 +253,7 @@ class WorkspaceTeamDetailView(APIView):
     def patch(self, request, shop_id, membership_id):
         actor_membership = self.get_actor_membership(shop_id)
         target_membership = self.get_target_membership(actor_membership, membership_id)
+        before_snapshot = snapshot_membership(target_membership)
         serializer = WorkspaceTeamMemberUpdateSerializer(
             data=request.data,
             context={
@@ -220,6 +264,20 @@ class WorkspaceTeamDetailView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         membership = serializer.apply()
+        create_workspace_audit_event(
+            shop=actor_membership.shop,
+            actor_user=request.user,
+            actor_role=actor_membership.role,
+            category="workspace",
+            event_type="workspace.team.member_updated",
+            entity_type="shop_membership",
+            entity_id=membership.id,
+            entity_label=membership.user.full_name or membership.user.email or membership.email,
+            summary=f"Updated workspace membership for {membership.user.email or membership.email}.",
+            source_surface="admin_web_team",
+            before=before_snapshot,
+            after=snapshot_membership(membership),
+        )
         response_serializer = WorkspaceTeamMemberSerializer(
             membership,
             context={"actor_membership": actor_membership},
@@ -232,11 +290,39 @@ class WorkspaceOwnershipTransferView(APIView):
 
     def post(self, request, shop_id):
         actor_membership = get_membership_or_403(request.user, shop_id, ShopMembership.Role.OWNER)
+        previous_owner_snapshot = snapshot_membership(actor_membership)
         serializer = WorkspaceOwnershipTransferSerializer(
             data=request.data,
             context={"actor_membership": actor_membership},
         )
         serializer.is_valid(raise_exception=True)
+        target_membership = serializer.validated_data["target_membership"]
+        next_owner_before_snapshot = snapshot_membership(target_membership)
         result = serializer.transfer()
+        actor_membership.refresh_from_db()
+        target_membership.refresh_from_db()
+        create_workspace_audit_event(
+            shop=actor_membership.shop,
+            actor_user=request.user,
+            actor_role=ShopMembership.Role.OWNER,
+            category="workspace",
+            event_type="workspace.team.ownership_transferred",
+            entity_type="shop",
+            entity_id=actor_membership.shop_id,
+            entity_label=actor_membership.shop.name,
+            summary=f"Transferred workspace ownership to {target_membership.user.email or target_membership.email}.",
+            source_surface="admin_web_team",
+            before={
+                "previous_owner": previous_owner_snapshot,
+                "next_owner_candidate": next_owner_before_snapshot,
+            },
+            after={
+                "previous_owner": snapshot_membership(actor_membership),
+                "new_owner": snapshot_membership(target_membership),
+            },
+            metadata={
+                "shop_slug_confirmation": request.data.get("confirmation_text", ""),
+            },
+        )
         response_serializer = WorkspaceOwnershipTransferResultSerializer(result)
         return Response(response_serializer.data)

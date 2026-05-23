@@ -50,3 +50,45 @@ class MigrationReconciliationEvent(UUIDStampedModel):
 
     def __str__(self) -> str:
         return f"{self.domain}:{self.issue_code}:{self.status}"
+
+
+class WorkspaceAuditEvent(UUIDStampedModel):
+    class Category(models.TextChoices):
+        WORKSPACE = "workspace", "Workspace"
+        INVENTORY = "inventory", "Inventory"
+        CUSTOMER = "customer", "Customer"
+        SALE = "sale", "Sale"
+        PAYMENT = "payment", "Payment"
+
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="audit_events")
+    actor_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="workspace_audit_events",
+        blank=True,
+        null=True,
+    )
+    actor_role = models.CharField(max_length=16, blank=True)
+    category = models.CharField(max_length=32, choices=Category.choices)
+    event_type = models.CharField(max_length=64)
+    entity_type = models.CharField(max_length=64)
+    entity_id = models.CharField(max_length=128, blank=True)
+    entity_label = models.CharField(max_length=255, blank=True)
+    summary = models.TextField()
+    source_surface = models.CharField(max_length=64, blank=True)
+    before_json = models.JSONField(default=dict, blank=True)
+    after_json = models.JSONField(default=dict, blank=True)
+    metadata_json = models.JSONField(default=dict, blank=True)
+    occurred_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["-occurred_at", "-created_at"]
+        indexes = [
+            models.Index(fields=["shop", "occurred_at"]),
+            models.Index(fields=["shop", "category", "occurred_at"]),
+            models.Index(fields=["actor_user", "occurred_at"]),
+            models.Index(fields=["event_type", "occurred_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.shop_id}:{self.category}:{self.event_type}"

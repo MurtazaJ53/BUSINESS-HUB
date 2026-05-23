@@ -74,6 +74,28 @@ export type WorkspaceOwnershipTransferPayload = {
   transferred_at: string;
 };
 
+export type WorkspaceAuditEventPayload = {
+  id: string;
+  shop: string;
+  shop_name: string;
+  actor_user: string | null;
+  actor_name: string | null;
+  actor_role: "owner" | "admin" | "staff" | "viewer" | "";
+  category: "workspace" | "inventory" | "customer" | "sale" | "payment";
+  event_type: string;
+  entity_type: string;
+  entity_id: string;
+  entity_label: string;
+  summary: string;
+  source_surface: string;
+  before_json: Record<string, unknown>;
+  after_json: Record<string, unknown>;
+  metadata_json: Record<string, unknown>;
+  occurred_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type SessionPayload = {
   user: SessionUser;
   memberships: ShopMembership[];

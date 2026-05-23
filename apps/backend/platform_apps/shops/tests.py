@@ -14,6 +14,7 @@ from platform_apps.common.migration import (
     MigrationWriteMaster,
 )
 from platform_apps.jobs.models import MigrationControlEvent, MigrationDomainControl, MigrationJobRun
+from platform_apps.audit.models import WorkspaceAuditEvent
 from platform_apps.shops.models import Shop, ShopMembership, ShopPlanRequest
 from platform_apps.users.models import PlatformUser
 
@@ -184,6 +185,9 @@ class ShopPlanRequestApiTests(TestCase):
         self.assertEqual(plan_request.current_plan_tier, "starter")
         self.assertEqual(plan_request.requested_plan_tier, "growth")
         self.assertEqual(plan_request.status, ShopPlanRequest.Status.OPEN)
+        audit_event = WorkspaceAuditEvent.objects.get(event_type="workspace.plan.requested")
+        self.assertEqual(audit_event.shop_id, self.shop.id)
+        self.assertEqual(audit_event.actor_user_id, self.owner.id)
 
     def test_duplicate_open_request_returns_existing(self):
         ShopPlanRequest.objects.create(
@@ -420,6 +424,9 @@ class WorkspaceTeamApiTests(TestCase):
         self.assertEqual(self.owner_membership.role, ShopMembership.Role.ADMIN)
         self.assertEqual(self.admin_membership.role, ShopMembership.Role.OWNER)
         self.assertEqual(response.json()["new_owner_email"], self.admin.email)
+        audit_event = WorkspaceAuditEvent.objects.get(event_type="workspace.team.ownership_transferred")
+        self.assertEqual(audit_event.actor_user_id, self.owner.id)
+        self.assertEqual(audit_event.entity_id, str(self.shop.id))
 
     def test_owner_can_choose_previous_owner_role_during_transfer(self):
         self.client.force_authenticate(user=self.owner)

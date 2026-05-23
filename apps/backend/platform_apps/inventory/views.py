@@ -12,6 +12,7 @@ from rest_framework import exceptions, generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from platform_apps.audit.services import create_workspace_audit_event, snapshot_inventory_item
 from platform_apps.common.migration import MigrationDomain
 from platform_apps.common.migration_guards import assert_postgres_primary_write_enabled
 from platform_apps.inventory.models import InventoryItem, InventoryStockLedger
@@ -105,9 +106,29 @@ class InventoryItemListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
         return context
 
     def perform_create(self, serializer):
-        get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.STAFF)
+        membership = get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.STAFF)
         self.assert_inventory_postgres_write_enabled()
         serializer.save()
+        item = serializer.instance
+        item = (
+            InventoryItem.objects.filter(pk=item.pk)
+            .select_related("private")
+            .annotate(stock_on_hand=Coalesce(Sum("ledger_entries__quantity_delta"), 0))
+            .get()
+        )
+        create_workspace_audit_event(
+            shop=membership.shop,
+            actor_user=self.request.user,
+            actor_role=membership.role,
+            category="inventory",
+            event_type="inventory.item.created",
+            entity_type="inventory_item",
+            entity_id=item.id,
+            entity_label=item.name,
+            summary=f"Created inventory item {item.name}.",
+            source_surface="backend_api",
+            after=snapshot_inventory_item(item),
+        )
 
 
 class InventoryItemDetailView(ShopScopedMixin, generics.RetrieveUpdateDestroyAPIView):
@@ -137,17 +158,53 @@ class InventoryItemDetailView(ShopScopedMixin, generics.RetrieveUpdateDestroyAPI
         return context
 
     def perform_update(self, serializer):
-        get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.STAFF)
+        membership = get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.STAFF)
+        before_snapshot = snapshot_inventory_item(serializer.instance)
         self.assert_inventory_postgres_write_enabled()
         serializer.save()
+        item = (
+            InventoryItem.objects.filter(pk=serializer.instance.pk)
+            .select_related("private")
+            .annotate(stock_on_hand=Coalesce(Sum("ledger_entries__quantity_delta"), 0))
+            .get()
+        )
+        create_workspace_audit_event(
+            shop=membership.shop,
+            actor_user=self.request.user,
+            actor_role=membership.role,
+            category="inventory",
+            event_type="inventory.item.updated",
+            entity_type="inventory_item",
+            entity_id=item.id,
+            entity_label=item.name,
+            summary=f"Updated inventory item {item.name}.",
+            source_surface="backend_api",
+            before=before_snapshot,
+            after=snapshot_inventory_item(item),
+        )
 
     @transaction.atomic
     def perform_destroy(self, instance):
-        get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.ADMIN)
+        membership = get_membership_or_403(self.request.user, self.kwargs["shop_id"], ShopMembership.Role.ADMIN)
+        before_snapshot = snapshot_inventory_item(instance)
         self.assert_inventory_postgres_write_enabled()
         instance.tombstone = True
         instance.status = InventoryItem.Status.ARCHIVED
         instance.save(update_fields=["tombstone", "status", "updated_at"])
+        create_workspace_audit_event(
+            shop=membership.shop,
+            actor_user=self.request.user,
+            actor_role=membership.role,
+            category="inventory",
+            event_type="inventory.item.archived",
+            entity_type="inventory_item",
+            entity_id=instance.id,
+            entity_label=instance.name,
+            summary=f"Archived inventory item {instance.name}.",
+            source_surface="backend_api",
+            before=before_snapshot,
+            after=snapshot_inventory_item(instance),
+        )
 
 
 class InventorySummaryView(ShopScopedMixin, APIView):
@@ -237,6 +294,26 @@ class InventoryItemAdjustmentView(ShopScopedMixin, APIView):
 
         current_stock = (
             item.ledger_entries.aggregate(total=Coalesce(Sum("quantity_delta"), 0))["total"]
+        )
+        create_workspace_audit_event(
+            shop=membership.shop,
+            actor_user=request.user,
+            actor_role=membership.role,
+            category="inventory",
+            event_type="inventory.stock.adjusted",
+            entity_type="inventory_item",
+            entity_id=item.id,
+            entity_label=item.name,
+            summary=f"Adjusted stock for {item.name} by {payload['quantity_delta']}.",
+            source_surface="backend_api",
+            before={"stock_on_hand": (current_stock - payload["quantity_delta"])},
+            after={"stock_on_hand": current_stock},
+            metadata={
+                "ledger_event_id": ledger.id,
+                "event_type": payload["event_type"],
+                "quantity_delta": payload["quantity_delta"],
+                "note": payload.get("note", ""),
+            },
         )
         return Response(
             {
