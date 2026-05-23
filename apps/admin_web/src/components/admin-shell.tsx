@@ -11,6 +11,7 @@ type AdminShellProps = {
   activeShop: ShopMembership | null;
   activeRoute:
     | "overview"
+    | "team"
     | "plan"
     | "inventory"
     | "customers"
@@ -62,6 +63,13 @@ const navItems: readonly NavItem[] = [
     href: "/sales",
     glyph: "SAL",
     group: "core",
+  },
+  {
+    key: "team",
+    label: "Team",
+    href: "/team",
+    glyph: "TEM",
+    group: "operations",
   },
   {
     key: "plan",

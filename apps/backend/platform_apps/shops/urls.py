@@ -27,12 +27,16 @@ from platform_apps.shops.views import (
     ShopDomainStateView,
     ShopMembershipListView,
     ShopPlanRequestListCreateView,
+    WorkspaceTeamDetailView,
+    WorkspaceTeamListCreateView,
 )
 
 urlpatterns = [
     path("", ShopMembershipListView.as_view(), name="shop-memberships"),
     path("<uuid:shop_id>/domain-state/<slug:domain>/", ShopDomainStateView.as_view(), name="shop-domain-state"),
     path("<uuid:shop_id>/plan-requests/", ShopPlanRequestListCreateView.as_view(), name="shop-plan-requests"),
+    path("<uuid:shop_id>/team/", WorkspaceTeamListCreateView.as_view(), name="workspace-team"),
+    path("<uuid:shop_id>/team/<uuid:membership_id>/", WorkspaceTeamDetailView.as_view(), name="workspace-team-detail"),
     path("<uuid:shop_id>/customers/", CustomerListCreateView.as_view(), name="customer-list"),
     path("<uuid:shop_id>/customers/summary/", CustomerSummaryView.as_view(), name="customer-summary"),
     path("<uuid:shop_id>/customers/<uuid:customer_id>/", CustomerDetailView.as_view(), name="customer-detail"),

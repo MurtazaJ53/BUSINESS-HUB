@@ -50,6 +50,7 @@ import type {
   ShopDomainState,
   ShopMembership,
   ShopPlanRequestPayload,
+  WorkspaceTeamMemberPayload,
 } from "@/lib/types";
 
 type FetchOptions = {
@@ -149,6 +150,12 @@ export const getMemberships = cache(async (): Promise<ShopMembership[]> => {
 export const getShopPlanRequests = cache(async (shopId: string): Promise<ShopPlanRequestPayload[]> => {
   return apiFetch<ShopPlanRequestPayload[]>(`/shops/${shopId}/plan-requests/`);
 });
+
+export const getWorkspaceTeamMembers = cache(
+  async (shopId: string): Promise<WorkspaceTeamMemberPayload[]> => {
+    return apiFetch<WorkspaceTeamMemberPayload[]>(`/shops/${shopId}/team/`);
+  },
+);
 
 export const getInventory = cache(async (shopId: string, query?: string): Promise<InventoryItem[]> => {
   return apiFetch<InventoryItem[]>(`/shops/${shopId}/inventory/`, {

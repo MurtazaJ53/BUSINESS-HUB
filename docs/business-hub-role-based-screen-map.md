@@ -271,6 +271,7 @@ Do not make admin web the normal cashier workflow.
 ### Allowed sections
 
 - dashboard
+- workspace team when the account is truly a store-admin role
 - inventory
 - customers
 - sales/history
@@ -291,6 +292,7 @@ Do not make admin web the normal cashier workflow.
 ### Allowed sections
 
 - dashboard
+- workspace team
 - inventory
 - customers
 - sales/history

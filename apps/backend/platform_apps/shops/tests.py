@@ -251,3 +251,151 @@ class ShopPlanRequestApiTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 400)
+
+
+class WorkspaceTeamApiTests(TestCase):
+    def setUp(self):
+        self.owner = PlatformUser.objects.create_user(
+            email="owner@example.com",
+            password="secret",
+            full_name="Owner",
+        )
+        self.admin = PlatformUser.objects.create_user(
+            email="admin@example.com",
+            password="secret",
+            full_name="Admin",
+        )
+        self.staff = PlatformUser.objects.create_user(
+            email="staff@example.com",
+            password="secret",
+            full_name="Staff",
+        )
+        self.viewer = PlatformUser.objects.create_user(
+            email="viewer@example.com",
+            password="secret",
+            full_name="Viewer",
+        )
+        self.shop = Shop.objects.create(
+            name="Demo Shop",
+            slug="demo-shop",
+            owner_user=self.owner,
+        )
+        self.owner_membership = ShopMembership.objects.create(
+            user=self.owner,
+            shop=self.shop,
+            role=ShopMembership.Role.OWNER,
+            status=ShopMembership.Status.ACTIVE,
+            email=self.owner.email,
+        )
+        self.admin_membership = ShopMembership.objects.create(
+            user=self.admin,
+            shop=self.shop,
+            role=ShopMembership.Role.ADMIN,
+            status=ShopMembership.Status.ACTIVE,
+            email=self.admin.email,
+        )
+        self.staff_membership = ShopMembership.objects.create(
+            user=self.staff,
+            shop=self.shop,
+            role=ShopMembership.Role.STAFF,
+            status=ShopMembership.Status.ACTIVE,
+            email=self.staff.email,
+        )
+        self.viewer_membership = ShopMembership.objects.create(
+            user=self.viewer,
+            shop=self.shop,
+            role=ShopMembership.Role.VIEWER,
+            status=ShopMembership.Status.ACTIVE,
+            email=self.viewer.email,
+        )
+        self.client = APIClient()
+
+    def test_owner_can_list_workspace_team(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get(f"/api/v1/shops/{self.shop.id}/team/")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload), 4)
+        owner_row = next(row for row in payload if row["member_email"] == self.owner.email)
+        staff_row = next(row for row in payload if row["member_email"] == self.staff.email)
+        self.assertFalse(owner_row["can_manage"])
+        self.assertEqual(staff_row["role_label"], "Staff operator")
+        self.assertTrue(staff_row["can_manage"])
+
+    def test_staff_cannot_access_team_management(self):
+        self.client.force_authenticate(user=self.staff)
+        response = self.client.get(f"/api/v1/shops/{self.shop.id}/team/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_owner_can_create_store_admin_member(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/team/",
+            {
+                "email": "new-admin@example.com",
+                "full_name": "New Admin",
+                "phone": "+91-1111111111",
+                "role": "admin",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        membership = ShopMembership.objects.get(email="new-admin@example.com", shop=self.shop)
+        self.assertEqual(membership.role, ShopMembership.Role.ADMIN)
+        self.assertEqual(membership.status, ShopMembership.Status.INVITED)
+
+    def test_admin_cannot_create_admin_member_but_can_manage_staff(self):
+        self.client.force_authenticate(user=self.admin)
+
+        create_response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/team/",
+            {
+                "email": "future-admin@example.com",
+                "full_name": "Future Admin",
+                "role": "admin",
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, 403)
+
+        patch_response = self.client.patch(
+            f"/api/v1/shops/{self.shop.id}/team/{self.staff_membership.id}/",
+            {
+                "role": "viewer",
+                "status": ShopMembership.Status.DISABLED,
+            },
+            format="json",
+        )
+        self.assertEqual(patch_response.status_code, 200)
+        self.staff_membership.refresh_from_db()
+        self.assertEqual(self.staff_membership.role, ShopMembership.Role.VIEWER)
+        self.assertEqual(self.staff_membership.status, ShopMembership.Status.DISABLED)
+
+    def test_admin_cannot_manage_owner_or_admin_memberships(self):
+        self.client.force_authenticate(user=self.admin)
+
+        owner_response = self.client.patch(
+            f"/api/v1/shops/{self.shop.id}/team/{self.owner_membership.id}/",
+            {"status": ShopMembership.Status.DISABLED},
+            format="json",
+        )
+        self.assertEqual(owner_response.status_code, 403)
+
+        admin_response = self.client.patch(
+            f"/api/v1/shops/{self.shop.id}/team/{self.admin_membership.id}/",
+            {"role": "staff"},
+            format="json",
+        )
+        self.assertEqual(admin_response.status_code, 403)
+
+    def test_owner_cannot_change_own_membership_here(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.patch(
+            f"/api/v1/shops/{self.shop.id}/team/{self.owner_membership.id}/",
+            {"role": "admin"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)

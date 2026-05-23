@@ -42,6 +42,24 @@ export type ShopPlanRequestPayload = {
   updated_at: string;
 };
 
+export type WorkspaceTeamMemberPayload = {
+  id: string;
+  member_name: string;
+  member_email: string;
+  phone: string;
+  role: "owner" | "admin" | "staff" | "viewer";
+  role_label: string;
+  role_summary: string;
+  role_profile: "owner_control" | "store_admin" | "daily_operator" | "read_only";
+  status: "active" | "invited" | "disabled";
+  permissions_version: number;
+  permissions_json: Record<string, unknown>;
+  is_current_user: boolean;
+  can_manage: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type SessionPayload = {
   user: SessionUser;
   memberships: ShopMembership[];

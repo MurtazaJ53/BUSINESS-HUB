@@ -21,6 +21,9 @@ from platform_apps.shops.serializers import (
     ShopMembershipListSerializer,
     ShopPlanRequestCreateSerializer,
     ShopPlanRequestSerializer,
+    WorkspaceTeamMemberCreateSerializer,
+    WorkspaceTeamMemberSerializer,
+    WorkspaceTeamMemberUpdateSerializer,
 )
 
 
@@ -149,3 +152,74 @@ class ShopPlanRequestListCreateView(APIView):
         )
         response_serializer = ShopPlanRequestSerializer(plan_request)
         return Response(response_serializer.data, status=201)
+
+
+class WorkspaceTeamListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_membership(self, shop_id):
+        return get_membership_or_403(self.request.user, shop_id, ShopMembership.Role.ADMIN)
+
+    def get(self, request, shop_id):
+        actor_membership = self.get_membership(shop_id)
+        queryset = (
+            ShopMembership.objects.filter(shop=actor_membership.shop)
+            .select_related("user", "shop")
+            .order_by("role", "status", "user__full_name", "user__email")
+        )
+        serializer = WorkspaceTeamMemberSerializer(
+            queryset,
+            many=True,
+            context={"actor_membership": actor_membership},
+        )
+        return Response(serializer.data)
+
+    def post(self, request, shop_id):
+        actor_membership = self.get_membership(shop_id)
+        serializer = WorkspaceTeamMemberCreateSerializer(
+            data=request.data,
+            context={"actor_membership": actor_membership},
+        )
+        serializer.is_valid(raise_exception=True)
+        membership = serializer.create_or_update_membership()
+        response_serializer = WorkspaceTeamMemberSerializer(
+            membership,
+            context={"actor_membership": actor_membership},
+        )
+        return Response(response_serializer.data, status=201)
+
+
+class WorkspaceTeamDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_actor_membership(self, shop_id):
+        return get_membership_or_403(self.request.user, shop_id, ShopMembership.Role.ADMIN)
+
+    def get_target_membership(self, actor_membership, membership_id):
+        membership = (
+            ShopMembership.objects.filter(shop=actor_membership.shop, pk=membership_id)
+            .select_related("user", "shop")
+            .first()
+        )
+        if membership is None:
+            raise exceptions.NotFound("Workspace membership not found.")
+        return membership
+
+    def patch(self, request, shop_id, membership_id):
+        actor_membership = self.get_actor_membership(shop_id)
+        target_membership = self.get_target_membership(actor_membership, membership_id)
+        serializer = WorkspaceTeamMemberUpdateSerializer(
+            data=request.data,
+            context={
+                "actor_membership": actor_membership,
+                "target_membership": target_membership,
+            },
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        membership = serializer.apply()
+        response_serializer = WorkspaceTeamMemberSerializer(
+            membership,
+            context={"actor_membership": actor_membership},
+        )
+        return Response(response_serializer.data)
