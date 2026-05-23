@@ -50,6 +50,7 @@ import type {
   ShopDomainState,
   ShopMembership,
   ShopPlanRequestPayload,
+  WorkspaceAccessSessionPayload,
   WorkspaceAuditEventPayload,
   WorkspaceTeamMemberPayload,
 } from "@/lib/types";
@@ -171,6 +172,12 @@ export const getWorkspaceAuditEvents = cache(
         event_type: query?.eventType,
       },
     });
+  },
+);
+
+export const getWorkspaceAccessSessions = cache(
+  async (shopId: string): Promise<WorkspaceAccessSessionPayload[]> => {
+    return apiFetch<WorkspaceAccessSessionPayload[]>(`/shops/${shopId}/sessions/`);
   },
 );
 

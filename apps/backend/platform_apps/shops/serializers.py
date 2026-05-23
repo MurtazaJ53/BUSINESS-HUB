@@ -3,9 +3,12 @@ from __future__ import annotations
 from django.db import transaction
 from rest_framework import serializers
 
-from platform_apps.shops.models import ShopMembership, ShopPlanRequest
+from django.utils import timezone
+
+from platform_apps.shops.models import ShopMembership, ShopPlanRequest, WorkspaceAccessSession
 from platform_apps.shops.permissions import (
     can_manage_workspace_membership,
+    ensure_workspace_access_session_management_or_403,
     ensure_workspace_membership_management_or_403,
     ensure_workspace_ownership_transfer_or_403,
     ensure_workspace_role_assignment_or_403,
@@ -421,3 +424,205 @@ class WorkspaceOwnershipTransferSerializer(serializers.Serializer):
             or target_membership.email,
             "transferred_at": target_membership.updated_at,
         }
+
+
+class WorkspaceAccessSessionSerializer(serializers.ModelSerializer):
+    member_name = serializers.SerializerMethodField()
+    member_email = serializers.SerializerMethodField()
+    role_label = serializers.SerializerMethodField()
+    can_manage = serializers.SerializerMethodField()
+    wipe_requested = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WorkspaceAccessSession
+        fields = (
+            "id",
+            "member_name",
+            "member_email",
+            "membership_role_snapshot",
+            "role_label",
+            "status",
+            "device_label",
+            "platform_name",
+            "package_name",
+            "app_version",
+            "build_number",
+            "release_channel",
+            "release_tag",
+            "last_seen_at",
+            "revoked_at",
+            "revoke_reason",
+            "wipe_requested",
+            "wipe_requested_at",
+            "wipe_acknowledged_at",
+            "metadata_json",
+            "can_manage",
+            "created_at",
+            "updated_at",
+        )
+
+    def get_member_name(self, obj):
+        return obj.user.full_name or obj.user.email or obj.device_label
+
+    def get_member_email(self, obj):
+        return obj.user.email
+
+    def get_role_label(self, obj):
+        return get_membership_role_label(obj.membership_role_snapshot)
+
+    def get_can_manage(self, obj):
+        actor_membership = self.context.get("actor_membership")
+        if actor_membership is None:
+            return False
+        try:
+            ensure_workspace_access_session_management_or_403(actor_membership, obj)
+            return True
+        except Exception:
+            return False
+
+    def get_wipe_requested(self, obj):
+        return obj.wipe_requested_at is not None and obj.wipe_acknowledged_at is None
+
+
+class WorkspaceAccessSessionHeartbeatSerializer(serializers.Serializer):
+    app_instance_id = serializers.CharField(max_length=128)
+    device_label = serializers.CharField(max_length=255)
+    platform_name = serializers.CharField(required=False, allow_blank=True, max_length=64)
+    package_name = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    app_version = serializers.CharField(required=False, allow_blank=True, max_length=64)
+    build_number = serializers.CharField(required=False, allow_blank=True, max_length=32)
+    release_channel = serializers.CharField(required=False, allow_blank=True, max_length=32)
+    release_tag = serializers.CharField(required=False, allow_blank=True, max_length=64)
+    metadata_json = serializers.DictField(required=False)
+
+    def upsert(self) -> WorkspaceAccessSession:
+        actor_membership = self.context["actor_membership"]
+        validated = self.validated_data
+        now = timezone.now()
+        session, _ = WorkspaceAccessSession.objects.get_or_create(
+            user=actor_membership.user,
+            shop=actor_membership.shop,
+            app_instance_id=validated["app_instance_id"],
+            defaults={
+                "membership": actor_membership,
+                "membership_role_snapshot": actor_membership.role,
+                "device_label": validated["device_label"],
+                "platform_name": validated.get("platform_name", ""),
+                "package_name": validated.get("package_name", ""),
+                "app_version": validated.get("app_version", ""),
+                "build_number": validated.get("build_number", ""),
+                "release_channel": validated.get("release_channel", ""),
+                "release_tag": validated.get("release_tag", ""),
+                "last_seen_at": now,
+                "metadata_json": validated.get("metadata_json", {}),
+                "source_system": "mobile-session",
+                "source_id": validated["app_instance_id"],
+                "source_shop_id": actor_membership.shop.source_id,
+                "source_path": f"shops/{actor_membership.shop_id}/sessions/{validated['app_instance_id']}",
+            },
+        )
+
+        updated_fields: list[str] = []
+        next_values = {
+            "membership": actor_membership,
+            "membership_role_snapshot": actor_membership.role,
+            "device_label": validated["device_label"],
+            "platform_name": validated.get("platform_name", ""),
+            "package_name": validated.get("package_name", ""),
+            "app_version": validated.get("app_version", ""),
+            "build_number": validated.get("build_number", ""),
+            "release_channel": validated.get("release_channel", ""),
+            "release_tag": validated.get("release_tag", ""),
+            "metadata_json": validated.get("metadata_json", {}),
+            "last_seen_at": now,
+        }
+        for field, value in next_values.items():
+            if getattr(session, field) != value:
+                setattr(session, field, value)
+                updated_fields.append(field)
+
+        if updated_fields:
+            updated_fields.append("updated_at")
+            session.save(update_fields=updated_fields)
+        return session
+
+
+class WorkspaceAccessSessionHeartbeatResultSerializer(serializers.Serializer):
+    session_id = serializers.UUIDField()
+    status = serializers.CharField()
+    device_label = serializers.CharField()
+    revoke_reason = serializers.CharField(allow_blank=True)
+    revoked_at = serializers.DateTimeField(allow_null=True)
+    wipe_requested = serializers.BooleanField()
+    wipe_requested_at = serializers.DateTimeField(allow_null=True)
+    wipe_acknowledged_at = serializers.DateTimeField(allow_null=True)
+    should_sign_out = serializers.BooleanField()
+    should_wipe_local_data = serializers.BooleanField()
+
+
+class WorkspaceAccessSessionUpdateSerializer(serializers.Serializer):
+    action = serializers.ChoiceField(choices=["revoke", "request_wipe", "restore"])
+    note = serializers.CharField(required=False, allow_blank=True, max_length=2000)
+
+    def validate(self, attrs):
+        actor_membership = self.context["actor_membership"]
+        target_session = self.context["target_session"]
+        ensure_workspace_access_session_management_or_403(actor_membership, target_session)
+        return attrs
+
+    def apply(self) -> WorkspaceAccessSession:
+        actor_membership = self.context["actor_membership"]
+        target_session = self.context["target_session"]
+        action = self.validated_data["action"]
+        note = self.validated_data.get("note", "").strip()
+        now = timezone.now()
+        updated_fields: list[str] = []
+
+        if action == "revoke":
+            target_session.status = WorkspaceAccessSession.Status.REVOKED
+            target_session.revoked_at = now
+            target_session.revoked_by_user = actor_membership.user
+            target_session.revoke_reason = note or "Revoked from workspace access control."
+            updated_fields.extend(["status", "revoked_at", "revoked_by_user", "revoke_reason"])
+        elif action == "request_wipe":
+            target_session.status = WorkspaceAccessSession.Status.REVOKED
+            target_session.revoked_at = now
+            target_session.revoked_by_user = actor_membership.user
+            target_session.revoke_reason = note or "Revoked and marked for remote wipe."
+            target_session.wipe_requested_at = now
+            target_session.wipe_requested_by_user = actor_membership.user
+            updated_fields.extend(
+                [
+                    "status",
+                    "revoked_at",
+                    "revoked_by_user",
+                    "revoke_reason",
+                    "wipe_requested_at",
+                    "wipe_requested_by_user",
+                ]
+            )
+        elif action == "restore":
+            target_session.status = WorkspaceAccessSession.Status.ACTIVE
+            target_session.revoked_at = None
+            target_session.revoked_by_user = None
+            target_session.revoke_reason = ""
+            target_session.wipe_requested_at = None
+            target_session.wipe_requested_by_user = None
+            target_session.wipe_acknowledged_at = None
+            updated_fields.extend(
+                [
+                    "status",
+                    "revoked_at",
+                    "revoked_by_user",
+                    "revoke_reason",
+                    "wipe_requested_at",
+                    "wipe_requested_by_user",
+                    "wipe_acknowledged_at",
+                ]
+            )
+
+        if updated_fields:
+            updated_fields.append("updated_at")
+            target_session.save(update_fields=updated_fields)
+
+        return target_session

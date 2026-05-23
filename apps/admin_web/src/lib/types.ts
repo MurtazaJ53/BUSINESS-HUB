@@ -96,6 +96,32 @@ export type WorkspaceAuditEventPayload = {
   updated_at: string;
 };
 
+export type WorkspaceAccessSessionPayload = {
+  id: string;
+  member_name: string;
+  member_email: string;
+  membership_role_snapshot: "owner" | "admin" | "staff" | "viewer";
+  role_label: string;
+  status: "active" | "revoked";
+  device_label: string;
+  platform_name: string;
+  package_name: string;
+  app_version: string;
+  build_number: string;
+  release_channel: string;
+  release_tag: string;
+  last_seen_at: string | null;
+  revoked_at: string | null;
+  revoke_reason: string;
+  wipe_requested: boolean;
+  wipe_requested_at: string | null;
+  wipe_acknowledged_at: string | null;
+  metadata_json: Record<string, unknown>;
+  can_manage: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type SessionPayload = {
   user: SessionUser;
   memberships: ShopMembership[];

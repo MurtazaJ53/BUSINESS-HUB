@@ -120,6 +120,32 @@ def ensure_workspace_ownership_transfer_or_403(
         raise exceptions.PermissionDenied("Transfer ownership only to an active workspace member.")
 
 
+def ensure_workspace_access_session_management_or_403(
+    actor_membership: ShopMembership,
+    target_session,
+) -> None:
+    if actor_membership.shop_id != target_session.shop_id:
+        raise exceptions.PermissionDenied("You cannot manage sessions outside your workspace.")
+
+    target_role = getattr(target_session, "membership_role_snapshot", "") or ShopMembership.Role.STAFF
+
+    if actor_membership.user_id == target_session.user_id:
+        if actor_membership.role in {ShopMembership.Role.OWNER, ShopMembership.Role.ADMIN}:
+            return
+        raise exceptions.PermissionDenied("You cannot manage this workspace session.")
+
+    if actor_membership.role == ShopMembership.Role.OWNER:
+        return
+
+    if actor_membership.role == ShopMembership.Role.ADMIN and target_role in {
+        ShopMembership.Role.STAFF,
+        ShopMembership.Role.VIEWER,
+    }:
+        return
+
+    raise exceptions.PermissionDenied("Your workspace role cannot manage that device session.")
+
+
 def has_feature_enabled(membership: ShopMembership, feature_key: str) -> bool:
     return membership.shop.enabled_features.get(feature_key) is True
 

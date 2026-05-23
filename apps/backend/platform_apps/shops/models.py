@@ -87,3 +87,68 @@ class ShopPlanRequest(SourceTrackedModel):
 
     def __str__(self) -> str:
         return f"{self.shop} upgrade {self.current_plan_tier} -> {self.requested_plan_tier}"
+
+
+class WorkspaceAccessSession(SourceTrackedModel):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        REVOKED = "revoked", "Revoked"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="workspace_access_sessions",
+    )
+    shop = models.ForeignKey(
+        Shop,
+        on_delete=models.CASCADE,
+        related_name="access_sessions",
+    )
+    membership = models.ForeignKey(
+        ShopMembership,
+        on_delete=models.SET_NULL,
+        related_name="access_sessions",
+        blank=True,
+        null=True,
+    )
+    app_instance_id = models.CharField(max_length=128)
+    membership_role_snapshot = models.CharField(max_length=16, default=ShopMembership.Role.STAFF)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
+    device_label = models.CharField(max_length=255)
+    platform_name = models.CharField(max_length=64, blank=True)
+    package_name = models.CharField(max_length=255, blank=True)
+    app_version = models.CharField(max_length=64, blank=True)
+    build_number = models.CharField(max_length=32, blank=True)
+    release_channel = models.CharField(max_length=32, blank=True)
+    release_tag = models.CharField(max_length=64, blank=True)
+    last_seen_at = models.DateTimeField(blank=True, null=True)
+    revoked_at = models.DateTimeField(blank=True, null=True)
+    revoked_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="revoked_workspace_access_sessions",
+        blank=True,
+        null=True,
+    )
+    revoke_reason = models.TextField(blank=True)
+    wipe_requested_at = models.DateTimeField(blank=True, null=True)
+    wipe_requested_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="wipe_requested_workspace_access_sessions",
+        blank=True,
+        null=True,
+    )
+    wipe_acknowledged_at = models.DateTimeField(blank=True, null=True)
+    metadata_json = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        unique_together = ("user", "shop", "app_instance_id")
+        indexes = [
+            models.Index(fields=["shop", "status", "last_seen_at"]),
+            models.Index(fields=["user", "last_seen_at"]),
+            models.Index(fields=["shop", "wipe_requested_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.shop}::{self.user}::{self.device_label}"

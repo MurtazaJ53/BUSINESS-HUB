@@ -41,6 +41,42 @@ class BackendCommandResponse {
   final String? entityId;
 }
 
+class WorkspaceSessionHeartbeatPayload {
+  const WorkspaceSessionHeartbeatPayload({
+    required this.appInstanceId,
+    required this.deviceLabel,
+    required this.platformName,
+    required this.packageName,
+    required this.appVersion,
+    required this.buildNumber,
+    required this.releaseChannel,
+    required this.releaseTag,
+    this.metadata = const <String, dynamic>{},
+  });
+
+  final String appInstanceId;
+  final String deviceLabel;
+  final String platformName;
+  final String packageName;
+  final String appVersion;
+  final String buildNumber;
+  final String releaseChannel;
+  final String releaseTag;
+  final Map<String, dynamic> metadata;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'app_instance_id': appInstanceId,
+    'device_label': deviceLabel,
+    'platform_name': platformName,
+    'package_name': packageName,
+    'app_version': appVersion,
+    'build_number': buildNumber,
+    'release_channel': releaseChannel,
+    'release_tag': releaseTag,
+    'metadata_json': metadata,
+  };
+}
+
 class BackendApiClient {
   BackendApiClient({required this.baseUrl});
 
@@ -232,6 +268,43 @@ class BackendApiClient {
     );
   }
 
+  Future<WorkspaceAccessSessionHeartbeatResult> sendWorkspaceSessionHeartbeat({
+    required User user,
+    required String shopId,
+    required WorkspaceSessionHeartbeatPayload payload,
+  }) async {
+    final decoded = await _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/sessions/mobile/heartbeat/',
+      body: payload.toJson(),
+    );
+
+    return WorkspaceAccessSessionHeartbeatResult(
+      sessionId: (decoded['session_id'] ?? '').toString(),
+      status: (decoded['status'] ?? '').toString(),
+      deviceLabel: (decoded['device_label'] ?? payload.deviceLabel).toString(),
+      shouldSignOut: decoded['should_sign_out'] == true,
+      shouldWipeLocalData: decoded['should_wipe_local_data'] == true,
+      revokeReason: _nullableText(decoded['revoke_reason']),
+      revokedAt: _asNullableDateTime(decoded['revoked_at']),
+      wipeRequestedAt: _asNullableDateTime(decoded['wipe_requested_at']),
+      wipeAcknowledgedAt: _asNullableDateTime(decoded['wipe_acknowledged_at']),
+    );
+  }
+
+  Future<void> acknowledgeWorkspaceSessionWipe({
+    required User user,
+    required String shopId,
+    required String sessionId,
+  }) async {
+    await _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/sessions/$sessionId/wipe-ack/',
+    );
+  }
+
   Future<Map<String, dynamic>> _request({
     required User user,
     required String method,
@@ -367,6 +440,19 @@ DateTime _asDateTime(Object? value) {
     return DateTime.tryParse(value)?.toLocal() ?? DateTime.now();
   }
   return DateTime.now();
+}
+
+DateTime? _asNullableDateTime(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  if (value is DateTime) {
+    return value;
+  }
+  if (value is String) {
+    return DateTime.tryParse(value)?.toLocal();
+  }
+  return null;
 }
 
 String? _nullableText(Object? value) {

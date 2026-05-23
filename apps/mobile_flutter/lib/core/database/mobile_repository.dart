@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,6 +29,7 @@ class ShopRepository {
 
   final BusinessHubDatabase _db;
   static const String _pilotEvidenceTrackerKey = 'pilot_evidence_tracker';
+  static const String _appInstanceIdKey = 'app_instance_id';
 
   Stream<ShopInfo> watchShopInfo() {
     final query = (_db.select(
@@ -271,8 +273,31 @@ class ShopRepository {
     await savePilotEvidenceTracker(next);
   }
 
-  Future<void> clearWorkspace() async {
+  Future<String> ensureAppInstanceId() async {
+    final existing = await _readShopSetting(_appInstanceIdKey);
+    if (existing != null && existing.trim().isNotEmpty) {
+      return existing.trim();
+    }
+
+    final random = Random.secure();
+    final next =
+        'mobile-${DateTime.now().microsecondsSinceEpoch.toRadixString(16)}-'
+        '${List<String>.generate(6, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
+    await _saveShopSetting(_appInstanceIdKey, next);
+    return next;
+  }
+
+  Future<void> clearWorkspace({bool preserveAppInstanceId = true}) async {
+    final preservedAppInstanceId = preserveAppInstanceId
+        ? await _readShopSetting(_appInstanceIdKey)
+        : null;
+
     await _db.delete(_db.shopSettingsEntries).go();
+
+    if (preservedAppInstanceId != null &&
+        preservedAppInstanceId.trim().isNotEmpty) {
+      await _saveShopSetting(_appInstanceIdKey, preservedAppInstanceId.trim());
+    }
   }
 
   PilotEvidenceTrackerState _decodePilotEvidenceTracker(String rawValue) {
@@ -282,6 +307,25 @@ class ShopRepository {
     } catch (_) {
       return const PilotEvidenceTrackerState();
     }
+  }
+
+  Future<String?> _readShopSetting(String key) async {
+    final row = await (_db.select(
+      _db.shopSettingsEntries,
+    )..where((tbl) => tbl.key.equals(key))).getSingleOrNull();
+    return row?.value;
+  }
+
+  Future<void> _saveShopSetting(String key, String value) async {
+    await _db
+        .into(_db.shopSettingsEntries)
+        .insertOnConflictUpdate(
+          ShopSettingsEntriesCompanion.insert(
+            key: key,
+            value: value,
+            updatedAt: DateTime.now().millisecondsSinceEpoch,
+          ),
+        );
   }
 }
 

@@ -15,7 +15,7 @@ from platform_apps.common.migration import (
 )
 from platform_apps.jobs.models import MigrationControlEvent, MigrationDomainControl, MigrationJobRun
 from platform_apps.audit.models import WorkspaceAuditEvent
-from platform_apps.shops.models import Shop, ShopMembership, ShopPlanRequest
+from platform_apps.shops.models import Shop, ShopMembership, ShopPlanRequest, WorkspaceAccessSession
 from platform_apps.users.models import PlatformUser
 
 
@@ -493,3 +493,169 @@ class WorkspaceTeamApiTests(TestCase):
             format="json",
         )
         self.assertEqual(confirmation_response.status_code, 400)
+
+
+class WorkspaceAccessSessionApiTests(TestCase):
+    def setUp(self):
+        self.owner = PlatformUser.objects.create_user(
+            email="owner@example.com",
+            password="secret",
+            full_name="Owner",
+        )
+        self.admin = PlatformUser.objects.create_user(
+            email="admin@example.com",
+            password="secret",
+            full_name="Admin",
+        )
+        self.staff = PlatformUser.objects.create_user(
+            email="staff@example.com",
+            password="secret",
+            full_name="Staff",
+        )
+        self.shop = Shop.objects.create(name="Demo Shop", slug="demo-shop", owner_user=self.owner)
+        self.owner_membership = ShopMembership.objects.create(
+            user=self.owner,
+            shop=self.shop,
+            role=ShopMembership.Role.OWNER,
+            status=ShopMembership.Status.ACTIVE,
+            email=self.owner.email,
+        )
+        self.admin_membership = ShopMembership.objects.create(
+            user=self.admin,
+            shop=self.shop,
+            role=ShopMembership.Role.ADMIN,
+            status=ShopMembership.Status.ACTIVE,
+            email=self.admin.email,
+        )
+        self.staff_membership = ShopMembership.objects.create(
+            user=self.staff,
+            shop=self.shop,
+            role=ShopMembership.Role.STAFF,
+            status=ShopMembership.Status.ACTIVE,
+            email=self.staff.email,
+        )
+        self.client = APIClient()
+
+    def test_mobile_heartbeat_upserts_workspace_session(self):
+        self.client.force_authenticate(user=self.staff)
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sessions/mobile/heartbeat/",
+            {
+                "app_instance_id": "mobile-app-instance-1",
+                "device_label": "Android app • A1B2C3",
+                "platform_name": "android",
+                "package_name": "com.businesshub.mobile",
+                "app_version": "1.3.9",
+                "build_number": "9",
+                "release_channel": "pilot",
+                "release_tag": "mobile-v1.3.9",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        session = WorkspaceAccessSession.objects.get(
+            shop=self.shop,
+            user=self.staff,
+            app_instance_id="mobile-app-instance-1",
+        )
+        self.assertEqual(session.device_label, "Android app • A1B2C3")
+        self.assertEqual(session.status, WorkspaceAccessSession.Status.ACTIVE)
+        self.assertFalse(response.json()["should_sign_out"])
+
+    def test_owner_can_list_workspace_sessions(self):
+        WorkspaceAccessSession.objects.create(
+            user=self.staff,
+            shop=self.shop,
+            membership=self.staff_membership,
+            app_instance_id="mobile-app-instance-2",
+            membership_role_snapshot=ShopMembership.Role.STAFF,
+            device_label="Android app • D4E5F6",
+            platform_name="android",
+            status=WorkspaceAccessSession.Status.ACTIVE,
+        )
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get(f"/api/v1/shops/{self.shop.id}/sessions/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 1)
+
+    def test_admin_can_revoke_staff_session_but_not_owner_session(self):
+        staff_session = WorkspaceAccessSession.objects.create(
+            user=self.staff,
+            shop=self.shop,
+            membership=self.staff_membership,
+            app_instance_id="mobile-app-instance-3",
+            membership_role_snapshot=ShopMembership.Role.STAFF,
+            device_label="Android app • G7H8I9",
+            status=WorkspaceAccessSession.Status.ACTIVE,
+        )
+        owner_session = WorkspaceAccessSession.objects.create(
+            user=self.owner,
+            shop=self.shop,
+            membership=self.owner_membership,
+            app_instance_id="mobile-owner-instance",
+            membership_role_snapshot=ShopMembership.Role.OWNER,
+            device_label="Owner phone",
+            status=WorkspaceAccessSession.Status.ACTIVE,
+        )
+
+        self.client.force_authenticate(user=self.admin)
+        revoke_staff = self.client.patch(
+            f"/api/v1/shops/{self.shop.id}/sessions/{staff_session.id}/",
+            {"action": "revoke", "note": "Lost device"},
+            format="json",
+        )
+        self.assertEqual(revoke_staff.status_code, 200)
+        staff_session.refresh_from_db()
+        self.assertEqual(staff_session.status, WorkspaceAccessSession.Status.REVOKED)
+
+        revoke_owner = self.client.patch(
+            f"/api/v1/shops/{self.shop.id}/sessions/{owner_session.id}/",
+            {"action": "revoke", "note": "Not allowed"},
+            format="json",
+        )
+        self.assertEqual(revoke_owner.status_code, 403)
+
+    def test_wipe_request_and_acknowledge_flow(self):
+        session = WorkspaceAccessSession.objects.create(
+            user=self.staff,
+            shop=self.shop,
+            membership=self.staff_membership,
+            app_instance_id="mobile-app-instance-4",
+            membership_role_snapshot=ShopMembership.Role.STAFF,
+            device_label="Android app • J1K2L3",
+            status=WorkspaceAccessSession.Status.ACTIVE,
+        )
+
+        self.client.force_authenticate(user=self.owner)
+        wipe_response = self.client.patch(
+            f"/api/v1/shops/{self.shop.id}/sessions/{session.id}/",
+            {"action": "request_wipe", "note": "Phone lost"},
+            format="json",
+        )
+        self.assertEqual(wipe_response.status_code, 200)
+        session.refresh_from_db()
+        self.assertEqual(session.status, WorkspaceAccessSession.Status.REVOKED)
+        self.assertIsNotNone(session.wipe_requested_at)
+
+        self.client.force_authenticate(user=self.staff)
+        heartbeat_response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sessions/mobile/heartbeat/",
+            {
+                "app_instance_id": "mobile-app-instance-4",
+                "device_label": "Android app • J1K2L3",
+            },
+            format="json",
+        )
+        self.assertEqual(heartbeat_response.status_code, 200)
+        self.assertTrue(heartbeat_response.json()["should_sign_out"])
+        self.assertTrue(heartbeat_response.json()["should_wipe_local_data"])
+
+        ack_response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sessions/{session.id}/wipe-ack/",
+            {},
+            format="json",
+        )
+        self.assertEqual(ack_response.status_code, 200)
+        session.refresh_from_db()
+        self.assertIsNotNone(session.wipe_acknowledged_at)

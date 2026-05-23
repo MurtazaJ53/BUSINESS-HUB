@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,6 +12,7 @@ import '../backend/backend_api_client.dart';
 import '../database/mobile_repository.dart';
 import '../models/mobile_models.dart';
 import '../models/mobile_session.dart';
+import '../runtime/app_runtime_info.dart';
 import '../session/mobile_session_controller.dart';
 
 final syncStatusProvider =
@@ -82,6 +85,7 @@ class MobileSyncCoordinator {
   bool _isFlushingOutbox = false;
   Timer? _outboxRetryTimer;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
+  Future<AppRuntimeInfo>? _runtimeInfoFuture;
 
   Future<void> handleSession(
     MobileSession? session, {
@@ -112,6 +116,10 @@ class MobileSyncCoordinator {
 
     setStatus(MobileSyncStatus.syncing);
     final shopId = session.shopId!;
+    final hasAccess = await _syncWorkspaceAccessSession(session);
+    if (!hasAccess) {
+      return;
+    }
     await _ensureAdminBootstrap(session, shopId);
     final domainStates = await _refreshBackendDomainEpochs(session, shopId);
     final customerState = domainStates['customers'];
@@ -219,7 +227,7 @@ class MobileSyncCoordinator {
 
     setStatus(MobileSyncStatus.idle);
     _startOutboxRetryLoop();
-    await flushCommerceOutbox();
+    await flushCommerceOutbox(checkAccess: false);
   }
 
   Future<void> refresh() => handleSession(_session, force: true);
@@ -301,6 +309,7 @@ class MobileSyncCoordinator {
 
   Future<CommerceSyncResult> flushCommerceOutbox({
     String? triggerCommandId,
+    bool checkAccess = true,
   }) async {
     if (_isFlushingOutbox) {
       return CommerceSyncResult(
@@ -317,6 +326,18 @@ class MobileSyncCoordinator {
         state: CommerceSyncState.queued,
         message: 'Outbox is waiting for an authenticated workspace.',
       );
+    }
+
+    if (checkAccess) {
+      final hasAccess = await _syncWorkspaceAccessSession(session);
+      if (!hasAccess) {
+        return CommerceSyncResult(
+          commandId: triggerCommandId ?? 'unknown',
+          state: CommerceSyncState.queued,
+          message:
+              'Workspace access ended on this device. Sign in again if access is restored.',
+        );
+      }
     }
 
     _isFlushingOutbox = true;
@@ -440,6 +461,99 @@ class MobileSyncCoordinator {
     await Future.wait<void>(futures);
   }
 
+  Future<bool> _syncWorkspaceAccessSession(MobileSession session) async {
+    if (!session.hasShop) {
+      return true;
+    }
+
+    try {
+      final runtimeInfo = await _loadRuntimeInfo();
+      final appInstanceId = await _shopRepository.ensureAppInstanceId();
+      final heartbeat = await _backendApiClient.sendWorkspaceSessionHeartbeat(
+        user: session.user,
+        shopId: session.shopId!,
+        payload: WorkspaceSessionHeartbeatPayload(
+          appInstanceId: appInstanceId,
+          deviceLabel:
+              '${runtimeInfo.appName} ${runtimeInfo.versionLabel} (${Platform.operatingSystem})',
+          platformName: Platform.operatingSystem,
+          packageName: runtimeInfo.packageName,
+          appVersion: runtimeInfo.version,
+          buildNumber: runtimeInfo.buildNumber,
+          releaseChannel: runtimeInfo.releaseChannel,
+          releaseTag: runtimeInfo.releaseTag,
+          metadata: <String, dynamic>{
+            'role': session.normalizedRole,
+            'role_profile_key': session.roleProfileKey,
+            'release_sha': runtimeInfo.releaseSha,
+            'pilot_scope': runtimeInfo.pilotScope,
+          },
+        ),
+      );
+
+      if (!heartbeat.shouldSignOut && !heartbeat.shouldWipeLocalData) {
+        return true;
+      }
+
+      await _enforceWorkspaceSessionInstruction(session, heartbeat: heartbeat);
+      return false;
+    } on BackendApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 403) {
+        await _forceWorkspaceSignOut();
+        return false;
+      }
+      debugPrint('Workspace session heartbeat skipped: $error');
+      return true;
+    } catch (error) {
+      debugPrint('Workspace session heartbeat skipped: $error');
+      return true;
+    }
+  }
+
+  Future<void> _enforceWorkspaceSessionInstruction(
+    MobileSession session, {
+    required WorkspaceAccessSessionHeartbeatResult heartbeat,
+  }) async {
+    await _cancelSubscriptions();
+    await _clearWorkspaceCache(clearSales: true);
+
+    if (heartbeat.shouldWipeLocalData) {
+      try {
+        await _backendApiClient.acknowledgeWorkspaceSessionWipe(
+          user: session.user,
+          shopId: session.shopId!,
+          sessionId: heartbeat.sessionId,
+        );
+      } catch (error) {
+        debugPrint('Workspace session wipe acknowledge skipped: $error');
+      }
+    }
+
+    await _finalizeLocalSignOut();
+  }
+
+  Future<void> _forceWorkspaceSignOut() async {
+    await _cancelSubscriptions();
+    await _clearWorkspaceCache(clearSales: true);
+    await _finalizeLocalSignOut();
+  }
+
+  Future<void> _finalizeLocalSignOut() async {
+    _session = null;
+    _customersReadUseBackend = false;
+    _salesReadsUseBackend = false;
+    setStatus(MobileSyncStatus.idle);
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (error) {
+      debugPrint('Workspace sign-out skipped: $error');
+    }
+  }
+
+  Future<AppRuntimeInfo> _loadRuntimeInfo() {
+    return _runtimeInfoFuture ??= AppRuntimeInfo.load();
+  }
+
   Future<void> _primeWorkspaceSnapshot(
     String shopId, {
     required bool includeCost,
@@ -474,11 +588,9 @@ class MobileSyncCoordinator {
                 as QuerySnapshot<Map<String, dynamic>>
           : null;
       final inventoryPrivateSnapshot = includeCost
-          ? snapshotFutures[
-                (includeFirestoreCustomers ? 1 : 0) +
+          ? snapshotFutures[(includeFirestoreCustomers ? 1 : 0) +
                     (includeFirestoreSales ? 1 : 0) +
-                    2
-              ]
+                    2]
                 as QuerySnapshot<Map<String, dynamic>>
           : null;
 
@@ -548,24 +660,31 @@ class MobileSyncCoordinator {
       if (session == null || !session.hasShop) {
         return;
       }
-      unawaited(flushCommerceOutbox());
-      if (_salesReadsUseBackend) {
-        unawaited(
-          _syncBackendSalesSnapshot(
-            session,
-            session.shopId!,
-            updateStatus: false,
-          ),
-        );
-      }
+      unawaited(_runBackgroundSyncTick(session));
     });
+  }
+
+  Future<void> _runBackgroundSyncTick(MobileSession session) async {
+    final stillAllowed = await _syncWorkspaceAccessSession(session);
+    if (!stillAllowed) {
+      return;
+    }
+
+    await flushCommerceOutbox(checkAccess: false);
+    if (_salesReadsUseBackend) {
+      await _syncBackendSalesSnapshot(
+        session,
+        session.shopId!,
+        updateStatus: false,
+      );
+    }
   }
 
   Future<void> _syncBackendSalesSnapshot(
     MobileSession session,
-    String shopId,
-    {bool updateStatus = true}
-  ) async {
+    String shopId, {
+    bool updateStatus = true,
+  }) async {
     try {
       final backendSales = await _backendApiClient.fetchRecentSales(
         user: session.user,

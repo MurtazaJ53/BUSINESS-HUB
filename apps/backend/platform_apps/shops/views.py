@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.utils import timezone
 from rest_framework import exceptions
 from rest_framework.response import Response
 from rest_framework.generics import ListAPIView
@@ -15,7 +16,7 @@ from platform_apps.common.migration import (
 )
 from platform_apps.jobs.readiness import build_pilot_signoff
 from platform_apps.jobs.models import MigrationDomainControl
-from platform_apps.shops.models import ShopMembership, ShopPlanRequest
+from platform_apps.shops.models import ShopMembership, ShopPlanRequest, WorkspaceAccessSession
 from platform_apps.shops.permissions import get_membership_or_403
 from platform_apps.shops.serializers import (
     ShopDomainStateSerializer,
@@ -24,6 +25,10 @@ from platform_apps.shops.serializers import (
     ShopPlanRequestSerializer,
     WorkspaceOwnershipTransferResultSerializer,
     WorkspaceOwnershipTransferSerializer,
+    WorkspaceAccessSessionHeartbeatResultSerializer,
+    WorkspaceAccessSessionHeartbeatSerializer,
+    WorkspaceAccessSessionSerializer,
+    WorkspaceAccessSessionUpdateSerializer,
     WorkspaceTeamMemberCreateSerializer,
     WorkspaceTeamMemberSerializer,
     WorkspaceTeamMemberUpdateSerializer,
@@ -326,3 +331,155 @@ class WorkspaceOwnershipTransferView(APIView):
         )
         response_serializer = WorkspaceOwnershipTransferResultSerializer(result)
         return Response(response_serializer.data)
+
+
+class WorkspaceAccessSessionListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, shop_id):
+        actor_membership = get_membership_or_403(request.user, shop_id, ShopMembership.Role.ADMIN)
+        queryset = (
+            WorkspaceAccessSession.objects.filter(shop=actor_membership.shop)
+            .select_related("user", "shop", "membership")
+            .order_by("-last_seen_at", "-created_at")
+        )
+        serializer = WorkspaceAccessSessionSerializer(
+            queryset,
+            many=True,
+            context={"actor_membership": actor_membership},
+        )
+        return Response(serializer.data)
+
+
+class WorkspaceAccessSessionHeartbeatView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, shop_id):
+        actor_membership = get_membership_or_403(request.user, shop_id, ShopMembership.Role.VIEWER)
+        serializer = WorkspaceAccessSessionHeartbeatSerializer(
+            data=request.data,
+            context={"actor_membership": actor_membership},
+        )
+        serializer.is_valid(raise_exception=True)
+        session = serializer.upsert()
+        response_serializer = WorkspaceAccessSessionHeartbeatResultSerializer(
+            {
+                "session_id": session.id,
+                "status": session.status,
+                "device_label": session.device_label,
+                "revoke_reason": session.revoke_reason,
+                "revoked_at": session.revoked_at,
+                "wipe_requested": (
+                    session.wipe_requested_at is not None and session.wipe_acknowledged_at is None
+                ),
+                "wipe_requested_at": session.wipe_requested_at,
+                "wipe_acknowledged_at": session.wipe_acknowledged_at,
+                "should_sign_out": session.status == WorkspaceAccessSession.Status.REVOKED,
+                "should_wipe_local_data": (
+                    session.wipe_requested_at is not None and session.wipe_acknowledged_at is None
+                ),
+            }
+        )
+        return Response(response_serializer.data)
+
+
+class WorkspaceAccessSessionDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_actor_membership(self, shop_id):
+        return get_membership_or_403(self.request.user, shop_id, ShopMembership.Role.ADMIN)
+
+    def get_target_session(self, actor_membership, session_id):
+        target_session = (
+            WorkspaceAccessSession.objects.filter(shop=actor_membership.shop, pk=session_id)
+            .select_related("user", "shop", "membership")
+            .first()
+        )
+        if target_session is None:
+            raise exceptions.NotFound("Workspace access session not found.")
+        return target_session
+
+    def patch(self, request, shop_id, session_id):
+        actor_membership = self.get_actor_membership(shop_id)
+        target_session = self.get_target_session(actor_membership, session_id)
+        before_snapshot = {
+            "status": target_session.status,
+            "revoke_reason": target_session.revoke_reason,
+            "revoked_at": target_session.revoked_at,
+            "wipe_requested_at": target_session.wipe_requested_at,
+            "wipe_acknowledged_at": target_session.wipe_acknowledged_at,
+        }
+        serializer = WorkspaceAccessSessionUpdateSerializer(
+            data=request.data,
+            context={
+                "actor_membership": actor_membership,
+                "target_session": target_session,
+            },
+        )
+        serializer.is_valid(raise_exception=True)
+        updated_session = serializer.apply()
+        action = serializer.validated_data["action"]
+        event_type = {
+            "revoke": "workspace.session.revoked",
+            "request_wipe": "workspace.session.wipe_requested",
+            "restore": "workspace.session.restored",
+        }[action]
+        summary = {
+            "revoke": f"Revoked workspace session {updated_session.device_label}.",
+            "request_wipe": f"Requested remote wipe for workspace session {updated_session.device_label}.",
+            "restore": f"Restored workspace session {updated_session.device_label}.",
+        }[action]
+        create_workspace_audit_event(
+            shop=actor_membership.shop,
+            actor_user=request.user,
+            actor_role=actor_membership.role,
+            category="workspace",
+            event_type=event_type,
+            entity_type="workspace_access_session",
+            entity_id=updated_session.id,
+            entity_label=updated_session.device_label,
+            summary=summary,
+            source_surface="admin_web_sessions",
+            before=before_snapshot,
+            after={
+                "status": updated_session.status,
+                "revoke_reason": updated_session.revoke_reason,
+                "revoked_at": updated_session.revoked_at,
+                "wipe_requested_at": updated_session.wipe_requested_at,
+                "wipe_acknowledged_at": updated_session.wipe_acknowledged_at,
+            },
+        )
+        response_serializer = WorkspaceAccessSessionSerializer(
+            updated_session,
+            context={"actor_membership": actor_membership},
+        )
+        return Response(response_serializer.data)
+
+
+class WorkspaceAccessSessionWipeAcknowledgeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, shop_id, session_id):
+        actor_membership = get_membership_or_403(request.user, shop_id, ShopMembership.Role.VIEWER)
+        session = (
+            WorkspaceAccessSession.objects.filter(
+                shop=actor_membership.shop,
+                pk=session_id,
+                user=request.user,
+            )
+            .select_related("shop", "user")
+            .first()
+        )
+        if session is None:
+            raise exceptions.NotFound("Workspace access session not found.")
+
+        if session.wipe_requested_at is not None and session.wipe_acknowledged_at is None:
+            session.wipe_acknowledged_at = timezone.now()
+            session.save(update_fields=["wipe_acknowledged_at", "updated_at"])
+
+        return Response(
+            {
+                "session_id": str(session.id),
+                "wipe_acknowledged_at": session.wipe_acknowledged_at,
+            }
+        )

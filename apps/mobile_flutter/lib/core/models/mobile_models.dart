@@ -63,6 +63,30 @@ class ShopInfo {
   }
 }
 
+class WorkspaceAccessSessionHeartbeatResult {
+  const WorkspaceAccessSessionHeartbeatResult({
+    required this.sessionId,
+    required this.status,
+    required this.deviceLabel,
+    required this.shouldSignOut,
+    required this.shouldWipeLocalData,
+    this.revokeReason,
+    this.revokedAt,
+    this.wipeRequestedAt,
+    this.wipeAcknowledgedAt,
+  });
+
+  final String sessionId;
+  final String status;
+  final String deviceLabel;
+  final bool shouldSignOut;
+  final bool shouldWipeLocalData;
+  final String? revokeReason;
+  final DateTime? revokedAt;
+  final DateTime? wipeRequestedAt;
+  final DateTime? wipeAcknowledgedAt;
+}
+
 String _normalizePlanTier(String value) {
   final normalized = value.trim().toLowerCase();
   if (normalized == 'starter' || normalized == 'pro') {

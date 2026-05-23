@@ -29,6 +29,10 @@ from platform_apps.shops.views import (
     ShopMembershipListView,
     ShopPlanRequestListCreateView,
     WorkspaceOwnershipTransferView,
+    WorkspaceAccessSessionDetailView,
+    WorkspaceAccessSessionHeartbeatView,
+    WorkspaceAccessSessionListView,
+    WorkspaceAccessSessionWipeAcknowledgeView,
     WorkspaceTeamDetailView,
     WorkspaceTeamListCreateView,
 )
@@ -40,6 +44,22 @@ urlpatterns = [
     path("<uuid:shop_id>/team/", WorkspaceTeamListCreateView.as_view(), name="workspace-team"),
     path("<uuid:shop_id>/team/<uuid:membership_id>/", WorkspaceTeamDetailView.as_view(), name="workspace-team-detail"),
     path("<uuid:shop_id>/audit/", WorkspaceAuditEventListView.as_view(), name="workspace-audit"),
+    path("<uuid:shop_id>/sessions/", WorkspaceAccessSessionListView.as_view(), name="workspace-sessions"),
+    path(
+        "<uuid:shop_id>/sessions/mobile/heartbeat/",
+        WorkspaceAccessSessionHeartbeatView.as_view(),
+        name="workspace-sessions-mobile-heartbeat",
+    ),
+    path(
+        "<uuid:shop_id>/sessions/<uuid:session_id>/",
+        WorkspaceAccessSessionDetailView.as_view(),
+        name="workspace-session-detail",
+    ),
+    path(
+        "<uuid:shop_id>/sessions/<uuid:session_id>/wipe-ack/",
+        WorkspaceAccessSessionWipeAcknowledgeView.as_view(),
+        name="workspace-session-wipe-ack",
+    ),
     path(
         "<uuid:shop_id>/team/transfer-ownership/",
         WorkspaceOwnershipTransferView.as_view(),
