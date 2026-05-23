@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { apiMutation } from "@/lib/admin-api";
+import { requirePlatformAdminAccess } from "@/lib/server-guards";
 import type {
   MigrationGoLiveCheckpointEvent,
   MigrationJobRun,
@@ -57,6 +58,7 @@ async function runPilotAction(
   const shop = getOptionalField(formData, "shop");
 
   try {
+    await requirePlatformAdminAccess("Migration control");
     await apiMutation(pathBuilder(controlId), { method: "POST" });
     revalidatePath("/migration");
     redirect(
@@ -102,6 +104,7 @@ async function runReconciliationAction(
   const issue = getOptionalField(formData, "issue");
 
   try {
+    await requirePlatformAdminAccess("Migration control");
     await apiMutation(`/migration/reconciliation/${eventId}/`, {
       method: "PATCH",
       body: {
@@ -163,6 +166,7 @@ async function runMigrationJobAction(
   }
 
   try {
+    await requirePlatformAdminAccess("Migration control");
     const job = await apiMutation<MigrationJobRun>("/migration/jobs/?run_inline=1", {
       method: "POST",
       body: {
@@ -243,6 +247,7 @@ export async function runPilotPreparationAction(formData: FormData) {
   const shop = getOptionalField(formData, "shop");
 
   try {
+    await requirePlatformAdminAccess("Migration control");
     const result = await apiMutation<MigrationPilotPreparationResult>(
       `/migration/domains/${controlId}/prepare-pilot/?run_inline=1`,
       {
@@ -288,6 +293,7 @@ export async function runPilotVerificationAction(formData: FormData) {
   const shop = getOptionalField(formData, "shop");
 
   try {
+    await requirePlatformAdminAccess("Migration control");
     const result = await apiMutation<MigrationPilotVerificationResult>(
       `/migration/domains/${controlId}/verify-pilot/?run_inline=1`,
       {
@@ -347,6 +353,7 @@ export async function recordShopCheckpointAction(formData: FormData) {
   }
 
   try {
+    await requirePlatformAdminAccess("Migration control");
     const result = await apiMutation<MigrationShopCheckpointEvent>(
       "/migration/pilot-shop-checkpoints/",
       {
@@ -400,6 +407,7 @@ export async function recordPhaseCheckpointAction(formData: FormData) {
   }
 
   try {
+    await requirePlatformAdminAccess("Migration control");
     const result = await apiMutation<MigrationPhaseCheckpointEvent>(
       "/migration/phase-checkpoints/",
       {
@@ -453,6 +461,7 @@ export async function recordLaunchCheckpointAction(formData: FormData) {
   }
 
   try {
+    await requirePlatformAdminAccess("Migration control");
     const result = await apiMutation<MigrationLaunchCheckpointEvent>(
       "/migration/launch-checkpoints/",
       {
@@ -506,6 +515,7 @@ export async function recordGoLiveCheckpointAction(formData: FormData) {
   }
 
   try {
+    await requirePlatformAdminAccess("Migration control");
     const result = await apiMutation<MigrationGoLiveCheckpointEvent>(
       "/migration/go-live-checkpoints/",
       {
@@ -559,6 +569,7 @@ export async function recordRolloutCheckpointAction(formData: FormData) {
   }
 
   try {
+    await requirePlatformAdminAccess("Migration control");
     const result = await apiMutation<MigrationRolloutCheckpointEvent>(
       "/migration/rollout-checkpoints/",
       {
@@ -612,6 +623,7 @@ export async function recordSteadyStateCheckpointAction(formData: FormData) {
   }
 
   try {
+    await requirePlatformAdminAccess("Migration control");
     const result = await apiMutation<MigrationSteadyStateCheckpointEvent>(
       "/migration/steady-state-checkpoints/",
       {

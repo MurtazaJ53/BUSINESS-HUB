@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { apiMutation } from "@/lib/admin-api";
+import { requirePlatformAdminShopAccess } from "@/lib/server-guards";
 
 function getRequiredShopId(formData: FormData): string {
   const shopId = String(formData.get("shopId") || "").trim();
@@ -40,6 +41,7 @@ async function runERPNextAction(
   let successResult: Record<string, unknown> | null = null;
 
   try {
+    await requirePlatformAdminShopAccess(shopId, "ERPNext control");
     successResult = await apiMutation<Record<string, unknown>>(pathBuilder(shopId), {
       method: "POST",
       body: bodyBuilder ? bodyBuilder(formData) : {},
