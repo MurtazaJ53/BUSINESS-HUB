@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django.db import transaction
 from django.db.models import Q
+from django.db.models import Count
 from django.db.models import Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
@@ -12,7 +15,11 @@ from rest_framework.views import APIView
 from platform_apps.common.migration import MigrationDomain
 from platform_apps.common.migration_guards import assert_postgres_primary_write_enabled
 from platform_apps.inventory.models import InventoryItem, InventoryStockLedger
-from platform_apps.inventory.serializers import InventoryAdjustmentSerializer, InventoryItemSerializer
+from platform_apps.inventory.serializers import (
+    InventoryAdjustmentSerializer,
+    InventoryItemSerializer,
+    InventorySummarySerializer,
+)
 from platform_apps.shops.models import ShopMembership
 from platform_apps.shops.permissions import (
     ROLE_ORDER,
@@ -141,6 +148,65 @@ class InventoryItemDetailView(ShopScopedMixin, generics.RetrieveUpdateDestroyAPI
         instance.tombstone = True
         instance.status = InventoryItem.Status.ARCHIVED
         instance.save(update_fields=["tombstone", "status", "updated_at"])
+
+
+class InventorySummaryView(ShopScopedMixin, APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, shop_id):
+        membership = self.get_membership()
+        queryset = (
+            InventoryItem.objects.filter(shop=membership.shop, tombstone=False)
+            .annotate(stock_on_hand=Coalesce(Sum("ledger_entries__quantity_delta"), 0))
+        )
+
+        query = self.request.query_params.get("q", "").strip()
+        category = self.request.query_params.get("category", "").strip()
+        status_value = self.request.query_params.get("status", "").strip()
+
+        if query:
+            queryset = queryset.filter(
+                Q(name__icontains=query) | Q(sku__icontains=query) | Q(barcode__icontains=query)
+            )
+        if category:
+            queryset = queryset.filter(category__iexact=category)
+        if status_value:
+            queryset = queryset.filter(status=status_value)
+
+        aggregates = queryset.aggregate(
+            total_items=Count("id"),
+            available_items=Count("id", filter=Q(stock_on_hand__gt=0)),
+            low_stock_items=Count(
+                "id",
+                filter=Q(stock_on_hand__gt=0) & Q(stock_on_hand__lte=5),
+            ),
+            out_of_stock_items=Count("id", filter=Q(stock_on_hand__lte=0)),
+            categories=Count("category", filter=~Q(category=""), distinct=True),
+        )
+
+        projected_sell_value = None
+        if has_feature_enabled(membership, "advanced_reports"):
+            projected_sell_value = (
+                sum(
+                    (
+                        (item.sell_price or Decimal("0.00")) * item.stock_on_hand
+                        for item in queryset
+                    ),
+                    Decimal("0.00"),
+                )
+            ).quantize(Decimal("0.01"))
+
+        serializer = InventorySummarySerializer(
+            {
+                "total_items": aggregates["total_items"] or 0,
+                "available_items": aggregates["available_items"] or 0,
+                "low_stock_items": aggregates["low_stock_items"] or 0,
+                "out_of_stock_items": aggregates["out_of_stock_items"] or 0,
+                "categories": aggregates["categories"] or 0,
+                "projected_sell_value": projected_sell_value,
+            }
+        )
+        return Response(serializer.data)
 
 
 class InventoryItemAdjustmentView(ShopScopedMixin, APIView):

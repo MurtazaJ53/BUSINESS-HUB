@@ -170,6 +170,77 @@ class InventoryApiTests(TestCase):
         self.assertEqual(pro_response.json()[0]["supplier_id"], "SUP-0001")
         self.assertEqual(pro_response.json()[0]["last_purchase_date"], str(timezone.localdate()))
 
+    def test_inventory_summary_returns_aggregates(self):
+        low = InventoryItem.objects.create(
+            shop=self.shop,
+            name="Low Stock Shirt",
+            category="Shirts",
+            status=InventoryItem.Status.ACTIVE,
+            sell_price=Decimal("499.00"),
+        )
+        empty = InventoryItem.objects.create(
+            shop=self.shop,
+            name="Out Of Stock Pant",
+            category="Pants",
+            status=InventoryItem.Status.ACTIVE,
+            sell_price=Decimal("899.00"),
+        )
+        InventoryStockLedger.objects.create(
+            shop=self.shop,
+            item=low,
+            actor_user=self.user,
+            event_type=InventoryStockLedger.EventType.OPENING_BALANCE,
+            quantity_delta=3,
+            unit_price=Decimal("499.00"),
+            occurred_at=timezone.now(),
+        )
+        InventoryStockLedger.objects.create(
+            shop=self.shop,
+            item=empty,
+            actor_user=self.user,
+            event_type=InventoryStockLedger.EventType.OPENING_BALANCE,
+            quantity_delta=0,
+            unit_price=Decimal("899.00"),
+            occurred_at=timezone.now(),
+        )
+
+        self.shop.settings_json = {"plan_tier": "pro"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+        response = self.client.get(f"/api/v1/shops/{self.shop.id}/inventory/summary/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["total_items"], 2)
+        self.assertEqual(response.json()["available_items"], 1)
+        self.assertEqual(response.json()["low_stock_items"], 1)
+        self.assertEqual(response.json()["out_of_stock_items"], 1)
+        self.assertEqual(response.json()["categories"], 2)
+        self.assertEqual(response.json()["projected_sell_value"], "1497.00")
+
+    def test_inventory_summary_hides_projected_value_without_advanced_reports(self):
+        item = InventoryItem.objects.create(
+            shop=self.shop,
+            name="Growth Shirt",
+            category="Shirts",
+            status=InventoryItem.Status.ACTIVE,
+            sell_price=Decimal("499.00"),
+        )
+        InventoryStockLedger.objects.create(
+            shop=self.shop,
+            item=item,
+            actor_user=self.user,
+            event_type=InventoryStockLedger.EventType.OPENING_BALANCE,
+            quantity_delta=5,
+            unit_price=Decimal("499.00"),
+            occurred_at=timezone.now(),
+        )
+
+        self.shop.settings_json = {"plan_tier": "growth"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+        response = self.client.get(f"/api/v1/shops/{self.shop.id}/inventory/summary/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.json()["projected_sell_value"])
+
     def test_adjust_inventory_stock(self):
         item = InventoryItem.objects.create(shop=self.shop, name="Classic Socks", sell_price=Decimal("199.00"))
         InventoryStockLedger.objects.create(

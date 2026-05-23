@@ -4,16 +4,13 @@ import { cache } from "react";
 
 import type {
   AttendanceSession,
-  AttendanceStats,
   AttendanceSummaryPayload,
   Customer,
   CustomerSummaryPayload,
-  CustomerStats,
   DashboardSnapshot,
   Expense,
-  ExpenseStats,
   InventoryItem,
-  InventoryStats,
+  InventorySummaryPayload,
   ERPNextDocumentLink,
   ERPNextHealthPayload,
   ERPNextMetaPayload,
@@ -45,12 +42,10 @@ import type {
   MigrationShopCheckpointEvent,
   MigrationShadowSummary,
   MigrationStats,
-  PaymentStats,
   PaymentSummaryPayload,
   Sale,
   SalePaymentRecord,
   SalesSummaryPayload,
-  SalesStats,
   SessionPayload,
   ShopDomainState,
   ShopMembership,
@@ -156,6 +151,10 @@ export const getInventory = cache(async (shopId: string, query?: string): Promis
       q: query,
     },
   });
+});
+
+export const getInventorySummary = cache(async (shopId: string): Promise<InventorySummaryPayload> => {
+  return apiFetch<InventorySummaryPayload>(`/shops/${shopId}/inventory/summary/`);
 });
 
 export const getShopDomainState = cache(
@@ -413,101 +412,6 @@ export function resolveActiveShop(session: SessionPayload): ShopMembership | nul
     session.memberships[0] ??
     null
   );
-}
-
-export function buildInventoryStats(items: InventoryItem[]): InventoryStats {
-  const categorySet = new Set(
-    items
-      .map((item) => item.category.trim())
-      .filter(Boolean),
-  );
-
-  const projectedSellValue = items.reduce((total, item) => {
-    const price = Number(item.sell_price);
-    return total + (Number.isFinite(price) ? price : 0) * item.stock_on_hand;
-  }, 0);
-
-  return {
-    totalItems: items.length,
-    activeItems: items.filter((item) => item.status === "active" && !item.tombstone).length,
-    lowStockItems: items.filter((item) => item.stock_on_hand > 0 && item.stock_on_hand <= 5).length,
-    outOfStockItems: items.filter((item) => item.stock_on_hand <= 0).length,
-    categories: categorySet.size,
-    projectedSellValue,
-  };
-}
-
-export function buildCustomerStats(customers: Customer[]): CustomerStats {
-  return {
-    totalCustomers: customers.length,
-    activeCredits: customers.filter((customer) => Number(customer.balance) > 0).length,
-    totalOutstanding: customers.reduce((total, customer) => total + Number(customer.balance || 0), 0),
-    totalLifetimeSpend: customers.reduce((total, customer) => total + Number(customer.total_spent || 0), 0),
-  };
-}
-
-export function buildExpenseStats(expenses: Expense[]): ExpenseStats {
-  const totalsByCategory = new Map<string, number>();
-
-  for (const expense of expenses) {
-    const amount = Number(expense.amount || 0);
-    totalsByCategory.set(expense.category, (totalsByCategory.get(expense.category) ?? 0) + amount);
-  }
-
-  let biggestCategory: string | null = null;
-  let biggestAmount = -1;
-  for (const [category, total] of totalsByCategory.entries()) {
-    if (total > biggestAmount) {
-      biggestAmount = total;
-      biggestCategory = category;
-    }
-  }
-
-  return {
-    totalEntries: expenses.length,
-    totalAmount: expenses.reduce((total, expense) => total + Number(expense.amount || 0), 0),
-    uniqueCategories: totalsByCategory.size,
-    biggestCategory,
-  };
-}
-
-export function buildAttendanceStats(
-  sessions: AttendanceSession[],
-  today: string,
-): AttendanceStats {
-  return {
-    totalSessions: sessions.length,
-    presentCount: sessions.filter((session) => session.status === "PRESENT").length,
-    leaveCount: sessions.filter((session) => session.status === "LEAVE").length,
-    activeWorkersToday: sessions.filter(
-      (session) =>
-        session.session_date === today &&
-        (session.status === "PRESENT" || session.status === "HALF_DAY"),
-    ).length,
-  };
-}
-
-export function buildSalesStats(sales: Sale[]): SalesStats {
-  const grossRevenue = sales.reduce((total, sale) => total + Number(sale.total_amount || 0), 0);
-  const outstandingRevenue = sales.reduce((total, sale) => total + Number(sale.amount_due || 0), 0);
-
-  return {
-    totalSales: sales.length,
-    grossRevenue,
-    outstandingRevenue,
-    averageTicket: sales.length ? grossRevenue / sales.length : 0,
-  };
-}
-
-export function buildPaymentStats(payments: SalePaymentRecord[]): PaymentStats {
-  return {
-    paymentCount: payments.length,
-    totalCollected: payments.reduce((total, payment) => total + Number(payment.amount || 0), 0),
-    creditCount: payments.filter((payment) => payment.payment_method === "CREDIT").length,
-    digitalShareCount: payments.filter((payment) =>
-      ["UPI", "BANK", "CARD"].includes(payment.payment_method),
-    ).length,
-  };
 }
 
 export function buildMigrationStats(

@@ -5,9 +5,7 @@ import { EmptyState } from "@/components/empty-state";
 import { MetricCard } from "@/components/metric-card";
 import { WorkspacePlanCard } from "@/components/workspace-plan-card";
 import {
-  buildInventoryStats,
   getDashboardSnapshot,
-  getInventory,
   getSession,
   resolveActiveShop,
 } from "@/lib/admin-api";
@@ -172,9 +170,7 @@ function buildPlanGuidance(activeShop: ShopMembership | null) {
 export default async function HomePage() {
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
-  const items = activeShop ? await getInventory(activeShop.shop.id) : [];
   const dashboardSnapshot = activeShop ? await getDashboardSnapshot(activeShop.shop.id) : null;
-  const stats = buildInventoryStats(items);
   const quickActions = buildQuickActions(activeShop);
   const canUseAdvancedReports = canAccessAdvancedReports(activeShop);
   const canUseFinanceSummary = canAccessFinanceSummary(activeShop);
@@ -208,17 +204,17 @@ export default async function HomePage() {
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label="Products live"
-              value={(dashboardSnapshot?.inventory_items_count ?? stats.totalItems).toString()}
+              value={(dashboardSnapshot?.inventory_items_count ?? 0).toString()}
               detail={`${
-                dashboardSnapshot?.active_inventory_items_count ?? stats.activeItems
+                dashboardSnapshot?.active_inventory_items_count ?? 0
               } active products across ${
-                dashboardSnapshot?.category_count ?? stats.categories
+                dashboardSnapshot?.category_count ?? 0
               } categories`}
               icon="INV"
             />
             <MetricCard
               label="Stock at risk"
-              value={(dashboardSnapshot?.low_stock_items_count ?? stats.lowStockItems).toString()}
+              value={(dashboardSnapshot?.low_stock_items_count ?? 0).toString()}
               detail="Items at five units or lower that need a restock decision"
               accent="rose"
               icon="RST"

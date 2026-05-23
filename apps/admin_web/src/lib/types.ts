@@ -52,13 +52,13 @@ export type InventoryItem = {
   last_purchase_date: string | null;
 };
 
-export type InventoryStats = {
-  totalItems: number;
-  activeItems: number;
-  lowStockItems: number;
-  outOfStockItems: number;
+export type InventorySummaryPayload = {
+  total_items: number;
+  available_items: number;
+  low_stock_items: number;
+  out_of_stock_items: number;
   categories: number;
-  projectedSellValue: number;
+  projected_sell_value: string | null;
 };
 
 export type ShopDomainState = {
@@ -135,13 +135,6 @@ export type Customer = {
   source_meta_json: Record<string, unknown>;
 };
 
-export type CustomerStats = {
-  totalCustomers: number;
-  activeCredits: number;
-  totalOutstanding: number;
-  totalLifetimeSpend: number;
-};
-
 export type CustomerSummaryPayload = {
   total_customers: number;
   active_credit_customers: number;
@@ -159,13 +152,6 @@ export type Expense = {
   expense_date: string;
   tombstone: boolean;
   actor_name: string | null;
-};
-
-export type ExpenseStats = {
-  totalEntries: number;
-  totalAmount: number;
-  uniqueCategories: number;
-  biggestCategory: string | null;
 };
 
 export type ExpenseSummaryPayload = {
@@ -189,13 +175,6 @@ export type AttendanceSession = {
   bonus_amount: string;
   note: string;
   tombstone: boolean;
-};
-
-export type AttendanceStats = {
-  totalSessions: number;
-  presentCount: number;
-  leaveCount: number;
-  activeWorkersToday: number;
 };
 
 export type AttendanceSummaryPayload = {
@@ -267,25 +246,11 @@ export type SalePaymentRecord = {
   actor_name: string | null;
 };
 
-export type SalesStats = {
-  totalSales: number;
-  grossRevenue: number;
-  outstandingRevenue: number;
-  averageTicket: number;
-};
-
 export type SalesSummaryPayload = {
   total_sales: number;
   gross_revenue: string;
   outstanding_revenue: string | null;
   average_ticket: string | null;
-};
-
-export type PaymentStats = {
-  paymentCount: number;
-  totalCollected: number;
-  creditCount: number;
-  digitalShareCount: number;
 };
 
 export type PaymentSummaryPayload = {

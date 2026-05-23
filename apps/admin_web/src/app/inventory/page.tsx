@@ -4,16 +4,18 @@ import { EmptyState } from "@/components/empty-state";
 import { InventoryTable } from "@/components/inventory-table";
 import { MetricCard } from "@/components/metric-card";
 import {
-  buildInventoryStats,
   getInventory,
+  getInventorySummary,
   getSession,
   getShopDomainState,
   resolveActiveShop,
 } from "@/lib/admin-api";
 import { formatCurrency } from "@/lib/formatters";
 import {
+  canAccessAdvancedReports,
   canAccessPurchaseWorkflow,
   canAccessSupplierDirectory,
+  formatPlanTier,
 } from "@/lib/plans";
 
 function buildInventoryModeCopy(
@@ -54,12 +56,15 @@ function buildInventoryModeCopy(
 export default async function InventoryPage() {
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
-  const items = activeShop ? await getInventory(activeShop.shop.id) : [];
-  const domainState = activeShop
-    ? await getShopDomainState(activeShop.shop.id, "inventory")
-    : null;
-  const stats = buildInventoryStats(items);
+  const [items, inventorySummary, domainState] = activeShop
+    ? await Promise.all([
+        getInventory(activeShop.shop.id),
+        getInventorySummary(activeShop.shop.id),
+        getShopDomainState(activeShop.shop.id, "inventory"),
+      ])
+    : [[], null, null];
   const inventoryMode = domainState ? buildInventoryModeCopy(domainState) : null;
+  const canUseAdvancedReports = canAccessAdvancedReports(activeShop);
   const showSupplierColumn = canAccessSupplierDirectory(activeShop);
   const showPurchaseColumn = canAccessPurchaseWorkflow(activeShop);
   const lowStockItems = items
@@ -85,31 +90,44 @@ export default async function InventoryPage() {
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label="Products live"
-              value={stats.totalItems.toString()}
-              detail={`${stats.categories} categories currently in the store catalog`}
+              value={(inventorySummary?.total_items ?? items.length).toString()}
+              detail={`${inventorySummary?.categories ?? 0} categories currently in the store catalog`}
               icon="CAT"
             />
             <MetricCard
               label="Ready to sell"
-              value={(stats.totalItems - stats.outOfStockItems).toString()}
+              value={(inventorySummary?.available_items ?? 0).toString()}
               detail="Products that still have stock available"
               accent="green"
               icon="AVL"
             />
             <MetricCard
               label="Needs restock"
-              value={stats.lowStockItems.toString()}
+              value={(inventorySummary?.low_stock_items ?? 0).toString()}
               detail="Products at five units or lower"
               accent="rose"
               icon="LOW"
             />
-            <MetricCard
-              label="Retail value"
-              value={formatCurrency(stats.projectedSellValue, activeShop.shop.currency_code)}
-              detail="Current sell-side value of visible inventory"
-              accent="blue"
-              icon="VAL"
-            />
+            {canUseAdvancedReports ? (
+              <MetricCard
+                label="Retail value"
+                value={formatCurrency(
+                  Number(inventorySummary?.projected_sell_value ?? 0),
+                  activeShop.shop.currency_code,
+                )}
+                detail="Current sell-side value of visible inventory"
+                accent="blue"
+                icon="VAL"
+              />
+            ) : (
+              <MetricCard
+                label="Plan insight"
+                value={`${formatPlanTier(activeShop.shop.plan_tier)} plan`}
+                detail="Inventory value rollups unlock on Pro."
+                accent="blue"
+                icon="PLN"
+              />
+            )}
           </section>
 
           <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)]">

@@ -207,3 +207,16 @@ class InventoryAdjustmentSerializer(serializers.Serializer):
         ],
         default=InventoryStockLedger.EventType.ADJUSTMENT,
     )
+
+
+class InventorySummarySerializer(serializers.Serializer):
+    total_items = serializers.IntegerField()
+    available_items = serializers.IntegerField()
+    low_stock_items = serializers.IntegerField()
+    out_of_stock_items = serializers.IntegerField()
+    categories = serializers.IntegerField()
+    projected_sell_value = serializers.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        allow_null=True,
+    )
