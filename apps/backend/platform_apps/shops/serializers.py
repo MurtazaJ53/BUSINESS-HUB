@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from django.db import transaction
 from rest_framework import serializers
 
 from platform_apps.shops.models import ShopMembership, ShopPlanRequest
 from platform_apps.shops.permissions import (
     can_manage_workspace_membership,
     ensure_workspace_membership_management_or_403,
+    ensure_workspace_ownership_transfer_or_403,
     ensure_workspace_role_assignment_or_403,
 )
 from platform_apps.shops.plans import PLAN_TIERS, normalize_plan_tier
@@ -323,3 +325,99 @@ class WorkspaceTeamMemberUpdateSerializer(serializers.Serializer):
             target_membership.save(update_fields=updated_fields)
 
         return target_membership
+
+
+class WorkspaceOwnershipTransferResultSerializer(serializers.Serializer):
+    shop_id = serializers.UUIDField()
+    shop_name = serializers.CharField()
+    previous_owner_membership_id = serializers.UUIDField()
+    previous_owner_email = serializers.EmailField()
+    previous_owner_name = serializers.CharField()
+    previous_owner_role = serializers.CharField()
+    previous_owner_role_label = serializers.CharField()
+    new_owner_membership_id = serializers.UUIDField()
+    new_owner_email = serializers.EmailField()
+    new_owner_name = serializers.CharField()
+    transferred_at = serializers.DateTimeField()
+
+
+class WorkspaceOwnershipTransferSerializer(serializers.Serializer):
+    target_membership_id = serializers.UUIDField()
+    previous_owner_role = serializers.CharField(
+        required=False,
+        default=ShopMembership.Role.ADMIN,
+        max_length=16,
+    )
+    confirmation_text = serializers.CharField(max_length=255)
+
+    def validate_previous_owner_role(self, value: str) -> str:
+        normalized = normalize_membership_role(value)
+        if normalized == ShopMembership.Role.OWNER:
+            raise serializers.ValidationError("The previous owner must move to a lower workspace role.")
+        return normalized
+
+    def validate_confirmation_text(self, value: str) -> str:
+        confirmation = value.strip()
+        actor_membership = self.context["actor_membership"]
+        if confirmation.lower() != actor_membership.shop.slug.lower():
+            raise serializers.ValidationError("Type the exact workspace slug to confirm ownership transfer.")
+        return confirmation
+
+    def validate(self, attrs):
+        actor_membership = self.context["actor_membership"]
+        ensure_workspace_role_assignment_or_403(actor_membership, attrs["previous_owner_role"])
+
+        target_membership = (
+            ShopMembership.objects.filter(
+                shop=actor_membership.shop,
+                pk=attrs["target_membership_id"],
+            )
+            .select_related("user", "shop")
+            .first()
+        )
+        if target_membership is None:
+            raise serializers.ValidationError(
+                {"target_membership_id": "Select an active workspace member from this store."}
+            )
+
+        ensure_workspace_ownership_transfer_or_403(actor_membership, target_membership)
+        attrs["target_membership"] = target_membership
+        return attrs
+
+    @transaction.atomic
+    def transfer(self) -> dict[str, object]:
+        actor_membership = self.context["actor_membership"]
+        target_membership: ShopMembership = self.validated_data["target_membership"]
+        previous_owner_role: str = self.validated_data["previous_owner_role"]
+        shop = actor_membership.shop
+
+        actor_membership.role = previous_owner_role
+        actor_membership.save(update_fields=["role", "updated_at"])
+
+        target_membership.role = ShopMembership.Role.OWNER
+        if target_membership.status != ShopMembership.Status.ACTIVE:
+            target_membership.status = ShopMembership.Status.ACTIVE
+            target_membership.save(update_fields=["role", "status", "updated_at"])
+        else:
+            target_membership.save(update_fields=["role", "updated_at"])
+
+        shop.owner_user = target_membership.user
+        shop.save(update_fields=["owner_user", "updated_at"])
+
+        return {
+            "shop_id": shop.id,
+            "shop_name": shop.name,
+            "previous_owner_membership_id": actor_membership.id,
+            "previous_owner_email": actor_membership.user.email or actor_membership.email,
+            "previous_owner_name": actor_membership.user.full_name
+            or actor_membership.user.email
+            or actor_membership.email,
+            "previous_owner_role": actor_membership.role,
+            "previous_owner_role_label": get_membership_role_label(actor_membership.role),
+            "new_owner_membership_id": target_membership.id,
+            "new_owner_email": target_membership.user.email or target_membership.email,
+            "new_owner_name": target_membership.user.full_name
+            or target_membership.user.email
+            or target_membership.email,
+            "transferred_at": target_membership.updated_at,
+        }

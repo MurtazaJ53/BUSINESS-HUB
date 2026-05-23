@@ -60,6 +60,20 @@ export type WorkspaceTeamMemberPayload = {
   updated_at: string;
 };
 
+export type WorkspaceOwnershipTransferPayload = {
+  shop_id: string;
+  shop_name: string;
+  previous_owner_membership_id: string;
+  previous_owner_email: string;
+  previous_owner_name: string;
+  previous_owner_role: "admin" | "staff" | "viewer";
+  previous_owner_role_label: string;
+  new_owner_membership_id: string;
+  new_owner_email: string;
+  new_owner_name: string;
+  transferred_at: string;
+};
+
 export type SessionPayload = {
   user: SessionUser;
   memberships: ShopMembership[];

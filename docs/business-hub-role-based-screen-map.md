@@ -286,6 +286,7 @@ Do not make admin web the normal cashier workflow.
 - feature flag surfaces
 - platform-wide settings
 - raw finance/admin internals
+- ownership transfer
 
 ## Owner admin web
 
@@ -293,6 +294,7 @@ Do not make admin web the normal cashier workflow.
 
 - dashboard
 - workspace team
+- ownership transfer from the workspace team surface
 - inventory
 - customers
 - sales/history

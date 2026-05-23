@@ -9,3 +9,7 @@ export function canManageWorkspace(role: WorkspaceRole) {
 export function canAccessPaymentsWorkspace(role: WorkspaceRole) {
   return canManageWorkspace(role);
 }
+
+export function canTransferWorkspaceOwnership(role: WorkspaceRole) {
+  return role === "owner";
+}

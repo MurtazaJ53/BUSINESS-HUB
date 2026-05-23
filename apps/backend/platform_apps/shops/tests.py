@@ -399,3 +399,90 @@ class WorkspaceTeamApiTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 403)
+
+    def test_owner_can_transfer_workspace_ownership(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/team/transfer-ownership/",
+            {
+                "target_membership_id": str(self.admin_membership.id),
+                "confirmation_text": self.shop.slug,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.shop.refresh_from_db()
+        self.owner_membership.refresh_from_db()
+        self.admin_membership.refresh_from_db()
+
+        self.assertEqual(self.shop.owner_user_id, self.admin.id)
+        self.assertEqual(self.owner_membership.role, ShopMembership.Role.ADMIN)
+        self.assertEqual(self.admin_membership.role, ShopMembership.Role.OWNER)
+        self.assertEqual(response.json()["new_owner_email"], self.admin.email)
+
+    def test_owner_can_choose_previous_owner_role_during_transfer(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/team/transfer-ownership/",
+            {
+                "target_membership_id": str(self.staff_membership.id),
+                "previous_owner_role": "viewer",
+                "confirmation_text": self.shop.slug,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.owner_membership.refresh_from_db()
+        self.staff_membership.refresh_from_db()
+        self.assertEqual(self.owner_membership.role, ShopMembership.Role.VIEWER)
+        self.assertEqual(self.staff_membership.role, ShopMembership.Role.OWNER)
+
+    def test_admin_cannot_transfer_workspace_ownership(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/team/transfer-ownership/",
+            {
+                "target_membership_id": str(self.staff_membership.id),
+                "confirmation_text": self.shop.slug,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_owner_transfer_requires_active_target_and_exact_confirmation(self):
+        invited_user = PlatformUser.objects.create_user(
+            email="invited@example.com",
+            password="secret",
+            full_name="Invited",
+        )
+        invited_membership = ShopMembership.objects.create(
+            user=invited_user,
+            shop=self.shop,
+            role=ShopMembership.Role.STAFF,
+            status=ShopMembership.Status.INVITED,
+            email=invited_user.email,
+        )
+
+        self.client.force_authenticate(user=self.owner)
+        invited_response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/team/transfer-ownership/",
+            {
+                "target_membership_id": str(invited_membership.id),
+                "confirmation_text": self.shop.slug,
+            },
+            format="json",
+        )
+        self.assertEqual(invited_response.status_code, 403)
+
+        confirmation_response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/team/transfer-ownership/",
+            {
+                "target_membership_id": str(self.admin_membership.id),
+                "confirmation_text": "wrong-slug",
+            },
+            format="json",
+        )
+        self.assertEqual(confirmation_response.status_code, 400)

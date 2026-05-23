@@ -48,3 +48,21 @@ export async function requireWorkspaceManagerAccess(
 
   return { session, membership };
 }
+
+export async function requireWorkspaceOwnerAccess(
+  shopId: string,
+  contextLabel: string,
+) {
+  const session = await getSession();
+  const membership = session.memberships.find((entry) => entry.shop.id === shopId);
+
+  if (!membership) {
+    throw new Error(`${contextLabel} requires access to the selected workspace.`);
+  }
+
+  if (membership.role !== "owner") {
+    throw new Error(`${contextLabel} requires the current workspace owner role.`);
+  }
+
+  return { session, membership };
+}

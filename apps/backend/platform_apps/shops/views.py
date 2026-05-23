@@ -21,6 +21,8 @@ from platform_apps.shops.serializers import (
     ShopMembershipListSerializer,
     ShopPlanRequestCreateSerializer,
     ShopPlanRequestSerializer,
+    WorkspaceOwnershipTransferResultSerializer,
+    WorkspaceOwnershipTransferSerializer,
     WorkspaceTeamMemberCreateSerializer,
     WorkspaceTeamMemberSerializer,
     WorkspaceTeamMemberUpdateSerializer,
@@ -222,4 +224,19 @@ class WorkspaceTeamDetailView(APIView):
             membership,
             context={"actor_membership": actor_membership},
         )
+        return Response(response_serializer.data)
+
+
+class WorkspaceOwnershipTransferView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, shop_id):
+        actor_membership = get_membership_or_403(request.user, shop_id, ShopMembership.Role.OWNER)
+        serializer = WorkspaceOwnershipTransferSerializer(
+            data=request.data,
+            context={"actor_membership": actor_membership},
+        )
+        serializer.is_valid(raise_exception=True)
+        result = serializer.transfer()
+        response_serializer = WorkspaceOwnershipTransferResultSerializer(result)
         return Response(response_serializer.data)

@@ -100,6 +100,26 @@ def ensure_workspace_membership_management_or_403(
     )
 
 
+def ensure_workspace_ownership_transfer_or_403(
+    actor_membership: ShopMembership,
+    target_membership: ShopMembership,
+) -> None:
+    if actor_membership.shop_id != target_membership.shop_id:
+        raise exceptions.PermissionDenied("You cannot transfer ownership outside your workspace.")
+
+    if actor_membership.role != ShopMembership.Role.OWNER:
+        raise exceptions.PermissionDenied("Only the current workspace owner can transfer ownership.")
+
+    if actor_membership.user_id == target_membership.user_id:
+        raise exceptions.PermissionDenied("Choose another active member to receive workspace ownership.")
+
+    if target_membership.role == ShopMembership.Role.OWNER:
+        raise exceptions.PermissionDenied("That membership already owns the workspace.")
+
+    if target_membership.status != ShopMembership.Status.ACTIVE:
+        raise exceptions.PermissionDenied("Transfer ownership only to an active workspace member.")
+
+
 def has_feature_enabled(membership: ShopMembership, feature_key: str) -> bool:
     return membership.shop.enabled_features.get(feature_key) is True
 
