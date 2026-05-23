@@ -3,7 +3,7 @@ import { AttendanceTable } from "@/components/attendance-table";
 import { EmptyState } from "@/components/empty-state";
 import { MetricCard } from "@/components/metric-card";
 import {
-  buildAttendanceStats,
+  getAttendanceSummary,
   getAttendanceSessions,
   getSession,
   resolveActiveShop,
@@ -22,10 +22,12 @@ export default async function AttendancePage() {
   const activeShop = resolveActiveShop(session);
   const canUseAttendance = canAccessAttendance(activeShop);
   const today = toToday();
-  const sessions = activeShop && canUseAttendance
-    ? await getAttendanceSessions(activeShop.shop.id, { dateFrom: today })
-    : [];
-  const stats = buildAttendanceStats(sessions, today);
+  const [sessions, attendanceSummary] = activeShop && canUseAttendance
+    ? await Promise.all([
+        getAttendanceSessions(activeShop.shop.id, { dateFrom: today }),
+        getAttendanceSummary(activeShop.shop.id, { dateFrom: today, today }),
+      ])
+    : [[], null];
   const todaySessions = sessions
     .filter((sessionItem) => sessionItem.session_date === today)
     .slice(0, 8);
@@ -53,27 +55,27 @@ export default async function AttendancePage() {
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label="Sessions tracked"
-              value={stats.totalSessions.toString()}
+              value={`${attendanceSummary?.total_sessions ?? sessions.length}`}
               detail="Attendance records currently visible in the selected window"
               icon="ATT"
             />
             <MetricCard
               label="Present records"
-              value={stats.presentCount.toString()}
+              value={`${attendanceSummary?.present_count ?? 0}`}
               detail="Sessions marked present in the current result set"
               accent="green"
               icon="PRS"
             />
             <MetricCard
               label="Leave records"
-              value={stats.leaveCount.toString()}
+              value={`${attendanceSummary?.leave_count ?? 0}`}
               detail="Sessions marked leave in the current result set"
               accent="rose"
               icon="LEV"
             />
             <MetricCard
               label="On floor today"
-              value={stats.activeWorkersToday.toString()}
+              value={`${attendanceSummary?.active_workers_today ?? 0}`}
               detail="Present or half-day memberships for today"
               accent="blue"
               icon="DAY"

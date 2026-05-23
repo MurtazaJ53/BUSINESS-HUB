@@ -3,8 +3,8 @@ import { EmptyState } from "@/components/empty-state";
 import { ExpenseTable } from "@/components/expense-table";
 import { MetricCard } from "@/components/metric-card";
 import {
-  buildExpenseStats,
   getExpenses,
+  getExpenseSummary,
   getSession,
   resolveActiveShop,
 } from "@/lib/admin-api";
@@ -15,8 +15,12 @@ export default async function ExpensesPage() {
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
   const canUseExpenses = canAccessExpenses(activeShop);
-  const expenses = activeShop && canUseExpenses ? await getExpenses(activeShop.shop.id) : [];
-  const stats = buildExpenseStats(expenses);
+  const [expenses, expenseSummary] = activeShop && canUseExpenses
+    ? await Promise.all([
+        getExpenses(activeShop.shop.id),
+        getExpenseSummary(activeShop.shop.id),
+      ])
+    : [[], null];
   const topExpenses = [...expenses]
     .sort((left, right) => Number(right.amount) - Number(left.amount))
     .slice(0, 6);
@@ -44,27 +48,30 @@ export default async function ExpensesPage() {
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label="Expense entries"
-              value={stats.totalEntries.toString()}
+              value={(expenseSummary?.total_entries ?? expenses.length).toString()}
               detail="Outgoing spend records currently visible in this store"
               icon="EXP"
             />
             <MetricCard
               label="Total spend"
-              value={formatCurrency(stats.totalAmount, activeShop.shop.currency_code)}
+              value={formatCurrency(
+                Number(expenseSummary?.total_amount ?? 0),
+                activeShop.shop.currency_code,
+              )}
               detail="Total outgoing amount across recorded expense entries"
               accent="rose"
               icon="TOT"
             />
             <MetricCard
               label="Categories tracked"
-              value={stats.uniqueCategories.toString()}
+              value={`${expenseSummary?.unique_categories ?? 0}`}
               detail="Different expense buckets used by this store"
               accent="blue"
               icon="CAT"
             />
             <MetricCard
               label="Top category"
-              value={stats.biggestCategory ?? "None yet"}
+              value={expenseSummary?.biggest_category ?? "None yet"}
               detail="Largest spend bucket in the current view"
               accent="green"
               icon="TOP"

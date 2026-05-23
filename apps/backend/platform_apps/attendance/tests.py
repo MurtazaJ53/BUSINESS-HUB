@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from platform_apps.attendance.models import AttendanceSession
@@ -57,6 +58,31 @@ class AttendanceApiTests(TestCase):
         response = self.client.get(f"/api/v1/shops/{self.shop.id}/attendance/")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 1)
+
+    def test_attendance_summary_returns_aggregates(self):
+        today = str(timezone.localdate())
+        AttendanceSession.objects.create(
+            shop=self.shop,
+            membership=self.staff_membership,
+            session_date=today,
+            status=AttendanceSession.Status.PRESENT,
+        )
+        AttendanceSession.objects.create(
+            shop=self.shop,
+            membership=self.owner_membership,
+            session_date=today,
+            status=AttendanceSession.Status.LEAVE,
+        )
+
+        response = self.client.get(
+            f"/api/v1/shops/{self.shop.id}/attendance/summary/?date_from={today}&today={today}"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["total_sessions"], 2)
+        self.assertEqual(response.data["present_count"], 1)
+        self.assertEqual(response.data["leave_count"], 1)
+        self.assertEqual(response.data["active_workers_today"], 1)
 
     def test_can_recreate_attendance_after_soft_delete(self):
         session = AttendanceSession.objects.create(

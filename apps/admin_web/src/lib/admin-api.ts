@@ -5,6 +5,7 @@ import { cache } from "react";
 import type {
   AttendanceSession,
   AttendanceStats,
+  AttendanceSummaryPayload,
   Customer,
   CustomerSummaryPayload,
   CustomerStats,
@@ -21,6 +22,7 @@ import type {
   ERPNextShopBinding,
   ERPNextSupplierMirror,
   ERPNextSupplierPaymentMirror,
+  ExpenseSummaryPayload,
   ERPNextSyncState,
   MigrationDomainControl,
   MigrationBridgeReceipt,
@@ -186,12 +188,35 @@ export const getExpenses = cache(async (shopId: string, query?: string): Promise
   });
 });
 
+export const getExpenseSummary = cache(async (shopId: string, query?: string): Promise<ExpenseSummaryPayload> => {
+  return apiFetch<ExpenseSummaryPayload>(`/shops/${shopId}/expenses/summary/`, {
+    query: {
+      q: query,
+    },
+  });
+});
+
 export const getAttendanceSessions = cache(
   async (shopId: string, query?: { dateFrom?: string; dateTo?: string }): Promise<AttendanceSession[]> => {
     return apiFetch<AttendanceSession[]>(`/shops/${shopId}/attendance/`, {
       query: {
         date_from: query?.dateFrom,
         date_to: query?.dateTo,
+      },
+    });
+  },
+);
+
+export const getAttendanceSummary = cache(
+  async (
+    shopId: string,
+    query?: { dateFrom?: string; dateTo?: string; today?: string },
+  ): Promise<AttendanceSummaryPayload> => {
+    return apiFetch<AttendanceSummaryPayload>(`/shops/${shopId}/attendance/summary/`, {
+      query: {
+        date_from: query?.dateFrom,
+        date_to: query?.dateTo,
+        today: query?.today,
       },
     });
   },

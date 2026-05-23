@@ -5,6 +5,13 @@ from rest_framework import serializers
 from platform_apps.expenses.models import Expense
 
 
+class ExpenseSummarySerializer(serializers.Serializer):
+    total_entries = serializers.IntegerField()
+    total_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    unique_categories = serializers.IntegerField()
+    biggest_category = serializers.CharField(allow_null=True)
+
+
 class ExpenseSerializer(serializers.ModelSerializer):
     actor_name = serializers.SerializerMethodField(read_only=True)
 

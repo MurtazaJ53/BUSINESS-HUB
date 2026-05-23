@@ -57,6 +57,32 @@ class ExpenseApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 1)
 
+    def test_expense_summary_returns_aggregates(self):
+        Expense.objects.create(
+            shop=self.shop,
+            actor_user=self.user,
+            category="Packaging",
+            amount=Decimal("240.00"),
+            description="Courier bags and tape",
+            expense_date="2026-04-30",
+        )
+        Expense.objects.create(
+            shop=self.shop,
+            actor_user=self.user,
+            category="Travel",
+            amount=Decimal("600.00"),
+            description="Market pickup",
+            expense_date="2026-04-30",
+        )
+
+        response = self.client.get(f"/api/v1/shops/{self.shop.id}/expenses/summary/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["total_entries"], 2)
+        self.assertEqual(response.data["total_amount"], "840.00")
+        self.assertEqual(response.data["unique_categories"], 2)
+        self.assertEqual(response.data["biggest_category"], "Travel")
+
     def test_expense_detail_hides_archived_records(self):
         expense = Expense.objects.create(
             shop=self.shop,

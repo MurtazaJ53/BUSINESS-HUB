@@ -5,6 +5,13 @@ from rest_framework import serializers
 from platform_apps.attendance.models import AttendanceSession
 
 
+class AttendanceSummarySerializer(serializers.Serializer):
+    total_sessions = serializers.IntegerField()
+    present_count = serializers.IntegerField()
+    leave_count = serializers.IntegerField()
+    active_workers_today = serializers.IntegerField()
+
+
 class AttendanceSessionSerializer(serializers.ModelSerializer):
     membership_id = serializers.UUIDField(source="membership.id", read_only=True)
     member_name = serializers.SerializerMethodField()

@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
+from django.db.models import Count, Sum
 from django.db.models import Q
+from django.db.models.functions import Coalesce
 from rest_framework import generics, permissions
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from platform_apps.expenses.models import Expense
-from platform_apps.expenses.serializers import ExpenseSerializer
+from platform_apps.expenses.serializers import ExpenseSerializer, ExpenseSummarySerializer
 from platform_apps.shops.models import ShopMembership
 from platform_apps.shops.permissions import ensure_feature_enabled_or_403, get_membership_or_403
 
@@ -59,6 +65,55 @@ class ExpenseListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
         )
         ensure_feature_enabled_or_403(membership, "expenses")
         serializer.save()
+
+
+class ExpenseSummaryView(ShopScopedMixin, APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, shop_id):
+        membership = self.get_membership()
+        ensure_feature_enabled_or_403(membership, "expenses")
+        queryset = Expense.objects.filter(
+            shop=membership.shop,
+            tombstone=False,
+        )
+
+        query = self.request.query_params.get("q", "").strip()
+        category = self.request.query_params.get("category", "").strip()
+        if query:
+            queryset = queryset.filter(
+                Q(category__icontains=query)
+                | Q(description__icontains=query)
+                | Q(payment_reference__icontains=query)
+            )
+        if category:
+            queryset = queryset.filter(category__iexact=category)
+
+        aggregates = queryset.aggregate(
+            total_entries=Count("id"),
+            total_amount=Coalesce(Sum("amount"), Decimal("0.00")),
+            unique_categories=Count("category", distinct=True),
+        )
+        biggest_category_row = (
+            queryset.values("category")
+            .annotate(total_amount=Coalesce(Sum("amount"), Decimal("0.00")))
+            .order_by("-total_amount", "category")
+            .first()
+        )
+
+        serializer = ExpenseSummarySerializer(
+            {
+                "total_entries": aggregates["total_entries"] or 0,
+                "total_amount": aggregates["total_amount"] or 0,
+                "unique_categories": aggregates["unique_categories"] or 0,
+                "biggest_category": (
+                    biggest_category_row["category"]
+                    if biggest_category_row is not None
+                    else None
+                ),
+            }
+        )
+        return Response(serializer.data)
 
 
 class ExpenseDetailView(ShopScopedMixin, generics.RetrieveUpdateDestroyAPIView):

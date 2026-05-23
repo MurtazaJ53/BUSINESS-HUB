@@ -105,6 +105,12 @@ It is designed to support:
 78. [Business Hub UI And Experience Principles](./business-hub-ui-and-experience-principles.md)
 79. [Business Hub Role-Based Screen Map](./business-hub-role-based-screen-map.md)
 80. [Business Hub UI Redesign Execution Plan](./business-hub-ui-redesign-execution-plan.md)
+81. [Business Hub Role-Based Training Pack](./business-hub-role-based-training-pack.md)
+82. [Business Hub Support Playbook](./business-hub-support-playbook.md)
+83. [Business Hub Plan Packaging Sheet](./business-hub-plan-packaging-sheet.md)
+84. [Business Hub ERP Escalation Map](./business-hub-erp-escalation-map.md)
+85. [Business Hub UAT Scorecard](./business-hub-uat-scorecard.md)
+86. [Business Hub Go-Live Scorecard](./business-hub-go-live-scorecard.md)
 
 ## Current truth
 

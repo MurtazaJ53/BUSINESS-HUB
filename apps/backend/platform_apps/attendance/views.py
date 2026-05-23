@@ -1,10 +1,17 @@
 from __future__ import annotations
 
-from django.db.models import Q
+from django.db.models import Count, Q
+from django.utils import timezone
 from rest_framework import generics, permissions
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from platform_apps.attendance.models import AttendanceSession
-from platform_apps.attendance.serializers import AttendanceSessionSerializer, AttendanceSessionWriteSerializer
+from platform_apps.attendance.serializers import (
+    AttendanceSessionSerializer,
+    AttendanceSessionWriteSerializer,
+    AttendanceSummarySerializer,
+)
 from platform_apps.shops.models import ShopMembership
 from platform_apps.shops.permissions import ensure_feature_enabled_or_403, get_membership_or_403
 
@@ -85,6 +92,65 @@ class AttendanceSessionListCreateView(ShopScopedMixin, generics.ListCreateAPIVie
         )
         ensure_feature_enabled_or_403(membership, "attendance")
         serializer.save()
+
+
+class AttendanceSummaryView(ShopScopedMixin, APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, shop_id):
+        membership = self.get_membership()
+        ensure_feature_enabled_or_403(membership, "attendance")
+        queryset = AttendanceSession.objects.filter(
+            shop=membership.shop,
+            tombstone=False,
+        )
+
+        date_from = self.request.query_params.get("date_from", "").strip()
+        date_to = self.request.query_params.get("date_to", "").strip()
+        membership_id = self.request.query_params.get("membership_id", "").strip()
+        status_value = self.request.query_params.get("status", "").strip()
+        query = self.request.query_params.get("q", "").strip()
+        today = self.request.query_params.get("today", "").strip() or str(timezone.localdate())
+
+        if date_from:
+            queryset = queryset.filter(session_date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(session_date__lte=date_to)
+        if membership_id:
+            queryset = queryset.filter(membership_id=membership_id)
+        if status_value:
+            queryset = queryset.filter(status=status_value)
+        if query:
+            queryset = queryset.filter(
+                Q(membership__user__full_name__icontains=query)
+                | Q(membership__user__email__icontains=query)
+            )
+
+        aggregates = queryset.aggregate(
+            total_sessions=Count("id"),
+            present_count=Count("id", filter=Q(status=AttendanceSession.Status.PRESENT)),
+            leave_count=Count("id", filter=Q(status=AttendanceSession.Status.LEAVE)),
+            active_workers_today=Count(
+                "id",
+                filter=Q(session_date=today)
+                & Q(
+                    status__in=[
+                        AttendanceSession.Status.PRESENT,
+                        AttendanceSession.Status.HALF_DAY,
+                    ]
+                ),
+            ),
+        )
+
+        serializer = AttendanceSummarySerializer(
+            {
+                "total_sessions": aggregates["total_sessions"] or 0,
+                "present_count": aggregates["present_count"] or 0,
+                "leave_count": aggregates["leave_count"] or 0,
+                "active_workers_today": aggregates["active_workers_today"] or 0,
+            }
+        )
+        return Response(serializer.data)
 
 
 class AttendanceSessionDetailView(ShopScopedMixin, generics.RetrieveUpdateDestroyAPIView):

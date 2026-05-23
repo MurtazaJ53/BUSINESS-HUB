@@ -168,6 +168,13 @@ export type ExpenseStats = {
   biggestCategory: string | null;
 };
 
+export type ExpenseSummaryPayload = {
+  total_entries: number;
+  total_amount: string;
+  unique_categories: number;
+  biggest_category: string | null;
+};
+
 export type AttendanceSession = {
   id: string;
   membership_id: string;
@@ -189,6 +196,13 @@ export type AttendanceStats = {
   presentCount: number;
   leaveCount: number;
   activeWorkersToday: number;
+};
+
+export type AttendanceSummaryPayload = {
+  total_sessions: number;
+  present_count: number;
+  leave_count: number;
+  active_workers_today: number;
 };
 
 export type SaleItem = {
