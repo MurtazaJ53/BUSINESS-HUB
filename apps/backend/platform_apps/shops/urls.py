@@ -21,7 +21,7 @@ from platform_apps.inventory.views import (
 )
 from platform_apps.payments.views import SalePaymentCommandIngestionView, SalePaymentListView
 from platform_apps.payments.views import SalePaymentSummaryView
-from platform_apps.projections.views import ShopDashboardSnapshotView
+from platform_apps.projections.views import ShopDashboardSnapshotView, ShopPulseSnapshotView
 from platform_apps.sales.views import SaleCommandIngestionView, SaleDetailView, SaleListCreateView
 from platform_apps.sales.views import SaleSummaryView
 from platform_apps.shops.views import (
@@ -97,6 +97,11 @@ urlpatterns = [
         "<uuid:shop_id>/projections/dashboard/",
         ShopDashboardSnapshotView.as_view(),
         name="projection-dashboard",
+    ),
+    path(
+        "<uuid:shop_id>/projections/pulse/",
+        ShopPulseSnapshotView.as_view(),
+        name="projection-pulse",
     ),
     path("<uuid:shop_id>/sales/", SaleListCreateView.as_view(), name="sale-list"),
     path("<uuid:shop_id>/sales/summary/", SaleSummaryView.as_view(), name="sale-summary"),

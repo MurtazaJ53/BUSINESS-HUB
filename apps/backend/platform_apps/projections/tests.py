@@ -1,17 +1,20 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
 
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from platform_apps.customers.models import Customer
 from platform_apps.inventory.models import InventoryItem, InventoryStockLedger
 from platform_apps.payments.models import SalePayment
 from platform_apps.projections.models import ShopDashboardSnapshot, ShopLowStockSnapshot
+from platform_apps.projections.pulse import build_shop_pulse_snapshot
 from platform_apps.projections.services import refresh_shop_dashboard_projection
 from platform_apps.sales.models import Sale
-from platform_apps.shops.models import Shop, ShopMembership
+from platform_apps.shops.models import Shop, ShopMembership, ShopPlanRequest, WorkspaceAccessSession
 from platform_apps.users.models import PlatformUser
 
 
@@ -192,3 +195,104 @@ class ProjectionRefreshTests(TestCase):
         self.assertEqual(response.data["gross_revenue"], "650.00")
         self.assertEqual(response.data["outstanding_revenue"], "150.00")
         self.assertEqual(response.data["total_collected"], "500.00")
+
+    def test_build_shop_pulse_snapshot_generates_tasks_and_anomalies(self):
+        self.shop.settings_json = {"plan_tier": "pro"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+        self._seed_domain_data()
+
+        sale = Sale.objects.filter(shop=self.shop, status=Sale.Status.COMPLETED).first()
+        sale.discount_amount = Decimal("120.00")
+        sale.sale_date = timezone.localdate()
+        sale.occurred_at = timezone.now()
+        sale.save(update_fields=["discount_amount", "sale_date", "occurred_at", "updated_at"])
+
+        for index in range(2):
+            Sale.objects.create(
+                shop=self.shop,
+                actor_user=self.user,
+                receipt_number=f"VOID-{index}",
+                subtotal_amount="200.00",
+                total_amount="200.00",
+                amount_received="0.00",
+                amount_due="0.00",
+                payment_mode=Sale.PaymentMode.CASH,
+                sale_date="2026-04-30",
+                occurred_at=timezone.now(),
+                status=Sale.Status.VOID,
+            )
+
+        InventoryStockLedger.objects.create(
+            shop=self.shop,
+            item=InventoryItem.objects.filter(shop=self.shop, sku="DEN-001").first(),
+            event_type=InventoryStockLedger.EventType.ADJUSTMENT,
+            quantity_delta=-6,
+            occurred_at=timezone.now(),
+        )
+        InventoryStockLedger.objects.create(
+            shop=self.shop,
+            item=InventoryItem.objects.filter(shop=self.shop, sku="DEN-001").first(),
+            event_type=InventoryStockLedger.EventType.ADJUSTMENT,
+            quantity_delta=-4,
+            occurred_at=timezone.now(),
+        )
+
+        ShopPlanRequest.objects.create(
+            shop=self.shop,
+            requested_by_user=self.user,
+            current_plan_tier="pro",
+            requested_plan_tier="pro",
+            request_note="Need review",
+        )
+
+        membership = ShopMembership.objects.get(shop=self.shop, user=self.user)
+        WorkspaceAccessSession.objects.create(
+            user=self.user,
+            shop=self.shop,
+            membership=membership,
+            app_instance_id="owner-device",
+            membership_role_snapshot=membership.role,
+            device_label="Owner phone",
+            status=WorkspaceAccessSession.Status.ACTIVE,
+            last_seen_at=timezone.now() - timedelta(days=4),
+        )
+        WorkspaceAccessSession.objects.create(
+            user=self.user,
+            shop=self.shop,
+            membership=membership,
+            app_instance_id="lost-device",
+            membership_role_snapshot=membership.role,
+            device_label="Lost device",
+            status=WorkspaceAccessSession.Status.REVOKED,
+            revoked_at=timezone.now(),
+            wipe_requested_at=timezone.now(),
+        )
+
+        snapshot = refresh_shop_dashboard_projection(self.shop)
+        pulse = build_shop_pulse_snapshot(self.shop, dashboard_snapshot=snapshot)
+
+        self.assertEqual(pulse["headline"]["tone"], "critical")
+        task_codes = {task["code"] for task in pulse["tasks"]}
+        anomaly_codes = {anomaly["code"] for anomaly in pulse["anomalies"]}
+
+        self.assertIn("resolve_remote_wipes", task_codes)
+        self.assertIn("restock_out_of_stock", task_codes)
+        self.assertIn("collect_customer_dues", task_codes)
+        self.assertIn("review_plan_requests", task_codes)
+        self.assertIn("pending_remote_wipe", anomaly_codes)
+        self.assertIn("high_void_rate", anomaly_codes)
+        self.assertIn("inventory_shrinkage", anomaly_codes)
+        self.assertGreaterEqual(pulse["stats"]["critical_anomaly_count"], 1)
+
+    def test_pulse_api_returns_generated_payload(self):
+        self.shop.settings_json = {"plan_tier": "pro"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+        self._seed_domain_data()
+
+        response = self.client.get(f"/api/v1/shops/{self.shop.id}/projections/pulse/?refresh=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("headline", response.data)
+        self.assertIn("tasks", response.data)
+        self.assertIn("anomalies", response.data)
+        self.assertIn("stats", response.data)

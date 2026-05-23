@@ -75,3 +75,52 @@ class ShopDashboardSnapshotSerializer(serializers.ModelSerializer):
             payload["total_collected"] = None
 
         return payload
+
+
+class ShopPulseHeadlineSerializer(serializers.Serializer):
+    title = serializers.CharField()
+    body = serializers.CharField()
+    route = serializers.CharField()
+    cta_label = serializers.CharField()
+    tone = serializers.CharField()
+
+
+class ShopPulseTaskSerializer(serializers.Serializer):
+    code = serializers.CharField()
+    priority = serializers.CharField()
+    tone = serializers.CharField()
+    title = serializers.CharField()
+    body = serializers.CharField()
+    route = serializers.CharField()
+    cta_label = serializers.CharField()
+    count = serializers.IntegerField()
+    metadata_json = serializers.JSONField()
+
+
+class ShopPulseAnomalySerializer(serializers.Serializer):
+    code = serializers.CharField()
+    severity = serializers.CharField()
+    title = serializers.CharField()
+    body = serializers.CharField()
+    route = serializers.CharField()
+    cta_label = serializers.CharField()
+    metric_value = serializers.CharField()
+    metadata_json = serializers.JSONField()
+
+
+class ShopPulseStatsSerializer(serializers.Serializer):
+    open_task_count = serializers.IntegerField()
+    critical_anomaly_count = serializers.IntegerField()
+    warning_anomaly_count = serializers.IntegerField()
+    stale_session_count = serializers.IntegerField()
+    wipe_pending_count = serializers.IntegerField()
+    open_plan_request_count = serializers.IntegerField()
+    low_stock_count = serializers.IntegerField()
+
+
+class ShopPulseSnapshotSerializer(serializers.Serializer):
+    refreshed_at = serializers.DateTimeField()
+    headline = ShopPulseHeadlineSerializer()
+    stats = ShopPulseStatsSerializer()
+    tasks = ShopPulseTaskSerializer(many=True)
+    anomalies = ShopPulseAnomalySerializer(many=True)

@@ -356,6 +356,72 @@ class BackendApiClient {
     return _mapUserMfaStatus(decoded);
   }
 
+  Future<WorkspacePulseSnapshot> getWorkspacePulse({
+    required User user,
+    required String shopId,
+  }) async {
+    final decoded = await _request(
+      user: user,
+      method: 'GET',
+      path: '/shops/$shopId/projections/pulse/',
+    );
+
+    return WorkspacePulseSnapshot(
+      refreshedAt: _asDateTime(decoded['refreshed_at']),
+      headline: WorkspacePulseHeadline(
+        title: (decoded['headline']?['title'] ?? '').toString(),
+        body: (decoded['headline']?['body'] ?? '').toString(),
+        route: (decoded['headline']?['route'] ?? '/history').toString(),
+        ctaLabel: (decoded['headline']?['cta_label'] ?? 'Open').toString(),
+        tone: (decoded['headline']?['tone'] ?? 'info').toString(),
+      ),
+      stats: WorkspacePulseStats(
+        openTaskCount: _asInt(decoded['stats']?['open_task_count']),
+        criticalAnomalyCount: _asInt(decoded['stats']?['critical_anomaly_count']),
+        warningAnomalyCount: _asInt(decoded['stats']?['warning_anomaly_count']),
+        staleSessionCount: _asInt(decoded['stats']?['stale_session_count']),
+        wipePendingCount: _asInt(decoded['stats']?['wipe_pending_count']),
+        openPlanRequestCount: _asInt(decoded['stats']?['open_plan_request_count']),
+        lowStockCount: _asInt(decoded['stats']?['low_stock_count']),
+      ),
+      tasks: ((decoded['tasks'] ?? const <dynamic>[]) as List<dynamic>)
+          .whereType<Map>()
+          .map(
+            (row) => WorkspacePulseTask(
+              code: (row['code'] ?? '').toString(),
+              priority: (row['priority'] ?? 'medium').toString(),
+              tone: (row['tone'] ?? 'info').toString(),
+              title: (row['title'] ?? '').toString(),
+              body: (row['body'] ?? '').toString(),
+              route: (row['route'] ?? '/history').toString(),
+              ctaLabel: (row['cta_label'] ?? 'Open').toString(),
+              count: _asInt(row['count']),
+              metadata: row['metadata_json'] is Map
+                  ? Map<String, dynamic>.from(row['metadata_json'] as Map)
+                  : const <String, dynamic>{},
+            ),
+          )
+          .toList(growable: false),
+      anomalies: ((decoded['anomalies'] ?? const <dynamic>[]) as List<dynamic>)
+          .whereType<Map>()
+          .map(
+            (row) => WorkspacePulseAnomaly(
+              code: (row['code'] ?? '').toString(),
+              severity: (row['severity'] ?? 'info').toString(),
+              title: (row['title'] ?? '').toString(),
+              body: (row['body'] ?? '').toString(),
+              route: (row['route'] ?? '/history').toString(),
+              ctaLabel: (row['cta_label'] ?? 'Open').toString(),
+              metricValue: (row['metric_value'] ?? '').toString(),
+              metadata: row['metadata_json'] is Map
+                  ? Map<String, dynamic>.from(row['metadata_json'] as Map)
+                  : const <String, dynamic>{},
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+
   Future<void> acknowledgeWorkspaceSessionWipe({
     required User user,
     required String shopId,
@@ -507,6 +573,19 @@ double _asDouble(Object? value) {
   }
   if (value is String) {
     return double.tryParse(value) ?? 0;
+  }
+  return 0;
+}
+
+int _asInt(Object? value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  if (value is String) {
+    return int.tryParse(value) ?? 0;
   }
   return 0;
 }

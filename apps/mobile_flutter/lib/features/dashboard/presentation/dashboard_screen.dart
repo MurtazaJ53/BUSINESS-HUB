@@ -16,6 +16,8 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(mobileSessionProvider).asData?.value;
+    final pulseAsync = ref.watch(workspacePulseProvider);
+    final pulse = pulseAsync.asData?.value;
     final salesRepository = ref.read(salesRepositoryProvider);
     final syncStatus = ref.watch(syncStatusProvider);
     final shop =
@@ -161,6 +163,80 @@ class DashboardScreen extends ConsumerWidget {
           onTap: () => context.go(focus.route),
         ),
         const SizedBox(height: 18),
+        if (session?.isOwnerLike ?? false) ...<Widget>[
+          MobilePanel(
+            title: 'Workspace pulse',
+            action: MobileTag(
+              label: pulse == null
+                  ? (pulseAsync.isLoading ? 'Refreshing' : 'Unavailable')
+                  : pulse.stats.criticalAnomalyCount > 0
+                  ? '${pulse.stats.criticalAnomalyCount} critical'
+                  : '${pulse.stats.openTaskCount} tasks',
+              icon: pulse == null
+                  ? Icons.sync_rounded
+                  : pulse.stats.criticalAnomalyCount > 0
+                  ? Icons.crisis_alert_rounded
+                  : Icons.auto_awesome_rounded,
+              accent: pulse == null
+                  ? const Color(0xFF38BDF8)
+                  : pulse.stats.criticalAnomalyCount > 0
+                  ? const Color(0xFFFB7185)
+                  : const Color(0xFF38BDF8),
+            ),
+            child: pulse == null
+                ? MobileEmptyState(
+                    icon: pulseAsync.isLoading
+                        ? Icons.sync_rounded
+                        : Icons.wifi_tethering_error_rounded,
+                    title: pulseAsync.isLoading
+                        ? 'Refreshing workspace pulse'
+                        : 'Pulse not available',
+                    body: pulseAsync.isLoading
+                        ? 'Business Hub is generating owner/admin tasks and anomaly signals from the current workspace data.'
+                        : 'Pulse needs a live backend check to show cross-workspace tasks and anomaly warnings.',
+                  )
+                : Column(
+                    children: <Widget>[
+                      _DashboardRow(
+                        title: pulse.headline.title,
+                        subtitle: pulse.headline.body,
+                        trailing: pulse.headline.ctaLabel,
+                        accent: _pulseToneColor(pulse.headline.tone),
+                        onTap: () => context.go(
+                          _resolvePulseRoute(pulse.headline.route),
+                        ),
+                      ),
+                      ...pulse.tasks
+                          .take(2)
+                          .map(
+                            (task) => _DashboardRow(
+                              title: task.title,
+                              subtitle: task.body,
+                              trailing: task.priority.toUpperCase(),
+                              accent: _pulseToneColor(task.tone),
+                              onTap: () =>
+                                  context.go(_resolvePulseRoute(task.route)),
+                            ),
+                          ),
+                      if (pulse.anomalies.isNotEmpty)
+                        _DashboardRow(
+                          title: pulse.anomalies.first.title,
+                          subtitle: pulse.anomalies.first.body,
+                          trailing: pulse.anomalies.first.metricValue,
+                          accent: _pulseSeverityColor(
+                            pulse.anomalies.first.severity,
+                          ),
+                          onTap: () => context.go(
+                            _resolvePulseRoute(
+                              pulse.anomalies.first.route,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+          const SizedBox(height: 18),
+        ],
         MobilePanel(
           title: roleProfile.quickActionsTitle,
           action: MobileTag(
@@ -1372,4 +1448,45 @@ Color _syncTone(CommerceSyncState state) {
     CommerceSyncState.failed => const Color(0xFFFB7185),
     CommerceSyncState.localOnly => Colors.white70,
   };
+}
+
+String _resolvePulseRoute(String route) {
+  switch (route) {
+    case '/sales':
+      return '/history';
+    case '/plan':
+      return '/settings/plan';
+    case '/sessions':
+    case '/audit':
+    case '/migration':
+    case '/erpnext':
+      return '/settings/security';
+    default:
+      return route;
+  }
+}
+
+Color _pulseToneColor(String tone) {
+  switch (tone) {
+    case 'critical':
+    case 'danger':
+      return const Color(0xFFFB7185);
+    case 'warning':
+      return const Color(0xFFF59E0B);
+    case 'healthy':
+      return const Color(0xFF22C55E);
+    default:
+      return const Color(0xFF38BDF8);
+  }
+}
+
+Color _pulseSeverityColor(String severity) {
+  switch (severity) {
+    case 'critical':
+      return const Color(0xFFFB7185);
+    case 'warning':
+      return const Color(0xFFF59E0B);
+    default:
+      return const Color(0xFF38BDF8);
+  }
 }

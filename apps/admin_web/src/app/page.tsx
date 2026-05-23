@@ -7,6 +7,7 @@ import { WorkspacePlanCard } from "@/components/workspace-plan-card";
 import {
   getDashboardSnapshot,
   getSession,
+  getWorkspacePulse,
   resolveActiveShop,
 } from "@/lib/admin-api";
 import { formatCurrency } from "@/lib/formatters";
@@ -18,7 +19,7 @@ import {
   formatPlanTier,
 } from "@/lib/plans";
 import { canManageWorkspace } from "@/lib/roles";
-import type { DashboardSnapshot, ShopMembership } from "@/lib/types";
+import type { DashboardSnapshot, ShopMembership, WorkspacePulseSnapshot } from "@/lib/types";
 
 type QuickAction = {
   label: string;
@@ -136,6 +137,29 @@ function buildAttentionCard(
   };
 }
 
+function buildAttentionCardFromPulse(pulse: WorkspacePulseSnapshot | null) {
+  if (!pulse) {
+    return null;
+  }
+
+  const tone =
+    pulse.headline.tone === "critical" || pulse.headline.tone === "danger"
+      ? "text-[var(--warning)] border-[rgba(251,113,133,0.18)] bg-[rgba(40,12,19,0.72)]"
+      : pulse.headline.tone === "warning"
+      ? "text-[var(--warning)] border-[rgba(245,158,11,0.18)] bg-[rgba(77,49,9,0.34)]"
+      : pulse.headline.tone === "healthy"
+      ? "text-[var(--success)] border-[rgba(58,215,162,0.18)] bg-[rgba(8,34,26,0.72)]"
+      : "text-[var(--accent)] border-[rgba(71,176,255,0.18)] bg-[rgba(11,24,41,0.72)]";
+
+  return {
+    title: pulse.headline.title,
+    body: pulse.headline.body,
+    ctaLabel: pulse.headline.cta_label,
+    href: pulse.headline.route,
+    tone,
+  };
+}
+
 function buildPlanGuidance(activeShop: ShopMembership | null) {
   if (!activeShop) {
     return null;
@@ -168,16 +192,16 @@ export default async function HomePage() {
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
   const dashboardSnapshot = activeShop ? await getDashboardSnapshot(activeShop.shop.id) : null;
+  const pulseSnapshot = activeShop ? await getWorkspacePulse(activeShop.shop.id) : null;
   const quickActions = buildQuickActions(activeShop);
   const canUseAdvancedReports = canAccessAdvancedReports(activeShop);
   const canUseFinanceSummary = canAccessFinanceSummary(activeShop);
-  const attentionCard = buildAttentionCard(
-    dashboardSnapshot,
-    {
+  const attentionCard =
+    buildAttentionCardFromPulse(pulseSnapshot) ??
+    buildAttentionCard(dashboardSnapshot, {
       currencyCode: activeShop?.shop.currency_code ?? "INR",
       canUseFinanceSummary,
-    },
-  );
+    });
   const planGuidance = buildPlanGuidance(activeShop);
   const lowStockPreview = dashboardSnapshot?.low_stock_preview ?? [];
   const totalOutstanding = Number(dashboardSnapshot?.total_outstanding_balance ?? 0);
@@ -310,6 +334,49 @@ export default async function HomePage() {
                   ))}
                 </div>
               </div>
+
+              {pulseSnapshot ? (
+                <div className="panel-soft rounded-[28px] px-6 py-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="eyebrow">Pulse queue</p>
+                      <h2 className="mt-3 text-2xl font-bold">What needs owner/admin attention</h2>
+                    </div>
+                    <Link
+                      href="/pulse"
+                      className="rounded-full border border-[rgba(71,176,255,0.14)] bg-[rgba(71,176,255,0.08)] px-3 py-1 text-xs font-medium text-[var(--accent)]"
+                    >
+                      Open pulse
+                    </Link>
+                  </div>
+
+                  <div className="mt-5 space-y-3">
+                    {pulseSnapshot.tasks.length ? (
+                      pulseSnapshot.tasks.slice(0, 3).map((task) => (
+                        <Link
+                          key={task.code}
+                          href={task.route}
+                          className="surface-muted block rounded-[22px] px-4 py-4 transition hover:border-[rgba(71,176,255,0.18)] hover:bg-[rgba(14,22,34,0.72)]"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-base font-semibold">{task.title}</p>
+                            <span className="rounded-full border border-[rgba(152,164,189,0.12)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+                              {task.priority}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+                            {task.body}
+                          </p>
+                        </Link>
+                      ))
+                    ) : (
+                      <p className="text-sm text-[var(--text-secondary)]">
+                        No open pulse tasks right now.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="space-y-6">
@@ -341,6 +408,45 @@ export default async function HomePage() {
                   )}
                 </div>
               </div>
+
+              {pulseSnapshot ? (
+                <div className="panel-soft rounded-[28px] px-6 py-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="eyebrow">Anomaly watch</p>
+                      <h2 className="mt-3 text-2xl font-bold">Unusual store signals</h2>
+                    </div>
+                    <span className="rounded-full border border-[rgba(245,158,11,0.18)] bg-[rgba(77,49,9,0.34)] px-3 py-1 text-xs font-medium text-[var(--warning)]">
+                      {pulseSnapshot.stats.critical_anomaly_count + pulseSnapshot.stats.warning_anomaly_count} live
+                    </span>
+                  </div>
+                  <div className="mt-5 space-y-3">
+                    {pulseSnapshot.anomalies.length ? (
+                      pulseSnapshot.anomalies.slice(0, 3).map((anomaly) => (
+                        <Link
+                          key={anomaly.code}
+                          href={anomaly.route}
+                          className="surface-muted block rounded-[22px] px-4 py-4 transition hover:border-[rgba(245,158,11,0.18)] hover:bg-[rgba(21,18,12,0.72)]"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-base font-semibold">{anomaly.title}</p>
+                            <span className="rounded-full border border-[rgba(245,158,11,0.18)] px-3 py-1 text-xs font-semibold text-[var(--warning)]">
+                              {anomaly.metric_value}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+                            {anomaly.body}
+                          </p>
+                        </Link>
+                      ))
+                    ) : (
+                      <p className="text-sm text-[var(--text-secondary)]">
+                        No anomaly signals are active right now.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : null}
 
               <div className="panel-soft rounded-[28px] px-6 py-6">
                 <p className="eyebrow">Workspace access</p>

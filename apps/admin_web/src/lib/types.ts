@@ -238,6 +238,53 @@ export type DashboardSnapshot = {
   low_stock_preview: DashboardLowStockItem[];
 };
 
+export type WorkspacePulseHeadline = {
+  title: string;
+  body: string;
+  route: string;
+  cta_label: string;
+  tone: "critical" | "danger" | "warning" | "info" | "healthy" | string;
+};
+
+export type WorkspacePulseTask = {
+  code: string;
+  priority: "critical" | "high" | "medium" | "low" | string;
+  tone: "danger" | "warning" | "info" | "healthy" | string;
+  title: string;
+  body: string;
+  route: string;
+  cta_label: string;
+  count: number;
+  metadata_json: Record<string, unknown>;
+};
+
+export type WorkspacePulseAnomaly = {
+  code: string;
+  severity: "critical" | "warning" | "info" | string;
+  title: string;
+  body: string;
+  route: string;
+  cta_label: string;
+  metric_value: string;
+  metadata_json: Record<string, unknown>;
+};
+
+export type WorkspacePulseSnapshot = {
+  refreshed_at: string;
+  headline: WorkspacePulseHeadline;
+  stats: {
+    open_task_count: number;
+    critical_anomaly_count: number;
+    warning_anomaly_count: number;
+    stale_session_count: number;
+    wipe_pending_count: number;
+    open_plan_request_count: number;
+    low_stock_count: number;
+  };
+  tasks: WorkspacePulseTask[];
+  anomalies: WorkspacePulseAnomaly[];
+};
+
 export type Customer = {
   id: string;
   name: string;

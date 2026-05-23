@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../database/mobile_repository.dart';
+import '../backend/backend_api_client.dart';
 import '../models/mobile_models.dart';
+import '../session/mobile_session_controller.dart';
 
 final shopInfoProvider = StreamProvider<ShopInfo>((ref) {
   final shopRepository = ref.watch(shopRepositoryProvider);
@@ -21,6 +23,18 @@ final pendingOutboxCountProvider = StreamProvider<int>((ref) {
 final mobileMfaVerifiedUntilProvider = StreamProvider<DateTime?>((ref) {
   final shopRepository = ref.watch(shopRepositoryProvider);
   return shopRepository.watchMfaVerifiedUntil();
+});
+
+final workspacePulseProvider = FutureProvider<WorkspacePulseSnapshot?>((ref) async {
+  final session = await ref.watch(mobileSessionProvider.future);
+  if (session == null || !session.isOwnerLike || !session.hasShop) {
+    return null;
+  }
+
+  return ref.read(backendApiClientProvider).getWorkspacePulse(
+    user: session.user,
+    shopId: session.shopId!,
+  );
 });
 
 final dashboardOverviewProvider =

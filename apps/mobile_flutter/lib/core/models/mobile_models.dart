@@ -123,6 +123,104 @@ class UserMfaVerifyResult {
   final DateTime verifiedUntil;
 }
 
+class WorkspacePulseHeadline {
+  const WorkspacePulseHeadline({
+    required this.title,
+    required this.body,
+    required this.route,
+    required this.ctaLabel,
+    required this.tone,
+  });
+
+  final String title;
+  final String body;
+  final String route;
+  final String ctaLabel;
+  final String tone;
+}
+
+class WorkspacePulseTask {
+  const WorkspacePulseTask({
+    required this.code,
+    required this.priority,
+    required this.tone,
+    required this.title,
+    required this.body,
+    required this.route,
+    required this.ctaLabel,
+    required this.count,
+    this.metadata = const <String, dynamic>{},
+  });
+
+  final String code;
+  final String priority;
+  final String tone;
+  final String title;
+  final String body;
+  final String route;
+  final String ctaLabel;
+  final int count;
+  final Map<String, dynamic> metadata;
+}
+
+class WorkspacePulseAnomaly {
+  const WorkspacePulseAnomaly({
+    required this.code,
+    required this.severity,
+    required this.title,
+    required this.body,
+    required this.route,
+    required this.ctaLabel,
+    required this.metricValue,
+    this.metadata = const <String, dynamic>{},
+  });
+
+  final String code;
+  final String severity;
+  final String title;
+  final String body;
+  final String route;
+  final String ctaLabel;
+  final String metricValue;
+  final Map<String, dynamic> metadata;
+}
+
+class WorkspacePulseStats {
+  const WorkspacePulseStats({
+    required this.openTaskCount,
+    required this.criticalAnomalyCount,
+    required this.warningAnomalyCount,
+    required this.staleSessionCount,
+    required this.wipePendingCount,
+    required this.openPlanRequestCount,
+    required this.lowStockCount,
+  });
+
+  final int openTaskCount;
+  final int criticalAnomalyCount;
+  final int warningAnomalyCount;
+  final int staleSessionCount;
+  final int wipePendingCount;
+  final int openPlanRequestCount;
+  final int lowStockCount;
+}
+
+class WorkspacePulseSnapshot {
+  const WorkspacePulseSnapshot({
+    required this.refreshedAt,
+    required this.headline,
+    required this.stats,
+    required this.tasks,
+    required this.anomalies,
+  });
+
+  final DateTime refreshedAt;
+  final WorkspacePulseHeadline headline;
+  final WorkspacePulseStats stats;
+  final List<WorkspacePulseTask> tasks;
+  final List<WorkspacePulseAnomaly> anomalies;
+}
+
 String _normalizePlanTier(String value) {
   final normalized = value.trim().toLowerCase();
   if (normalized == 'starter' || normalized == 'pro') {
