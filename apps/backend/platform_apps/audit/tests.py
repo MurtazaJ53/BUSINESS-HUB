@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -124,3 +125,19 @@ class WorkspaceAuditApiTests(TestCase):
         self.client.force_authenticate(user=self.staff)
         response = self.client.get(f"/api/v1/shops/{self.shop.id}/audit/")
         self.assertEqual(response.status_code, 403)
+
+    def test_workspace_audit_event_is_append_only_for_updates(self):
+        self.event.summary = "Tampered summary"
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            "Workspace audit events are append-only and cannot be modified.",
+        ):
+            self.event.save()
+
+    def test_workspace_audit_event_is_append_only_for_deletes(self):
+        with self.assertRaisesMessage(
+            ValidationError,
+            "Workspace audit events are append-only and cannot be deleted.",
+        ):
+            self.event.delete()

@@ -64,6 +64,11 @@ Risky device posture now feeds the owner/admin pulse desk automatically so devic
 
 Owner/admin users can now review append-only audit events for important workspace changes.
 
+Workspace audit events are now protected as append-only records at the backend model layer:
+- existing audit rows cannot be edited
+- existing audit rows cannot be deleted
+- the Django admin audit surface is read-only
+
 Audited areas currently include:
 - plan requests
 - team changes

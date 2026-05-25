@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from platform_apps.common.migration import MigrationDomain, ReconciliationSeverity, ReconciliationStatus
@@ -89,6 +90,14 @@ class WorkspaceAuditEvent(UUIDStampedModel):
             models.Index(fields=["actor_user", "occurred_at"]),
             models.Index(fields=["event_type", "occurred_at"]),
         ]
+
+    def save(self, *args, **kwargs):
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError("Workspace audit events are append-only and cannot be modified.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, using=None, keep_parents=False):
+        raise ValidationError("Workspace audit events are append-only and cannot be deleted.")
 
     def __str__(self) -> str:
         return f"{self.shop_id}:{self.category}:{self.event_type}"
