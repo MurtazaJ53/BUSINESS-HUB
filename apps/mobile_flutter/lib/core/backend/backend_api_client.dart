@@ -265,6 +265,69 @@ class BackendApiClient {
     return _mapAttendanceSession(decoded);
   }
 
+  Future<ExpenseSummarySnapshot> getExpenseSummary({
+    required User user,
+    required String shopId,
+  }) async {
+    final decoded = await _request(
+      user: user,
+      method: 'GET',
+      path: '/shops/$shopId/expenses/summary/',
+    );
+    return ExpenseSummarySnapshot(
+      totalEntries: _asInt(decoded['total_entries']),
+      totalAmount: _asDouble(decoded['total_amount']),
+      uniqueCategories: _asInt(decoded['unique_categories']),
+      biggestCategory: _nullableText(decoded['biggest_category']),
+    );
+  }
+
+  Future<List<ExpenseRecord>> getExpenses({
+    required User user,
+    required String shopId,
+    String query = '',
+    String category = '',
+  }) async {
+    final queryParts = <String>[];
+    if (query.trim().isNotEmpty) {
+      queryParts.add('q=${Uri.encodeQueryComponent(query.trim())}');
+    }
+    if (category.trim().isNotEmpty) {
+      queryParts.add('category=${Uri.encodeQueryComponent(category.trim())}');
+    }
+    final path = queryParts.isEmpty
+        ? '/shops/$shopId/expenses/'
+        : '/shops/$shopId/expenses/?${queryParts.join('&')}';
+    final decoded = await _requestList(user: user, method: 'GET', path: path);
+    return decoded.map(_mapExpense).toList(growable: false);
+  }
+
+  Future<ExpenseRecord> createExpense({
+    required User user,
+    required String shopId,
+    required String category,
+    required double amount,
+    required DateTime expenseDate,
+    String description = '',
+    String paymentMethod = 'CASH',
+    String paymentReference = '',
+  }) async {
+    final decoded = await _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/expenses/',
+      body: <String, dynamic>{
+        'category': category,
+        'amount': amount.toStringAsFixed(2),
+        'description': description,
+        'payment_method': paymentMethod,
+        'payment_reference': paymentReference,
+        'expense_date': expenseDate.toIso8601String().split('T').first,
+      },
+    );
+    return _mapExpense(decoded);
+  }
+
   Future<BackendCommandResponse> submitSaleCommand({
     required User user,
     required String shopId,
@@ -986,6 +1049,20 @@ class BackendApiClient {
       overtimeHours: _asDouble(row['overtime_hours']),
       bonusAmount: _asDouble(row['bonus_amount']),
       note: (row['note'] ?? '').toString(),
+      tombstone: row['tombstone'] == true,
+    );
+  }
+
+  ExpenseRecord _mapExpense(Map<String, dynamic> row) {
+    return ExpenseRecord(
+      id: (row['id'] ?? '').toString(),
+      category: (row['category'] ?? 'Expense').toString(),
+      amount: _asDouble(row['amount']),
+      description: (row['description'] ?? '').toString(),
+      paymentMethod: (row['payment_method'] ?? 'CASH').toString(),
+      paymentReference: (row['payment_reference'] ?? '').toString(),
+      expenseDate: _asDateTime(row['expense_date']),
+      actorName: _nullableText(row['actor_name']),
       tombstone: row['tombstone'] == true,
     );
   }

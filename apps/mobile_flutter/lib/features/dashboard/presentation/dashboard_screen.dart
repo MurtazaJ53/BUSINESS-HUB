@@ -100,6 +100,16 @@ class DashboardScreen extends ConsumerWidget {
           accent: const Color(0xFF14B8A6),
           onTap: () => context.push('/settings/attendance'),
         ),
+      if (shop.supportsExpenses)
+        _QuickActionTile(
+          icon: Icons.payments_rounded,
+          title: 'Expenses',
+          subtitle: session?.isOwnerLike ?? false
+              ? 'Review spend and capture costs'
+              : 'Log store spending',
+          accent: const Color(0xFFFB7185),
+          onTap: () => context.push('/settings/expenses'),
+        ),
     ];
     final metricCards = roleProfile.buildMetrics(
       overview: overview,

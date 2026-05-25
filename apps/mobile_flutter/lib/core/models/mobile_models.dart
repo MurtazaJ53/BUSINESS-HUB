@@ -179,6 +179,44 @@ class AttendanceSessionRecord {
   final bool tombstone;
 }
 
+class ExpenseSummarySnapshot {
+  const ExpenseSummarySnapshot({
+    required this.totalEntries,
+    required this.totalAmount,
+    required this.uniqueCategories,
+    required this.biggestCategory,
+  });
+
+  final int totalEntries;
+  final double totalAmount;
+  final int uniqueCategories;
+  final String? biggestCategory;
+}
+
+class ExpenseRecord {
+  const ExpenseRecord({
+    required this.id,
+    required this.category,
+    required this.amount,
+    required this.description,
+    required this.paymentMethod,
+    required this.paymentReference,
+    required this.expenseDate,
+    required this.actorName,
+    required this.tombstone,
+  });
+
+  final String id;
+  final String category;
+  final double amount;
+  final String description;
+  final String paymentMethod;
+  final String paymentReference;
+  final DateTime expenseDate;
+  final String? actorName;
+  final bool tombstone;
+}
+
 class WorkspaceAccessSessionHeartbeatResult {
   const WorkspaceAccessSessionHeartbeatResult({
     required this.sessionId,

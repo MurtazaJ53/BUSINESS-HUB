@@ -147,6 +147,30 @@ final attendanceSessionsProvider =
           );
     });
 
+final expenseSummaryProvider = FutureProvider<ExpenseSummarySnapshot?>((
+  ref,
+) async {
+  final session = await ref.watch(mobileSessionProvider.future);
+  if (session == null || !session.hasShop) {
+    return null;
+  }
+
+  return ref
+      .read(backendApiClientProvider)
+      .getExpenseSummary(user: session.user, shopId: session.shopId!);
+});
+
+final expensesProvider = FutureProvider<List<ExpenseRecord>>((ref) async {
+  final session = await ref.watch(mobileSessionProvider.future);
+  if (session == null || !session.hasShop) {
+    return const <ExpenseRecord>[];
+  }
+
+  return ref
+      .read(backendApiClientProvider)
+      .getExpenses(user: session.user, shopId: session.shopId!);
+});
+
 final dashboardOverviewProvider =
     StreamProvider.family<DashboardOverview, bool>((ref, includeCost) {
       final inventoryRepository = ref.watch(inventoryRepositoryProvider);

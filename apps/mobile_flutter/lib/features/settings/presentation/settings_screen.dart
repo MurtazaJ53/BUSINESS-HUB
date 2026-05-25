@@ -34,6 +34,8 @@ class SettingsScreen extends ConsumerWidget {
         teamMembersAsync.asData?.value ?? const <WorkspaceTeamMemberRecord>[];
     final attendanceSummaryAsync = ref.watch(attendanceSummaryProvider);
     final attendanceSummary = attendanceSummaryAsync.asData?.value;
+    final expenseSummaryAsync = ref.watch(expenseSummaryProvider);
+    final expenseSummary = expenseSummaryAsync.asData?.value;
     final history =
         ref.watch(historyOverviewProvider).asData?.value ??
         HistoryOverview.empty();
@@ -119,7 +121,7 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 18),
           MobilePanel(
             title: session?.isOwnerLike ?? false
-                ? 'Team and staffing'
+                ? 'Team and operations'
                 : 'My shop access',
             action: MobileTag(
               label: session?.isOwnerLike ?? false
@@ -143,8 +145,8 @@ class SettingsScreen extends ConsumerWidget {
               children: <Widget>[
                 Text(
                   session?.isOwnerLike ?? false
-                      ? 'Attach staff with the exact email they will use on the phone, control who is admin or viewer, and keep attendance inside the same product.'
-                      : 'Your owner or store admin must attach this exact email to the workspace first. After that, sign in with the same email and use Attendance from here when your shift starts.',
+                      ? 'Attach staff with the exact email they will use on the phone, control who is admin or viewer, and keep attendance and expenses inside the same product.'
+                      : 'Your owner or store admin must attach this exact email to the workspace first. After that, sign in with the same email and use attendance and store operations from here during the shift.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.white.withValues(alpha: 0.72),
                     height: 1.45,
@@ -169,9 +171,20 @@ class SettingsScreen extends ConsumerWidget {
                         icon: Icons.check_circle_rounded,
                         accent: const Color(0xFF38BDF8),
                       ),
+                      if (shop.supportsExpenses)
+                        MobileTag(
+                          label: expenseSummaryAsync.isLoading
+                              ? 'Refreshing spend'
+                              : formatCurrency(
+                                  expenseSummary?.totalAmount ?? 0,
+                                ),
+                          icon: Icons.payments_rounded,
+                          accent: const Color(0xFFF59E0B),
+                        ),
                     ],
                   ),
-                if (shop.supportsAttendance) const SizedBox(height: 14),
+                if (shop.supportsAttendance || shop.supportsExpenses)
+                  const SizedBox(height: 14),
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final stacked = constraints.maxWidth < 430;
@@ -194,6 +207,16 @@ class SettingsScreen extends ConsumerWidget {
                             },
                             icon: const Icon(Icons.fact_check_rounded),
                             label: const Text('Attendance'),
+                          ),
+                        ),
+                      if (shop.supportsExpenses)
+                        Expanded(
+                          child: FilledButton.tonalIcon(
+                            onPressed: () {
+                              context.push('/settings/expenses');
+                            },
+                            icon: const Icon(Icons.payments_rounded),
+                            label: const Text('Expenses'),
                           ),
                         ),
                     ];

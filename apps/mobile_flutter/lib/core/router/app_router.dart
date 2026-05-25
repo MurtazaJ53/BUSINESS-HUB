@@ -10,6 +10,7 @@ import '../../features/inventory/presentation/inventory_screen.dart';
 import '../../features/pos/presentation/pos_screen.dart';
 import '../../features/settings/presentation/settings_ops_screen.dart';
 import '../../features/settings/presentation/settings_attendance_screen.dart';
+import '../../features/settings/presentation/settings_expenses_screen.dart';
 import '../../features/settings/presentation/settings_plan_screen.dart';
 import '../../features/settings/presentation/settings_pulse_screen.dart';
 import '../../features/settings/presentation/settings_security_screen.dart';
@@ -107,6 +108,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: 'attendance',
             pageBuilder: (context, state) =>
                 const NoTransitionPage<void>(child: SettingsAttendanceScreen()),
+          ),
+          GoRoute(
+            parentNavigatorKey: appRootNavigatorKey,
+            path: 'expenses',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage<void>(child: SettingsExpensesScreen()),
           ),
           GoRoute(
             parentNavigatorKey: appRootNavigatorKey,
