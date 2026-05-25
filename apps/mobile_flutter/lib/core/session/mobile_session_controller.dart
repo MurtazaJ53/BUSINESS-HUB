@@ -2,6 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../backend/backend_api_client.dart';
+import '../models/mobile_models.dart';
 import '../models/mobile_session.dart';
 
 final mobileSessionProvider = StreamProvider<MobileSession?>((ref) async* {
@@ -21,6 +23,7 @@ final mobileSessionProvider = StreamProvider<MobileSession?>((ref) async* {
       user,
       claims,
       fallbackRole: recoveredContext?.role,
+      fallbackMembershipId: recoveredContext?.membershipId,
       fallbackPermissions: recoveredContext?.permissions,
       fallbackShopId: recoveredContext?.shopId,
       fallbackIsElevatedAdmin: recoveredContext?.isElevatedAdmin ?? false,
@@ -32,12 +35,14 @@ class _RecoveredWorkspaceContext {
   const _RecoveredWorkspaceContext({
     required this.shopId,
     required this.role,
+    this.membershipId,
     this.permissions,
     this.isElevatedAdmin = false,
   });
 
   final String shopId;
   final String? role;
+  final String? membershipId;
   final Map<String, dynamic>? permissions;
   final bool isElevatedAdmin;
 }
@@ -50,6 +55,7 @@ Future<_RecoveredWorkspaceContext?> _recoverWorkspaceContext(
     return _RecoveredWorkspaceContext(
       shopId: claims['shopId'].toString(),
       role: claims['role']?.toString(),
+      membershipId: claims['membershipId']?.toString(),
       permissions: claims['perms'] is Map
           ? Map<String, dynamic>.from(claims['perms'] as Map)
           : null,
@@ -98,15 +104,55 @@ Future<_RecoveredWorkspaceContext?> _recoverWorkspaceContext(
           permissions: staffData['permissions'] is Map
               ? Map<String, dynamic>.from(staffData['permissions'] as Map)
               : null,
-          isElevatedAdmin:
-              <String>{'admin', 'owner'}.contains(
-                (staffData['role']?.toString() ?? '').toLowerCase(),
-              ),
+          isElevatedAdmin: <String>{
+            'admin',
+            'owner',
+          }.contains((staffData['role']?.toString() ?? '').toLowerCase()),
         );
       }
     }
   } catch (_) {
     // Fall back to owner-based recovery.
+  }
+
+  try {
+    final backendClient = BackendApiClient(
+      baseUrl: const String.fromEnvironment(
+        'BUSINESS_HUB_API_BASE_URL',
+        defaultValue: 'http://10.0.2.2:8000/api/v1',
+      ),
+    );
+    final memberships = await backendClient.getShopMemberships(user: user);
+    final selectedMembership = memberships
+        .where((item) => item.isActive)
+        .fold<ShopMembershipAccessRecord?>(null, (current, next) {
+          if (current == null) {
+            return next;
+          }
+          const roleRank = <String, int>{
+            'owner': 4,
+            'admin': 3,
+            'staff': 2,
+            'viewer': 1,
+          };
+          final currentRank = roleRank[current.role] ?? 0;
+          final nextRank = roleRank[next.role] ?? 0;
+          return nextRank > currentRank ? next : current;
+        });
+    if (selectedMembership != null &&
+        selectedMembership.shopId.trim().isNotEmpty) {
+      return _RecoveredWorkspaceContext(
+        shopId: selectedMembership.shopId,
+        role: selectedMembership.role,
+        membershipId: selectedMembership.id,
+        isElevatedAdmin: const <String>{
+          'owner',
+          'admin',
+        }.contains(selectedMembership.role.toLowerCase()),
+      );
+    }
+  } catch (_) {
+    // Fall through to owner-based recovery.
   }
 
   try {

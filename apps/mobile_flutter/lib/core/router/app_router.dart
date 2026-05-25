@@ -9,11 +9,13 @@ import '../../features/history/presentation/history_screen.dart';
 import '../../features/inventory/presentation/inventory_screen.dart';
 import '../../features/pos/presentation/pos_screen.dart';
 import '../../features/settings/presentation/settings_ops_screen.dart';
+import '../../features/settings/presentation/settings_attendance_screen.dart';
 import '../../features/settings/presentation/settings_plan_screen.dart';
 import '../../features/settings/presentation/settings_pulse_screen.dart';
 import '../../features/settings/presentation/settings_security_screen.dart';
 import '../../features/settings/presentation/settings_sessions_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
+import '../../features/settings/presentation/settings_team_screen.dart';
 import '../../features/shell/presentation/mobile_shell_screen.dart';
 
 final GlobalKey<NavigatorState> appRootNavigatorKey =
@@ -93,6 +95,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: 'security',
             pageBuilder: (context, state) =>
                 const NoTransitionPage<void>(child: SettingsSecurityScreen()),
+          ),
+          GoRoute(
+            parentNavigatorKey: appRootNavigatorKey,
+            path: 'team',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage<void>(child: SettingsTeamScreen()),
+          ),
+          GoRoute(
+            parentNavigatorKey: appRootNavigatorKey,
+            path: 'attendance',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage<void>(child: SettingsAttendanceScreen()),
           ),
           GoRoute(
             parentNavigatorKey: appRootNavigatorKey,

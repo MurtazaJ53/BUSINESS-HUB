@@ -147,10 +147,11 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen> {
                 children: <Widget>[
                   const _BrandedStatus(
                     icon: Icons.sync_problem_rounded,
-                    eyebrow: 'Workspace recovery',
-                    title: 'Your account is in, shop link is still healing',
+                    eyebrow: 'Workspace access missing',
+                    title:
+                        'Your email is signed in, but this shop is not attached yet',
                     subtitle:
-                        'The mobile app is refreshing workspace ownership and staff membership so your Business Hub data can attach correctly.',
+                        'Ask the owner or store admin to add this exact email in Workspace team first. After that, sign in again, or use password recovery if this is your first mobile login.',
                   ),
                   const SizedBox(height: 18),
                   FilledButton.tonalIcon(

@@ -6,6 +6,7 @@ class MobileSession {
     required this.email,
     required this.uid,
     required this.role,
+    required this.membershipId,
     required this.permissions,
     required this.shopId,
     required this.isElevatedAdmin,
@@ -15,6 +16,7 @@ class MobileSession {
   final String email;
   final String uid;
   final String? role;
+  final String? membershipId;
   final Map<String, dynamic>? permissions;
   final String? shopId;
   final bool isElevatedAdmin;
@@ -88,6 +90,7 @@ class MobileSession {
     User user,
     Map<String, dynamic>? claims, {
     String? fallbackRole,
+    String? fallbackMembershipId,
     Map<String, dynamic>? fallbackPermissions,
     String? fallbackShopId,
     bool fallbackIsElevatedAdmin = false,
@@ -97,6 +100,7 @@ class MobileSession {
       email: user.email ?? '',
       uid: user.uid,
       role: claims?['role']?.toString() ?? fallbackRole,
+      membershipId: claims?['membershipId']?.toString() ?? fallbackMembershipId,
       permissions: claims?['perms'] is Map<String, dynamic>
           ? Map<String, dynamic>.from(claims!['perms'] as Map)
           : fallbackPermissions,

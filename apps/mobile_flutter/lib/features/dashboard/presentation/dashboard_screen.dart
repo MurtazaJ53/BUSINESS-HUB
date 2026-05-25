@@ -90,6 +90,16 @@ class DashboardScreen extends ConsumerWidget {
         accent: const Color(0xFFF59E0B),
         onTap: () => context.go('/history'),
       ),
+      if (shop.supportsAttendance)
+        _QuickActionTile(
+          icon: Icons.fact_check_rounded,
+          title: 'Attendance',
+          subtitle: session?.isOwnerLike ?? false
+              ? 'Review the floor and mark shifts'
+              : 'Mark your day and review shifts',
+          accent: const Color(0xFF14B8A6),
+          onTap: () => context.push('/settings/attendance'),
+        ),
     ];
     final metricCards = roleProfile.buildMetrics(
       overview: overview,
@@ -108,7 +118,9 @@ class DashboardScreen extends ConsumerWidget {
             MobileMetricCard(
               label: 'Low stock',
               value: '${overview.metrics.lowStock}',
-              caption: overview.metrics.lowStock > 0 ? 'Needs refill' : 'Healthy',
+              caption: overview.metrics.lowStock > 0
+                  ? 'Needs refill'
+                  : 'Healthy',
               icon: Icons.warning_amber_rounded,
               accent: overview.metrics.lowStock > 0
                   ? const Color(0xFFFB7185)
@@ -223,7 +235,8 @@ class DashboardScreen extends ConsumerWidget {
           },
         ),
         const SizedBox(height: 18),
-        if ((session?.isOwnerLike ?? false) && !shop.supportsFinanceSummary) ...<Widget>[
+        if ((session?.isOwnerLike ?? false) &&
+            !shop.supportsFinanceSummary) ...<Widget>[
           MobilePanel(
             title: 'Plan compare',
             action: MobileTag(
@@ -593,25 +606,26 @@ class _OwnerPulsePanel extends ConsumerWidget {
                   subtitle: pulse.headline.body,
                   trailing: pulse.headline.ctaLabel,
                   accent: _pulseToneColor(pulse.headline.tone),
-                  onTap: () => context.go(_resolvePulseRoute(pulse.headline.route)),
+                  onTap: () =>
+                      context.go(_resolvePulseRoute(pulse.headline.route)),
                 ),
-                ...pulse.tasks.take(2).map(
-                  (task) => _DashboardRow(
-                    title: task.title,
-                    subtitle: task.body,
-                    trailing: task.priority.toUpperCase(),
-                    accent: _pulseToneColor(task.tone),
-                    onTap: () => context.go(_resolvePulseRoute(task.route)),
-                  ),
-                ),
+                ...pulse.tasks
+                    .take(2)
+                    .map(
+                      (task) => _DashboardRow(
+                        title: task.title,
+                        subtitle: task.body,
+                        trailing: task.priority.toUpperCase(),
+                        accent: _pulseToneColor(task.tone),
+                        onTap: () => context.go(_resolvePulseRoute(task.route)),
+                      ),
+                    ),
                 if (pulse.anomalies.isNotEmpty)
                   _DashboardRow(
                     title: pulse.anomalies.first.title,
                     subtitle: pulse.anomalies.first.body,
                     trailing: pulse.anomalies.first.metricValue,
-                    accent: _pulseSeverityColor(
-                      pulse.anomalies.first.severity,
-                    ),
+                    accent: _pulseSeverityColor(pulse.anomalies.first.severity),
                     onTap: () => context.go(
                       _resolvePulseRoute(pulse.anomalies.first.route),
                     ),
@@ -1054,10 +1068,7 @@ List<String> _dashboardNextPlanLines(ShopInfo shop) {
 }
 
 class _DashboardPlanBlock extends StatelessWidget {
-  const _DashboardPlanBlock({
-    required this.title,
-    required this.lines,
-  });
+  const _DashboardPlanBlock({required this.title, required this.lines});
 
   final String title;
   final List<String> lines;

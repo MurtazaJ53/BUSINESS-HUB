@@ -21,6 +21,7 @@ from platform_apps.shops.roles import (
     normalize_membership_role,
 )
 from platform_apps.shops.session_trust import evaluate_workspace_session_trust
+from platform_apps.users.firebase_accounts import ensure_firebase_email_account
 from platform_apps.users.models import PlatformUser
 
 
@@ -228,6 +229,8 @@ class WorkspaceTeamMemberCreateSerializer(serializers.Serializer):
         if full_name and user.full_name != full_name:
             user.full_name = full_name
             user.save(update_fields=["full_name", "updated_at"])
+
+        ensure_firebase_email_account(email=email, full_name=full_name)
 
         membership, membership_created = ShopMembership.objects.get_or_create(
             user=user,

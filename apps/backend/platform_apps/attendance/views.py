@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.db.models import Count, Q
 from django.utils import timezone
+from rest_framework import exceptions
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -87,10 +88,22 @@ class AttendanceSessionListCreateView(ShopScopedMixin, generics.ListCreateAPIVie
         return context
 
     def perform_create(self, serializer):
-        membership = get_membership_or_403(
-            self.request.user, self.kwargs["shop_id"], ShopMembership.Role.ADMIN
-        )
+        membership = self.get_membership()
         ensure_feature_enabled_or_403(membership, "attendance")
+        target_membership = self.get_membership_map().get(
+            str(serializer.validated_data["membership_id"])
+        )
+        if target_membership is None:
+            raise exceptions.PermissionDenied(
+                "Attendance membership is outside this workspace."
+            )
+        if membership.role not in {
+            ShopMembership.Role.OWNER,
+            ShopMembership.Role.ADMIN,
+        } and target_membership.id != membership.id:
+            raise exceptions.PermissionDenied(
+                "Daily operators can only mark attendance for themselves."
+            )
         serializer.save()
 
 

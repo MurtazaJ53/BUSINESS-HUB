@@ -137,3 +137,37 @@ class AttendanceApiTests(TestCase):
             format="json",
         )
         self.assertEqual(create_response.status_code, 403)
+
+    def test_staff_can_mark_their_own_attendance(self):
+        staff_client = APIClient()
+        staff_client.force_authenticate(user=self.staff)
+
+        response = staff_client.post(
+            f"/api/v1/shops/{self.shop.id}/attendance/",
+            {
+                "membership_id": str(self.staff_membership.id),
+                "session_date": "2026-04-30",
+                "status": "PRESENT",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        session = AttendanceSession.objects.get(membership=self.staff_membership)
+        self.assertEqual(session.status, AttendanceSession.Status.PRESENT)
+
+    def test_staff_cannot_mark_someone_else_attendance(self):
+        staff_client = APIClient()
+        staff_client.force_authenticate(user=self.staff)
+
+        response = staff_client.post(
+            f"/api/v1/shops/{self.shop.id}/attendance/",
+            {
+                "membership_id": str(self.owner_membership.id),
+                "session_date": "2026-04-30",
+                "status": "PRESENT",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)

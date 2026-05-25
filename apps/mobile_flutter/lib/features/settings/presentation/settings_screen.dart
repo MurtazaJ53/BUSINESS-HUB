@@ -25,10 +25,15 @@ class SettingsScreen extends ConsumerWidget {
     final pulseAsync = ref.watch(workspacePulseProvider);
     final pulse = pulseAsync.asData?.value;
     final sessionsAsync = ref.watch(workspaceAccessSessionsProvider);
-    final sessions = sessionsAsync.asData?.value ??
-        const <WorkspaceAccessSessionRecord>[];
+    final sessions =
+        sessionsAsync.asData?.value ?? const <WorkspaceAccessSessionRecord>[];
     final shop =
         ref.watch(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
+    final teamMembersAsync = ref.watch(workspaceTeamMembersProvider);
+    final teamMembers =
+        teamMembersAsync.asData?.value ?? const <WorkspaceTeamMemberRecord>[];
+    final attendanceSummaryAsync = ref.watch(attendanceSummaryProvider);
+    final attendanceSummary = attendanceSummaryAsync.asData?.value;
     final history =
         ref.watch(historyOverviewProvider).asData?.value ??
         HistoryOverview.empty();
@@ -107,6 +112,122 @@ class SettingsScreen extends ConsumerWidget {
                   label: 'Plan',
                   value: '${shop.planLabel} plan',
                   icon: Icons.workspace_premium_rounded,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          MobilePanel(
+            title: session?.isOwnerLike ?? false
+                ? 'Team and staffing'
+                : 'My shop access',
+            action: MobileTag(
+              label: session?.isOwnerLike ?? false
+                  ? teamMembers.isEmpty
+                        ? (teamMembersAsync.isLoading
+                              ? 'Refreshing'
+                              : 'No team')
+                        : '${teamMembers.length} attached'
+                  : shop.supportsAttendance
+                  ? (attendanceSummaryAsync.isLoading
+                        ? 'Refreshing'
+                        : '${attendanceSummary?.totalSessions ?? 0} records')
+                  : 'Shop access',
+              icon: session?.isOwnerLike ?? false
+                  ? Icons.groups_rounded
+                  : Icons.badge_rounded,
+              accent: const Color(0xFF38BDF8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  session?.isOwnerLike ?? false
+                      ? 'Attach staff with the exact email they will use on the phone, control who is admin or viewer, and keep attendance inside the same product.'
+                      : 'Your owner or store admin must attach this exact email to the workspace first. After that, sign in with the same email and use Attendance from here when your shift starts.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                if (shop.supportsAttendance)
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: <Widget>[
+                      if (session?.isOwnerLike ?? false)
+                        MobileTag(
+                          label:
+                              '${attendanceSummary?.activeWorkersToday ?? 0} on floor today',
+                          icon: Icons.groups_rounded,
+                          accent: const Color(0xFF22C55E),
+                        ),
+                      MobileTag(
+                        label:
+                            '${attendanceSummary?.presentCount ?? 0} present records',
+                        icon: Icons.check_circle_rounded,
+                        accent: const Color(0xFF38BDF8),
+                      ),
+                    ],
+                  ),
+                if (shop.supportsAttendance) const SizedBox(height: 14),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final stacked = constraints.maxWidth < 430;
+                    final actions = <Widget>[
+                      if (session?.isOwnerLike ?? false)
+                        Expanded(
+                          child: FilledButton.tonalIcon(
+                            onPressed: () {
+                              context.push('/settings/team');
+                            },
+                            icon: const Icon(Icons.groups_rounded),
+                            label: const Text('Workspace team'),
+                          ),
+                        ),
+                      if (shop.supportsAttendance)
+                        Expanded(
+                          child: FilledButton.tonalIcon(
+                            onPressed: () {
+                              context.push('/settings/attendance');
+                            },
+                            icon: const Icon(Icons.fact_check_rounded),
+                            label: const Text('Attendance'),
+                          ),
+                        ),
+                    ];
+
+                    if (actions.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+
+                    if (stacked) {
+                      return Column(
+                        children: actions
+                            .expand(
+                              (widget) => <Widget>[
+                                widget,
+                                if (widget != actions.last)
+                                  const SizedBox(height: 10),
+                              ],
+                            )
+                            .toList(growable: false),
+                      );
+                    }
+
+                    return Row(
+                      children: actions
+                          .expand(
+                            (widget) => <Widget>[
+                              widget,
+                              if (widget != actions.last)
+                                const SizedBox(width: 10),
+                            ],
+                          )
+                          .toList(growable: false),
+                    );
+                  },
                 ),
               ],
             ),
@@ -297,7 +418,8 @@ class SettingsScreen extends ConsumerWidget {
                 icon: sessions.isEmpty
                     ? Icons.smartphone_rounded
                     : Icons.devices_rounded,
-                accent: sessions.any((item) => item.isRisky || item.wipeRequested)
+                accent:
+                    sessions.any((item) => item.isRisky || item.wipeRequested)
                     ? const Color(0xFFFB7185)
                     : const Color(0xFF38BDF8),
               ),

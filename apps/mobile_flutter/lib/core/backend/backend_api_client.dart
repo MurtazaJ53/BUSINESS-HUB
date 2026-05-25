@@ -110,6 +110,161 @@ class BackendApiClient {
     return DomainControlState.fromJson(decoded, fallbackDomain: domain);
   }
 
+  Future<List<ShopMembershipAccessRecord>> getShopMemberships({
+    required User user,
+  }) async {
+    final decoded = await _requestList(
+      user: user,
+      method: 'GET',
+      path: '/shops/',
+    );
+    return decoded
+        .map(
+          (row) => ShopMembershipAccessRecord(
+            id: (row['id'] ?? '').toString(),
+            role: (row['role'] ?? 'staff').toString(),
+            roleLabel: (row['role_label'] ?? 'Staff').toString(),
+            roleSummary: (row['role_summary'] ?? '').toString(),
+            roleProfile: (row['role_profile'] ?? '').toString(),
+            status: (row['status'] ?? 'active').toString(),
+            shopId: (row['shop_id'] ?? '').toString(),
+            shopName: (row['shop_name'] ?? '').toString(),
+            shopSlug: (row['shop_slug'] ?? '').toString(),
+            shopCurrencyCode: (row['shop_currency_code'] ?? 'INR').toString(),
+            shopTimezone: (row['shop_timezone'] ?? 'Asia/Kolkata').toString(),
+            shopPlanTier: (row['shop_plan_tier'] ?? 'growth').toString(),
+            shopEnabledFeatures: row['shop_enabled_features'] is Map
+                ? Map<String, bool>.from(
+                    (row['shop_enabled_features'] as Map).map(
+                      (key, value) => MapEntry(key.toString(), value == true),
+                    ),
+                  )
+                : const <String, bool>{},
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Future<List<WorkspaceTeamMemberRecord>> getWorkspaceTeamMembers({
+    required User user,
+    required String shopId,
+  }) async {
+    final decoded = await _requestList(
+      user: user,
+      method: 'GET',
+      path: '/shops/$shopId/team/',
+    );
+    return decoded.map(_mapWorkspaceTeamMember).toList(growable: false);
+  }
+
+  Future<WorkspaceTeamMemberRecord> createWorkspaceTeamMember({
+    required User user,
+    required String shopId,
+    required String email,
+    String fullName = '',
+    String phone = '',
+    String role = 'staff',
+  }) async {
+    final decoded = await _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/team/',
+      body: <String, dynamic>{
+        'email': email,
+        'full_name': fullName,
+        'phone': phone,
+        'role': role,
+      },
+    );
+    return _mapWorkspaceTeamMember(decoded);
+  }
+
+  Future<WorkspaceTeamMemberRecord> updateWorkspaceTeamMember({
+    required User user,
+    required String shopId,
+    required String membershipId,
+    String? role,
+    String? status,
+  }) async {
+    final body = <String, dynamic>{};
+    if (role != null) {
+      body['role'] = role;
+    }
+    if (status != null) {
+      body['status'] = status;
+    }
+    final decoded = await _request(
+      user: user,
+      method: 'PATCH',
+      path: '/shops/$shopId/team/$membershipId/',
+      body: body,
+    );
+    return _mapWorkspaceTeamMember(decoded);
+  }
+
+  Future<AttendanceSummarySnapshot> getAttendanceSummary({
+    required User user,
+    required String shopId,
+    String? membershipId,
+  }) async {
+    final query = membershipId == null || membershipId.trim().isEmpty
+        ? ''
+        : '?membership_id=${Uri.encodeQueryComponent(membershipId.trim())}';
+    final decoded = await _request(
+      user: user,
+      method: 'GET',
+      path: '/shops/$shopId/attendance/summary/$query',
+    );
+    return AttendanceSummarySnapshot(
+      totalSessions: _asInt(decoded['total_sessions']),
+      presentCount: _asInt(decoded['present_count']),
+      leaveCount: _asInt(decoded['leave_count']),
+      activeWorkersToday: _asInt(decoded['active_workers_today']),
+    );
+  }
+
+  Future<List<AttendanceSessionRecord>> getAttendanceSessions({
+    required User user,
+    required String shopId,
+    String? membershipId,
+  }) async {
+    final query = membershipId == null || membershipId.trim().isEmpty
+        ? ''
+        : '?membership_id=${Uri.encodeQueryComponent(membershipId.trim())}';
+    final decoded = await _requestList(
+      user: user,
+      method: 'GET',
+      path: '/shops/$shopId/attendance/$query',
+    );
+    return decoded.map(_mapAttendanceSession).toList(growable: false);
+  }
+
+  Future<AttendanceSessionRecord> createAttendanceSession({
+    required User user,
+    required String shopId,
+    required String membershipId,
+    required DateTime sessionDate,
+    required String status,
+    DateTime? clockInAt,
+    DateTime? clockOutAt,
+    String note = '',
+  }) async {
+    final decoded = await _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/attendance/',
+      body: <String, dynamic>{
+        'membership_id': membershipId,
+        'session_date': sessionDate.toIso8601String().split('T').first,
+        'status': status,
+        'clock_in_at': clockInAt?.toIso8601String(),
+        'clock_out_at': clockOutAt?.toIso8601String(),
+        'note': note,
+      },
+    );
+    return _mapAttendanceSession(decoded);
+  }
+
   Future<BackendCommandResponse> submitSaleCommand({
     required User user,
     required String shopId,
@@ -379,11 +534,15 @@ class BackendApiClient {
       ),
       stats: WorkspacePulseStats(
         openTaskCount: _asInt(decoded['stats']?['open_task_count']),
-        criticalAnomalyCount: _asInt(decoded['stats']?['critical_anomaly_count']),
+        criticalAnomalyCount: _asInt(
+          decoded['stats']?['critical_anomaly_count'],
+        ),
         warningAnomalyCount: _asInt(decoded['stats']?['warning_anomaly_count']),
         staleSessionCount: _asInt(decoded['stats']?['stale_session_count']),
         wipePendingCount: _asInt(decoded['stats']?['wipe_pending_count']),
-        openPlanRequestCount: _asInt(decoded['stats']?['open_plan_request_count']),
+        openPlanRequestCount: _asInt(
+          decoded['stats']?['open_plan_request_count'],
+        ),
         lowStockCount: _asInt(decoded['stats']?['low_stock_count']),
       ),
       tasks: ((decoded['tasks'] ?? const <dynamic>[]) as List<dynamic>)
@@ -432,11 +591,7 @@ class BackendApiClient {
     final path = status == null || status.trim().isEmpty
         ? '/shops/$shopId/projections/pulse/signals/'
         : '/shops/$shopId/projections/pulse/signals/?status=${Uri.encodeQueryComponent(status.trim())}';
-    final decoded = await _requestList(
-      user: user,
-      method: 'GET',
-      path: path,
-    );
+    final decoded = await _requestList(user: user, method: 'GET', path: path);
     return decoded
         .map(
           (row) => WorkspacePulseSignal(
@@ -496,7 +651,8 @@ class BackendApiClient {
       body: <String, dynamic>{
         'action': action,
         'note': note,
-        if (assigneeMembershipId != null && assigneeMembershipId.trim().isNotEmpty)
+        if (assigneeMembershipId != null &&
+            assigneeMembershipId.trim().isNotEmpty)
           'assignee_membership_id': assigneeMembershipId,
       },
     );
@@ -517,7 +673,9 @@ class BackendApiClient {
       count: _asInt(decoded['count']),
       firstDetectedAt: _asDateTime(decoded['first_detected_at']),
       lastDetectedAt: _asDateTime(decoded['last_detected_at']),
-      lastSnapshotRefreshedAt: _asDateTime(decoded['last_snapshot_refreshed_at']),
+      lastSnapshotRefreshedAt: _asDateTime(
+        decoded['last_snapshot_refreshed_at'],
+      ),
       assignedMembershipId: _nullableText(decoded['assigned_membership_id']),
       assignedMemberName: _nullableText(decoded['assigned_member_name']),
       assignedMemberRole: _nullableText(decoded['assigned_member_role']),
@@ -554,8 +712,8 @@ class BackendApiClient {
             id: (row['id'] ?? '').toString(),
             memberName: (row['member_name'] ?? '').toString(),
             memberEmail: (row['member_email'] ?? '').toString(),
-            membershipRoleSnapshot:
-                (row['membership_role_snapshot'] ?? 'staff').toString(),
+            membershipRoleSnapshot: (row['membership_role_snapshot'] ?? 'staff')
+                .toString(),
             roleLabel: (row['role_label'] ?? 'Staff').toString(),
             status: (row['status'] ?? 'active').toString(),
             deviceLabel: (row['device_label'] ?? '').toString(),
@@ -603,18 +761,15 @@ class BackendApiClient {
       user: user,
       method: 'PATCH',
       path: '/shops/$shopId/sessions/$sessionId/',
-      body: <String, dynamic>{
-        'action': action,
-        'note': note,
-      },
+      body: <String, dynamic>{'action': action, 'note': note},
     );
 
     return WorkspaceAccessSessionRecord(
       id: (decoded['id'] ?? '').toString(),
       memberName: (decoded['member_name'] ?? '').toString(),
       memberEmail: (decoded['member_email'] ?? '').toString(),
-      membershipRoleSnapshot:
-          (decoded['membership_role_snapshot'] ?? 'staff').toString(),
+      membershipRoleSnapshot: (decoded['membership_role_snapshot'] ?? 'staff')
+          .toString(),
       roleLabel: (decoded['role_label'] ?? 'Staff').toString(),
       status: (decoded['status'] ?? 'active').toString(),
       deviceLabel: (decoded['device_label'] ?? '').toString(),
@@ -682,7 +837,9 @@ class BackendApiClient {
     client.connectionTimeout = _requestTimeout;
     try {
       final url = Uri.parse('${baseUrl.replaceAll(RegExp(r"/$"), "")}$path');
-      final request = await client.openUrl(method, url).timeout(_requestTimeout);
+      final request = await client
+          .openUrl(method, url)
+          .timeout(_requestTimeout);
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       if (body != null) {
@@ -691,7 +848,9 @@ class BackendApiClient {
       }
 
       final response = await request.close().timeout(_requestTimeout);
-      final bodyText = await utf8.decodeStream(response).timeout(_requestTimeout);
+      final bodyText = await utf8
+          .decodeStream(response)
+          .timeout(_requestTimeout);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw BackendApiException(
           'Backend request failed (${response.statusCode}) for $path: $bodyText',
@@ -736,12 +895,16 @@ class BackendApiClient {
     client.connectionTimeout = _requestTimeout;
     try {
       final url = Uri.parse('${baseUrl.replaceAll(RegExp(r"/$"), "")}$path');
-      final request = await client.openUrl(method, url).timeout(_requestTimeout);
+      final request = await client
+          .openUrl(method, url)
+          .timeout(_requestTimeout);
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
 
       final response = await request.close().timeout(_requestTimeout);
-      final bodyText = await utf8.decodeStream(response).timeout(_requestTimeout);
+      final bodyText = await utf8
+          .decodeStream(response)
+          .timeout(_requestTimeout);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw BackendApiException(
           'Backend request failed (${response.statusCode}) for $path: $bodyText',
@@ -782,6 +945,48 @@ class BackendApiClient {
       balance: _asDouble(row['balance']),
       status: (row['status'] ?? 'active').toString(),
       notes: _nullableText(row['notes']),
+    );
+  }
+
+  WorkspaceTeamMemberRecord _mapWorkspaceTeamMember(Map<String, dynamic> row) {
+    return WorkspaceTeamMemberRecord(
+      id: (row['id'] ?? '').toString(),
+      memberName: (row['member_name'] ?? 'Workspace member').toString(),
+      memberEmail: (row['member_email'] ?? '').toString(),
+      phone: (row['phone'] ?? '').toString(),
+      role: (row['role'] ?? 'staff').toString(),
+      roleLabel: (row['role_label'] ?? 'Staff').toString(),
+      roleSummary: (row['role_summary'] ?? '').toString(),
+      roleProfile: (row['role_profile'] ?? '').toString(),
+      status: (row['status'] ?? 'active').toString(),
+      permissionsVersion: _asInt(row['permissions_version']),
+      permissions: row['permissions_json'] is Map
+          ? Map<String, dynamic>.from(row['permissions_json'] as Map)
+          : const <String, dynamic>{},
+      isCurrentUser: row['is_current_user'] == true,
+      canManage: row['can_manage'] == true,
+      createdAt: _asDateTime(row['created_at']),
+      updatedAt: _asDateTime(row['updated_at']),
+    );
+  }
+
+  AttendanceSessionRecord _mapAttendanceSession(Map<String, dynamic> row) {
+    return AttendanceSessionRecord(
+      id: (row['id'] ?? '').toString(),
+      membershipId: (row['membership_id'] ?? '').toString(),
+      memberName: (row['member_name'] ?? 'Team member').toString(),
+      memberRole: (row['member_role'] ?? 'staff').toString(),
+      sessionDate: _asDateTime(row['session_date']),
+      clockInAt: _asNullableDateTime(row['clock_in_at']),
+      clockOutAt: _asNullableDateTime(row['clock_out_at']),
+      status: (row['status'] ?? 'ABSENT').toString(),
+      totalHours: row['total_hours'] == null
+          ? null
+          : _asDouble(row['total_hours']),
+      overtimeHours: _asDouble(row['overtime_hours']),
+      bonusAmount: _asDouble(row['bonus_amount']),
+      note: (row['note'] ?? '').toString(),
+      tombstone: row['tombstone'] == true,
     );
   }
 

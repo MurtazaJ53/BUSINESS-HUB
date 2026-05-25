@@ -25,16 +25,29 @@ final mobileMfaVerifiedUntilProvider = StreamProvider<DateTime?>((ref) {
   return shopRepository.watchMfaVerifiedUntil();
 });
 
-final workspacePulseProvider = FutureProvider<WorkspacePulseSnapshot?>((ref) async {
+final shopMembershipsProvider =
+    FutureProvider<List<ShopMembershipAccessRecord>>((ref) async {
+      final session = await ref.watch(mobileSessionProvider.future);
+      if (session == null) {
+        return const <ShopMembershipAccessRecord>[];
+      }
+
+      return ref
+          .read(backendApiClientProvider)
+          .getShopMemberships(user: session.user);
+    });
+
+final workspacePulseProvider = FutureProvider<WorkspacePulseSnapshot?>((
+  ref,
+) async {
   final session = await ref.watch(mobileSessionProvider.future);
   if (session == null || !session.isOwnerLike || !session.hasShop) {
     return null;
   }
 
-  return ref.read(backendApiClientProvider).getWorkspacePulse(
-    user: session.user,
-    shopId: session.shopId!,
-  );
+  return ref
+      .read(backendApiClientProvider)
+      .getWorkspacePulse(user: session.user, shopId: session.shopId!);
 });
 
 final workspacePulseSignalsProvider =
@@ -44,10 +57,12 @@ final workspacePulseSignalsProvider =
         return const <WorkspacePulseSignal>[];
       }
 
-      return ref.read(backendApiClientProvider).getWorkspacePulseSignals(
-        user: session.user,
-        shopId: session.shopId!,
-      );
+      return ref
+          .read(backendApiClientProvider)
+          .getWorkspacePulseSignals(
+            user: session.user,
+            shopId: session.shopId!,
+          );
     });
 
 final workspaceAccessSessionsProvider =
@@ -57,10 +72,79 @@ final workspaceAccessSessionsProvider =
         return const <WorkspaceAccessSessionRecord>[];
       }
 
-      return ref.read(backendApiClientProvider).getWorkspaceAccessSessions(
+      return ref
+          .read(backendApiClientProvider)
+          .getWorkspaceAccessSessions(
+            user: session.user,
+            shopId: session.shopId!,
+          );
+    });
+
+final workspaceTeamMembersProvider =
+    FutureProvider<List<WorkspaceTeamMemberRecord>>((ref) async {
+      final session = await ref.watch(mobileSessionProvider.future);
+      if (session == null || !session.isOwnerLike || !session.hasShop) {
+        return const <WorkspaceTeamMemberRecord>[];
+      }
+
+      return ref
+          .read(backendApiClientProvider)
+          .getWorkspaceTeamMembers(user: session.user, shopId: session.shopId!);
+    });
+
+final attendanceSummaryProvider = FutureProvider<AttendanceSummarySnapshot?>((
+  ref,
+) async {
+  final session = await ref.watch(mobileSessionProvider.future);
+  final memberships = await ref.watch(shopMembershipsProvider.future);
+  if (session == null || !session.hasShop) {
+    return null;
+  }
+
+  final scopedMembershipId = session.isOwnerLike
+      ? null
+      : memberships
+            .where((item) => item.shopId == session.shopId && item.isActive)
+            .map((item) => item.id)
+            .cast<String?>()
+            .firstWhere(
+              (item) => item != null && item.isNotEmpty,
+              orElse: () => session.membershipId,
+            );
+  return ref
+      .read(backendApiClientProvider)
+      .getAttendanceSummary(
         user: session.user,
         shopId: session.shopId!,
+        membershipId: scopedMembershipId,
       );
+});
+
+final attendanceSessionsProvider =
+    FutureProvider<List<AttendanceSessionRecord>>((ref) async {
+      final session = await ref.watch(mobileSessionProvider.future);
+      final memberships = await ref.watch(shopMembershipsProvider.future);
+      if (session == null || !session.hasShop) {
+        return const <AttendanceSessionRecord>[];
+      }
+
+      final scopedMembershipId = session.isOwnerLike
+          ? null
+          : memberships
+                .where((item) => item.shopId == session.shopId && item.isActive)
+                .map((item) => item.id)
+                .cast<String?>()
+                .firstWhere(
+                  (item) => item != null && item.isNotEmpty,
+                  orElse: () => session.membershipId,
+                );
+      return ref
+          .read(backendApiClientProvider)
+          .getAttendanceSessions(
+            user: session.user,
+            shopId: session.shopId!,
+            membershipId: scopedMembershipId,
+          );
     });
 
 final dashboardOverviewProvider =

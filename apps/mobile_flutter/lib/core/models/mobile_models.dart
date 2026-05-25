@@ -63,6 +63,122 @@ class ShopInfo {
   }
 }
 
+class ShopMembershipAccessRecord {
+  const ShopMembershipAccessRecord({
+    required this.id,
+    required this.role,
+    required this.roleLabel,
+    required this.roleSummary,
+    required this.roleProfile,
+    required this.status,
+    required this.shopId,
+    required this.shopName,
+    required this.shopSlug,
+    required this.shopCurrencyCode,
+    required this.shopTimezone,
+    required this.shopPlanTier,
+    required this.shopEnabledFeatures,
+  });
+
+  final String id;
+  final String role;
+  final String roleLabel;
+  final String roleSummary;
+  final String roleProfile;
+  final String status;
+  final String shopId;
+  final String shopName;
+  final String shopSlug;
+  final String shopCurrencyCode;
+  final String shopTimezone;
+  final String shopPlanTier;
+  final Map<String, bool> shopEnabledFeatures;
+
+  bool get isActive => status == 'active';
+}
+
+class WorkspaceTeamMemberRecord {
+  const WorkspaceTeamMemberRecord({
+    required this.id,
+    required this.memberName,
+    required this.memberEmail,
+    required this.phone,
+    required this.role,
+    required this.roleLabel,
+    required this.roleSummary,
+    required this.roleProfile,
+    required this.status,
+    required this.permissionsVersion,
+    required this.permissions,
+    required this.isCurrentUser,
+    required this.canManage,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  final String id;
+  final String memberName;
+  final String memberEmail;
+  final String phone;
+  final String role;
+  final String roleLabel;
+  final String roleSummary;
+  final String roleProfile;
+  final String status;
+  final int permissionsVersion;
+  final Map<String, dynamic> permissions;
+  final bool isCurrentUser;
+  final bool canManage;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+}
+
+class AttendanceSummarySnapshot {
+  const AttendanceSummarySnapshot({
+    required this.totalSessions,
+    required this.presentCount,
+    required this.leaveCount,
+    required this.activeWorkersToday,
+  });
+
+  final int totalSessions;
+  final int presentCount;
+  final int leaveCount;
+  final int activeWorkersToday;
+}
+
+class AttendanceSessionRecord {
+  const AttendanceSessionRecord({
+    required this.id,
+    required this.membershipId,
+    required this.memberName,
+    required this.memberRole,
+    required this.sessionDate,
+    required this.clockInAt,
+    required this.clockOutAt,
+    required this.status,
+    required this.totalHours,
+    required this.overtimeHours,
+    required this.bonusAmount,
+    required this.note,
+    required this.tombstone,
+  });
+
+  final String id;
+  final String membershipId;
+  final String memberName;
+  final String memberRole;
+  final DateTime sessionDate;
+  final DateTime? clockInAt;
+  final DateTime? clockOutAt;
+  final String status;
+  final double? totalHours;
+  final double overtimeHours;
+  final double bonusAmount;
+  final String note;
+  final bool tombstone;
+}
+
 class WorkspaceAccessSessionHeartbeatResult {
   const WorkspaceAccessSessionHeartbeatResult({
     required this.sessionId,
