@@ -7,6 +7,7 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from platform_apps.audit.models import WorkspaceAuditEvent
 from platform_apps.customers.models import Customer
 from platform_apps.inventory.models import InventoryItem, InventoryStockLedger
 from platform_apps.payments.models import SalePayment
@@ -338,6 +339,83 @@ class ProjectionRefreshTests(TestCase):
 
         self.assertIn("review_device_trust", task_codes)
         self.assertIn("risky_device_posture", anomaly_codes)
+
+    def test_pulse_snapshot_flags_access_control_spike_from_audit_activity(self):
+        self.shop.settings_json = {"plan_tier": "pro"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+        self._seed_domain_data()
+        current_time = timezone.now()
+        audit_events = [
+            (
+                "workspace.session.revoked",
+                "workspace_access_session",
+                "revoked-device-1",
+            ),
+            (
+                "workspace.session.wipe_requested",
+                "workspace_access_session",
+                "wipe-device-1",
+            ),
+            (
+                "workspace.session.restored",
+                "workspace_access_session",
+                "restored-device-1",
+            ),
+            (
+                "workspace.team.member_updated",
+                "shop_membership",
+                "membership-1",
+            ),
+            (
+                "workspace.team.ownership_transferred",
+                "shop_membership",
+                "membership-2",
+            ),
+        ]
+        for index, (event_type, entity_type, entity_id) in enumerate(audit_events):
+            WorkspaceAuditEvent.objects.create(
+                shop=self.shop,
+                actor_user=self.user,
+                actor_role=ShopMembership.Role.OWNER,
+                category=WorkspaceAuditEvent.Category.WORKSPACE,
+                event_type=event_type,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                entity_label=f"Entity {index}",
+                summary=f"Synthetic audit event {event_type}.",
+                source_surface="test",
+                occurred_at=current_time - timedelta(hours=index),
+            )
+
+        snapshot = refresh_shop_dashboard_projection(self.shop)
+        pulse = build_shop_pulse_snapshot(self.shop, dashboard_snapshot=snapshot)
+        task_codes = {task["code"] for task in pulse["tasks"]}
+        anomaly_codes = {anomaly["code"] for anomaly in pulse["anomalies"]}
+
+        self.assertIn("review_access_control_changes", task_codes)
+        self.assertIn("access_control_spike", anomaly_codes)
+
+    def test_pulse_snapshot_keeps_session_hygiene_task_for_revoked_history(self):
+        self.shop.settings_json = {"plan_tier": "pro"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+        self._seed_domain_data()
+        owner_membership = ShopMembership.objects.get(shop=self.shop, user=self.user)
+        WorkspaceAccessSession.objects.create(
+            user=self.user,
+            shop=self.shop,
+            membership=owner_membership,
+            app_instance_id="revoked-history-only",
+            membership_role_snapshot=owner_membership.role,
+            device_label="Revoked only device",
+            status=WorkspaceAccessSession.Status.REVOKED,
+            revoked_at=timezone.now(),
+        )
+
+        snapshot = refresh_shop_dashboard_projection(self.shop)
+        pulse = build_shop_pulse_snapshot(self.shop, dashboard_snapshot=snapshot)
+        task_codes = {task["code"] for task in pulse["tasks"]}
+
+        self.assertIn("review_session_hygiene", task_codes)
 
     def test_pulse_api_returns_generated_payload(self):
         self.shop.settings_json = {"plan_tier": "pro"}

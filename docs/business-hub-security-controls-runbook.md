@@ -75,6 +75,13 @@ Audited areas currently include:
 - sale creation/acceptance
 - payment acceptance
 
+Recent control activity now also feeds the owner/admin pulse desk automatically.
+
+That includes:
+- bursts of session revoke / restore / wipe actions
+- heavy team/access-control churn
+- ownership transfer follow-up pressure
+
 ## Admin web operator flow
 
 ### Security setup
@@ -141,7 +148,6 @@ The current security layer is strong, but it is not the final enterprise endpoin
 
 Still pending:
 - full WebAuthn resident-key / platform-specific trust policy controls
-- deeper audit-linked anomaly correlation
 - stronger device attestation / integrity enforcement
 
 ## Related docs

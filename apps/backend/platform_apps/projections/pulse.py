@@ -7,12 +7,31 @@ from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from platform_apps.audit.models import WorkspaceAuditEvent
 from platform_apps.inventory.models import InventoryStockLedger
 from platform_apps.payments.models import SalePayment
 from platform_apps.projections.models import ShopDashboardSnapshot, ShopPulseSignal
 from platform_apps.sales.models import Sale
 from platform_apps.shops.models import Shop, ShopPlanRequest, WorkspaceAccessSession
 from platform_apps.shops.session_trust import evaluate_workspace_session_trust
+
+
+TEAM_CONTROL_AUDIT_EVENT_TYPES = {
+    "workspace.team.member_added",
+    "workspace.team.member_reactivated",
+    "workspace.team.member_updated",
+    "workspace.team.ownership_transferred",
+}
+
+SESSION_CONTROL_AUDIT_EVENT_TYPES = {
+    "workspace.session.revoked",
+    "workspace.session.wipe_requested",
+    "workspace.session.restored",
+}
+
+CONTROL_AUDIT_EVENT_TYPES = (
+    TEAM_CONTROL_AUDIT_EVENT_TYPES | SESSION_CONTROL_AUDIT_EVENT_TYPES
+)
 
 
 def build_shop_pulse_snapshot(
@@ -60,6 +79,29 @@ def build_shop_pulse_snapshot(
     risky_device_count = sum(
         1 for trust in session_trust if trust["trust_level"] in {"risky", "blocked"}
     )
+    audit_summary = WorkspaceAuditEvent.objects.filter(
+        shop=shop,
+        occurred_at__gte=seven_days_ago,
+    ).aggregate(
+        control_change_count=Count("id", filter=Q(event_type__in=CONTROL_AUDIT_EVENT_TYPES)),
+        team_control_count=Count("id", filter=Q(event_type__in=TEAM_CONTROL_AUDIT_EVENT_TYPES)),
+        ownership_transfer_count=Count(
+            "id",
+            filter=Q(event_type="workspace.team.ownership_transferred"),
+        ),
+        session_control_count=Count(
+            "id",
+            filter=Q(event_type__in=SESSION_CONTROL_AUDIT_EVENT_TYPES),
+        ),
+        control_actor_count=Count(
+            "actor_user",
+            distinct=True,
+            filter=Q(
+                event_type__in=CONTROL_AUDIT_EVENT_TYPES,
+                actor_user__isnull=False,
+            ),
+        ),
+    )
     open_plan_requests = ShopPlanRequest.objects.filter(
         shop=shop,
         status__in=[ShopPlanRequest.Status.OPEN, ShopPlanRequest.Status.IN_REVIEW],
@@ -105,6 +147,11 @@ def build_shop_pulse_snapshot(
     wipe_pending_count = int(session_summary["wipe_pending_count"] or 0)
     stale_active_count = int(session_summary["stale_active_count"] or 0)
     revoked_count = int(session_summary["revoked_count"] or 0)
+    control_change_count = int(audit_summary["control_change_count"] or 0)
+    team_control_count = int(audit_summary["team_control_count"] or 0)
+    ownership_transfer_count = int(audit_summary["ownership_transfer_count"] or 0)
+    session_control_count = int(audit_summary["session_control_count"] or 0)
+    control_actor_count = int(audit_summary["control_actor_count"] or 0)
     low_stock_count = int(dashboard_snapshot.low_stock_items_count or 0)
     out_of_stock_count = int(dashboard_snapshot.out_of_stock_items_count or 0)
     active_credit_customers = int(dashboard_snapshot.active_credit_customers_count or 0)
@@ -253,6 +300,41 @@ def build_shop_pulse_snapshot(
             count=open_plan_requests,
         )
 
+    if control_change_count >= 3:
+        access_body_parts = [
+            f"{control_change_count} access-control change{'s were' if control_change_count != 1 else ' was'} recorded in the last 7 days."
+        ]
+        if team_control_count > 0:
+            access_body_parts.append(
+                f"{team_control_count} involved team or ownership changes."
+            )
+        if session_control_count > 0:
+            access_body_parts.append(
+                f"{session_control_count} involved session revoke, restore, or wipe actions."
+            )
+        if control_actor_count > 0:
+            access_body_parts.append(
+                f"{control_actor_count} owner/admin actor{'s were' if control_actor_count != 1 else ' was'} involved."
+            )
+        add_task(
+            code="review_access_control_changes",
+            priority_rank=290 if ownership_transfer_count > 0 or session_control_count >= 3 else 210,
+            priority="high" if ownership_transfer_count > 0 or session_control_count >= 3 else "medium",
+            tone="warning" if ownership_transfer_count > 0 or session_control_count > 0 else "info",
+            title="Review recent access-control changes",
+            body=" ".join(access_body_parts),
+            route="/audit",
+            cta_label="Open audit",
+            count=control_change_count,
+            metadata={
+                "control_change_count": control_change_count,
+                "team_control_count": team_control_count,
+                "ownership_transfer_count": ownership_transfer_count,
+                "session_control_count": session_control_count,
+                "control_actor_count": control_actor_count,
+            },
+        )
+
     if dashboard_snapshot.last_sale_at is None or dashboard_snapshot.last_sale_at < now - timedelta(hours=24):
         add_task(
             code="verify_sales_flow",
@@ -270,6 +352,21 @@ def build_shop_pulse_snapshot(
             f"{stale_active_count} active session{'s have' if stale_active_count != 1 else ' has'} gone quiet for more than 3 days."
             if stale_active_count > 0
             else f"{revoked_count} revoked session{'s still' if revoked_count != 1 else ' still'} appear in the workspace history."
+        )
+        add_task(
+            code="review_session_hygiene",
+            priority_rank=120,
+            priority="low",
+            tone="info",
+            title="Clean up device access posture",
+            body=session_body,
+            route="/sessions",
+            cta_label="Open sessions",
+            count=max(stale_active_count, revoked_count),
+            metadata={
+                "stale_session_count": stale_active_count,
+                "revoked_session_count": revoked_count,
+            },
         )
 
     if risky_device_count > 0 or review_device_count > 0:
@@ -295,17 +392,6 @@ def build_shop_pulse_snapshot(
                 "review_device_count": review_device_count,
                 "risky_device_count": risky_device_count,
             },
-        )
-        add_task(
-            code="review_session_hygiene",
-            priority_rank=120,
-            priority="low",
-            tone="info",
-            title="Clean up device access posture",
-            body=session_body,
-            route="/sessions",
-            cta_label="Open sessions",
-            count=max(stale_active_count, revoked_count),
         )
 
     if wipe_pending_count > 0:
@@ -333,6 +419,29 @@ def build_shop_pulse_snapshot(
             metadata={
                 "void_sales_count": weekly_void_count,
                 "weekly_sale_count": weekly_sale_count,
+            },
+        )
+
+    if session_control_count >= 3 or ownership_transfer_count > 0:
+        add_anomaly(
+            code="access_control_spike",
+            severity_rank=300 if ownership_transfer_count == 0 and session_control_count < 5 else 360,
+            severity="warning" if ownership_transfer_count == 0 and session_control_count < 5 else "critical",
+            title="Access-control activity is elevated",
+            body=(
+                f"{session_control_count} session control action{'s were' if session_control_count != 1 else ' was'} recorded in the last 7 days."
+                if ownership_transfer_count == 0
+                else f"{ownership_transfer_count} ownership transfer{'s and' if ownership_transfer_count != 1 else ' and'} {session_control_count} session control action{'s were' if session_control_count != 1 else ' was'} recorded in the last 7 days."
+            ),
+            route="/audit",
+            cta_label="Review audit",
+            metric_value=str(max(session_control_count, ownership_transfer_count)),
+            metadata={
+                "control_change_count": control_change_count,
+                "team_control_count": team_control_count,
+                "ownership_transfer_count": ownership_transfer_count,
+                "session_control_count": session_control_count,
+                "control_actor_count": control_actor_count,
             },
         )
 
