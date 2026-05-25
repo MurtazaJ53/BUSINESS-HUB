@@ -537,6 +537,114 @@ class BackendApiClient {
     );
   }
 
+  Future<List<WorkspaceAccessSessionRecord>> getWorkspaceAccessSessions({
+    required User user,
+    required String shopId,
+  }) async {
+    final decoded = await _requestList(
+      user: user,
+      method: 'GET',
+      path: '/shops/$shopId/sessions/',
+    );
+    return decoded
+        .map(
+          (row) => WorkspaceAccessSessionRecord(
+            id: (row['id'] ?? '').toString(),
+            memberName: (row['member_name'] ?? '').toString(),
+            memberEmail: (row['member_email'] ?? '').toString(),
+            membershipRoleSnapshot:
+                (row['membership_role_snapshot'] ?? 'staff').toString(),
+            roleLabel: (row['role_label'] ?? 'Staff').toString(),
+            status: (row['status'] ?? 'active').toString(),
+            deviceLabel: (row['device_label'] ?? '').toString(),
+            platformName: (row['platform_name'] ?? '').toString(),
+            packageName: (row['package_name'] ?? '').toString(),
+            appVersion: (row['app_version'] ?? '').toString(),
+            buildNumber: (row['build_number'] ?? '').toString(),
+            releaseChannel: (row['release_channel'] ?? '').toString(),
+            releaseTag: (row['release_tag'] ?? '').toString(),
+            lastSeenAt: _asNullableDateTime(row['last_seen_at']),
+            revokedAt: _asNullableDateTime(row['revoked_at']),
+            revokeReason: _nullableText(row['revoke_reason']),
+            wipeRequested: row['wipe_requested'] == true,
+            wipeRequestedAt: _asNullableDateTime(row['wipe_requested_at']),
+            wipeAcknowledgedAt: _asNullableDateTime(
+              row['wipe_acknowledged_at'],
+            ),
+            trustScore: _asInt(row['trust_score']),
+            trustLevel: (row['trust_level'] ?? 'review').toString(),
+            trustSummary: (row['trust_summary'] ?? '').toString(),
+            trustReasons:
+                ((row['trust_reasons'] ?? const <dynamic>[]) as List<dynamic>)
+                    .map((item) => item.toString())
+                    .where((item) => item.trim().isNotEmpty)
+                    .toList(growable: false),
+            metadata: row['metadata_json'] is Map
+                ? Map<String, dynamic>.from(row['metadata_json'] as Map)
+                : const <String, dynamic>{},
+            canManage: row['can_manage'] == true,
+            createdAt: _asDateTime(row['created_at']),
+            updatedAt: _asDateTime(row['updated_at']),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Future<WorkspaceAccessSessionRecord> updateWorkspaceAccessSession({
+    required User user,
+    required String shopId,
+    required String sessionId,
+    required String action,
+    String note = '',
+  }) async {
+    final decoded = await _request(
+      user: user,
+      method: 'PATCH',
+      path: '/shops/$shopId/sessions/$sessionId/',
+      body: <String, dynamic>{
+        'action': action,
+        'note': note,
+      },
+    );
+
+    return WorkspaceAccessSessionRecord(
+      id: (decoded['id'] ?? '').toString(),
+      memberName: (decoded['member_name'] ?? '').toString(),
+      memberEmail: (decoded['member_email'] ?? '').toString(),
+      membershipRoleSnapshot:
+          (decoded['membership_role_snapshot'] ?? 'staff').toString(),
+      roleLabel: (decoded['role_label'] ?? 'Staff').toString(),
+      status: (decoded['status'] ?? 'active').toString(),
+      deviceLabel: (decoded['device_label'] ?? '').toString(),
+      platformName: (decoded['platform_name'] ?? '').toString(),
+      packageName: (decoded['package_name'] ?? '').toString(),
+      appVersion: (decoded['app_version'] ?? '').toString(),
+      buildNumber: (decoded['build_number'] ?? '').toString(),
+      releaseChannel: (decoded['release_channel'] ?? '').toString(),
+      releaseTag: (decoded['release_tag'] ?? '').toString(),
+      lastSeenAt: _asNullableDateTime(decoded['last_seen_at']),
+      revokedAt: _asNullableDateTime(decoded['revoked_at']),
+      revokeReason: _nullableText(decoded['revoke_reason']),
+      wipeRequested: decoded['wipe_requested'] == true,
+      wipeRequestedAt: _asNullableDateTime(decoded['wipe_requested_at']),
+      wipeAcknowledgedAt: _asNullableDateTime(decoded['wipe_acknowledged_at']),
+      trustScore: _asInt(decoded['trust_score']),
+      trustLevel: (decoded['trust_level'] ?? 'review').toString(),
+      trustSummary: (decoded['trust_summary'] ?? '').toString(),
+      trustReasons:
+          ((decoded['trust_reasons'] ?? const <dynamic>[]) as List<dynamic>)
+              .map((item) => item.toString())
+              .where((item) => item.trim().isNotEmpty)
+              .toList(growable: false),
+      metadata: decoded['metadata_json'] is Map
+          ? Map<String, dynamic>.from(decoded['metadata_json'] as Map)
+          : const <String, dynamic>{},
+      canManage: decoded['can_manage'] == true,
+      createdAt: _asDateTime(decoded['created_at']),
+      updatedAt: _asDateTime(decoded['updated_at']),
+    );
+  }
+
   Future<void> acknowledgeWorkspaceSessionWipe({
     required User user,
     required String shopId,

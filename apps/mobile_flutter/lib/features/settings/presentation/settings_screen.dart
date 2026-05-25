@@ -24,6 +24,9 @@ class SettingsScreen extends ConsumerWidget {
     final runtimeInfoAsync = ref.watch(appRuntimeInfoProvider);
     final pulseAsync = ref.watch(workspacePulseProvider);
     final pulse = pulseAsync.asData?.value;
+    final sessionsAsync = ref.watch(workspaceAccessSessionsProvider);
+    final sessions = sessionsAsync.asData?.value ??
+        const <WorkspaceAccessSessionRecord>[];
     final shop =
         ref.watch(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
     final history =
@@ -280,6 +283,43 @@ class SettingsScreen extends ConsumerWidget {
                     },
                     icon: const Icon(Icons.monitor_heart_rounded),
                     label: const Text('Open pulse desk'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            MobilePanel(
+              title: 'Workspace sessions',
+              action: MobileTag(
+                label: sessions.isEmpty
+                    ? (sessionsAsync.isLoading ? 'Refreshing' : 'No devices')
+                    : '${sessions.length} devices',
+                icon: sessions.isEmpty
+                    ? Icons.smartphone_rounded
+                    : Icons.devices_rounded,
+                accent: sessions.any((item) => item.isRisky || item.wipeRequested)
+                    ? const Color(0xFFFB7185)
+                    : const Color(0xFF38BDF8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    sessions.isEmpty
+                        ? 'Review mobile device access, risky trust posture, and remote wipe actions from one owner/admin desk.'
+                        : '${sessions.where((item) => item.isTrusted && !item.wipeRequested).length} trusted, ${sessions.where((item) => item.needsReview).length} review, and ${sessions.where((item) => item.isRisky || item.wipeRequested).length} risky or wipe-pending device sessions are visible right now.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.72),
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  FilledButton.tonalIcon(
+                    onPressed: () {
+                      context.push('/settings/sessions');
+                    },
+                    icon: const Icon(Icons.devices_rounded),
+                    label: const Text('Open sessions'),
                   ),
                 ],
               ),

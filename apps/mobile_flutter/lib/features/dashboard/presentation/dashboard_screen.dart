@@ -1466,6 +1466,7 @@ String _resolvePulseRoute(String route) {
     case '/plan':
       return '/settings/plan';
     case '/sessions':
+      return '/settings/sessions';
     case '/audit':
     case '/migration':
     case '/erpnext':

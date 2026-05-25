@@ -50,6 +50,19 @@ final workspacePulseSignalsProvider =
       );
     });
 
+final workspaceAccessSessionsProvider =
+    FutureProvider<List<WorkspaceAccessSessionRecord>>((ref) async {
+      final session = await ref.watch(mobileSessionProvider.future);
+      if (session == null || !session.isOwnerLike || !session.hasShop) {
+        return const <WorkspaceAccessSessionRecord>[];
+      }
+
+      return ref.read(backendApiClientProvider).getWorkspaceAccessSessions(
+        user: session.user,
+        shopId: session.shopId!,
+      );
+    });
+
 final dashboardOverviewProvider =
     StreamProvider.family<DashboardOverview, bool>((ref, includeCost) {
       final inventoryRepository = ref.watch(inventoryRepositoryProvider);

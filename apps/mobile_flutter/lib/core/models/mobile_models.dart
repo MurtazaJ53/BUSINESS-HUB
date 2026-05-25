@@ -87,6 +87,73 @@ class WorkspaceAccessSessionHeartbeatResult {
   final DateTime? wipeAcknowledgedAt;
 }
 
+class WorkspaceAccessSessionRecord {
+  const WorkspaceAccessSessionRecord({
+    required this.id,
+    required this.memberName,
+    required this.memberEmail,
+    required this.membershipRoleSnapshot,
+    required this.roleLabel,
+    required this.status,
+    required this.deviceLabel,
+    required this.platformName,
+    required this.packageName,
+    required this.appVersion,
+    required this.buildNumber,
+    required this.releaseChannel,
+    required this.releaseTag,
+    required this.lastSeenAt,
+    required this.revokedAt,
+    required this.revokeReason,
+    required this.wipeRequested,
+    required this.wipeRequestedAt,
+    required this.wipeAcknowledgedAt,
+    required this.trustScore,
+    required this.trustLevel,
+    required this.trustSummary,
+    required this.trustReasons,
+    required this.metadata,
+    required this.canManage,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  final String id;
+  final String memberName;
+  final String memberEmail;
+  final String membershipRoleSnapshot;
+  final String roleLabel;
+  final String status;
+  final String deviceLabel;
+  final String platformName;
+  final String packageName;
+  final String appVersion;
+  final String buildNumber;
+  final String releaseChannel;
+  final String releaseTag;
+  final DateTime? lastSeenAt;
+  final DateTime? revokedAt;
+  final String? revokeReason;
+  final bool wipeRequested;
+  final DateTime? wipeRequestedAt;
+  final DateTime? wipeAcknowledgedAt;
+  final int trustScore;
+  final String trustLevel;
+  final String trustSummary;
+  final List<String> trustReasons;
+  final Map<String, dynamic> metadata;
+  final bool canManage;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  bool get isActive => status == 'active';
+  bool get isRevoked => status == 'revoked';
+  bool get isTrusted => trustLevel == 'trusted';
+  bool get needsReview => trustLevel == 'review';
+  bool get isRisky => trustLevel == 'risky' || trustLevel == 'blocked';
+  bool get isBlocked => trustLevel == 'blocked';
+}
+
 class UserMfaStatus {
   const UserMfaStatus({
     required this.totpEnabled,
