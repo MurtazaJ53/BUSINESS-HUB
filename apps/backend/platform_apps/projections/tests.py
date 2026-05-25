@@ -16,8 +16,14 @@ from platform_apps.projections.models import (
     ShopLowStockSnapshot,
     ShopPulseSignal,
 )
-from platform_apps.projections.pulse import build_shop_pulse_snapshot, sync_shop_pulse_signals
+from platform_apps.projections.pulse import (
+    auto_escalate_shop_pulse_signals,
+    build_shop_pulse_snapshot,
+    run_shop_pulse_cycle,
+    sync_shop_pulse_signals,
+)
 from platform_apps.projections.services import refresh_shop_dashboard_projection
+from platform_apps.projections.tasks import run_workspace_pulse_cycles_task
 from platform_apps.sales.models import Sale
 from platform_apps.shops.models import Shop, ShopMembership, ShopPlanRequest, WorkspaceAccessSession
 from platform_apps.users.models import PlatformUser
@@ -416,6 +422,81 @@ class ProjectionRefreshTests(TestCase):
         task_codes = {task["code"] for task in pulse["tasks"]}
 
         self.assertIn("review_session_hygiene", task_codes)
+
+    def test_auto_escalate_shop_pulse_signals_marks_stale_critical_signal(self):
+        signal = ShopPulseSignal.objects.create(
+            shop=self.shop,
+            signal_kind=ShopPulseSignal.SignalKind.ANOMALY,
+            code="pending_remote_wipe",
+            status=ShopPulseSignal.Status.OPEN,
+            signal_level="critical",
+            signal_rank=400,
+            tone="critical",
+            title="Remote wipe still pending",
+            body="A device wipe has not been acknowledged.",
+            route="/sessions",
+            cta_label="Review sessions",
+            first_detected_at=timezone.now() - timedelta(hours=2),
+            last_detected_at=timezone.now() - timedelta(hours=1),
+            last_snapshot_refreshed_at=timezone.now() - timedelta(hours=1),
+        )
+
+        escalated = auto_escalate_shop_pulse_signals(self.shop, now=timezone.now())
+
+        signal.refresh_from_db()
+        self.assertEqual(len(escalated), 1)
+        self.assertTrue(signal.is_escalated)
+        self.assertIn("Auto-escalated", signal.escalation_note)
+        self.assertTrue(
+            WorkspaceAuditEvent.objects.filter(
+                shop=self.shop,
+                event_type="workspace.pulse.auto_escalated",
+                entity_id=str(signal.id),
+            ).exists()
+        )
+
+    def test_run_shop_pulse_cycle_reports_auto_escalations(self):
+        self.shop.settings_json = {"plan_tier": "pro"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+        self._seed_domain_data()
+        old_signal = ShopPulseSignal.objects.create(
+            shop=self.shop,
+            signal_kind=ShopPulseSignal.SignalKind.TASK,
+            code="restock_out_of_stock",
+            status=ShopPulseSignal.Status.OPEN,
+            signal_level="high",
+            signal_rank=320,
+            tone="warning",
+            title="Refill out-of-stock products",
+            body="Out-of-stock products still need review.",
+            route="/inventory",
+            cta_label="Open inventory",
+            first_detected_at=timezone.now() - timedelta(days=2),
+            last_detected_at=timezone.now() - timedelta(days=1),
+            last_snapshot_refreshed_at=timezone.now() - timedelta(days=1),
+        )
+
+        payload = run_shop_pulse_cycle(self.shop, now=timezone.now(), signal_limit=None)
+
+        old_signal.refresh_from_db()
+        self.assertEqual(payload["shop_slug"], self.shop.slug)
+        self.assertGreaterEqual(payload["signal_count"], 1)
+        self.assertIn(old_signal.code, payload["auto_escalated_signal_codes"])
+        self.assertTrue(old_signal.is_escalated)
+
+    def test_run_workspace_pulse_cycles_task_skips_inactive_shops_by_default(self):
+        self.shop.settings_json = {"plan_tier": "pro"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+        inactive_shop = Shop.objects.create(
+            name="Inactive Projection Shop",
+            slug="inactive-projection-shop",
+            is_active=False,
+        )
+        run_result = run_workspace_pulse_cycles_task.run(signal_limit=None, active_only=True)
+
+        shop_slugs = {row["shop_slug"] for row in run_result["results"]}
+        self.assertIn(self.shop.slug, shop_slugs)
+        self.assertNotIn(inactive_shop.slug, shop_slugs)
 
     def test_pulse_api_returns_generated_payload(self):
         self.shop.settings_json = {"plan_tier": "pro"}

@@ -7,6 +7,7 @@ from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from platform_apps.audit.services import create_workspace_audit_event
 from platform_apps.audit.models import WorkspaceAuditEvent
 from platform_apps.inventory.models import InventoryStockLedger
 from platform_apps.payments.models import SalePayment
@@ -32,6 +33,29 @@ SESSION_CONTROL_AUDIT_EVENT_TYPES = {
 CONTROL_AUDIT_EVENT_TYPES = (
     TEAM_CONTROL_AUDIT_EVENT_TYPES | SESSION_CONTROL_AUDIT_EVENT_TYPES
 )
+
+PULSE_AUTO_ESCALATION_RULES = {
+    "critical": {
+        ShopPulseSignal.Status.OPEN: timedelta(minutes=30),
+        ShopPulseSignal.Status.ACKNOWLEDGED: timedelta(hours=2),
+    },
+    "danger": {
+        ShopPulseSignal.Status.OPEN: timedelta(minutes=30),
+        ShopPulseSignal.Status.ACKNOWLEDGED: timedelta(hours=2),
+    },
+    "high": {
+        ShopPulseSignal.Status.OPEN: timedelta(hours=4),
+        ShopPulseSignal.Status.ACKNOWLEDGED: timedelta(hours=8),
+    },
+    "warning": {
+        ShopPulseSignal.Status.OPEN: timedelta(hours=6),
+        ShopPulseSignal.Status.ACKNOWLEDGED: timedelta(hours=12),
+    },
+    "medium": {
+        ShopPulseSignal.Status.OPEN: timedelta(hours=18),
+        ShopPulseSignal.Status.ACKNOWLEDGED: timedelta(hours=24),
+    },
+}
 
 
 def build_shop_pulse_snapshot(
@@ -589,6 +613,162 @@ def build_shop_pulse_snapshot(
         },
         "tasks": tasks,
         "anomalies": anomalies,
+    }
+
+
+def auto_escalate_shop_pulse_signals(
+    shop: Shop,
+    *,
+    signals: list[ShopPulseSignal] | None = None,
+    now=None,
+) -> list[ShopPulseSignal]:
+    now = now or timezone.now()
+    signals_to_review = list(
+        signals
+        if signals is not None
+        else ShopPulseSignal.objects.filter(
+            shop=shop,
+            status__in=[ShopPulseSignal.Status.OPEN, ShopPulseSignal.Status.ACKNOWLEDGED],
+        ).select_related("assigned_membership__user")
+    )
+    auto_escalated: list[ShopPulseSignal] = []
+
+    for signal in signals_to_review:
+        if signal.is_escalated:
+            continue
+        normalized_level = (signal.signal_level or "").strip().lower()
+        status_rules = PULSE_AUTO_ESCALATION_RULES.get(normalized_level)
+        if not status_rules:
+            continue
+        threshold = status_rules.get(signal.status)
+        if threshold is None:
+            continue
+        reference_time = (
+            signal.acknowledged_at
+            if signal.status == ShopPulseSignal.Status.ACKNOWLEDGED
+            else signal.first_detected_at
+        )
+        if reference_time is None or now - reference_time < threshold:
+            continue
+
+        before = {
+            "status": signal.status,
+            "is_escalated": signal.is_escalated,
+            "escalated_at": signal.escalated_at,
+            "escalation_note": signal.escalation_note,
+        }
+        threshold_hours = round(threshold.total_seconds() / 3600, 2)
+        threshold_phrase = (
+            f"{int(threshold_hours)} hours"
+            if threshold_hours.is_integer() and threshold_hours >= 1
+            else f"{int(threshold.total_seconds() // 60)} minutes"
+        )
+        signal.is_escalated = True
+        signal.escalated_at = now
+        signal.escalated_by_user = None
+        signal.escalation_note = (
+            f"Auto-escalated after remaining {signal.status} for more than {threshold_phrase}."
+        )
+        signal.save(
+            update_fields=[
+                "is_escalated",
+                "escalated_at",
+                "escalated_by_user",
+                "escalation_note",
+                "updated_at",
+            ]
+        )
+        create_workspace_audit_event(
+            shop=shop,
+            actor_user=None,
+            actor_role="system",
+            category="workspace",
+            event_type="workspace.pulse.auto_escalated",
+            entity_type="shop_pulse_signal",
+            entity_id=signal.id,
+            entity_label=signal.title,
+            summary=f"Auto-escalated pulse signal {signal.code}.",
+            source_surface="pulse_automation",
+            before=before,
+            after={
+                "status": signal.status,
+                "is_escalated": signal.is_escalated,
+                "escalated_at": signal.escalated_at,
+                "escalation_note": signal.escalation_note,
+            },
+            metadata={
+                "signal_level": signal.signal_level,
+                "signal_kind": signal.signal_kind,
+                "threshold_minutes": int(threshold.total_seconds() // 60),
+            },
+            occurred_at=now,
+        )
+        auto_escalated.append(signal)
+
+    return auto_escalated
+
+
+def run_shop_pulse_cycle(
+    shop: Shop,
+    *,
+    now=None,
+    signal_limit: int | None = None,
+) -> dict[str, object]:
+    now = now or timezone.now()
+    dashboard_snapshot = ShopDashboardSnapshot.objects.filter(shop=shop).first()
+    if dashboard_snapshot is None or dashboard_snapshot.refreshed_at < now - timedelta(minutes=5):
+        from platform_apps.projections.services import refresh_shop_dashboard_projection
+
+        dashboard_snapshot = refresh_shop_dashboard_projection(shop)
+    else:
+        dashboard_snapshot = (
+            ShopDashboardSnapshot.objects.filter(pk=dashboard_snapshot.pk)
+            .select_related("shop")
+            .prefetch_related("low_stock_preview")
+            .get()
+        )
+
+    full_pulse = build_shop_pulse_snapshot(
+        shop,
+        dashboard_snapshot=dashboard_snapshot,
+        now=now,
+        signal_limit=None,
+    )
+    persisted_signals = sync_shop_pulse_signals(
+        shop,
+        pulse_snapshot=full_pulse,
+        now=dashboard_snapshot.refreshed_at,
+    )
+    auto_escalated = auto_escalate_shop_pulse_signals(
+        shop,
+        signals=persisted_signals,
+        now=now,
+    )
+    pulse = build_shop_pulse_snapshot(
+        shop,
+        dashboard_snapshot=dashboard_snapshot,
+        now=now,
+        signal_limit=signal_limit,
+    )
+    refreshed_signals = list(
+        ShopPulseSignal.objects.filter(shop=shop)
+        .select_related(
+            "assigned_membership__user",
+            "assigned_by_user",
+            "acknowledged_by_user",
+            "escalated_by_user",
+            "resolved_by_user",
+        )
+        .order_by("status", "-signal_rank", "-last_detected_at", "title")
+    )
+    return {
+        "shop_id": str(shop.id),
+        "shop_slug": shop.slug,
+        "refreshed_at": dashboard_snapshot.refreshed_at,
+        "pulse": pulse,
+        "signal_count": len(refreshed_signals),
+        "auto_escalated_count": len(auto_escalated),
+        "auto_escalated_signal_codes": [signal.code for signal in auto_escalated],
     }
 
 

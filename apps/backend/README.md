@@ -268,3 +268,17 @@ If you want a fully local ERPNext test without live credentials, set:
 For queue-based execution, the backend also includes:
 
 - Celery task: `platform_apps.erpnext.tasks.run_erpnext_cycle_task`
+
+## Workspace pulse automation
+
+The workspace pulse layer now supports scheduled background refresh and stale-signal escalation:
+
+- Celery task: `platform_apps.projections.tasks.run_shop_pulse_cycle_task`
+- Celery task: `platform_apps.projections.tasks.run_workspace_pulse_cycles_task`
+- `manage.py run_pulse_cycle --shop-slug <slug>`
+- `manage.py run_workspace_pulse_cycles`
+
+Optional environment flags:
+
+- `WORKSPACE_PULSE_BEAT_ENABLED`
+- `WORKSPACE_PULSE_BEAT_MINUTES`

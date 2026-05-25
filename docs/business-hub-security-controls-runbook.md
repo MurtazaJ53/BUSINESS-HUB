@@ -82,6 +82,8 @@ That includes:
 - heavy team/access-control churn
 - ownership transfer follow-up pressure
 
+The pulse layer can now also run as a scheduled background cycle so stale critical or high-priority signals escalate automatically even if no one is actively watching the desk.
+
 ## Admin web operator flow
 
 ### Security setup
@@ -108,6 +110,13 @@ Use `Sessions` when:
 - a shop device should be blocked immediately
 - you want to force a clean re-login
 - you want to review which devices are trusted, which only need review, and which are risky
+
+### Pulse automation
+
+Use the background pulse cycle when:
+- you want stale critical signals escalated automatically
+- you want access-control churn to surface even if the admin desk was not open
+- you want a scheduled owner/admin attention layer across all active workspaces
 
 ### Audit review
 
