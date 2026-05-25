@@ -100,10 +100,14 @@ class MobileSyncCoordinator {
 
     await _cancelSubscriptions();
 
-    if (session == null || previousShopId != session.shopId) {
+    final isSigningOut = session == null;
+    final isSwitchingWorkspace =
+        previousShopId != null &&
+        session != null &&
+        previousShopId != session.shopId;
+
+    if (isSigningOut || isSwitchingWorkspace) {
       await _clearWorkspaceCache(clearSales: true);
-    } else if (force) {
-      await _clearWorkspaceCache(clearSales: false);
     }
 
     _session = session;
@@ -120,8 +124,11 @@ class MobileSyncCoordinator {
     if (!hasAccess) {
       return;
     }
-    await _ensureAdminBootstrap(session, shopId);
-    final domainStates = await _refreshBackendDomainEpochs(session, shopId);
+    final setupResults = await Future.wait<Object?>(<Future<Object?>>[
+      _ensureAdminBootstrap(session, shopId),
+      _refreshBackendDomainEpochs(session, shopId),
+    ]);
+    final domainStates = setupResults[1] as Map<String, DomainControlState>;
     final customerState = domainStates['customers'];
     final salesState = domainStates['sales'];
     _customersReadUseBackend = customerState?.isPostgresPrimary ?? false;
@@ -618,7 +625,6 @@ class MobileSyncCoordinator {
     MobileSession session,
     String shopId,
   ) async {
-    final states = <String, DomainControlState>{};
     final domains = <String>[
       'inventory',
       'customers',
@@ -627,21 +633,26 @@ class MobileSyncCoordinator {
       'payments',
     ];
 
-    for (final domain in domains) {
-      try {
-        final state = await _backendApiClient.getDomainState(
-          user: session.user,
-          shopId: shopId,
-          domain: domain,
-        );
-        await _shopRepository.saveDomainState(state: state);
-        states[domain] = state;
-      } catch (error) {
-        debugPrint('$domain domain state refresh skipped: $error');
-      }
-    }
+    final stateEntries = await Future.wait(
+      domains.map((domain) async {
+        try {
+          final state = await _backendApiClient.getDomainState(
+            user: session.user,
+            shopId: shopId,
+            domain: domain,
+          );
+          await _shopRepository.saveDomainState(state: state);
+          return MapEntry(domain, state);
+        } catch (error) {
+          debugPrint('$domain domain state refresh skipped: $error');
+          return null;
+        }
+      }),
+    );
 
-    return states;
+    return Map<String, DomainControlState>.fromEntries(
+      stateEntries.whereType<MapEntry<String, DomainControlState>>(),
+    );
   }
 
   Future<void> _cancelSubscriptions() async {
