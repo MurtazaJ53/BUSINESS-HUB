@@ -12,6 +12,7 @@ from platform_apps.payments.models import SalePayment
 from platform_apps.projections.models import ShopDashboardSnapshot, ShopPulseSignal
 from platform_apps.sales.models import Sale
 from platform_apps.shops.models import Shop, ShopPlanRequest, WorkspaceAccessSession
+from platform_apps.shops.session_trust import evaluate_workspace_session_trust
 
 
 def build_shop_pulse_snapshot(
@@ -43,6 +44,21 @@ def build_shop_pulse_snapshot(
                 last_seen_at__lt=stale_session_cutoff,
             ),
         ),
+    )
+    session_queryset = list(
+        WorkspaceAccessSession.objects.filter(
+            shop=shop,
+            status=WorkspaceAccessSession.Status.ACTIVE,
+        )
+        .select_related("user", "membership")
+        .prefetch_related("user__passkeys")
+    )
+    session_trust = [evaluate_workspace_session_trust(session, now=now) for session in session_queryset]
+    review_device_count = sum(
+        1 for trust in session_trust if trust["trust_level"] == "review"
+    )
+    risky_device_count = sum(
+        1 for trust in session_trust if trust["trust_level"] in {"risky", "blocked"}
     )
     open_plan_requests = ShopPlanRequest.objects.filter(
         shop=shop,
@@ -255,6 +271,31 @@ def build_shop_pulse_snapshot(
             if stale_active_count > 0
             else f"{revoked_count} revoked session{'s still' if revoked_count != 1 else ' still'} appear in the workspace history."
         )
+
+    if risky_device_count > 0 or review_device_count > 0:
+        count = risky_device_count if risky_device_count > 0 else review_device_count
+        priority = "high" if risky_device_count > 0 else "medium"
+        rank = 300 if risky_device_count > 0 else 170
+        tone = "warning" if risky_device_count > 0 else "info"
+        add_task(
+            code="review_device_trust",
+            priority_rank=rank,
+            priority=priority,
+            tone=tone,
+            title="Review device trust posture",
+            body=(
+                f"{risky_device_count} device session{'s look' if risky_device_count != 1 else ' looks'} risky or blocked and should be reviewed immediately."
+                if risky_device_count > 0
+                else f"{review_device_count} device session{'s need' if review_device_count != 1 else ' needs'} trust review before they become risky."
+            ),
+            route="/sessions",
+            cta_label="Open sessions",
+            count=count,
+            metadata={
+                "review_device_count": review_device_count,
+                "risky_device_count": risky_device_count,
+            },
+        )
         add_task(
             code="review_session_hygiene",
             priority_rank=120,
@@ -357,6 +398,22 @@ def build_shop_pulse_snapshot(
             route="/sessions",
             cta_label="Review sessions",
             metric_value=str(stale_active_count),
+        )
+
+    if risky_device_count > 0:
+        add_anomaly(
+            code="risky_device_posture",
+            severity_rank=300,
+            severity="warning" if risky_device_count < 2 else "critical",
+            title="Device trust posture is degraded",
+            body=f"{risky_device_count} active device session{'s carry' if risky_device_count != 1 else ' carries'} a risky or blocked trust posture.",
+            route="/sessions",
+            cta_label="Review devices",
+            metric_value=str(risky_device_count),
+            metadata={
+                "review_device_count": review_device_count,
+                "risky_device_count": risky_device_count,
+            },
         )
 
     tasks.sort(key=lambda item: (-int(item["priority_rank"]), -int(item["count"] or 0), item["title"]))

@@ -7,6 +7,7 @@ This runbook explains the current owner/admin security controls now available ac
 It covers:
 - MFA for sensitive owner/admin surfaces
 - workspace session control and remote wipe
+- workspace device trust scoring
 - workspace audit review
 - passkey / WebAuthn enrollment and verification
 
@@ -41,7 +42,25 @@ Available actions:
 
 When a mobile device receives a wipe request, the local workspace data is cleared and the user is signed out.
 
-### 3. Workspace audit
+### 3. Workspace device trust scoring
+
+Workspace sessions now carry a trust posture:
+- `trusted`
+- `review`
+- `risky`
+- `blocked`
+
+Trust scoring currently considers:
+- recent check-in freshness
+- release/version hygiene
+- package identity presence
+- remote wipe / revoke state
+- owner/admin second-factor enrollment
+- device integrity metadata when provided
+
+Risky device posture now feeds the owner/admin pulse desk automatically so device trust issues become actionable tasks, not hidden session details.
+
+### 4. Workspace audit
 
 Owner/admin users can now review append-only audit events for important workspace changes.
 
@@ -81,6 +100,7 @@ Use `Sessions` when:
 - a staff member leaves
 - a shop device should be blocked immediately
 - you want to force a clean re-login
+- you want to review which devices are trusted, which only need review, and which are risky
 
 ### Audit review
 
@@ -121,9 +141,8 @@ The current security layer is strong, but it is not the final enterprise endpoin
 
 Still pending:
 - full WebAuthn resident-key / platform-specific trust policy controls
-- anomaly detection on audit and finance events
-- automatic security-task generation
-- device trust scoring
+- deeper audit-linked anomaly correlation
+- stronger device attestation / integrity enforcement
 
 ## Related docs
 

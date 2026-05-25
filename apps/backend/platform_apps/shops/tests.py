@@ -578,6 +578,13 @@ class WorkspaceAccessSessionApiTests(TestCase):
         response = self.client.get(f"/api/v1/shops/{self.shop.id}/sessions/")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 1)
+        payload = response.json()[0]
+        self.assertIn("trust_score", payload)
+        self.assertIn("trust_level", payload)
+        self.assertIn("trust_summary", payload)
+        self.assertIn("trust_reasons", payload)
+        self.assertEqual(payload["trust_level"], "review")
+        self.assertGreaterEqual(payload["trust_score"], 60)
 
     def test_admin_can_revoke_staff_session_but_not_owner_session(self):
         staff_session = WorkspaceAccessSession.objects.create(

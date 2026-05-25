@@ -73,6 +73,19 @@ function statusLabel(session: WorkspaceAccessSessionPayload) {
   return session.status;
 }
 
+function trustToneClasses(level: string) {
+  switch (level) {
+    case "trusted":
+      return "border-[rgba(52,211,153,0.18)] bg-[rgba(7,33,25,0.76)] text-[var(--success)]";
+    case "review":
+      return "border-[rgba(71,176,255,0.18)] bg-[rgba(11,24,41,0.72)] text-[var(--accent)]";
+    case "blocked":
+      return "border-[rgba(251,113,133,0.18)] bg-[rgba(40,12,19,0.76)] text-[var(--warning)]";
+    default:
+      return "border-[rgba(245,158,11,0.18)] bg-[rgba(77,49,9,0.34)] text-[var(--warning)]";
+  }
+}
+
 export default async function SessionsPage({ searchParams }: SessionsPageProps) {
   const resolvedSearchParams = (await searchParams) ?? {};
   const session = await getSession();
@@ -121,25 +134,25 @@ export default async function SessionsPage({ searchParams }: SessionsPageProps) 
               icon="SES"
             />
             <MetricCard
-              label="Active"
-              value={countSessions(sessions, (item) => item.status === "active" && !item.wipe_requested).toString()}
-              detail="Devices still allowed to use the workspace"
+              label="Trusted"
+              value={countSessions(sessions, (item) => item.status === "active" && item.trust_level === "trusted" && !item.wipe_requested).toString()}
+              detail="Active devices with healthy trust posture"
               accent="green"
-              icon="ACT"
+              icon="TRU"
             />
             <MetricCard
-              label="Revoked"
-              value={countSessions(sessions, (item) => item.status === "revoked").toString()}
-              detail="Devices blocked from further workspace use"
-              accent="rose"
-              icon="REV"
-            />
-            <MetricCard
-              label="Wipe pending"
-              value={countSessions(sessions, (item) => item.wipe_requested).toString()}
-              detail="Devices that should clear local data on next contact"
+              label="Needs review"
+              value={countSessions(sessions, (item) => item.status === "active" && item.trust_level === "review").toString()}
+              detail="Usable devices that still need trust review"
               accent="blue"
-              icon="WIP"
+              icon="REVW"
+            />
+            <MetricCard
+              label="Risky or blocked"
+              value={countSessions(sessions, (item) => ["risky", "blocked"].includes(item.trust_level) || item.wipe_requested).toString()}
+              detail="Sessions that should be reviewed or cut off quickly"
+              accent="rose"
+              icon="RISK"
             />
           </section>
 
@@ -168,6 +181,11 @@ export default async function SessionsPage({ searchParams }: SessionsPageProps) 
                               <span className="rounded-full border border-[rgba(152,164,189,0.12)] bg-[rgba(9,14,22,0.52)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
                                 {statusLabel(item)}
                               </span>
+                              <span
+                                className={`rounded-full border px-3 py-1 text-xs font-medium ${trustToneClasses(item.trust_level)}`}
+                              >
+                                trust {item.trust_level} · {item.trust_score}
+                              </span>
                             </div>
                             <p className="mt-2 text-sm text-[var(--text-secondary)]">{item.member_email}</p>
                             <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -189,11 +207,32 @@ export default async function SessionsPage({ searchParams }: SessionsPageProps) 
                                   {item.app_version ? `v${item.app_version}+${item.build_number || "?"}` : "Version unknown"}
                                 </div>
                               </div>
+                              <div className="rounded-[18px] border border-[rgba(152,164,189,0.12)] bg-[rgba(13,18,28,0.68)] px-4 py-4 text-sm text-[var(--text-secondary)]">
+                                Trust posture
+                                <div className="mt-1 text-base font-semibold text-[var(--text-primary)]">
+                                  {item.trust_summary}
+                                </div>
+                                <div className="mt-1 text-xs text-[var(--text-muted)]">
+                                  Score {item.trust_score} · {item.trust_level}
+                                </div>
+                              </div>
                             </div>
                             {item.revoke_reason ? (
                               <p className="mt-4 text-sm text-[var(--text-secondary)]">
                                 Reason: {item.revoke_reason}
                               </p>
+                            ) : null}
+                            {item.trust_reasons.length ? (
+                              <div className="mt-4 rounded-[18px] border border-[rgba(152,164,189,0.12)] bg-[rgba(9,14,22,0.52)] px-4 py-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                                  Trust reasons
+                                </p>
+                                <ul className="mt-3 space-y-2 text-sm text-[var(--text-secondary)]">
+                                  {item.trust_reasons.map((reason) => (
+                                    <li key={reason}>- {reason}</li>
+                                  ))}
+                                </ul>
+                              </div>
                             ) : null}
                           </div>
 
@@ -269,6 +308,7 @@ export default async function SessionsPage({ searchParams }: SessionsPageProps) 
                   <li>- Revoke blocks a mobile app instance from continued workspace use.</li>
                   <li>- Revoke and wipe tells that app to clear local workspace data the next time it checks in.</li>
                   <li>- Restore lets a previously blocked device work again.</li>
+                  <li>- Trust posture scores recent check-in, release hygiene, and owner/admin second-factor coverage.</li>
                   <li>- Admins can manage their own sessions and lower roles. Owners can manage every workspace device session.</li>
                 </ul>
               </section>

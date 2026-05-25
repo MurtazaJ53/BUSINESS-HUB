@@ -310,6 +310,35 @@ class ProjectionRefreshTests(TestCase):
         self.assertIn("inventory_shrinkage", anomaly_codes)
         self.assertGreaterEqual(pulse["stats"]["critical_anomaly_count"], 1)
 
+    def test_pulse_snapshot_flags_risky_device_trust(self):
+        self.shop.settings_json = {"plan_tier": "pro"}
+        self.shop.save(update_fields=["settings_json", "updated_at"])
+        self._seed_domain_data()
+        WorkspaceAccessSession.objects.create(
+            user=self.admin_user,
+            shop=self.shop,
+            membership=self.admin_membership,
+            app_instance_id="admin-risky-device",
+            membership_role_snapshot=ShopMembership.Role.ADMIN,
+            device_label="Admin Android",
+            platform_name="android",
+            package_name="",
+            app_version="",
+            build_number="",
+            release_channel="beta",
+            release_tag="",
+            status=WorkspaceAccessSession.Status.ACTIVE,
+            last_seen_at=timezone.now() - timedelta(days=5),
+        )
+
+        snapshot = refresh_shop_dashboard_projection(self.shop)
+        pulse = build_shop_pulse_snapshot(self.shop, dashboard_snapshot=snapshot)
+        task_codes = {task["code"] for task in pulse["tasks"]}
+        anomaly_codes = {anomaly["code"] for anomaly in pulse["anomalies"]}
+
+        self.assertIn("review_device_trust", task_codes)
+        self.assertIn("risky_device_posture", anomaly_codes)
+
     def test_pulse_api_returns_generated_payload(self):
         self.shop.settings_json = {"plan_tier": "pro"}
         self.shop.save(update_fields=["settings_json", "updated_at"])

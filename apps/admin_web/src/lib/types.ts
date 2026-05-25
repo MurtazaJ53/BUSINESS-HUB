@@ -203,6 +203,10 @@ export type WorkspaceAccessSessionPayload = {
   wipe_requested: boolean;
   wipe_requested_at: string | null;
   wipe_acknowledged_at: string | null;
+  trust_score: number;
+  trust_level: "trusted" | "review" | "risky" | "blocked" | string;
+  trust_summary: string;
+  trust_reasons: string[];
   metadata_json: Record<string, unknown>;
   can_manage: boolean;
   created_at: string;

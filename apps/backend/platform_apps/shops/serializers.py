@@ -20,6 +20,7 @@ from platform_apps.shops.roles import (
     get_membership_role_summary,
     normalize_membership_role,
 )
+from platform_apps.shops.session_trust import evaluate_workspace_session_trust
 from platform_apps.users.models import PlatformUser
 
 
@@ -432,6 +433,10 @@ class WorkspaceAccessSessionSerializer(serializers.ModelSerializer):
     role_label = serializers.SerializerMethodField()
     can_manage = serializers.SerializerMethodField()
     wipe_requested = serializers.SerializerMethodField()
+    trust_score = serializers.SerializerMethodField()
+    trust_level = serializers.SerializerMethodField()
+    trust_summary = serializers.SerializerMethodField()
+    trust_reasons = serializers.SerializerMethodField()
 
     class Meta:
         model = WorkspaceAccessSession
@@ -455,6 +460,10 @@ class WorkspaceAccessSessionSerializer(serializers.ModelSerializer):
             "wipe_requested",
             "wipe_requested_at",
             "wipe_acknowledged_at",
+            "trust_score",
+            "trust_level",
+            "trust_summary",
+            "trust_reasons",
             "metadata_json",
             "can_manage",
             "created_at",
@@ -482,6 +491,25 @@ class WorkspaceAccessSessionSerializer(serializers.ModelSerializer):
 
     def get_wipe_requested(self, obj):
         return obj.wipe_requested_at is not None and obj.wipe_acknowledged_at is None
+
+    def _trust(self, obj):
+        cached = getattr(obj, "_workspace_trust_cache", None)
+        if cached is None:
+            cached = evaluate_workspace_session_trust(obj)
+            setattr(obj, "_workspace_trust_cache", cached)
+        return cached
+
+    def get_trust_score(self, obj):
+        return self._trust(obj)["trust_score"]
+
+    def get_trust_level(self, obj):
+        return self._trust(obj)["trust_level"]
+
+    def get_trust_summary(self, obj):
+        return self._trust(obj)["trust_summary"]
+
+    def get_trust_reasons(self, obj):
+        return self._trust(obj)["trust_reasons"]
 
 
 class WorkspaceAccessSessionHeartbeatSerializer(serializers.Serializer):

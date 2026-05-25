@@ -341,6 +341,7 @@ class WorkspaceAccessSessionListView(APIView):
         queryset = (
             WorkspaceAccessSession.objects.filter(shop=actor_membership.shop)
             .select_related("user", "shop", "membership")
+            .prefetch_related("user__passkeys")
             .order_by("-last_seen_at", "-created_at")
         )
         serializer = WorkspaceAccessSessionSerializer(
@@ -393,6 +394,7 @@ class WorkspaceAccessSessionDetailView(APIView):
         target_session = (
             WorkspaceAccessSession.objects.filter(shop=actor_membership.shop, pk=session_id)
             .select_related("user", "shop", "membership")
+            .prefetch_related("user__passkeys")
             .first()
         )
         if target_session is None:
