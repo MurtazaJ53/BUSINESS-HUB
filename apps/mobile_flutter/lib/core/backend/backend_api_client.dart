@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -93,6 +94,7 @@ class BackendApiClient {
   BackendApiClient({required this.baseUrl});
 
   final String baseUrl;
+  static const Duration _requestTimeout = Duration(seconds: 8);
 
   Future<DomainControlState> getDomainState({
     required User user,
@@ -677,9 +679,10 @@ class BackendApiClient {
     }
 
     final client = HttpClient();
+    client.connectionTimeout = _requestTimeout;
     try {
       final url = Uri.parse('${baseUrl.replaceAll(RegExp(r"/$"), "")}$path');
-      final request = await client.openUrl(method, url);
+      final request = await client.openUrl(method, url).timeout(_requestTimeout);
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       if (body != null) {
@@ -687,8 +690,8 @@ class BackendApiClient {
         request.write(jsonEncode(body));
       }
 
-      final response = await request.close();
-      final bodyText = await utf8.decodeStream(response);
+      final response = await request.close().timeout(_requestTimeout);
+      final bodyText = await utf8.decodeStream(response).timeout(_requestTimeout);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw BackendApiException(
           'Backend request failed (${response.statusCode}) for $path: $bodyText',
@@ -701,6 +704,10 @@ class BackendApiClient {
       }
       return Map<String, dynamic>.from(
         jsonDecode(bodyText) as Map<String, dynamic>,
+      );
+    } on TimeoutException {
+      throw BackendApiException(
+        'Backend request timed out for $path. Check connectivity or backend load.',
       );
     } finally {
       client.close(force: true);
@@ -726,14 +733,15 @@ class BackendApiClient {
     }
 
     final client = HttpClient();
+    client.connectionTimeout = _requestTimeout;
     try {
       final url = Uri.parse('${baseUrl.replaceAll(RegExp(r"/$"), "")}$path');
-      final request = await client.openUrl(method, url);
+      final request = await client.openUrl(method, url).timeout(_requestTimeout);
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
 
-      final response = await request.close();
-      final bodyText = await utf8.decodeStream(response);
+      final response = await request.close().timeout(_requestTimeout);
+      final bodyText = await utf8.decodeStream(response).timeout(_requestTimeout);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw BackendApiException(
           'Backend request failed (${response.statusCode}) for $path: $bodyText',
@@ -755,6 +763,10 @@ class BackendApiClient {
           .whereType<Map>()
           .map((item) => Map<String, dynamic>.from(item))
           .toList(growable: false);
+    } on TimeoutException {
+      throw BackendApiException(
+        'Backend request timed out for $path. Check connectivity or backend load.',
+      );
     } finally {
       client.close(force: true);
     }

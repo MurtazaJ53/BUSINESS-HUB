@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.core.cache import cache
 from rest_framework import permissions
 from rest_framework import exceptions
 from rest_framework.response import Response
@@ -18,6 +19,20 @@ from platform_apps.projections.services import refresh_shop_dashboard_projection
 from platform_apps.shops.models import ShopMembership
 from platform_apps.shops.permissions import get_membership_or_403
 
+_DASHBOARD_CACHE_TTL_SECONDS = 30
+_PULSE_CACHE_TTL_SECONDS = 30
+
+
+def _dashboard_cache_key(shop_id: str, *, finance_summary: bool, advanced_reports: bool) -> str:
+    return (
+        f"shop-dashboard:{shop_id}:"
+        f"finance-{int(finance_summary)}:advanced-{int(advanced_reports)}"
+    )
+
+
+def _pulse_cache_key(shop_id: str) -> str:
+    return f"shop-pulse:{shop_id}"
+
 
 class ShopDashboardSnapshotView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -25,6 +40,16 @@ class ShopDashboardSnapshotView(APIView):
     def get(self, request, shop_id):
         membership = get_membership_or_403(request.user, shop_id, ShopMembership.Role.VIEWER)
         refresh_requested = request.query_params.get("refresh", "").strip().lower() in {"1", "true", "yes"}
+        cache_key = _dashboard_cache_key(
+            str(membership.shop_id),
+            finance_summary=membership.shop.enabled_features.get("finance_summary", False),
+            advanced_reports=membership.shop.enabled_features.get("advanced_reports", False),
+        )
+
+        if not refresh_requested:
+            cached_payload = cache.get(cache_key)
+            if cached_payload is not None:
+                return Response(cached_payload)
 
         snapshot = (
             refresh_shop_dashboard_projection(membership.shop)
@@ -43,7 +68,9 @@ class ShopDashboardSnapshotView(APIView):
                 "membership": membership,
             },
         )
-        return Response(serializer.data)
+        payload = serializer.data
+        cache.set(cache_key, payload, _DASHBOARD_CACHE_TTL_SECONDS)
+        return Response(payload)
 
 
 class ShopPulseSnapshotView(APIView):
@@ -52,6 +79,12 @@ class ShopPulseSnapshotView(APIView):
     def get(self, request, shop_id):
         membership = get_membership_or_403(request.user, shop_id, ShopMembership.Role.ADMIN)
         refresh_requested = request.query_params.get("refresh", "").strip().lower() in {"1", "true", "yes"}
+        cache_key = _pulse_cache_key(str(membership.shop_id))
+
+        if not refresh_requested:
+            cached_payload = cache.get(cache_key)
+            if cached_payload is not None:
+                return Response(cached_payload)
 
         snapshot = (
             refresh_shop_dashboard_projection(membership.shop)
@@ -79,7 +112,9 @@ class ShopPulseSnapshotView(APIView):
             dashboard_snapshot=snapshot,
         )
         serializer = ShopPulseSnapshotSerializer(pulse)
-        return Response(serializer.data)
+        payload = serializer.data
+        cache.set(cache_key, payload, _PULSE_CACHE_TTL_SECONDS)
+        return Response(payload)
 
 
 class ShopPulseSignalListView(APIView):
@@ -182,5 +217,6 @@ class ShopPulseSignalDetailView(APIView):
                 "resolution_note": signal.resolution_note,
             },
         )
+        cache.delete(_pulse_cache_key(str(membership.shop_id)))
         response_serializer = ShopPulseSignalSerializer(signal)
         return Response(response_serializer.data)

@@ -16,27 +16,38 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(mobileSessionProvider).asData?.value;
-    final pulseAsync = ref.watch(workspacePulseProvider);
-    final pulse = pulseAsync.asData?.value;
     final salesRepository = ref.read(salesRepositoryProvider);
     final syncStatus = ref.watch(syncStatusProvider);
-    final shop =
-        ref.watch(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
-    final overview =
-        ref
-            .watch(dashboardOverviewProvider(session?.canViewCost ?? false))
-            .asData
-            ?.value ??
-        DashboardOverview.empty();
-    final history =
-        ref.watch(historyOverviewProvider).asData?.value ??
-        HistoryOverview.empty();
-    final lowStock =
-        ref.watch(dashboardLowStockPreviewProvider).asData?.value ??
-        const <LowStockItem>[];
-    final sales =
-        ref.watch(dashboardRecentSalesProvider).asData?.value ??
-        const <RecentSaleSummary>[];
+    final shopAsync = ref.watch(shopInfoProvider);
+    final overviewAsync = ref.watch(
+      dashboardOverviewProvider(session?.canViewCost ?? false),
+    );
+    final historyAsync = ref.watch(historyOverviewProvider);
+    final lowStockAsync = ref.watch(dashboardLowStockPreviewProvider);
+    final salesAsync = ref.watch(dashboardRecentSalesProvider);
+    final shop = shopAsync.asData?.value ?? ShopInfo.fallback();
+    final overview = overviewAsync.asData?.value ?? DashboardOverview.empty();
+    final history = historyAsync.asData?.value ?? HistoryOverview.empty();
+    final lowStock = lowStockAsync.asData?.value ?? const <LowStockItem>[];
+    final sales = salesAsync.asData?.value ?? const <RecentSaleSummary>[];
+    final isCoreLoading =
+        shopAsync.isLoading &&
+        overviewAsync.isLoading &&
+        historyAsync.isLoading &&
+        lowStockAsync.isLoading &&
+        salesAsync.isLoading;
+    final hasCoreContent =
+        shopAsync.hasValue ||
+        overviewAsync.hasValue ||
+        historyAsync.hasValue ||
+        lowStockAsync.hasValue ||
+        salesAsync.hasValue;
+    final hasCoreError =
+        shopAsync.hasError ||
+        overviewAsync.hasError ||
+        historyAsync.hasError ||
+        lowStockAsync.hasError ||
+        salesAsync.hasError;
     final roleProfile = _DashboardRoleProfile.fromSession(
       session: session,
       shop: shop,
@@ -163,87 +174,15 @@ class DashboardScreen extends ConsumerWidget {
           onTap: () => context.go(focus.route),
         ),
         const SizedBox(height: 18),
+        if (isCoreLoading && !hasCoreContent) ...<Widget>[
+          const _DashboardBootstrapPanel(),
+          const SizedBox(height: 18),
+        ] else if (hasCoreError && !hasCoreContent) ...<Widget>[
+          const _DashboardUnavailablePanel(),
+          const SizedBox(height: 18),
+        ],
         if (session?.isOwnerLike ?? false) ...<Widget>[
-          MobilePanel(
-            title: 'Workspace pulse',
-            action: MobileTag(
-              label: pulse == null
-                  ? (pulseAsync.isLoading ? 'Refreshing' : 'Unavailable')
-                  : pulse.stats.criticalAnomalyCount > 0
-                  ? '${pulse.stats.criticalAnomalyCount} critical'
-                  : '${pulse.stats.openTaskCount} tasks',
-              icon: pulse == null
-                  ? Icons.sync_rounded
-                  : pulse.stats.criticalAnomalyCount > 0
-                  ? Icons.crisis_alert_rounded
-                  : Icons.auto_awesome_rounded,
-              accent: pulse == null
-                  ? const Color(0xFF38BDF8)
-                  : pulse.stats.criticalAnomalyCount > 0
-                  ? const Color(0xFFFB7185)
-                  : const Color(0xFF38BDF8),
-            ),
-            child: pulse == null
-                ? MobileEmptyState(
-                    icon: pulseAsync.isLoading
-                        ? Icons.sync_rounded
-                        : Icons.wifi_tethering_error_rounded,
-                    title: pulseAsync.isLoading
-                        ? 'Refreshing workspace pulse'
-                        : 'Pulse not available',
-                    body: pulseAsync.isLoading
-                        ? 'Business Hub is generating owner/admin tasks and anomaly signals from the current workspace data.'
-                        : 'Pulse needs a live backend check to show cross-workspace tasks and anomaly warnings.',
-                  )
-                : Column(
-                    children: <Widget>[
-                      _DashboardRow(
-                        title: pulse.headline.title,
-                        subtitle: pulse.headline.body,
-                        trailing: pulse.headline.ctaLabel,
-                        accent: _pulseToneColor(pulse.headline.tone),
-                        onTap: () => context.go(
-                          _resolvePulseRoute(pulse.headline.route),
-                        ),
-                      ),
-                      ...pulse.tasks
-                          .take(2)
-                          .map(
-                            (task) => _DashboardRow(
-                              title: task.title,
-                              subtitle: task.body,
-                              trailing: task.priority.toUpperCase(),
-                              accent: _pulseToneColor(task.tone),
-                              onTap: () =>
-                                  context.go(_resolvePulseRoute(task.route)),
-                            ),
-                          ),
-                      if (pulse.anomalies.isNotEmpty)
-                        _DashboardRow(
-                          title: pulse.anomalies.first.title,
-                          subtitle: pulse.anomalies.first.body,
-                          trailing: pulse.anomalies.first.metricValue,
-                          accent: _pulseSeverityColor(
-                            pulse.anomalies.first.severity,
-                          ),
-                          onTap: () => context.go(
-                            _resolvePulseRoute(
-                              pulse.anomalies.first.route,
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 4),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: FilledButton.tonalIcon(
-                          onPressed: () => context.push('/settings/pulse'),
-                          icon: const Icon(Icons.monitor_heart_rounded),
-                          label: const Text('Open pulse desk'),
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
+          const _OwnerPulsePanel(),
           const SizedBox(height: 18),
         ],
         MobilePanel(
@@ -560,6 +499,134 @@ class DashboardScreen extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _DashboardBootstrapPanel extends StatelessWidget {
+  const _DashboardBootstrapPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return MobilePanel(
+      title: 'Preparing Home',
+      action: const MobileTag(
+        label: 'LOADING',
+        icon: Icons.sync_rounded,
+        accent: Color(0xFF38BDF8),
+      ),
+      child: const MobileEmptyState(
+        icon: Icons.dashboard_customize_rounded,
+        title: 'Loading your workspace snapshot',
+        body:
+            'Business Hub is warming the local dashboard, stock watch, and recent receipt feed so Home opens with real data instead of a blank surface.',
+      ),
+    );
+  }
+}
+
+class _DashboardUnavailablePanel extends StatelessWidget {
+  const _DashboardUnavailablePanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return MobilePanel(
+      title: 'Home needs attention',
+      action: const MobileTag(
+        label: 'CHECK DATA',
+        icon: Icons.wifi_tethering_error_rounded,
+        accent: Color(0xFFFB7185),
+      ),
+      child: const MobileEmptyState(
+        icon: Icons.cloud_off_rounded,
+        title: 'Dashboard data did not load cleanly',
+        body:
+            'The app kept Home visible instead of leaving a blank screen. Use refresh or open POS while the workspace retries its local and backend data.',
+      ),
+    );
+  }
+}
+
+class _OwnerPulsePanel extends ConsumerWidget {
+  const _OwnerPulsePanel();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pulseAsync = ref.watch(workspacePulseProvider);
+    final pulse = pulseAsync.asData?.value;
+
+    return MobilePanel(
+      title: 'Workspace pulse',
+      action: MobileTag(
+        label: pulse == null
+            ? (pulseAsync.isLoading ? 'Refreshing' : 'Unavailable')
+            : pulse.stats.criticalAnomalyCount > 0
+            ? '${pulse.stats.criticalAnomalyCount} critical'
+            : '${pulse.stats.openTaskCount} tasks',
+        icon: pulse == null
+            ? Icons.sync_rounded
+            : pulse.stats.criticalAnomalyCount > 0
+            ? Icons.crisis_alert_rounded
+            : Icons.auto_awesome_rounded,
+        accent: pulse == null
+            ? const Color(0xFF38BDF8)
+            : pulse.stats.criticalAnomalyCount > 0
+            ? const Color(0xFFFB7185)
+            : const Color(0xFF38BDF8),
+      ),
+      child: pulse == null
+          ? MobileEmptyState(
+              icon: pulseAsync.isLoading
+                  ? Icons.sync_rounded
+                  : Icons.wifi_tethering_error_rounded,
+              title: pulseAsync.isLoading
+                  ? 'Refreshing workspace pulse'
+                  : 'Pulse not available',
+              body: pulseAsync.isLoading
+                  ? 'Business Hub is generating owner/admin tasks and anomaly signals from the current workspace data.'
+                  : 'Pulse needs a live backend check to show cross-workspace tasks and anomaly warnings.',
+            )
+          : Column(
+              children: <Widget>[
+                _DashboardRow(
+                  title: pulse.headline.title,
+                  subtitle: pulse.headline.body,
+                  trailing: pulse.headline.ctaLabel,
+                  accent: _pulseToneColor(pulse.headline.tone),
+                  onTap: () => context.go(_resolvePulseRoute(pulse.headline.route)),
+                ),
+                ...pulse.tasks.take(2).map(
+                  (task) => _DashboardRow(
+                    title: task.title,
+                    subtitle: task.body,
+                    trailing: task.priority.toUpperCase(),
+                    accent: _pulseToneColor(task.tone),
+                    onTap: () => context.go(_resolvePulseRoute(task.route)),
+                  ),
+                ),
+                if (pulse.anomalies.isNotEmpty)
+                  _DashboardRow(
+                    title: pulse.anomalies.first.title,
+                    subtitle: pulse.anomalies.first.body,
+                    trailing: pulse.anomalies.first.metricValue,
+                    accent: _pulseSeverityColor(
+                      pulse.anomalies.first.severity,
+                    ),
+                    onTap: () => context.go(
+                      _resolvePulseRoute(pulse.anomalies.first.route),
+                    ),
+                  ),
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => context.push('/settings/pulse'),
+                    icon: const Icon(Icons.monitor_heart_rounded),
+                    label: const Text('Open pulse desk'),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }
