@@ -71,10 +71,10 @@ class SettingsScreen extends ConsumerWidget {
                 MobileSyncStatus.idle => Icons.verified_rounded,
               },
               accent: switch (syncStatus) {
-                MobileSyncStatus.syncing => const Color(0xFF38BDF8),
-                MobileSyncStatus.error => const Color(0xFFFB7185),
-                MobileSyncStatus.offline => const Color(0xFFF59E0B),
-                MobileSyncStatus.idle => const Color(0xFF22C55E),
+                MobileSyncStatus.syncing => const Color(0xFFE58A47),
+                MobileSyncStatus.error => const Color(0xFFEF6B67),
+                MobileSyncStatus.offline => const Color(0xFFF0C879),
+                MobileSyncStatus.idle => const Color(0xFF4EB79B),
               },
             ),
           ),
@@ -84,7 +84,7 @@ class SettingsScreen extends ConsumerWidget {
             action: MobileTag(
               label: profile.workspaceTag,
               icon: Icons.storefront_rounded,
-              accent: const Color(0xFF14B8A6),
+              accent: const Color(0xFF4EB79B),
             ),
             child: Column(
               children: <Widget>[
@@ -138,7 +138,7 @@ class SettingsScreen extends ConsumerWidget {
               icon: session?.isOwnerLike ?? false
                   ? Icons.groups_rounded
                   : Icons.badge_rounded,
-              accent: const Color(0xFF38BDF8),
+              accent: const Color(0xFFE58A47),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -163,13 +163,13 @@ class SettingsScreen extends ConsumerWidget {
                           label:
                               '${attendanceSummary?.activeWorkersToday ?? 0} on floor today',
                           icon: Icons.groups_rounded,
-                          accent: const Color(0xFF22C55E),
+                          accent: const Color(0xFF4EB79B),
                         ),
                       MobileTag(
                         label:
                             '${attendanceSummary?.presentCount ?? 0} present records',
                         icon: Icons.check_circle_rounded,
-                        accent: const Color(0xFF38BDF8),
+                        accent: const Color(0xFFE58A47),
                       ),
                       if (shop.supportsExpenses)
                         MobileTag(
@@ -179,7 +179,7 @@ class SettingsScreen extends ConsumerWidget {
                                   expenseSummary?.totalAmount ?? 0,
                                 ),
                           icon: Icons.payments_rounded,
-                          accent: const Color(0xFFF59E0B),
+                          accent: const Color(0xFFF0C879),
                         ),
                     ],
                   ),
@@ -261,7 +261,7 @@ class SettingsScreen extends ConsumerWidget {
             action: MobileTag(
               label: '${shop.planLabel} plan',
               icon: Icons.workspace_premium_rounded,
-              accent: const Color(0xFFF59E0B),
+              accent: const Color(0xFFF0C879),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -397,10 +397,10 @@ class SettingsScreen extends ConsumerWidget {
                     ? Icons.crisis_alert_rounded
                     : Icons.auto_awesome_rounded,
                 accent: pulse == null
-                    ? const Color(0xFF38BDF8)
+                    ? const Color(0xFFE58A47)
                     : pulse.stats.criticalAnomalyCount > 0
-                    ? const Color(0xFFFB7185)
-                    : const Color(0xFF38BDF8),
+                    ? const Color(0xFFEF6B67)
+                    : const Color(0xFFE58A47),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -443,8 +443,8 @@ class SettingsScreen extends ConsumerWidget {
                     : Icons.devices_rounded,
                 accent:
                     sessions.any((item) => item.isRisky || item.wipeRequested)
-                    ? const Color(0xFFFB7185)
-                    : const Color(0xFF38BDF8),
+                    ? const Color(0xFFEF6B67)
+                    : const Color(0xFFE58A47),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -475,7 +475,7 @@ class SettingsScreen extends ConsumerWidget {
               action: MobileTag(
                 label: 'Owner/admin gate',
                 icon: Icons.verified_user_rounded,
-                accent: const Color(0xFF38BDF8),
+                accent: const Color(0xFFE58A47),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -508,8 +508,8 @@ class SettingsScreen extends ConsumerWidget {
                   ? Icons.cloud_upload_rounded
                   : Icons.check_circle_rounded,
               accent: pending > 0
-                  ? const Color(0xFFF59E0B)
-                  : const Color(0xFF22C55E),
+                  ? const Color(0xFFF0C879)
+                  : const Color(0xFF4EB79B),
             ),
             child: Column(
               children: <Widget>[
@@ -617,7 +617,7 @@ class SettingsScreen extends ConsumerWidget {
             action: MobileTag(
               label: runtimeInfoAsync.asData?.value.versionLabel ?? 'Loading',
               icon: Icons.new_releases_rounded,
-              accent: const Color(0xFF38BDF8),
+              accent: const Color(0xFFE58A47),
             ),
             child: runtimeInfoAsync.when(
               data: (runtime) => Column(
@@ -769,14 +769,14 @@ class _SettingsRoleProfile {
         leadSubtitle:
             'Keep the day simple here. Check app health, refresh the workspace, and sign out when the shift ends.',
         leadIcon: Icons.settings_rounded,
-        leadAccent: Color(0xFF38BDF8),
+        leadAccent: Color(0xFFE58A47),
         workspaceTag: 'SHIFT READY',
         syncPanelTitle: 'App health',
         refreshButtonLabel: 'Refresh app',
         accountPanelTitle: 'Account',
         accountTag: 'FAST EXIT',
         accountIcon: Icons.flash_on_rounded,
-        accountAccent: Color(0xFF22C55E),
+        accountAccent: Color(0xFF4EB79B),
         showAdvancedOpsButton: false,
         showOwnerSyncDetails: false,
       );
@@ -789,14 +789,14 @@ class _SettingsRoleProfile {
         leadSubtitle:
             'Use this space for daily store settings and app health. Heavy platform tooling stays out of the way.',
         leadIcon: Icons.settings_applications_rounded,
-        leadAccent: Color(0xFF14B8A6),
+        leadAccent: Color(0xFF4EB79B),
         workspaceTag: 'STORE READY',
         syncPanelTitle: 'Workspace health',
         refreshButtonLabel: 'Refresh workspace',
         accountPanelTitle: 'Account',
         accountTag: 'DAILY USE',
         accountIcon: Icons.badge_rounded,
-        accountAccent: Color(0xFF14B8A6),
+        accountAccent: Color(0xFF4EB79B),
         showAdvancedOpsButton: false,
         showOwnerSyncDetails: false,
       );
@@ -808,14 +808,14 @@ class _SettingsRoleProfile {
       leadSubtitle:
           'Daily controls stay simple here. Advanced recovery, rollout, and technical tooling remain behind the admin-only ops area.',
       leadIcon: Icons.settings_rounded,
-      leadAccent: Color(0xFFA78BFA),
+      leadAccent: Color(0xFF7CA4F8),
       workspaceTag: 'OWNER VIEW',
       syncPanelTitle: 'Workspace health',
       refreshButtonLabel: 'Refresh workspace',
       accountPanelTitle: 'Owner and support',
       accountTag: 'ADMIN PATH',
       accountIcon: Icons.shield_rounded,
-      accountAccent: Color(0xFFA78BFA),
+      accountAccent: Color(0xFF7CA4F8),
       showAdvancedOpsButton: shop.supportsAdvancedOps,
       showOwnerSyncDetails: shop.supportsAdvancedOps,
     );
@@ -1003,7 +1003,7 @@ class _PlanSection extends StatelessWidget {
     final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1220),
+        color: const Color(0xFF232A36),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
@@ -1058,7 +1058,7 @@ class _SettingsRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: const Color(0xFF0A1220),
+          color: const Color(0xFF232A36),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
         ),
@@ -1071,7 +1071,7 @@ class _SettingsRow extends StatelessWidget {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF111827),
+                  color: const Color(0xFF232A36),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: Colors.white70, size: 18),

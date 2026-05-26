@@ -81,10 +81,8 @@ class SalesEntries extends Table {
       text().named('sync_status').withDefault(const Constant('local_only'))();
   TextColumn get backendReceiptId =>
       text().named('backend_receipt_id').nullable()();
-  TextColumn get backendSaleId =>
-      text().named('backend_sale_id').nullable()();
-  TextColumn get lastSyncError =>
-      text().named('last_sync_error').nullable()();
+  TextColumn get backendSaleId => text().named('backend_sale_id').nullable()();
+  TextColumn get lastSyncError => text().named('last_sync_error').nullable()();
   IntColumn get lastSyncedAt => integer().named('last_synced_at').nullable()();
   BoolColumn get tombstone => boolean().withDefault(const Constant(false))();
 }
@@ -98,8 +96,7 @@ class CustomerEntries extends Table {
   TextColumn get phone => text().nullable()();
   TextColumn get email => text().nullable()();
   TextColumn get notes => text().nullable()();
-  TextColumn get status =>
-      text().withDefault(const Constant('active'))();
+  TextColumn get status => text().withDefault(const Constant('active'))();
   RealColumn get totalSpent =>
       real().named('total_spent').withDefault(const Constant(0))();
   RealColumn get balance => real().withDefault(const Constant(0))();

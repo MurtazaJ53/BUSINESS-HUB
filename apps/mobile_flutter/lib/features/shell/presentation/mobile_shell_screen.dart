@@ -8,6 +8,7 @@ import '../../../core/models/mobile_session.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
+import '../../../core/theme/app_theme.dart';
 
 final List<GlobalKey<NavigatorState>> mobileShellBranchNavigatorKeys =
     List<GlobalKey<NavigatorState>>.generate(
@@ -98,9 +99,9 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: <Color>[
-                Color(0xFF05070B),
-                Color(0xFF0A1020),
-                Color(0xFF05070B),
+                AppPalette.background,
+                AppPalette.backgroundSoft,
+                AppPalette.backgroundAlt,
               ],
             ),
           ),
@@ -109,11 +110,11 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
               if (!compactChrome) ...const <Widget>[
                 _AmbientGlow(
                   alignment: Alignment.topLeft,
-                  color: Color(0xFF2563EB),
+                  color: AppPalette.primary,
                 ),
                 _AmbientGlow(
                   alignment: Alignment.bottomRight,
-                  color: Color(0xFF06B6D4),
+                  color: AppPalette.gold,
                 ),
               ],
               SafeArea(
@@ -133,8 +134,9 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
                         compact: compactChrome,
                         syncStatus: syncStatus,
                         canGoBack: _hasBackPath(navProfile.primaryBranchIndex),
-                        onBackPressed: () =>
-                            _handleBackNavigation(navProfile.primaryBranchIndex),
+                        onBackPressed: () => _handleBackNavigation(
+                          navProfile.primaryBranchIndex,
+                        ),
                         onSettingsPressed: _openSettings,
                         onRefreshPressed: syncCoordinator.refresh,
                       ),
@@ -146,22 +148,24 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
                         ),
                         child: DecoratedBox(
                           decoration: BoxDecoration(
-                            color: const Color(0xC4070B13),
+                            color: AppPalette.backgroundSoft.withValues(
+                              alpha: 0.94,
+                            ),
                             borderRadius: BorderRadius.circular(
                               compactChrome ? 24 : 30,
                             ),
                             border: Border.all(
-                              color: Colors.white.withValues(
-                                alpha: compactChrome ? 0.05 : 0.08,
-                              ),
+                              color: compactChrome
+                                  ? AppPalette.lineSoft
+                                  : AppPalette.line,
                             ),
                             boxShadow: compactChrome
                                 ? const <BoxShadow>[]
                                 : const <BoxShadow>[
                                     BoxShadow(
-                                      color: Color(0x42000000),
-                                      blurRadius: 28,
-                                      offset: Offset(0, 14),
+                                      color: Color(0x4A000000),
+                                      blurRadius: 30,
+                                      offset: Offset(0, 18),
                                     ),
                                   ],
                           ),
@@ -183,14 +187,16 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
                       ),
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: const Color(0xE6111826),
+                          color: AppPalette.backgroundSoft.withValues(
+                            alpha: 0.96,
+                          ),
                           borderRadius: BorderRadius.circular(
                             compactChrome ? 24 : 28,
                           ),
                           border: Border.all(
-                            color: Colors.white.withValues(
-                              alpha: compactChrome ? 0.05 : 0.08,
-                            ),
+                            color: compactChrome
+                                ? AppPalette.lineSoft
+                                : AppPalette.line,
                           ),
                         ),
                         child: Padding(
@@ -263,10 +269,10 @@ class _ShellHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final statusTone = switch (syncStatus) {
-      MobileSyncStatus.syncing => const Color(0xFF38BDF8),
-      MobileSyncStatus.error => const Color(0xFFFB7185),
-      MobileSyncStatus.offline => const Color(0xFFF59E0B),
-      MobileSyncStatus.idle => const Color(0xFF22C55E),
+      MobileSyncStatus.syncing => AppPalette.cobalt,
+      MobileSyncStatus.error => AppPalette.coral,
+      MobileSyncStatus.offline => AppPalette.gold,
+      MobileSyncStatus.idle => AppPalette.jade,
     };
 
     final statusLabel = switch (syncStatus) {
@@ -286,9 +292,9 @@ class _ShellHeader extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xE6111826),
+        color: AppPalette.backgroundSoft.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(compact ? 22 : 24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: AppPalette.line),
       ),
       child: Padding(
         padding: EdgeInsets.symmetric(
@@ -320,11 +326,11 @@ class _ShellHeader extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '$workspaceName • $roleLabel',
+                    '$workspaceName  ·  $roleLabel',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.58),
+                      color: AppPalette.textMuted,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.5,
                     ),
@@ -370,9 +376,9 @@ class _HeaderIconButton extends StatelessWidget {
       width: compact ? 44 : 50,
       height: compact ? 44 : 50,
       decoration: BoxDecoration(
-        color: const Color(0xFF111827),
+        color: AppPalette.panelStrong,
         borderRadius: BorderRadius.circular(compact ? 15 : 18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        border: Border.all(color: AppPalette.lineSoft),
       ),
       child: IconButton(
         onPressed: onPressed,
@@ -448,12 +454,12 @@ class _NavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? const Color(0xFF38BDF8) : Colors.white70;
+    final color = active ? AppPalette.primary : AppPalette.textSecondary;
     final label = compact ? item.compactLabel : item.label;
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: compact ? 2 : 4),
       child: Material(
-        color: active ? const Color(0xFF0F1F38) : Colors.transparent,
+        color: active ? AppPalette.panelStrong : Colors.transparent,
         borderRadius: BorderRadius.circular(22),
         child: InkWell(
           onTap: onTap,
@@ -556,10 +562,7 @@ class _ShellNavigationProfile {
 }
 
 class _VisibleShellNavItem {
-  const _VisibleShellNavItem({
-    required this.branchIndex,
-    required this.item,
-  });
+  const _VisibleShellNavItem({required this.branchIndex, required this.item});
 
   final int branchIndex;
   final _ShellNavItem item;

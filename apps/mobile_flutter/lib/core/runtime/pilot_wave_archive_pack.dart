@@ -19,8 +19,7 @@ class PilotWaveArchivePack {
   final DateTime generatedAt;
 
   bool get isArchiveReady => archiveStatus == 'archive_ready';
-  bool get isArchiveWithAttention =>
-      archiveStatus == 'archive_with_attention';
+  bool get isArchiveWithAttention => archiveStatus == 'archive_with_attention';
   bool get isArchiveIncomplete => archiveStatus == 'archive_incomplete';
   bool get isArchiveBlocked => archiveStatus == 'archive_blocked';
 

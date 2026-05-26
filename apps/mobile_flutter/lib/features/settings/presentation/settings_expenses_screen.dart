@@ -206,7 +206,7 @@ class _SettingsExpensesScreenState
                               errorText!,
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: const Color(0xFFFB7185),
+                                    color: const Color(0xFFEF6B67),
                                     fontWeight: FontWeight.w700,
                                   ),
                             ),
@@ -358,18 +358,18 @@ class _SettingsExpensesScreenState
             subtitle:
                 'Track outgoing spend, capture payment references, and keep day-to-day business costs visible from the same product.',
             icon: Icons.payments_rounded,
-            accent: const Color(0xFFF59E0B),
+            accent: const Color(0xFFF0C879),
             primaryTag: MobileTag(
               label: shop.planLabel,
               icon: Icons.workspace_premium_rounded,
-              accent: const Color(0xFFF59E0B),
+              accent: const Color(0xFFF0C879),
             ),
             secondaryTag: MobileTag(
               label: expenses.isEmpty
                   ? (expensesAsync.isLoading ? 'Refreshing' : 'No entries')
                   : '${expenses.length} entries',
               icon: Icons.receipt_long_rounded,
-              accent: const Color(0xFF38BDF8),
+              accent: const Color(0xFFE58A47),
             ),
           ),
           const SizedBox(height: 18),
@@ -409,28 +409,28 @@ class _SettingsExpensesScreenState
                       value: '${summary?.totalEntries ?? expenses.length}',
                       caption: 'Tracked spend records',
                       icon: Icons.receipt_long_rounded,
-                      accent: const Color(0xFF38BDF8),
+                      accent: const Color(0xFFE58A47),
                     ),
                     MobileMetricCard(
                       label: 'Total spend',
                       value: formatCurrency(summary?.totalAmount ?? 0),
                       caption: 'Visible outgoing amount',
                       icon: Icons.currency_rupee_rounded,
-                      accent: const Color(0xFFFB7185),
+                      accent: const Color(0xFFEF6B67),
                     ),
                     MobileMetricCard(
                       label: 'Categories',
                       value: '${summary?.uniqueCategories ?? 0}',
                       caption: 'Spend buckets tracked',
                       icon: Icons.category_rounded,
-                      accent: const Color(0xFF14B8A6),
+                      accent: const Color(0xFF4EB79B),
                     ),
                     MobileMetricCard(
                       label: 'Top category',
                       value: summary?.biggestCategory ?? 'None',
                       caption: 'Largest spend bucket',
                       icon: Icons.trending_up_rounded,
-                      accent: const Color(0xFFA78BFA),
+                      accent: const Color(0xFF7CA4F8),
                     ),
                   ],
                 );
@@ -445,7 +445,7 @@ class _SettingsExpensesScreenState
               icon: session.isViewer
                   ? Icons.visibility_rounded
                   : Icons.add_circle_rounded,
-              accent: const Color(0xFF38BDF8),
+              accent: const Color(0xFFE58A47),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -478,7 +478,7 @@ class _SettingsExpensesScreenState
                   ? 'No outflow'
                   : '${topExpenses.length} visible',
               icon: Icons.payments_rounded,
-              accent: const Color(0xFFF59E0B),
+              accent: const Color(0xFFF0C879),
             ),
             child: expensesAsync.isLoading
                 ? const MobileEmptyState(
@@ -521,7 +521,7 @@ class _ExpenseCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1220),
+        color: const Color(0xFF232A36),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
@@ -543,13 +543,13 @@ class _ExpenseCard extends StatelessWidget {
                 MobileTag(
                   label: formatCurrency(expense.amount),
                   icon: Icons.currency_rupee_rounded,
-                  accent: const Color(0xFFFB7185),
+                  accent: const Color(0xFFEF6B67),
                 ),
               ],
             ),
             const SizedBox(height: 6),
             Text(
-              '${formatCompactDate(expense.expenseDate)} • ${_paymentMethodLabel(expense.paymentMethod)}',
+              '${formatCompactDate(expense.expenseDate)}  ·  ${_paymentMethodLabel(expense.paymentMethod)}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Colors.white.withValues(alpha: 0.68),
                 fontWeight: FontWeight.w600,
@@ -573,19 +573,19 @@ class _ExpenseCard extends StatelessWidget {
                 MobileTag(
                   label: _paymentMethodLabel(expense.paymentMethod),
                   icon: Icons.account_balance_wallet_rounded,
-                  accent: const Color(0xFF38BDF8),
+                  accent: const Color(0xFFE58A47),
                 ),
                 if (expense.paymentReference.trim().isNotEmpty)
                   MobileTag(
                     label: expense.paymentReference,
                     icon: Icons.tag_rounded,
-                    accent: const Color(0xFF14B8A6),
+                    accent: const Color(0xFF4EB79B),
                   ),
                 if ((expense.actorName ?? '').trim().isNotEmpty)
                   MobileTag(
                     label: expense.actorName!,
                     icon: Icons.person_rounded,
-                    accent: const Color(0xFFA78BFA),
+                    accent: const Color(0xFF7CA4F8),
                   ),
               ],
             ),

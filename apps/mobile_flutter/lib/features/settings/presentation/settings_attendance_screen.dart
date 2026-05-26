@@ -136,7 +136,7 @@ class _SettingsAttendanceScreenState
                       eyebrow: 'Attendance desk',
                       title: 'Mark attendance',
                       subtitle:
-                          'Pick a team member, choose today’s status, and save the shift posture into this workspace.',
+                          'Pick a team member, choose todayâ€™s status, and save the shift posture into this workspace.',
                       icon: Icons.fact_check_rounded,
                     ),
                     const SizedBox(height: 16),
@@ -151,7 +151,7 @@ class _SettingsAttendanceScreenState
                                   (member) => DropdownMenuItem<String>(
                                     value: member.id,
                                     child: Text(
-                                      '${member.memberName} • ${member.roleLabel}',
+                                      '${member.memberName}  ·  ${member.roleLabel}',
                                     ),
                                   ),
                                 )
@@ -208,7 +208,7 @@ class _SettingsAttendanceScreenState
                               errorText!,
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: const Color(0xFFFB7185),
+                                    color: const Color(0xFFEF6B67),
                                     fontWeight: FontWeight.w700,
                                   ),
                             ),
@@ -356,11 +356,11 @@ class _SettingsAttendanceScreenState
                 ? 'Review who is on the floor, mark today for the team, and keep staffing visible without opening a separate HR system.'
                 : 'Mark your shift, review your recent attendance, and keep your daily operator access connected to this workspace.',
             icon: Icons.fact_check_rounded,
-            accent: const Color(0xFF38BDF8),
+            accent: const Color(0xFFE58A47),
             primaryTag: MobileTag(
               label: session.displayRoleLabel,
               icon: Icons.badge_rounded,
-              accent: const Color(0xFF14B8A6),
+              accent: const Color(0xFF4EB79B),
             ),
             secondaryTag: MobileTag(
               label: todayRecord == null
@@ -370,8 +370,8 @@ class _SettingsAttendanceScreenState
                   ? Icons.event_busy_rounded
                   : Icons.event_available_rounded,
               accent: todayRecord == null
-                  ? const Color(0xFFF59E0B)
-                  : const Color(0xFF22C55E),
+                  ? const Color(0xFFF0C879)
+                  : const Color(0xFF4EB79B),
             ),
           ),
           const SizedBox(height: 18),
@@ -397,7 +397,7 @@ class _SettingsAttendanceScreenState
               icon: session.isOwnerLike
                   ? Icons.groups_rounded
                   : Icons.person_pin_circle_rounded,
-              accent: const Color(0xFF38BDF8),
+              accent: const Color(0xFFE58A47),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -455,21 +455,21 @@ class _SettingsAttendanceScreenState
                     value: '${summary?.totalSessions ?? sessions.length}',
                     caption: 'Attendance sessions visible',
                     icon: Icons.list_alt_rounded,
-                    accent: const Color(0xFF38BDF8),
+                    accent: const Color(0xFFE58A47),
                   ),
                   MobileMetricCard(
                     label: 'Present',
                     value: '${summary?.presentCount ?? 0}',
                     caption: 'Marked present',
                     icon: Icons.check_circle_rounded,
-                    accent: const Color(0xFF22C55E),
+                    accent: const Color(0xFF4EB79B),
                   ),
                   MobileMetricCard(
                     label: 'Leave',
                     value: '${summary?.leaveCount ?? 0}',
                     caption: 'Leave sessions',
                     icon: Icons.beach_access_rounded,
-                    accent: const Color(0xFFF59E0B),
+                    accent: const Color(0xFFF0C879),
                   ),
                   MobileMetricCard(
                     label: 'On floor today',
@@ -478,7 +478,7 @@ class _SettingsAttendanceScreenState
                         ? 'Team active today'
                         : 'Active workers today',
                     icon: Icons.groups_rounded,
-                    accent: const Color(0xFFA78BFA),
+                    accent: const Color(0xFF7CA4F8),
                   ),
                 ],
               );
@@ -493,8 +493,8 @@ class _SettingsAttendanceScreenState
                   ? Icons.edit_calendar_rounded
                   : Icons.verified_rounded,
               accent: todayRecord == null
-                  ? const Color(0xFFF59E0B)
-                  : const Color(0xFF22C55E),
+                  ? const Color(0xFFF0C879)
+                  : const Color(0xFF4EB79B),
             ),
             child: currentMembershipId == null && !session.isOwnerLike
                 ? const MobileEmptyState(
@@ -567,7 +567,7 @@ class _SettingsAttendanceScreenState
               icon: sessionsAsync.isLoading
                   ? Icons.sync_rounded
                   : Icons.receipt_long_rounded,
-              accent: const Color(0xFF38BDF8),
+              accent: const Color(0xFFE58A47),
             ),
             child: sessionsAsync.isLoading
                 ? const MobileEmptyState(
@@ -612,15 +612,15 @@ class _AttendanceSessionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = switch (record.status) {
-      'PRESENT' => const Color(0xFF22C55E),
-      'HALF_DAY' => const Color(0xFF38BDF8),
-      'LEAVE' => const Color(0xFFF59E0B),
-      _ => const Color(0xFFFB7185),
+      'PRESENT' => const Color(0xFF4EB79B),
+      'HALF_DAY' => const Color(0xFFE58A47),
+      'LEAVE' => const Color(0xFFF0C879),
+      _ => const Color(0xFFEF6B67),
     };
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1220),
+        color: const Color(0xFF232A36),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
@@ -648,7 +648,7 @@ class _AttendanceSessionCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              '${formatCompactDate(record.sessionDate)} • ${_roleLabel(record.memberRole)}',
+              '${formatCompactDate(record.sessionDate)}  ·  ${_roleLabel(record.memberRole)}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Colors.white.withValues(alpha: 0.68),
                 fontWeight: FontWeight.w600,
@@ -664,20 +664,20 @@ class _AttendanceSessionCard extends StatelessWidget {
                       ? 'No clock-in'
                       : 'In ${_formatTime(record.clockInAt!)}',
                   icon: Icons.login_rounded,
-                  accent: const Color(0xFF38BDF8),
+                  accent: const Color(0xFFE58A47),
                 ),
                 MobileTag(
                   label: record.clockOutAt == null
                       ? 'Open shift'
                       : 'Out ${_formatTime(record.clockOutAt!)}',
                   icon: Icons.logout_rounded,
-                  accent: const Color(0xFFF59E0B),
+                  accent: const Color(0xFFF0C879),
                 ),
                 if (record.totalHours != null)
                   MobileTag(
                     label: '${record.totalHours!.toStringAsFixed(1)} h',
                     icon: Icons.schedule_rounded,
-                    accent: const Color(0xFFA78BFA),
+                    accent: const Color(0xFF7CA4F8),
                   ),
               ],
             ),

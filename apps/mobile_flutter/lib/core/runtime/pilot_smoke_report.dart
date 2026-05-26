@@ -16,10 +16,7 @@ class PilotSmokeCheckDefinition {
 }
 
 class PilotSmokeCheckResult {
-  const PilotSmokeCheckResult({
-    required this.check,
-    required this.outcome,
-  });
+  const PilotSmokeCheckResult({required this.check, required this.outcome});
 
   final PilotSmokeCheckDefinition check;
   final PilotSmokeCheckOutcome outcome;

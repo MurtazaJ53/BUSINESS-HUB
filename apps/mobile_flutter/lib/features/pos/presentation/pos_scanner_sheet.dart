@@ -54,17 +54,17 @@ class _PosScannerSheetState extends State<PosScannerSheet> {
               subtitle:
                   'Point the camera at a barcode, QR code, or exact inventory code. You can also type the code manually below.',
               icon: Icons.qr_code_scanner_rounded,
-              accent: Color(0xFF38BDF8),
+              accent: Color(0xFFE58A47),
               tags: <Widget>[
                 MobileTag(
                   label: 'Camera ready',
                   icon: Icons.camera_alt_rounded,
-                  accent: Color(0xFF22C55E),
+                  accent: Color(0xFF4EB79B),
                 ),
                 MobileTag(
                   label: 'Exact lookup',
                   icon: Icons.keyboard_alt_rounded,
-                  accent: Color(0xFFA78BFA),
+                  accent: Color(0xFF7CA4F8),
                 ),
               ],
             ),

@@ -42,14 +42,10 @@ class PilotOperatorActionPlan {
         reasons.add('Readiness is blocked for this device.');
       }
       if (diagnosticsSnapshot.historyOverview.failedSales > 0) {
-        reasons.add(
-          'Failed receipts are still recorded on the device.',
-        );
+        reasons.add('Failed receipts are still recorded on the device.');
       }
       if (recoveryReport.attentionEntries.any((entry) => entry.isFailed)) {
-        reasons.add(
-          'Recovery desk still contains failed commerce commands.',
-        );
+        reasons.add('Recovery desk still contains failed commerce commands.');
       }
       return PilotOperatorActionPlan(
         diagnosticsSnapshot: diagnosticsSnapshot,
@@ -103,8 +99,12 @@ class PilotOperatorActionPlan {
 
     if (diagnosticsSnapshot.hasSignedInOperator &&
         diagnosticsSnapshot.workspaceId != 'No workspace bound') {
-      reasons.add('The device is bound to a workspace and has a signed-in operator.');
-      reasons.add('Queue and recovery posture are currently clean enough for active floor validation.');
+      reasons.add(
+        'The device is bound to a workspace and has a signed-in operator.',
+      );
+      reasons.add(
+        'Queue and recovery posture are currently clean enough for active floor validation.',
+      );
       return PilotOperatorActionPlan(
         diagnosticsSnapshot: diagnosticsSnapshot,
         readinessReport: readinessReport,

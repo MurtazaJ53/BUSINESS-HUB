@@ -68,9 +68,9 @@ class _StartupBootScreen extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: <Color>[
-              Color(0xFF04070C),
-              Color(0xFF0A1220),
-              Color(0xFF04070C),
+              AppPalette.background,
+              AppPalette.backgroundSoft,
+              AppPalette.background,
             ],
           ),
         ),
@@ -82,14 +82,12 @@ class _StartupBootScreen extends StatelessWidget {
                 constraints: const BoxConstraints(maxWidth: 420),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0B121F),
+                    color: AppPalette.panel,
                     borderRadius: BorderRadius.circular(30),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.08),
-                    ),
+                    border: Border.all(color: AppPalette.lineSoft),
                     boxShadow: const <BoxShadow>[
                       BoxShadow(
-                        color: Color(0x32000000),
+                        color: Color(0x40000000),
                         blurRadius: 28,
                         offset: Offset(0, 14),
                       ),
@@ -104,14 +102,12 @@ class _StartupBootScreen extends StatelessWidget {
                           width: 72,
                           height: 72,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0EA5E9).withValues(
-                              alpha: 0.14,
-                            ),
+                            color: AppPalette.primary.withValues(alpha: 0.14),
                             borderRadius: BorderRadius.circular(24),
                           ),
                           child: const Icon(
                             Icons.storefront_rounded,
-                            color: Color(0xFF38BDF8),
+                            color: AppPalette.primary,
                             size: 34,
                           ),
                         ),
@@ -131,7 +127,7 @@ class _StartupBootScreen extends StatelessWidget {
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.72),
+                                color: AppPalette.textSecondary,
                                 fontWeight: FontWeight.w600,
                                 height: 1.45,
                               ),
@@ -156,10 +152,7 @@ class _StartupBootScreen extends StatelessWidget {
 }
 
 class _StartupFailedScreen extends StatelessWidget {
-  const _StartupFailedScreen({
-    required this.message,
-    required this.onRetry,
-  });
+  const _StartupFailedScreen({required this.message, required this.onRetry});
 
   final String message;
   final VoidCallback onRetry;
@@ -173,9 +166,9 @@ class _StartupFailedScreen extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: <Color>[
-              Color(0xFF04070C),
-              Color(0xFF0A1220),
-              Color(0xFF04070C),
+              AppPalette.background,
+              AppPalette.backgroundSoft,
+              AppPalette.background,
             ],
           ),
         ),
@@ -187,11 +180,9 @@ class _StartupFailedScreen extends StatelessWidget {
                 constraints: const BoxConstraints(maxWidth: 420),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0B121F),
+                    color: AppPalette.panel,
                     borderRadius: BorderRadius.circular(30),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.08),
-                    ),
+                    border: Border.all(color: AppPalette.lineSoft),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(24),
@@ -202,14 +193,12 @@ class _StartupFailedScreen extends StatelessWidget {
                           width: 68,
                           height: 68,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFB7185).withValues(
-                              alpha: 0.14,
-                            ),
+                            color: AppPalette.coral.withValues(alpha: 0.14),
                             borderRadius: BorderRadius.circular(22),
                           ),
                           child: const Icon(
                             Icons.error_outline_rounded,
-                            color: Color(0xFFFB7185),
+                            color: AppPalette.coral,
                             size: 32,
                           ),
                         ),

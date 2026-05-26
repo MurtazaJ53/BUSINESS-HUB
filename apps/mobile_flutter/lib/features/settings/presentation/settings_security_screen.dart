@@ -275,7 +275,7 @@ class _SettingsSecurityScreenState
             subtitle:
                 'Use an authenticator app before opening Workspace plan, Advanced ops, or other sensitive business-control surfaces.',
             icon: Icons.verified_user_rounded,
-            accent: const Color(0xFF38BDF8),
+            accent: const Color(0xFFE58A47),
             primaryTag: MobileTag(
               label: status == null
                   ? 'Loading'
@@ -285,7 +285,7 @@ class _SettingsSecurityScreenState
                   ? 'Setup pending'
                   : 'MFA not set',
               icon: Icons.security_rounded,
-              accent: const Color(0xFF38BDF8),
+              accent: const Color(0xFFE58A47),
             ),
             secondaryTag: MobileTag(
               label: hasFreshWindow ? 'Window open' : 'Verify needed',
@@ -293,8 +293,8 @@ class _SettingsSecurityScreenState
                   ? Icons.verified_rounded
                   : Icons.lock_clock_rounded,
               accent: hasFreshWindow
-                  ? const Color(0xFF22C55E)
-                  : const Color(0xFFF59E0B),
+                  ? const Color(0xFF4EB79B)
+                  : const Color(0xFFF0C879),
             ),
           ),
           const SizedBox(height: 18),
@@ -317,8 +317,8 @@ class _SettingsSecurityScreenState
                   ? Icons.lock_open_rounded
                   : Icons.lock_outline_rounded,
               accent: hasFreshWindow
-                  ? const Color(0xFF22C55E)
-                  : const Color(0xFFF59E0B),
+                  ? const Color(0xFF4EB79B)
+                  : const Color(0xFFF0C879),
             ),
             child: Column(
               children: <Widget>[

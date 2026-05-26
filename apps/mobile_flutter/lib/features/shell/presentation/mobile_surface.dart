@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_theme.dart';
+
 class MobileStandaloneScaffold extends StatelessWidget {
   const MobileStandaloneScaffold({
     super.key,
@@ -23,9 +25,9 @@ class MobileStandaloneScaffold extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: <Color>[
-              Color(0xFF05070B),
-              Color(0xFF0A1020),
-              Color(0xFF05070B),
+              AppPalette.background,
+              AppPalette.backgroundSoft,
+              AppPalette.backgroundAlt,
             ],
           ),
         ),
@@ -41,11 +43,9 @@ class MobileStandaloneScaffold extends StatelessWidget {
                 ),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: const Color(0xE6111826),
+                    color: AppPalette.backgroundSoft.withValues(alpha: 0.94),
                     borderRadius: BorderRadius.circular(compact ? 22 : 24),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.06),
-                    ),
+                    border: Border.all(color: AppPalette.lineSoft),
                   ),
                   child: Padding(
                     padding: EdgeInsets.symmetric(
@@ -58,13 +58,11 @@ class MobileStandaloneScaffold extends StatelessWidget {
                           width: compact ? 44 : 48,
                           height: compact ? 44 : 48,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF111827),
+                            color: AppPalette.panelStrong,
                             borderRadius: BorderRadius.circular(
                               compact ? 15 : 18,
                             ),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.06),
-                            ),
+                            border: Border.all(color: AppPalette.lineSoft),
                           ),
                           child: IconButton(
                             onPressed: () => Navigator.of(context).maybePop(),
@@ -114,7 +112,7 @@ class MobileHeroBanner extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.trailing,
-    this.accent = const Color(0xFF38BDF8),
+    this.accent = AppPalette.primary,
   });
 
   final String eyebrow;
@@ -134,17 +132,17 @@ class MobileHeroBanner extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: <Color>[
-            Color(0xFF09101B),
-            Color(0xFF0C1423),
-            Color(0xFF121A29),
+            AppPalette.panel,
+            AppPalette.panelStrong,
+            AppPalette.panelMuted,
           ],
         ),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: AppPalette.line),
         boxShadow: const <BoxShadow>[
           BoxShadow(
-            color: Color(0x38000000),
-            blurRadius: 28,
-            offset: Offset(0, 14),
+            color: Color(0x46000000),
+            blurRadius: 34,
+            offset: Offset(0, 18),
           ),
         ],
       ),
@@ -170,7 +168,7 @@ class MobileHeroBanner extends StatelessWidget {
               height: compact ? 118 : 150,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                color: Color(0x1406B6D4),
+                color: Color(0x1AF0C879),
               ),
             ),
           ),
@@ -187,7 +185,7 @@ class MobileHeroBanner extends StatelessWidget {
                     Text(
                       eyebrow.toUpperCase(),
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.52),
+                        color: AppPalette.textMuted,
                         fontWeight: FontWeight.w900,
                         letterSpacing: compact ? 1.4 : 1.8,
                       ),
@@ -213,7 +211,7 @@ class MobileHeroBanner extends StatelessWidget {
                       maxLines: compact ? 3 : null,
                       overflow: compact ? TextOverflow.ellipsis : null,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.72),
+                        color: AppPalette.textSecondary,
                         height: compact ? 1.4 : 1.5,
                         fontWeight: FontWeight.w600,
                       ),
@@ -284,14 +282,14 @@ class MobilePanel extends StatelessWidget {
     ];
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF0B121F),
+        color: AppPalette.panel,
         borderRadius: BorderRadius.circular(compact ? 22 : 28),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        border: Border.all(color: AppPalette.lineSoft),
         boxShadow: const <BoxShadow>[
           BoxShadow(
-            color: Color(0x2A000000),
-            blurRadius: 20,
-            offset: Offset(0, 10),
+            color: Color(0x36000000),
+            blurRadius: 24,
+            offset: Offset(0, 14),
           ),
         ],
       ),
@@ -318,7 +316,7 @@ class MobileScreenLead extends StatelessWidget {
     required this.icon,
     this.primaryTag,
     this.secondaryTag,
-    this.accent = const Color(0xFF38BDF8),
+    this.accent = AppPalette.primary,
   });
 
   final String title;
@@ -334,9 +332,9 @@ class MobileScreenLead extends StatelessWidget {
     final compact = MediaQuery.sizeOf(context).width < 420;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF0B121F),
+        color: AppPalette.panel,
         borderRadius: BorderRadius.circular(compact ? 22 : 26),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        border: Border.all(color: AppPalette.lineSoft),
       ),
       child: Padding(
         padding: EdgeInsets.all(compact ? 16 : 18),
@@ -375,7 +373,7 @@ class MobileScreenLead extends StatelessWidget {
                       Text(
                         subtitle,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.66),
+                          color: AppPalette.textMuted,
                           fontWeight: FontWeight.w600,
                           height: 1.4,
                         ),
@@ -408,7 +406,7 @@ class MobileMetricCard extends StatelessWidget {
     required this.label,
     required this.value,
     required this.icon,
-    this.accent = const Color(0xFF38BDF8),
+    this.accent = AppPalette.cobalt,
     this.caption,
     this.onTap,
   });
@@ -431,9 +429,9 @@ class MobileMetricCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(compact ? 20 : 24),
         child: Ink(
           decoration: BoxDecoration(
-            color: const Color(0xFF0A1220),
+            color: AppPalette.panelStrong,
             borderRadius: BorderRadius.circular(compact ? 20 : 24),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+            border: Border.all(color: AppPalette.lineSoft),
           ),
           child: Padding(
             padding: EdgeInsets.all(compact ? 14 : 18),
@@ -453,7 +451,7 @@ class MobileMetricCard extends StatelessWidget {
                 Text(
                   label.toUpperCase(),
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: AppPalette.textMuted,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 1.25,
                   ),
@@ -475,7 +473,7 @@ class MobileMetricCard extends StatelessWidget {
                   Text(
                     caption!,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.56),
+                      color: AppPalette.textMuted,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -497,7 +495,7 @@ class MobileActionCard extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.kicker,
-    this.accent = const Color(0xFF38BDF8),
+    this.accent = AppPalette.primary,
   });
 
   final String title;
@@ -525,10 +523,10 @@ class MobileActionCard extends StatelessWidget {
               colors: <Color>[
                 accent.withValues(alpha: 0.34),
                 accent.withValues(alpha: 0.14),
-                const Color(0xFF0D1424),
+                AppPalette.panelStrong,
               ],
             ),
-            border: Border.all(color: accent.withValues(alpha: 0.18)),
+            border: Border.all(color: accent.withValues(alpha: 0.26)),
           ),
           child: Padding(
             padding: EdgeInsets.all(compact ? 16 : 20),
@@ -553,7 +551,7 @@ class MobileActionCard extends StatelessWidget {
                   Text(
                     kicker!.toUpperCase(),
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.72),
+                      color: AppPalette.textPrimary.withValues(alpha: 0.76),
                       fontWeight: FontWeight.w900,
                       letterSpacing: compact ? 1.1 : 1.4,
                     ),
@@ -574,7 +572,7 @@ class MobileActionCard extends StatelessWidget {
                   maxLines: compact ? 3 : null,
                   overflow: compact ? TextOverflow.ellipsis : null,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.7),
+                    color: AppPalette.textSecondary,
                     fontWeight: FontWeight.w700,
                     height: 1.4,
                   ),
@@ -593,7 +591,7 @@ class MobileTag extends StatelessWidget {
     super.key,
     required this.label,
     this.icon,
-    this.accent = const Color(0xFF38BDF8),
+    this.accent = AppPalette.primary,
   });
 
   final String label;
@@ -656,10 +654,10 @@ class MobileEmptyState extends StatelessWidget {
             width: 58,
             height: 58,
             decoration: BoxDecoration(
-              color: const Color(0xFF111827),
+              color: AppPalette.panelMuted,
               borderRadius: BorderRadius.circular(18),
             ),
-            child: Icon(icon, color: Colors.white70, size: 26),
+            child: Icon(icon, color: AppPalette.textSecondary, size: 26),
           ),
           const SizedBox(height: 16),
           Text(
@@ -673,7 +671,7 @@ class MobileEmptyState extends StatelessWidget {
           Text(
             body,
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: Colors.white.withValues(alpha: 0.62),
+              color: AppPalette.textMuted,
               fontWeight: FontWeight.w600,
             ),
             textAlign: TextAlign.center,
@@ -691,7 +689,7 @@ class MobileSheetHeader extends StatelessWidget {
     required this.subtitle,
     required this.icon,
     this.eyebrow,
-    this.accent = const Color(0xFF38BDF8),
+    this.accent = AppPalette.primary,
     this.tags = const <Widget>[],
   });
 
@@ -707,9 +705,9 @@ class MobileSheetHeader extends StatelessWidget {
     final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1220),
+        color: AppPalette.panelStrong,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        border: Border.all(color: AppPalette.lineSoft),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -737,7 +735,7 @@ class MobileSheetHeader extends StatelessWidget {
                         Text(
                           eyebrow!.toUpperCase(),
                           style: theme.textTheme.labelSmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.5),
+                            color: AppPalette.textMuted,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 1.15,
                           ),
@@ -755,7 +753,7 @@ class MobileSheetHeader extends StatelessWidget {
                       Text(
                         subtitle,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.66),
+                          color: AppPalette.textSecondary,
                           fontWeight: FontWeight.w600,
                           height: 1.4,
                         ),
@@ -781,7 +779,7 @@ class MobileSheetSection extends StatelessWidget {
     super.key,
     required this.title,
     required this.child,
-    this.accent = const Color(0xFF38BDF8),
+    this.accent = AppPalette.gold,
   });
 
   final String title;
@@ -792,9 +790,9 @@ class MobileSheetSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1220),
+        color: AppPalette.panelStrong,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: AppPalette.lineSoft),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),

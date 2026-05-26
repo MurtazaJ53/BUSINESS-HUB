@@ -47,13 +47,15 @@ class _SettingsSessionsScreenState
       _messageIsError = false;
     });
     try {
-      await ref.read(backendApiClientProvider).updateWorkspaceAccessSession(
-        user: session.user,
-        shopId: session.shopId!,
-        sessionId: record.id,
-        action: action,
-        note: note,
-      );
+      await ref
+          .read(backendApiClientProvider)
+          .updateWorkspaceAccessSession(
+            user: session.user,
+            shopId: session.shopId!,
+            sessionId: record.id,
+            action: action,
+            note: note,
+          );
       await _refreshSessions();
       if (!mounted) {
         return;
@@ -82,14 +84,24 @@ class _SettingsSessionsScreenState
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(mobileSessionProvider).asData?.value;
-    final verifiedUntil = ref.watch(mobileMfaVerifiedUntilProvider).asData?.value;
+    final verifiedUntil = ref
+        .watch(mobileMfaVerifiedUntilProvider)
+        .asData
+        ?.value;
     final hasFreshSecurityWindow =
         verifiedUntil != null && verifiedUntil.isAfter(DateTime.now());
     final sessionsAsync = ref.watch(workspaceAccessSessionsProvider);
-    final sessions = sessionsAsync.asData?.value ?? const <WorkspaceAccessSessionRecord>[];
-    final trustedCount = sessions.where((item) => item.isActive && item.isTrusted && !item.wipeRequested).length;
-    final reviewCount = sessions.where((item) => item.isActive && item.needsReview).length;
-    final riskyCount = sessions.where((item) => item.isRisky || item.wipeRequested).length;
+    final sessions =
+        sessionsAsync.asData?.value ?? const <WorkspaceAccessSessionRecord>[];
+    final trustedCount = sessions
+        .where((item) => item.isActive && item.isTrusted && !item.wipeRequested)
+        .length;
+    final reviewCount = sessions
+        .where((item) => item.isActive && item.needsReview)
+        .length;
+    final riskyCount = sessions
+        .where((item) => item.isRisky || item.wipeRequested)
+        .length;
 
     if (session == null) {
       return MobileStandaloneScaffold(
@@ -141,11 +153,11 @@ class _SettingsSessionsScreenState
             subtitle:
                 'See which phones are trusted, which need review, and revoke or wipe access when a device should no longer touch this workspace.',
             icon: Icons.devices_rounded,
-            accent: const Color(0xFF38BDF8),
+            accent: const Color(0xFFE58A47),
             primaryTag: MobileTag(
               label: '${sessions.length} known',
               icon: Icons.smartphone_rounded,
-              accent: const Color(0xFF38BDF8),
+              accent: const Color(0xFFE58A47),
             ),
             secondaryTag: MobileTag(
               label: riskyCount > 0 ? '$riskyCount risky' : 'Trust stable',
@@ -153,8 +165,8 @@ class _SettingsSessionsScreenState
                   ? Icons.crisis_alert_rounded
                   : Icons.verified_rounded,
               accent: riskyCount > 0
-                  ? const Color(0xFFFB7185)
-                  : const Color(0xFF22C55E),
+                  ? const Color(0xFFEF6B67)
+                  : const Color(0xFF4EB79B),
             ),
           ),
           const SizedBox(height: 18),
@@ -185,7 +197,9 @@ class _SettingsSessionsScreenState
           else ...<Widget>[
             if (_message != null) ...<Widget>[
               MobilePanel(
-                title: _messageIsError ? 'Session action failed' : 'Session updated',
+                title: _messageIsError
+                    ? 'Session action failed'
+                    : 'Session updated',
                 child: Text(
                   _message!,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -210,17 +224,17 @@ class _SettingsSessionsScreenState
                   MobileTag(
                     label: '$trustedCount trusted',
                     icon: Icons.verified_rounded,
-                    accent: const Color(0xFF22C55E),
+                    accent: const Color(0xFF4EB79B),
                   ),
                   MobileTag(
                     label: '$reviewCount review',
                     icon: Icons.visibility_rounded,
-                    accent: const Color(0xFFF59E0B),
+                    accent: const Color(0xFFF0C879),
                   ),
                   MobileTag(
                     label: '$riskyCount risky',
                     icon: Icons.crisis_alert_rounded,
-                    accent: const Color(0xFFFB7185),
+                    accent: const Color(0xFFEF6B67),
                   ),
                 ],
               ),
@@ -229,9 +243,11 @@ class _SettingsSessionsScreenState
             MobilePanel(
               title: 'Workspace devices',
               action: MobileTag(
-                label: sessions.isEmpty ? 'No sessions' : '${sessions.length} devices',
+                label: sessions.isEmpty
+                    ? 'No sessions'
+                    : '${sessions.length} devices',
                 icon: Icons.devices_rounded,
-                accent: const Color(0xFF38BDF8),
+                accent: const Color(0xFFE58A47),
               ),
               child: sessionsAsync.isLoading
                   ? const MobileEmptyState(
@@ -255,39 +271,40 @@ class _SettingsSessionsScreenState
                               child: _WorkspaceSessionCard(
                                 record: record,
                                 busy: _busySessionId == record.id,
-                                onRevoke: record.canManage &&
+                                onRevoke:
+                                    record.canManage &&
                                         record.isActive &&
                                         !record.wipeRequested
                                     ? () => _applyAction(
-                                          session: session,
-                                          record: record,
-                                          action: 'revoke',
-                                          note: 'Revoked from mobile sessions.',
-                                          successMessage:
-                                              '${record.deviceLabel} can no longer use this workspace.',
-                                        )
+                                        session: session,
+                                        record: record,
+                                        action: 'revoke',
+                                        note: 'Revoked from mobile sessions.',
+                                        successMessage:
+                                            '${record.deviceLabel} can no longer use this workspace.',
+                                      )
                                     : null,
-                                onRequestWipe: record.canManage &&
-                                        !record.wipeRequested
+                                onRequestWipe:
+                                    record.canManage && !record.wipeRequested
                                     ? () => _applyAction(
-                                          session: session,
-                                          record: record,
-                                          action: 'request_wipe',
-                                          note:
-                                              'Requested remote wipe from mobile sessions.',
-                                          successMessage:
-                                              '${record.deviceLabel} will clear local workspace data when it comes online.',
-                                        )
+                                        session: session,
+                                        record: record,
+                                        action: 'request_wipe',
+                                        note:
+                                            'Requested remote wipe from mobile sessions.',
+                                        successMessage:
+                                            '${record.deviceLabel} will clear local workspace data when it comes online.',
+                                      )
                                     : null,
                                 onRestore: record.canManage && record.isRevoked
                                     ? () => _applyAction(
-                                          session: session,
-                                          record: record,
-                                          action: 'restore',
-                                          note: 'Restored from mobile sessions.',
-                                          successMessage:
-                                              '${record.deviceLabel} can use the workspace again.',
-                                        )
+                                        session: session,
+                                        record: record,
+                                        action: 'restore',
+                                        note: 'Restored from mobile sessions.',
+                                        successMessage:
+                                            '${record.deviceLabel} can use the workspace again.',
+                                      )
                                     : null,
                               ),
                             ),
@@ -328,7 +345,7 @@ class _WorkspaceSessionCard extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1220),
+        color: const Color(0xFF232A36),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
@@ -339,9 +356,9 @@ class _WorkspaceSessionCard extends StatelessWidget {
           children: <Widget>[
             Text(
               record.deviceLabel,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w900,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 6),
             Text(
@@ -363,8 +380,8 @@ class _WorkspaceSessionCard extends StatelessWidget {
                       ? Icons.wifi_tethering_rounded
                       : Icons.block_rounded,
                   accent: record.isActive
-                      ? const Color(0xFF22C55E)
-                      : const Color(0xFFFB7185),
+                      ? const Color(0xFF4EB79B)
+                      : const Color(0xFFEF6B67),
                 ),
                 MobileTag(
                   label: record.trustLevel.toUpperCase(),
@@ -374,13 +391,13 @@ class _WorkspaceSessionCard extends StatelessWidget {
                 MobileTag(
                   label: 'Score ${record.trustScore}',
                   icon: Icons.speed_rounded,
-                  accent: const Color(0xFF38BDF8),
+                  accent: const Color(0xFFE58A47),
                 ),
                 if (record.wipeRequested)
                   const MobileTag(
                     label: 'WIPE PENDING',
                     icon: Icons.delete_sweep_rounded,
-                    accent: Color(0xFFFB7185),
+                    accent: Color(0xFFEF6B67),
                   ),
               ],
             ),
@@ -427,19 +444,21 @@ class _WorkspaceSessionCard extends StatelessWidget {
             ],
             if (record.trustReasons.isNotEmpty) ...<Widget>[
               const SizedBox(height: 10),
-              ...record.trustReasons.take(3).map(
-                (reason) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(
-                    '- $reason',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.62),
-                      fontWeight: FontWeight.w600,
-                      height: 1.35,
+              ...record.trustReasons
+                  .take(3)
+                  .map(
+                    (reason) => Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(
+                        '- $reason',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.62),
+                          fontWeight: FontWeight.w600,
+                          height: 1.35,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
             ],
             const SizedBox(height: 14),
             LayoutBuilder(
@@ -483,7 +502,8 @@ class _WorkspaceSessionCard extends StatelessWidget {
                         .expand(
                           (widget) => <Widget>[
                             SizedBox(width: double.infinity, child: widget),
-                            if (widget != actions.last) const SizedBox(height: 10),
+                            if (widget != actions.last)
+                              const SizedBox(height: 10),
                           ],
                         )
                         .toList(growable: false),
@@ -525,14 +545,14 @@ String _deviceMetaLine(WorkspaceAccessSessionRecord record) {
 Color _trustColor(String level) {
   switch (level.trim().toLowerCase()) {
     case 'trusted':
-      return const Color(0xFF22C55E);
+      return const Color(0xFF4EB79B);
     case 'review':
-      return const Color(0xFFF59E0B);
+      return const Color(0xFFF0C879);
     case 'risky':
     case 'blocked':
-      return const Color(0xFFFB7185);
+      return const Color(0xFFEF6B67);
     default:
-      return const Color(0xFF38BDF8);
+      return const Color(0xFFE58A47);
   }
 }
 

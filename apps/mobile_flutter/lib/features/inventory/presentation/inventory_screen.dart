@@ -48,13 +48,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   ) {
     final compact = MediaQuery.sizeOf(context).width < 420;
     final stockAccent = item.stock <= 5
-        ? const Color(0xFFFB7185)
-        : const Color(0xFF22C55E);
+        ? const Color(0xFFEF6B67)
+        : const Color(0xFF4EB79B);
     final tags = <Widget>[
       MobileTag(
         label: formatCurrency(item.price),
         icon: Icons.currency_rupee_rounded,
-        accent: const Color(0xFF38BDF8),
+        accent: const Color(0xFFE58A47),
       ),
       MobileTag(
         label: 'Stock ${item.stock}',
@@ -64,7 +64,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       MobileTag(
         label: item.category,
         icon: Icons.category_rounded,
-        accent: const Color(0xFFA78BFA),
+        accent: const Color(0xFF7CA4F8),
       ),
     ];
     if ((item.size ?? '').isNotEmpty) {
@@ -72,7 +72,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         MobileTag(
           label: item.size!,
           icon: Icons.straighten_rounded,
-          accent: const Color(0xFF14B8A6),
+          accent: const Color(0xFF4EB79B),
         ),
       );
     }
@@ -81,7 +81,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         MobileTag(
           label: item.sku!,
           icon: Icons.qr_code_2_rounded,
-          accent: const Color(0xFFF59E0B),
+          accent: const Color(0xFFF0C879),
         ),
       );
     }
@@ -116,7 +116,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   subtitle:
                       'Review stock posture, sell price, and product identity without leaving the inventory flow.',
                   icon: Icons.inventory_2_rounded,
-                  accent: const Color(0xFF38BDF8),
+                  accent: const Color(0xFFE58A47),
                   tags: tags,
                 ),
                 const SizedBox(height: 16),
@@ -291,14 +291,14 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   value: '${metrics.totalItems}',
                   caption: 'Products available',
                   icon: Icons.apps_rounded,
-                  accent: const Color(0xFF38BDF8),
+                  accent: const Color(0xFFE58A47),
                 ),
                 MobileMetricCard(
                   label: 'Low stock',
                   value: '${metrics.lowStock}',
                   caption: _lowStockOnly ? 'Filtered now' : 'Needs refill',
                   icon: Icons.error_outline_rounded,
-                  accent: const Color(0xFFFB7185),
+                  accent: const Color(0xFFEF6B67),
                 ),
                 MobileMetricCard(
                   label: 'Stock value',
@@ -307,7 +307,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       ? 'Refreshing locally'
                       : 'Local inventory total',
                   icon: Icons.currency_rupee_rounded,
-                  accent: const Color(0xFF22C55E),
+                  accent: const Color(0xFF4EB79B),
                 ),
               ],
             );
@@ -401,19 +401,19 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       MobileTag(
                         label: 'Search: ${_search.trim()}',
                         icon: Icons.search_rounded,
-                        accent: const Color(0xFF38BDF8),
+                        accent: const Color(0xFFE58A47),
                       ),
                     if (_selectedCategory != null)
                       MobileTag(
                         label: _selectedCategory!,
                         icon: Icons.inventory_2_rounded,
-                        accent: const Color(0xFFA78BFA),
+                        accent: const Color(0xFF7CA4F8),
                       ),
                     if (_lowStockOnly)
                       const MobileTag(
                         label: 'Low stock only',
                         icon: Icons.error_outline_rounded,
-                        accent: Color(0xFFFB7185),
+                        accent: Color(0xFFEF6B67),
                       ),
                   ],
                 ),
@@ -556,12 +556,12 @@ class _InventoryRoleProfile {
         ? '${metrics.lowStock} low stock'
         : '${metrics.totalItems} products';
     final primaryAccent = metrics.lowStock > 0
-        ? const Color(0xFFFB7185)
-        : const Color(0xFF38BDF8);
+        ? const Color(0xFFEF6B67)
+        : const Color(0xFFE58A47);
     final secondaryLabel = syncing ? 'Refreshing' : 'Stock view ready';
     final secondaryAccent = syncing
-        ? const Color(0xFF38BDF8)
-        : const Color(0xFF22C55E);
+        ? const Color(0xFFE58A47)
+        : const Color(0xFF4EB79B);
 
     if (session?.isCashierLike ?? false) {
       return _InventoryRoleProfile(
@@ -637,13 +637,13 @@ class _CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = const Color(0xFF38BDF8);
+    final activeColor = const Color(0xFFE58A47);
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: Material(
         color: active
             ? activeColor.withValues(alpha: 0.14)
-            : const Color(0xFF111827),
+            : const Color(0xFF232A36),
         borderRadius: BorderRadius.circular(18),
         child: InkWell(
           onTap: onTap,
@@ -674,8 +674,8 @@ class _InventoryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final priceTone = item.stock <= 5
-        ? const Color(0xFFFB7185)
-        : const Color(0xFF38BDF8);
+        ? const Color(0xFFEF6B67)
+        : const Color(0xFFE58A47);
     final secondary = [
       item.category,
       if ((item.size ?? '').isNotEmpty) item.size!,
@@ -689,7 +689,7 @@ class _InventoryRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         child: Ink(
           decoration: BoxDecoration(
-            color: const Color(0xFF0A1220),
+            color: const Color(0xFF232A36),
             borderRadius: BorderRadius.circular(22),
             border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
           ),

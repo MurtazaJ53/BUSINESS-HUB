@@ -34,16 +34,16 @@ class SettingsPlanScreen extends ConsumerWidget {
             subtitle:
                 'See what this workspace includes now, what the next plan unlocks, and when an upgrade is actually worth it.',
             icon: Icons.workspace_premium_rounded,
-            accent: const Color(0xFFF59E0B),
+            accent: const Color(0xFFF0C879),
             primaryTag: MobileTag(
               label: '${shop.planLabel} plan',
               icon: Icons.workspace_premium_rounded,
-              accent: const Color(0xFFF59E0B),
+              accent: const Color(0xFFF0C879),
             ),
             secondaryTag: MobileTag(
               label: session?.displayRoleLabel ?? 'GUEST',
               icon: Icons.badge_rounded,
-              accent: const Color(0xFF38BDF8),
+              accent: const Color(0xFFE58A47),
             ),
           ),
           const SizedBox(height: 18),
@@ -87,7 +87,7 @@ class SettingsPlanScreen extends ConsumerWidget {
               action: MobileTag(
                 label: _nextPlanLabel(shop),
                 icon: Icons.trending_up_rounded,
-                accent: const Color(0xFF22C55E),
+                accent: const Color(0xFF4EB79B),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -115,7 +115,7 @@ class SettingsPlanScreen extends ConsumerWidget {
               action: MobileTag(
                 label: _nextPlanSectionTitle(shop),
                 icon: Icons.compare_arrows_rounded,
-                accent: const Color(0xFF38BDF8),
+                accent: const Color(0xFFE58A47),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,7 +138,7 @@ class SettingsPlanScreen extends ConsumerWidget {
               action: MobileTag(
                 label: '3 tiers',
                 icon: Icons.view_carousel_rounded,
-                accent: const Color(0xFF14B8A6),
+                accent: const Color(0xFF4EB79B),
               ),
               child: Column(
                 children: const <Widget>[
@@ -156,7 +156,7 @@ class SettingsPlanScreen extends ConsumerWidget {
               action: MobileTag(
                 label: 'Owner action',
                 icon: Icons.campaign_rounded,
-                accent: const Color(0xFFF59E0B),
+                accent: const Color(0xFFF0C879),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -271,7 +271,7 @@ class _PlanSectionCard extends StatelessWidget {
     final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1220),
+        color: const Color(0xFF232A36),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
@@ -353,7 +353,7 @@ class _PlanTierCard extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1220),
+        color: const Color(0xFF232A36),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),

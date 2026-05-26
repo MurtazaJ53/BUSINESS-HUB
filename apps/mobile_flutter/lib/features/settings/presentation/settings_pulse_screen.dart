@@ -14,7 +14,8 @@ class SettingsPulseScreen extends ConsumerStatefulWidget {
   const SettingsPulseScreen({super.key});
 
   @override
-  ConsumerState<SettingsPulseScreen> createState() => _SettingsPulseScreenState();
+  ConsumerState<SettingsPulseScreen> createState() =>
+      _SettingsPulseScreenState();
 }
 
 class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
@@ -43,13 +44,15 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
       _messageIsError = false;
     });
     try {
-      await ref.read(backendApiClientProvider).updateWorkspacePulseSignal(
-        user: session.user,
-        shopId: session.shopId!,
-        signalId: signal.id,
-        action: action,
-        note: note,
-      );
+      await ref
+          .read(backendApiClientProvider)
+          .updateWorkspacePulseSignal(
+            user: session.user,
+            shopId: session.shopId!,
+            signalId: signal.id,
+            action: action,
+            note: note,
+          );
       await _refreshDesk();
       if (!mounted) {
         return;
@@ -92,7 +95,8 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
     final pulseAsync = ref.watch(workspacePulseProvider);
     final signalsAsync = ref.watch(workspacePulseSignalsProvider);
     final pulse = pulseAsync.asData?.value;
-    final signals = signalsAsync.asData?.value ?? const <WorkspacePulseSignal>[];
+    final signals =
+        signalsAsync.asData?.value ?? const <WorkspacePulseSignal>[];
     final openSignals = signals
         .where((signal) => signal.status != 'resolved')
         .toList(growable: false);
@@ -151,15 +155,17 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
             subtitle:
                 'Acknowledge, resolve, or reopen workspace signals before stock, sync, or behavior issues spread into the day.',
             icon: Icons.auto_awesome_rounded,
-            accent: const Color(0xFF38BDF8),
+            accent: const Color(0xFFE58A47),
             primaryTag: MobileTag(
-              label: openSignals.isEmpty ? 'Desk calm' : '${openSignals.length} open',
+              label: openSignals.isEmpty
+                  ? 'Desk calm'
+                  : '${openSignals.length} open',
               icon: openSignals.isEmpty
                   ? Icons.check_circle_rounded
                   : Icons.notification_important_rounded,
               accent: openSignals.isEmpty
-                  ? const Color(0xFF22C55E)
-                  : const Color(0xFF38BDF8),
+                  ? const Color(0xFF4EB79B)
+                  : const Color(0xFFE58A47),
             ),
             secondaryTag: MobileTag(
               label: pulse == null
@@ -173,10 +179,10 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
                   ? Icons.crisis_alert_rounded
                   : Icons.monitor_heart_rounded,
               accent: pulse == null
-                  ? const Color(0xFF38BDF8)
+                  ? const Color(0xFFE58A47)
                   : pulse.stats.criticalAnomalyCount > 0
-                  ? const Color(0xFFFB7185)
-                  : const Color(0xFFF59E0B),
+                  ? const Color(0xFFEF6B67)
+                  : const Color(0xFFF0C879),
             ),
           ),
           const SizedBox(height: 18),
@@ -207,7 +213,9 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
           else ...<Widget>[
             if (_message != null) ...<Widget>[
               MobilePanel(
-                title: _messageIsError ? 'Pulse control failed' : 'Pulse updated',
+                title: _messageIsError
+                    ? 'Pulse control failed'
+                    : 'Pulse updated',
                 child: Text(
                   _message!,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -242,17 +250,17 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
                       children: <Widget>[
                         Text(
                           pulse.headline.title,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w900,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w900),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           pulse.headline.body,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.72),
-                            height: 1.45,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.72),
+                                height: 1.45,
+                              ),
                         ),
                         const SizedBox(height: 14),
                         Wrap(
@@ -262,23 +270,23 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
                             MobileTag(
                               label: '${pulse.stats.openTaskCount} tasks',
                               icon: Icons.assignment_late_rounded,
-                              accent: const Color(0xFF38BDF8),
+                              accent: const Color(0xFFE58A47),
                             ),
                             MobileTag(
                               label:
                                   '${pulse.stats.criticalAnomalyCount} critical',
                               icon: Icons.crisis_alert_rounded,
                               accent: pulse.stats.criticalAnomalyCount > 0
-                                  ? const Color(0xFFFB7185)
-                                  : const Color(0xFF22C55E),
+                                  ? const Color(0xFFEF6B67)
+                                  : const Color(0xFF4EB79B),
                             ),
                             MobileTag(
                               label:
                                   '${pulse.stats.warningAnomalyCount} warning',
                               icon: Icons.warning_amber_rounded,
                               accent: pulse.stats.warningAnomalyCount > 0
-                                  ? const Color(0xFFF59E0B)
-                                  : const Color(0xFF22C55E),
+                                  ? const Color(0xFFF0C879)
+                                  : const Color(0xFF4EB79B),
                             ),
                           ],
                         ),
@@ -289,13 +297,15 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
             MobilePanel(
               title: 'Open pulse desk',
               action: MobileTag(
-                label: openSignals.isEmpty ? 'Clear' : '${openSignals.length} active',
+                label: openSignals.isEmpty
+                    ? 'Clear'
+                    : '${openSignals.length} active',
                 icon: openSignals.isEmpty
                     ? Icons.done_all_rounded
                     : Icons.priority_high_rounded,
                 accent: openSignals.isEmpty
-                    ? const Color(0xFF22C55E)
-                    : const Color(0xFF38BDF8),
+                    ? const Color(0xFF4EB79B)
+                    : const Color(0xFFE58A47),
               ),
               child: signalsAsync.isLoading
                   ? const MobileEmptyState(
@@ -321,41 +331,44 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
                                 busy: _busySignalId == signal.id,
                                 onAcknowledge: signal.isOpen
                                     ? () => _applySignalAction(
-                                          session: session,
-                                          signal: signal,
-                                          action: 'acknowledge',
-                                        )
+                                        session: session,
+                                        signal: signal,
+                                        action: 'acknowledge',
+                                      )
                                     : null,
                                 onResolve: !signal.isResolved
                                     ? () => _applySignalAction(
-                                          session: session,
-                                          signal: signal,
-                                          action: 'resolve',
-                                          note: 'Resolved from mobile pulse desk.',
-                                        )
+                                        session: session,
+                                        signal: signal,
+                                        action: 'resolve',
+                                        note:
+                                            'Resolved from mobile pulse desk.',
+                                      )
                                     : null,
                                 onEscalate: !signal.isEscalated
                                     ? () => _applySignalAction(
-                                          session: session,
-                                          signal: signal,
-                                          action: 'escalate',
-                                          note: 'Escalated from mobile pulse desk.',
-                                        )
+                                        session: session,
+                                        signal: signal,
+                                        action: 'escalate',
+                                        note:
+                                            'Escalated from mobile pulse desk.',
+                                      )
                                     : null,
                                 onDeescalate: signal.isEscalated
                                     ? () => _applySignalAction(
-                                          session: session,
-                                          signal: signal,
-                                          action: 'deescalate',
-                                          note: 'Escalation lowered from mobile pulse desk.',
-                                        )
+                                        session: session,
+                                        signal: signal,
+                                        action: 'deescalate',
+                                        note:
+                                            'Escalation lowered from mobile pulse desk.',
+                                      )
                                     : null,
                                 onReopen: signal.isResolved
                                     ? () => _applySignalAction(
-                                          session: session,
-                                          signal: signal,
-                                          action: 'reopen',
-                                        )
+                                        session: session,
+                                        signal: signal,
+                                        action: 'reopen',
+                                      )
                                     : null,
                               ),
                             ),
@@ -369,7 +382,7 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
               action: MobileTag(
                 label: '${resolvedSignals.length} shown',
                 icon: Icons.task_alt_rounded,
-                accent: const Color(0xFF22C55E),
+                accent: const Color(0xFF4EB79B),
               ),
               child: resolvedSignals.isEmpty
                   ? const MobileEmptyState(
@@ -391,11 +404,12 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
                                 onEscalate: null,
                                 onDeescalate: signal.isEscalated
                                     ? () => _applySignalAction(
-                                          session: session,
-                                          signal: signal,
-                                          action: 'deescalate',
-                                          note: 'Escalation lowered from mobile pulse desk.',
-                                        )
+                                        session: session,
+                                        signal: signal,
+                                        action: 'deescalate',
+                                        note:
+                                            'Escalation lowered from mobile pulse desk.',
+                                      )
                                     : null,
                                 onReopen: () => _applySignalAction(
                                   session: session,
@@ -438,7 +452,7 @@ class _PulseSignalCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1220),
+        color: const Color(0xFF232A36),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
@@ -456,9 +470,8 @@ class _PulseSignalCard extends StatelessWidget {
                     children: <Widget>[
                       Text(
                         signal.title,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w900),
                       ),
                       const SizedBox(height: 6),
                       Text(
@@ -486,7 +499,7 @@ class _PulseSignalCard extends StatelessWidget {
                       : Icons.assignment_late_rounded,
                   accent: signal.signalKind == 'anomaly'
                       ? _signalLevelColor(signal.signalLevel)
-                      : const Color(0xFF38BDF8),
+                      : const Color(0xFFE58A47),
                 ),
                 MobileTag(
                   label: signal.status.toUpperCase(),
@@ -496,9 +509,9 @@ class _PulseSignalCard extends StatelessWidget {
                       ? Icons.visibility_rounded
                       : Icons.priority_high_rounded,
                   accent: signal.isResolved
-                      ? const Color(0xFF22C55E)
+                      ? const Color(0xFF4EB79B)
                       : signal.isAcknowledged
-                      ? const Color(0xFF38BDF8)
+                      ? const Color(0xFFE58A47)
                       : _signalLevelColor(signal.signalLevel),
                 ),
                 MobileTag(
@@ -510,26 +523,26 @@ class _PulseSignalCard extends StatelessWidget {
                   const MobileTag(
                     label: 'ESCALATED',
                     icon: Icons.vertical_align_top_rounded,
-                    accent: Color(0xFFFB7185),
+                    accent: Color(0xFFEF6B67),
                   ),
                 if (signal.assignedMemberName != null)
                   MobileTag(
                     label:
-                        '${signal.assignedMemberName} • ${_roleLabel(signal.assignedMemberRole)}',
+                        '${signal.assignedMemberName}  ·  ${_roleLabel(signal.assignedMemberRole)}',
                     icon: Icons.person_pin_circle_rounded,
-                    accent: const Color(0xFF38BDF8),
+                    accent: const Color(0xFFE58A47),
                   ),
                 if (signal.metricValue.isNotEmpty)
                   MobileTag(
                     label: signal.metricValue,
                     icon: Icons.speed_rounded,
-                    accent: const Color(0xFFF59E0B),
+                    accent: const Color(0xFFF0C879),
                   ),
                 if (signal.count > 0)
                   MobileTag(
                     label: 'Count ${signal.count}',
                     icon: Icons.format_list_numbered_rounded,
-                    accent: const Color(0xFFA78BFA),
+                    accent: const Color(0xFF7CA4F8),
                   ),
               ],
             ),
@@ -627,7 +640,8 @@ class _PulseSignalCard extends StatelessWidget {
                         .expand(
                           (widget) => <Widget>[
                             SizedBox(width: double.infinity, child: widget),
-                            if (widget != actions.last) const SizedBox(height: 10),
+                            if (widget != actions.last)
+                              const SizedBox(height: 10),
                           ],
                         )
                         .toList(growable: false),
@@ -661,7 +675,7 @@ String _signalMetaLine(WorkspacePulseSignal signal) {
       'Acknowledged ${_formatSignalDate(signal.acknowledgedAt)}${signal.acknowledgedByName?.isNotEmpty == true ? ' by ${signal.acknowledgedByName}' : ''}',
     _ => 'Last seen ${formatCompactDate(signal.lastDetectedAt)}',
   };
-  return '$statusLine • First seen ${formatCompactDate(signal.firstDetectedAt)}';
+  return '$statusLine  ·  First seen ${formatCompactDate(signal.firstDetectedAt)}';
 }
 
 String _formatSignalDate(DateTime? value) {
@@ -692,14 +706,14 @@ Color _signalLevelColor(String level) {
   switch (level.trim().toLowerCase()) {
     case 'critical':
     case 'danger':
-      return const Color(0xFFFB7185);
+      return const Color(0xFFEF6B67);
     case 'high':
     case 'warning':
-      return const Color(0xFFF59E0B);
+      return const Color(0xFFF0C879);
     case 'healthy':
-      return const Color(0xFF22C55E);
+      return const Color(0xFF4EB79B);
     default:
-      return const Color(0xFF38BDF8);
+      return const Color(0xFFE58A47);
   }
 }
 

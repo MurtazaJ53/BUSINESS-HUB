@@ -70,16 +70,16 @@ class SettingsTeamScreen extends ConsumerWidget {
             subtitle:
                 'Add the exact email a staff member will use to sign in. Business Hub will attach that person to this workspace and keep role control with owner/admin users.',
             icon: Icons.groups_rounded,
-            accent: const Color(0xFF38BDF8),
+            accent: const Color(0xFFE58A47),
             primaryTag: MobileTag(
               label: shop.planLabel,
               icon: Icons.workspace_premium_rounded,
-              accent: const Color(0xFFF59E0B),
+              accent: const Color(0xFFF0C879),
             ),
             secondaryTag: MobileTag(
               label: session.displayRoleLabel,
               icon: Icons.badge_rounded,
-              accent: const Color(0xFF14B8A6),
+              accent: const Color(0xFF4EB79B),
             ),
           ),
           const SizedBox(height: 18),
@@ -88,7 +88,7 @@ class SettingsTeamScreen extends ConsumerWidget {
             action: const MobileTag(
               label: 'SIGN-IN FLOW',
               icon: Icons.login_rounded,
-              accent: Color(0xFF14B8A6),
+              accent: Color(0xFF4EB79B),
             ),
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -116,7 +116,7 @@ class SettingsTeamScreen extends ConsumerWidget {
                   ? (membersAsync.isLoading ? 'Refreshing' : 'No members')
                   : '${members.length} attached',
               icon: Icons.groups_rounded,
-              accent: const Color(0xFF38BDF8),
+              accent: const Color(0xFFE58A47),
             ),
             child: members.isEmpty
                 ? MobileEmptyState(
@@ -154,7 +154,7 @@ class SettingsTeamScreen extends ConsumerWidget {
             action: const MobileTag(
               label: 'OWNER / ADMIN',
               icon: Icons.person_add_alt_1_rounded,
-              accent: Color(0xFF38BDF8),
+              accent: Color(0xFFE58A47),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -302,7 +302,7 @@ class SettingsTeamScreen extends ConsumerWidget {
                               errorText!,
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: const Color(0xFFFB7185),
+                                    color: const Color(0xFFEF6B67),
                                     fontWeight: FontWeight.w700,
                                   ),
                             ),
@@ -456,12 +456,12 @@ class SettingsTeamScreen extends ConsumerWidget {
                         MobileTag(
                           label: member.roleLabel,
                           icon: Icons.badge_rounded,
-                          accent: const Color(0xFF38BDF8),
+                          accent: const Color(0xFFE58A47),
                         ),
                         MobileTag(
                           label: member.status,
                           icon: Icons.circle_notifications_rounded,
-                          accent: const Color(0xFFF59E0B),
+                          accent: const Color(0xFFF0C879),
                         ),
                       ],
                     ),
@@ -520,7 +520,7 @@ class SettingsTeamScreen extends ConsumerWidget {
                               errorText!,
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: const Color(0xFFFB7185),
+                                    color: const Color(0xFFEF6B67),
                                     fontWeight: FontWeight.w700,
                                   ),
                             ),
@@ -609,7 +609,7 @@ class _TeamMemberRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: const Color(0xFF0A1220),
+          color: const Color(0xFF232A36),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
         ),
@@ -651,18 +651,18 @@ class _TeamMemberRow extends StatelessWidget {
                   MobileTag(
                     label: member.roleLabel,
                     icon: Icons.badge_rounded,
-                    accent: const Color(0xFF38BDF8),
+                    accent: const Color(0xFFE58A47),
                   ),
                   MobileTag(
                     label: member.status,
                     icon: Icons.circle_notifications_rounded,
-                    accent: const Color(0xFFF59E0B),
+                    accent: const Color(0xFFF0C879),
                   ),
                   if (member.isCurrentUser)
                     const MobileTag(
                       label: 'YOU',
                       icon: Icons.person_rounded,
-                      accent: Color(0xFF22C55E),
+                      accent: Color(0xFF4EB79B),
                     ),
                 ],
               ),
@@ -700,7 +700,7 @@ class _TeamBullet extends StatelessWidget {
             margin: const EdgeInsets.only(top: 6),
             decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              color: Color(0xFF38BDF8),
+              color: Color(0xFFE58A47),
             ),
           ),
           const SizedBox(width: 10),

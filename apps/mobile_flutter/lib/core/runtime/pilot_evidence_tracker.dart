@@ -125,21 +125,17 @@ class PilotEvidenceTrackerState {
         for (final artifact in artifacts) artifact.id: artifact,
       };
 
-  List<PilotEvidenceArtifact> get coreArtifacts => artifacts
-      .where((artifact) => artifact.isCore)
-      .toList(growable: false);
+  List<PilotEvidenceArtifact> get coreArtifacts =>
+      artifacts.where((artifact) => artifact.isCore).toList(growable: false);
 
-  List<PilotEvidenceArtifact> get optionalArtifacts => artifacts
-      .where((artifact) => !artifact.isCore)
-      .toList(growable: false);
+  List<PilotEvidenceArtifact> get optionalArtifacts =>
+      artifacts.where((artifact) => !artifact.isCore).toList(growable: false);
 
-  int get capturedCoreCount => coreArtifacts
-      .where((artifact) => isCaptured(artifact.id))
-      .length;
+  int get capturedCoreCount =>
+      coreArtifacts.where((artifact) => isCaptured(artifact.id)).length;
 
-  int get capturedOptionalCount => optionalArtifacts
-      .where((artifact) => isCaptured(artifact.id))
-      .length;
+  int get capturedOptionalCount =>
+      optionalArtifacts.where((artifact) => isCaptured(artifact.id)).length;
 
   int get totalCoreCount => coreArtifacts.length;
 
@@ -149,17 +145,14 @@ class PilotEvidenceTrackerState {
 
   int get missingOptionalCount => missingOptionalArtifacts.length;
 
-  int get archivedHealthyCount => archivedSessions
-      .where((entry) => entry.isCoreComplete)
-      .length;
+  int get archivedHealthyCount =>
+      archivedSessions.where((entry) => entry.isCoreComplete).length;
 
-  int get archivedAttentionCount => archivedSessions
-      .where((entry) => !entry.isCoreComplete)
-      .length;
+  int get archivedAttentionCount =>
+      archivedSessions.where((entry) => !entry.isCoreComplete).length;
 
-  bool get recentArchiveShowsAttention => archivedSessions
-      .take(3)
-      .any((entry) => !entry.isCoreComplete);
+  bool get recentArchiveShowsAttention =>
+      archivedSessions.take(3).any((entry) => !entry.isCoreComplete);
 
   bool get isCoreComplete => missingCoreCount == 0;
   bool get hasSessionContext =>
@@ -241,7 +234,8 @@ class PilotEvidenceTrackerState {
     );
   }
 
-  bool isCaptured(String artifactId) => capturedAtByArtifact.containsKey(artifactId);
+  bool isCaptured(String artifactId) =>
+      capturedAtByArtifact.containsKey(artifactId);
 
   PilotEvidenceSessionArchiveEntry? get latestArchivedSession =>
       archivedSessions.isEmpty ? null : archivedSessions.first;
@@ -275,7 +269,9 @@ class PilotEvidenceTrackerState {
     }
     return PilotEvidenceTrackerState(
       capturedAtByArtifact: capturedAtByArtifact,
-      sessionLabel: defaultLabel.trim().isEmpty ? 'Pilot session' : defaultLabel.trim(),
+      sessionLabel: defaultLabel.trim().isEmpty
+          ? 'Pilot session'
+          : defaultLabel.trim(),
       sessionStartedAt: startedAt ?? DateTime.now(),
       lastResetAt: lastResetAt,
       archivedSessions: archivedSessions,
@@ -357,7 +353,9 @@ class PilotEvidenceTrackerState {
     if (missingCoreArtifacts.isEmpty) {
       lines.add('- none');
     } else {
-      lines.addAll(missingCoreArtifacts.map((artifact) => '- ${artifact.label}'));
+      lines.addAll(
+        missingCoreArtifacts.map((artifact) => '- ${artifact.label}'),
+      );
     }
 
     lines.add('Missing optional artifacts:');
@@ -373,9 +371,7 @@ class PilotEvidenceTrackerState {
     if (archivedSessions.isEmpty) {
       lines.add('- none');
     } else {
-      lines.addAll(
-        archivedSessions.map((entry) => '- ${entry.summaryLine}'),
-      );
+      lines.addAll(archivedSessions.map((entry) => '- ${entry.summaryLine}'));
     }
 
     return lines.join('\n');
@@ -535,8 +531,9 @@ class PilotEvidenceSessionArchiveEntry {
           _readNullableInt(json['captured_optional_count']) ?? 0,
       totalOptionalCount: _readNullableInt(json['total_optional_count']) ?? 0,
       statusLabel: _readNullableString(json['status_label']) ?? 'UNKNOWN',
-      latestCapturedArtifactLabel:
-          _readNullableString(json['latest_captured_artifact_label']),
+      latestCapturedArtifactLabel: _readNullableString(
+        json['latest_captured_artifact_label'],
+      ),
       latestCapturedAt: _readNullableDateTime(json['latest_captured_at']),
     );
   }

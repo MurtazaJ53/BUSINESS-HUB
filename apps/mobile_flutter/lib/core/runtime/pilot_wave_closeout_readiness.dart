@@ -181,9 +181,7 @@ class PilotWaveCloseoutReadiness {
       );
     }
 
-    reasons.add(
-      'Required closeout evidence is captured for this session.',
-    );
+    reasons.add('Required closeout evidence is captured for this session.');
     reasons.add(
       'Current rollout posture is stable enough to close the device wave record cleanly.',
     );

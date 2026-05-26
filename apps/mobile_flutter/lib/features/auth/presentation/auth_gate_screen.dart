@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/session/mobile_session_controller.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../shell/presentation/mobile_surface.dart';
 
 class AuthGateScreen extends ConsumerStatefulWidget {
@@ -229,9 +230,9 @@ class _AuthScaffold extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: <Color>[
-              Color(0xFF03060B),
-              Color(0xFF09111F),
-              Color(0xFF05070B),
+              AppPalette.background,
+              AppPalette.backgroundSoft,
+              AppPalette.backgroundAlt,
             ],
           ),
         ),
@@ -240,17 +241,17 @@ class _AuthScaffold extends StatelessWidget {
             const Positioned(
               top: -90,
               left: -50,
-              child: _AuraBlob(size: 220, color: Color(0x222563EB)),
+              child: _AuraBlob(size: 220, color: Color(0x26E58A47)),
             ),
             const Positioned(
               top: 120,
               right: -44,
-              child: _AuraBlob(size: 180, color: Color(0x2206B6D4)),
+              child: _AuraBlob(size: 180, color: Color(0x22F0C879)),
             ),
             const Positioned(
               bottom: -60,
               left: 18,
-              child: _AuraBlob(size: 200, color: Color(0x1E38BDF8)),
+              child: _AuraBlob(size: 200, color: Color(0x1E7CA4F8)),
             ),
             SafeArea(
               child: Center(
@@ -278,7 +279,7 @@ class _AuthHero extends StatelessWidget {
       action: const MobileTag(
         label: 'LIVE LINK ACTIVE',
         icon: Icons.wifi_tethering_rounded,
-        accent: Color(0xFF22C55E),
+        accent: AppPalette.jade,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -291,7 +292,7 @@ class _AuthHero extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   gradient: const LinearGradient(
-                    colors: <Color>[Color(0xFF60A5FA), Color(0xFF2563EB)],
+                    colors: <Color>[AppPalette.gold, AppPalette.primary],
                   ),
                 ),
                 child: const Icon(
@@ -316,7 +317,7 @@ class _AuthHero extends StatelessWidget {
                     Text(
                       'ZARRA ECOSYSTEM',
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.52),
+                        color: AppPalette.textMuted,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 2.2,
                       ),
@@ -330,7 +331,7 @@ class _AuthHero extends StatelessWidget {
           Text(
             'Local vault speed. Live cloud continuity. Premium operations in your hand.',
             style: theme.textTheme.bodyLarge?.copyWith(
-              color: Colors.white.withValues(alpha: 0.76),
+              color: AppPalette.textSecondary,
               height: 1.5,
               fontWeight: FontWeight.w600,
             ),
@@ -347,12 +348,12 @@ class _AuthHero extends StatelessWidget {
               MobileTag(
                 label: 'FIREBASE SECURED',
                 icon: Icons.shield_rounded,
-                accent: Color(0xFF22C55E),
+                accent: AppPalette.jade,
               ),
               MobileTag(
                 label: 'PREMIUM CHECKOUT FLOW',
                 icon: Icons.point_of_sale_rounded,
-                accent: Color(0xFFA78BFA),
+                accent: AppPalette.gold,
               ),
             ],
           ),
@@ -395,9 +396,7 @@ class _AuthCard extends StatelessWidget {
       action: MobileTag(
         label: recoveryMode ? 'RECOVERY MODE' : 'SECURE LOGIN',
         icon: recoveryMode ? Icons.key_rounded : Icons.lock_rounded,
-        accent: recoveryMode
-            ? const Color(0xFFA78BFA)
-            : const Color(0xFF38BDF8),
+        accent: recoveryMode ? AppPalette.gold : AppPalette.primary,
       ),
       child: Form(
         key: formKey,
@@ -406,9 +405,9 @@ class _AuthCard extends StatelessWidget {
           children: <Widget>[
             DecoratedBox(
               decoration: BoxDecoration(
-                color: const Color(0xFF0A1220),
+                color: AppPalette.panelStrong,
                 borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                border: Border.all(color: AppPalette.lineSoft),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(6),
@@ -440,7 +439,7 @@ class _AuthCard extends StatelessWidget {
                   ? 'We will send a reset link to the operator email you enter below.'
                   : 'Use the same Business Hub account that already owns or belongs to your shop workspace.',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: Colors.white.withValues(alpha: 0.68),
+                color: AppPalette.textSecondary,
                 fontWeight: FontWeight.w600,
                 height: 1.45,
               ),
@@ -491,10 +490,10 @@ class _AuthCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2A1016),
+                  color: const Color(0xFF2D1819),
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(
-                    color: const Color(0xFFFB7185).withValues(alpha: 0.25),
+                    color: AppPalette.coral.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(
@@ -502,14 +501,14 @@ class _AuthCard extends StatelessWidget {
                   children: <Widget>[
                     const Icon(
                       Icons.warning_amber_rounded,
-                      color: Color(0xFFFB7185),
+                      color: AppPalette.coral,
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         error!,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: const Color(0xFFFFD1DB),
+                          color: const Color(0xFFFFE1DD),
                           fontWeight: FontWeight.w700,
                           height: 1.4,
                         ),
@@ -541,7 +540,7 @@ class _AuthCard extends StatelessWidget {
             Text(
               'The mobile app mounts local SQLite first, then syncs your live workspace after sign-in.',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.5),
+                color: AppPalette.textMuted,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -568,7 +567,7 @@ class _AuthModeButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: active ? const Color(0xFF2563EB) : Colors.transparent,
+      color: active ? AppPalette.primary : Colors.transparent,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: onTap,
@@ -581,13 +580,17 @@ class _AuthModeButton extends StatelessWidget {
               Icon(
                 icon,
                 size: 18,
-                color: active ? Colors.white : Colors.white70,
+                color: active
+                    ? const Color(0xFF1A1008)
+                    : AppPalette.textSecondary,
               ),
               const SizedBox(width: 8),
               Text(
                 label,
                 style: TextStyle(
-                  color: active ? Colors.white : Colors.white70,
+                  color: active
+                      ? const Color(0xFF1A1008)
+                      : AppPalette.textSecondary,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -624,7 +627,7 @@ class _BrandedStatus extends StatelessWidget {
             width: 72,
             height: 72,
             decoration: BoxDecoration(
-              color: const Color(0xFF10192A),
+              color: AppPalette.panelMuted,
               borderRadius: BorderRadius.circular(24),
             ),
             child: Icon(icon, color: Colors.white, size: 34),
@@ -633,7 +636,7 @@ class _BrandedStatus extends StatelessWidget {
           Text(
             subtitle,
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: Colors.white.withValues(alpha: 0.72),
+              color: AppPalette.textSecondary,
               fontWeight: FontWeight.w600,
               height: 1.5,
             ),

@@ -47,13 +47,11 @@ class PilotDiagnosticsSnapshot {
     return session!.email.isNotEmpty ? session!.email : 'Unknown operator';
   }
 
-  String get operatorRole =>
-      operatorRoleOverride?.trim().isNotEmpty == true
+  String get operatorRole => operatorRoleOverride?.trim().isNotEmpty == true
       ? operatorRoleOverride!.trim().toUpperCase()
       : session?.role?.toUpperCase() ?? 'GUEST';
 
-  String get workspaceId =>
-      workspaceIdOverride?.trim().isNotEmpty == true
+  String get workspaceId => workspaceIdOverride?.trim().isNotEmpty == true
       ? workspaceIdOverride!.trim()
       : session?.shopId ?? 'No workspace bound';
 

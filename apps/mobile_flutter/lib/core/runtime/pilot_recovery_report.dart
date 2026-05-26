@@ -37,12 +37,10 @@ class PilotRecoveryReport {
     }
 
     for (final entry in attentionEntries) {
-      final customerLabel =
-          (entry.customerName?.trim().isNotEmpty == true)
+      final customerLabel = (entry.customerName?.trim().isNotEmpty == true)
           ? entry.customerName!.trim()
           : 'Walk-in customer';
-      final errorLabel =
-          (entry.lastError?.trim().isNotEmpty == true)
+      final errorLabel = (entry.lastError?.trim().isNotEmpty == true)
           ? entry.lastError!.trim()
           : 'No error captured';
       lines.add(

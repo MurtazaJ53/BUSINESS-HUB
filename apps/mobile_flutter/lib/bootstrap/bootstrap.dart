@@ -45,11 +45,9 @@ class _FatalSurfaceFallback extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 420),
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: const Color(0xFF0B121F),
+                color: const Color(0xFF1A2029),
                 borderRadius: BorderRadius.circular(26),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.08),
-                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(22),
@@ -60,12 +58,12 @@ class _FatalSurfaceFallback extends StatelessWidget {
                       width: 62,
                       height: 62,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFB7185).withValues(alpha: 0.14),
+                        color: const Color(0xFFEF6B67).withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Icon(
                         Icons.error_outline_rounded,
-                        color: Color(0xFFFB7185),
+                        color: Color(0xFFEF6B67),
                         size: 30,
                       ),
                     ),

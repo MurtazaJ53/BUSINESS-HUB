@@ -50,7 +50,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     final customerRepository = ref.watch(customerRepositoryProvider);
     final backendApiClient = ref.watch(backendApiClientProvider);
     final syncStatus = ref.watch(syncStatusProvider);
-    final shop = ref.watch(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
+    final shop =
+        ref.watch(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
     final customerPulseStream = salesRepository.watchCustomerPulse(
       search: _search,
     );
@@ -140,7 +141,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                               ? 'Backend customer master'
                               : 'Legacy and local recall',
                           icon: Icons.groups_rounded,
-                          accent: const Color(0xFF14B8A6),
+                          accent: const Color(0xFF4EB79B),
                         ),
                         MobileMetricCard(
                           label: 'Ledger',
@@ -152,8 +153,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                               : 'Browse and review only',
                           icon: Icons.account_balance_wallet_rounded,
                           accent: ledgerDomainState.isPostgresPrimary
-                              ? const Color(0xFF22C55E)
-                              : const Color(0xFFF59E0B),
+                              ? const Color(0xFF4EB79B)
+                              : const Color(0xFFF0C879),
                         ),
                         MobileMetricCard(
                           label: 'Known sales',
@@ -162,7 +163,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                               ? '${history.queuedSales} queued receipt${history.queuedSales == 1 ? '' : 's'}'
                               : 'Awaiting local history',
                           icon: Icons.receipt_long_rounded,
-                          accent: const Color(0xFF38BDF8),
+                          accent: const Color(0xFFE58A47),
                         ),
                       ],
                     );
@@ -176,7 +177,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                         ? (_search.isEmpty ? 'ALL BUYERS' : 'FILTERED')
                         : _statusFilter.replaceAll('_', ' ').toUpperCase(),
                     icon: Icons.manage_search_rounded,
-                    accent: const Color(0xFF14B8A6),
+                    accent: const Color(0xFF4EB79B),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -250,7 +251,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                               MobileTag(
                                 label: 'Search: ${_search.trim()}',
                                 icon: Icons.search_rounded,
-                                accent: const Color(0xFF38BDF8),
+                                accent: const Color(0xFFE58A47),
                               ),
                             if (_statusFilter != 'all')
                               MobileTag(
@@ -260,7 +261,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                                     )
                                     .label,
                                 icon: Icons.filter_alt_rounded,
-                                accent: const Color(0xFF14B8A6),
+                                accent: const Color(0xFF4EB79B),
                               ),
                             if (_sortMode != 'due_desc')
                               MobileTag(
@@ -270,7 +271,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                                     )
                                     .label,
                                 icon: Icons.sort_rounded,
-                                accent: const Color(0xFFA78BFA),
+                                accent: const Color(0xFF7CA4F8),
                               ),
                           ],
                         ),
@@ -394,7 +395,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                         action: MobileTag(
                           label: '${orderedCustomers.length} live',
                           icon: Icons.verified_rounded,
-                          accent: const Color(0xFF22C55E),
+                          accent: const Color(0xFF4EB79B),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -414,12 +415,12 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                                   _CustomerSummaryTile(
                                     label: 'Visible',
                                     value: '${summary.visibleCount}',
-                                    tone: const Color(0xFF14B8A6),
+                                    tone: const Color(0xFF4EB79B),
                                   ),
                                   _CustomerSummaryTile(
                                     label: 'With due',
                                     value: '${summary.dueCount}',
-                                    tone: const Color(0xFFFB7185),
+                                    tone: const Color(0xFFEF6B67),
                                   ),
                                   if (showFinanceSummary)
                                     _CustomerSummaryTile(
@@ -428,14 +429,14 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                                         summary.receivableBalance,
                                       ),
                                       tone: summary.receivableBalance > 0
-                                          ? const Color(0xFFF59E0B)
-                                          : const Color(0xFF22C55E),
+                                          ? const Color(0xFFF0C879)
+                                          : const Color(0xFF4EB79B),
                                     ),
                                   if (showFinanceSummary)
                                     _CustomerSummaryTile(
                                       label: 'Inactive',
                                       value: '${summary.inactiveCount}',
-                                      tone: const Color(0xFFA78BFA),
+                                      tone: const Color(0xFF7CA4F8),
                                     ),
                                 ],
                               ),
@@ -444,8 +445,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                                 summary.highestBalanceCustomer == null
                                     ? 'No customer currently holds a due balance.'
                                     : showFinanceSummary
-                                        ? 'Highest due: ${summary.highestBalanceCustomer!.name} | ${formatCurrency(summary.highestBalanceCustomer!.balance)}'
-                                        : '${shop.planLabel} keeps account review lighter. Upgrade to Pro for full receivable rollups.',
+                                    ? 'Highest due: ${summary.highestBalanceCustomer!.name} | ${formatCurrency(summary.highestBalanceCustomer!.balance)}'
+                                    : '${shop.planLabel} keeps account review lighter. Upgrade to Pro for full receivable rollups.',
                                 style: Theme.of(context).textTheme.bodySmall
                                     ?.copyWith(
                                       color: Colors.white.withValues(
@@ -620,19 +621,19 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                           customer.email ??
                           'No contact recorded',
                       icon: Icons.groups_rounded,
-                      accent: const Color(0xFF14B8A6),
+                      accent: const Color(0xFF4EB79B),
                       tags: <Widget>[
                         MobileTag(
                           label: 'Balance ${formatCurrency(customer.balance)}',
                           icon: Icons.account_balance_wallet_rounded,
                           accent: customer.balance > 0
-                              ? const Color(0xFFFB7185)
-                              : const Color(0xFF22C55E),
+                              ? const Color(0xFFEF6B67)
+                              : const Color(0xFF4EB79B),
                         ),
                         MobileTag(
                           label: 'Spent ${formatCurrency(customer.totalSpent)}',
                           icon: Icons.trending_up_rounded,
-                          accent: const Color(0xFF38BDF8),
+                          accent: const Color(0xFFE58A47),
                         ),
                       ],
                     ),
@@ -640,7 +641,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                       const SizedBox(height: 14),
                       MobileSheetSection(
                         title: 'Customer actions',
-                        accent: const Color(0xFF14B8A6),
+                        accent: const Color(0xFF4EB79B),
                         child: Wrap(
                           spacing: 10,
                           runSpacing: 10,
@@ -711,7 +712,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                     else
                       MobileSheetSection(
                         title: 'Recent ledger entries',
-                        accent: const Color(0xFFA78BFA),
+                        accent: const Color(0xFF7CA4F8),
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxHeight: 320),
                           child: ListView(
@@ -776,10 +777,10 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                                                   ?.copyWith(
                                                     color: entry.amountDelta > 0
                                                         ? const Color(
-                                                            0xFFFB7185,
+                                                            0xFFEF6B67,
                                                           )
                                                         : const Color(
-                                                            0xFF22C55E,
+                                                            0xFF4EB79B,
                                                           ),
                                                     fontWeight: FontWeight.w900,
                                                   ),
@@ -863,16 +864,16 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                                 ? Icons.payments_rounded
                                 : Icons.tune_rounded,
                             accent: eventType == 'payment'
-                                ? const Color(0xFF22C55E)
-                                : const Color(0xFFF59E0B),
+                                ? const Color(0xFF4EB79B)
+                                : const Color(0xFFF0C879),
                             tags: <Widget>[
                               MobileTag(
                                 label:
                                     'Balance ${formatCurrency(customer.balance)}',
                                 icon: Icons.account_balance_wallet_rounded,
                                 accent: customer.balance > 0
-                                    ? const Color(0xFFFB7185)
-                                    : const Color(0xFF22C55E),
+                                    ? const Color(0xFFEF6B67)
+                                    : const Color(0xFF4EB79B),
                               ),
                             ],
                           ),
@@ -1124,7 +1125,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                             icon: existingCustomer == null
                                 ? Icons.person_add_alt_1_rounded
                                 : Icons.edit_note_rounded,
-                            accent: const Color(0xFF14B8A6),
+                            accent: const Color(0xFF4EB79B),
                             tags: <Widget>[
                               if (existingCustomer != null)
                                 MobileTag(
@@ -1133,14 +1134,14 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                                       ? Icons.verified_user_rounded
                                       : Icons.pause_circle_rounded,
                                   accent: existingCustomer.status == 'active'
-                                      ? const Color(0xFF22C55E)
-                                      : const Color(0xFFF59E0B),
+                                      ? const Color(0xFF4EB79B)
+                                      : const Color(0xFFF0C879),
                                 )
                               else
                                 const MobileTag(
                                   label: 'Bridge customer',
                                   icon: Icons.cloud_sync_rounded,
-                                  accent: Color(0xFF38BDF8),
+                                  accent: Color(0xFFE58A47),
                                 ),
                             ],
                           ),
@@ -1403,8 +1404,8 @@ class _CustomersRoleProfile {
         ? Icons.verified_rounded
         : Icons.swap_horiz_rounded;
     final primaryAccent = domainState.isPostgresPrimary
-        ? const Color(0xFF22C55E)
-        : const Color(0xFF14B8A6);
+        ? const Color(0xFF4EB79B)
+        : const Color(0xFF4EB79B);
     final secondaryLabel = history.totalSales > 0
         ? '${history.totalSales} receipts known'
         : (syncStatus == MobileSyncStatus.syncing
@@ -1415,7 +1416,7 @@ class _CustomersRoleProfile {
         : syncStatus == MobileSyncStatus.syncing
         ? Icons.sync_rounded
         : Icons.schedule_rounded;
-    final secondaryAccent = const Color(0xFF38BDF8);
+    final secondaryAccent = const Color(0xFFE58A47);
 
     if (session?.isCashierLike ?? false) {
       return _CustomersRoleProfile(
@@ -1426,7 +1427,7 @@ class _CustomersRoleProfile {
             ? 'Check buyer balances, attach the right customer, and review dues without leaving the floor flow.'
             : 'Search old cloud buyers and local sales recall while the live customer ledger finishes rolling out.',
         leadIcon: Icons.groups_rounded,
-        leadAccent: const Color(0xFF14B8A6),
+        leadAccent: const Color(0xFF4EB79B),
         primaryTagLabel: primaryLabel,
         primaryTagIcon: primaryIcon,
         primaryTagAccent: primaryAccent,
@@ -1445,7 +1446,7 @@ class _CustomersRoleProfile {
         leadSubtitle:
             'Track buyer accounts, receivables, and follow-up queues from a cleaner customer view.',
         leadIcon: Icons.groups_rounded,
-        leadAccent: const Color(0xFF14B8A6),
+        leadAccent: const Color(0xFF4EB79B),
         primaryTagLabel: primaryLabel,
         primaryTagIcon: primaryIcon,
         primaryTagAccent: primaryAccent,
@@ -1463,7 +1464,7 @@ class _CustomersRoleProfile {
       leadSubtitle:
           'Review buyer balances, receivables, and collections without exposing heavy ERP behavior to daily users.',
       leadIcon: Icons.groups_rounded,
-      leadAccent: const Color(0xFF14B8A6),
+      leadAccent: const Color(0xFF4EB79B),
       primaryTagLabel: primaryLabel,
       primaryTagIcon: primaryIcon,
       primaryTagAccent: primaryAccent,
@@ -1498,8 +1499,8 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
   ) {
     final compact = MediaQuery.sizeOf(context).width < 420;
     final balanceAccent = customer.balance > 0
-        ? const Color(0xFFFB7185)
-        : const Color(0xFF22C55E);
+        ? const Color(0xFFEF6B67)
+        : const Color(0xFF4EB79B);
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -1524,12 +1525,12 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
                       customer.email ??
                       'Loaded from the old cloud customer collection.',
                   icon: Icons.cloud_sync_rounded,
-                  accent: const Color(0xFF14B8A6),
+                  accent: const Color(0xFF4EB79B),
                   tags: <Widget>[
                     MobileTag(
                       label: 'Spent ${formatCurrency(customer.totalSpent)}',
                       icon: Icons.trending_up_rounded,
-                      accent: const Color(0xFF38BDF8),
+                      accent: const Color(0xFFE58A47),
                     ),
                     MobileTag(
                       label: 'Balance ${formatCurrency(customer.balance)}',
@@ -1539,7 +1540,7 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
                     MobileTag(
                       label: customer.status.toUpperCase(),
                       icon: Icons.verified_rounded,
-                      accent: const Color(0xFFA78BFA),
+                      accent: const Color(0xFF7CA4F8),
                     ),
                   ],
                 ),
@@ -1627,23 +1628,23 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
                       customer.phone ??
                       'Rebuilt from local sales history because the cloud customer master is empty for this view.',
                   icon: Icons.person_search_rounded,
-                  accent: const Color(0xFF14B8A6),
+                  accent: const Color(0xFF4EB79B),
                   tags: <Widget>[
                     MobileTag(
                       label: '${customer.visitCount} visits',
                       icon: Icons.repeat_rounded,
-                      accent: const Color(0xFF38BDF8),
+                      accent: const Color(0xFFE58A47),
                     ),
                     MobileTag(
                       label: 'Spent ${formatCurrency(customer.lifetimeSpend)}',
                       icon: Icons.currency_rupee_rounded,
-                      accent: const Color(0xFF22C55E),
+                      accent: const Color(0xFF4EB79B),
                     ),
                     if (customer.pendingSales > 0)
                       MobileTag(
                         label: '${customer.pendingSales} queued',
                         icon: Icons.cloud_upload_rounded,
-                        accent: const Color(0xFFF59E0B),
+                        accent: const Color(0xFFF0C879),
                       ),
                   ],
                 ),
@@ -1703,7 +1704,7 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
       action: MobileTag(
         label: 'FIRESTORE',
         icon: Icons.cloud_done_rounded,
-        accent: const Color(0xFF14B8A6),
+        accent: const Color(0xFF4EB79B),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1714,7 +1715,7 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
                 color: const Color(0xFF2A1508),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.16),
+                  color: const Color(0xFFF0C879).withValues(alpha: 0.16),
                 ),
               ),
               child: Padding(
@@ -1765,26 +1766,26 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
                         _CustomerSummaryTile(
                           label: 'Visible',
                           value: '${summary.visibleCount}',
-                          tone: const Color(0xFF14B8A6),
+                          tone: const Color(0xFF4EB79B),
                         ),
                         _CustomerSummaryTile(
                           label: 'With due',
                           value: '${summary.dueCount}',
-                          tone: const Color(0xFFFB7185),
+                          tone: const Color(0xFFEF6B67),
                         ),
                         if (showFinanceSummary)
                           _CustomerSummaryTile(
                             label: 'Receivable',
                             value: formatCurrency(summary.receivableBalance),
                             tone: summary.receivableBalance > 0
-                                ? const Color(0xFFF59E0B)
-                                : const Color(0xFF22C55E),
+                                ? const Color(0xFFF0C879)
+                                : const Color(0xFF4EB79B),
                           ),
                         if (showFinanceSummary)
                           _CustomerSummaryTile(
                             label: 'Inactive',
                             value: '${summary.inactiveCount}',
-                            tone: const Color(0xFFA78BFA),
+                            tone: const Color(0xFF7CA4F8),
                           ),
                       ],
                     ),
@@ -1886,7 +1887,7 @@ class _CustomerFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = const Color(0xFF14B8A6);
+    final accent = const Color(0xFF4EB79B);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1935,7 +1936,7 @@ class _CustomerSummaryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1220),
+        color: const Color(0xFF232A36),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: tone.withValues(alpha: 0.18)),
       ),
@@ -1979,10 +1980,10 @@ class _CollectionsQueuePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1220),
+        color: const Color(0xFF232A36),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: const Color(0xFFF59E0B).withValues(alpha: 0.18),
+          color: const Color(0xFFF0C879).withValues(alpha: 0.18),
         ),
       ),
       child: Padding(
@@ -2062,7 +2063,7 @@ class _CollectionsQueuePanel extends StatelessWidget {
                                 MobileTag(
                                   label: formatCurrency(customer.balance),
                                   icon: Icons.account_balance_wallet_rounded,
-                                  accent: const Color(0xFFF59E0B),
+                                  accent: const Color(0xFFF0C879),
                                 ),
                               ],
                             ),
@@ -2100,8 +2101,8 @@ class _BackendCustomerRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final balanceTone = customer.balance > 0
-        ? const Color(0xFFFB7185)
-        : const Color(0xFF22C55E);
+        ? const Color(0xFFEF6B67)
+        : const Color(0xFF4EB79B);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -2109,7 +2110,7 @@ class _BackendCustomerRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         child: Ink(
           decoration: BoxDecoration(
-            color: const Color(0xFF0A1220),
+            color: const Color(0xFF232A36),
             borderRadius: BorderRadius.circular(22),
             border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
           ),
@@ -2121,12 +2122,12 @@ class _BackendCustomerRow extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF14B8A6).withValues(alpha: 0.12),
+                    color: const Color(0xFF4EB79B).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: const Icon(
                     Icons.groups_rounded,
-                    color: Color(0xFF14B8A6),
+                    color: Color(0xFF4EB79B),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -2156,7 +2157,7 @@ class _BackendCustomerRow extends StatelessWidget {
                             label:
                                 'Spent ${formatCurrency(customer.totalSpent)}',
                             icon: Icons.trending_up_rounded,
-                            accent: const Color(0xFF38BDF8),
+                            accent: const Color(0xFFE58A47),
                           ),
                           MobileTag(
                             label:
@@ -2187,8 +2188,8 @@ class _LegacyCloudCustomerRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final balanceTone = customer.balance > 0
-        ? const Color(0xFFFB7185)
-        : const Color(0xFF22C55E);
+        ? const Color(0xFFEF6B67)
+        : const Color(0xFF4EB79B);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -2196,7 +2197,7 @@ class _LegacyCloudCustomerRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         child: Ink(
           decoration: BoxDecoration(
-            color: const Color(0xFF0A1220),
+            color: const Color(0xFF232A36),
             borderRadius: BorderRadius.circular(22),
             border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
           ),
@@ -2208,12 +2209,12 @@ class _LegacyCloudCustomerRow extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF14B8A6).withValues(alpha: 0.12),
+                    color: const Color(0xFF4EB79B).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: const Icon(
                     Icons.cloud_sync_rounded,
-                    color: Color(0xFF14B8A6),
+                    color: Color(0xFF4EB79B),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -2246,7 +2247,7 @@ class _LegacyCloudCustomerRow extends StatelessWidget {
                             label:
                                 'Spent ${formatCurrency(customer.totalSpent)}',
                             icon: Icons.trending_up_rounded,
-                            accent: const Color(0xFF38BDF8),
+                            accent: const Color(0xFFE58A47),
                           ),
                           MobileTag(
                             label:
@@ -2257,7 +2258,7 @@ class _LegacyCloudCustomerRow extends StatelessWidget {
                           MobileTag(
                             label: customer.status.toUpperCase(),
                             icon: Icons.cloud_done_rounded,
-                            accent: const Color(0xFF14B8A6),
+                            accent: const Color(0xFF4EB79B),
                           ),
                         ],
                       ),
@@ -2293,7 +2294,7 @@ class _LocalCustomerRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         child: Ink(
           decoration: BoxDecoration(
-            color: const Color(0xFF0A1220),
+            color: const Color(0xFF232A36),
             borderRadius: BorderRadius.circular(22),
             border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
           ),
@@ -2305,12 +2306,12 @@ class _LocalCustomerRow extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF14B8A6).withValues(alpha: 0.12),
+                    color: const Color(0xFF4EB79B).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: const Icon(
                     Icons.person_search_rounded,
-                    color: Color(0xFF14B8A6),
+                    color: Color(0xFF4EB79B),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -2340,19 +2341,19 @@ class _LocalCustomerRow extends StatelessWidget {
                           MobileTag(
                             label: '${customer.visitCount} visits',
                             icon: Icons.repeat_rounded,
-                            accent: const Color(0xFF38BDF8),
+                            accent: const Color(0xFFE58A47),
                           ),
                           MobileTag(
                             label:
                                 'Spent ${formatCurrency(customer.lifetimeSpend)}',
                             icon: Icons.currency_rupee_rounded,
-                            accent: const Color(0xFF22C55E),
+                            accent: const Color(0xFF4EB79B),
                           ),
                           if (customer.pendingSales > 0)
                             MobileTag(
                               label: '${customer.pendingSales} queued',
                               icon: Icons.cloud_upload_rounded,
-                              accent: const Color(0xFFF59E0B),
+                              accent: const Color(0xFFF0C879),
                             ),
                         ],
                       ),

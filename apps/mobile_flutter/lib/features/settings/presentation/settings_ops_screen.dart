@@ -62,11 +62,11 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
               subtitle:
                   'This workspace stays on the curated Business Hub path. Advanced recovery and rollout tooling only opens on Pro workspaces.',
               icon: Icons.lock_rounded,
-              accent: const Color(0xFFF59E0B),
+              accent: const Color(0xFFF0C879),
               primaryTag: MobileTag(
                 label: '${shop.planLabel} plan',
                 icon: Icons.workspace_premium_rounded,
-                accent: const Color(0xFFF59E0B),
+                accent: const Color(0xFFF0C879),
               ),
             ),
             const SizedBox(height: 18),
@@ -94,11 +94,11 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
               subtitle:
                   'Advanced ops now stays behind MFA on mobile. Verify the current owner/admin authenticator code from Security, then return here.',
               icon: Icons.security_rounded,
-              accent: const Color(0xFF38BDF8),
+              accent: const Color(0xFFE58A47),
               primaryTag: const MobileTag(
                 label: 'MFA required',
                 icon: Icons.lock_clock_rounded,
-                accent: Color(0xFFF59E0B),
+                accent: Color(0xFFF0C879),
               ),
             ),
             const SizedBox(height: 18),
@@ -280,11 +280,11 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
             subtitle:
                 'Operator packs, rollout evidence, recovery, and migration-facing tools live here so the daily settings screen stays fast.',
             icon: Icons.settings_rounded,
-            accent: const Color(0xFFA78BFA),
+            accent: const Color(0xFF7CA4F8),
             primaryTag: MobileTag(
               label: session?.displayRoleLabel ?? 'GUEST',
               icon: Icons.badge_rounded,
-              accent: const Color(0xFFA78BFA),
+              accent: const Color(0xFF7CA4F8),
             ),
             secondaryTag: MobileTag(
               label: syncStatus == MobileSyncStatus.syncing
@@ -294,8 +294,8 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                   ? Icons.sync_rounded
                   : Icons.verified_rounded,
               accent: syncStatus == MobileSyncStatus.error
-                  ? const Color(0xFFFB7185)
-                  : const Color(0xFF22C55E),
+                  ? const Color(0xFFEF6B67)
+                  : const Color(0xFF4EB79B),
             ),
           ),
           const SizedBox(height: 18),
@@ -309,8 +309,8 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                   ? Icons.edit_rounded
                   : Icons.lock_outline_rounded,
               accent: session != null && session.isOwnerLike
-                  ? const Color(0xFF14B8A6)
-                  : const Color(0xFFA78BFA),
+                  ? const Color(0xFF4EB79B)
+                  : const Color(0xFF7CA4F8),
             ),
             child: Column(
               children: <Widget>[
@@ -378,8 +378,8 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                   ? Icons.cloud_upload_rounded
                   : Icons.check_circle_rounded,
               accent: pending > 0
-                  ? const Color(0xFFF59E0B)
-                  : const Color(0xFF22C55E),
+                  ? const Color(0xFFF0C879)
+                  : const Color(0xFF4EB79B),
             ),
             child: Column(
               children: <Widget>[
@@ -505,8 +505,8 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                   ? Icons.admin_panel_settings_rounded
                   : Icons.favorite_rounded,
               accent: _showAdvancedTools
-                  ? const Color(0xFFA78BFA)
-                  : const Color(0xFF22C55E),
+                  ? const Color(0xFF7CA4F8)
+                  : const Color(0xFF4EB79B),
             ),
             child: Column(
               children: <Widget>[
@@ -610,7 +610,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                   ? Icons.visibility_rounded
                   : Icons.visibility_off_rounded,
               accent: _showAdvancedTools
-                  ? const Color(0xFFA78BFA)
+                  ? const Color(0xFF7CA4F8)
                   : const Color(0xFF64748B),
             ),
             child: Column(
@@ -635,7 +635,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                 label:
                     '${domainStates.where((state) => state.isPostgresPrimary).length} primary',
                 icon: Icons.schema_rounded,
-                accent: const Color(0xFF38BDF8),
+                accent: const Color(0xFFE58A47),
               ),
               child: Column(
                 children: domainStates
@@ -657,8 +657,8 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                     ? Icons.sync_rounded
                     : Icons.assignment_turned_in_rounded,
                 accent: diagnostics == null
-                    ? const Color(0xFFF59E0B)
-                    : const Color(0xFF22C55E),
+                    ? const Color(0xFFF0C879)
+                    : const Color(0xFF4EB79B),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -737,12 +737,12 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                         ? Icons.playlist_add_check_circle_rounded
                         : Icons.assignment_turned_in_rounded,
                     accent: actionPlan == null
-                        ? const Color(0xFFF59E0B)
+                        ? const Color(0xFFF0C879)
                         : actionPlan.isIncidentAction
-                        ? const Color(0xFFFB7185)
+                        ? const Color(0xFFEF6B67)
                         : actionPlan.isRecoveryAction
-                        ? const Color(0xFFF59E0B)
-                        : const Color(0xFF22C55E),
+                        ? const Color(0xFFF0C879)
+                        : const Color(0xFF4EB79B),
                   ),
                   child: actionPlan == null
                       ? const MobileEmptyState(
@@ -768,10 +768,10 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                               (reason) => _ReadinessNoteRow(
                                 message: reason,
                                 tone: actionPlan.isIncidentAction
-                                    ? const Color(0xFFFB7185)
+                                    ? const Color(0xFFEF6B67)
                                     : actionPlan.isRecoveryAction
-                                    ? const Color(0xFFF59E0B)
-                                    : const Color(0xFF22C55E),
+                                    ? const Color(0xFFF0C879)
+                                    : const Color(0xFF4EB79B),
                               ),
                             ),
                             const SizedBox(height: 14),
@@ -967,10 +967,10 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                         ? Icons.task_alt_rounded
                         : Icons.assignment_late_rounded,
                     accent: evidenceTrackerAsync.asData == null
-                        ? const Color(0xFFF59E0B)
+                        ? const Color(0xFFF0C879)
                         : evidenceTracker.isCoreComplete
-                        ? const Color(0xFF22C55E)
-                        : const Color(0xFFF59E0B),
+                        ? const Color(0xFF4EB79B)
+                        : const Color(0xFFF0C879),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1038,10 +1038,10 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                         evidenceTracker.archiveOperationalGuidance,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: !evidenceTracker.hasArchivedSessions
-                              ? const Color(0xFF38BDF8)
+                              ? const Color(0xFFE58A47)
                               : evidenceTracker.recentArchiveShowsAttention
-                              ? const Color(0xFFF59E0B)
-                              : const Color(0xFF22C55E),
+                              ? const Color(0xFFF0C879)
+                              : const Color(0xFF4EB79B),
                           fontWeight: FontWeight.w700,
                           height: 1.45,
                         ),
@@ -1077,7 +1077,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                           'Recent archived sessions:',
                           style: Theme.of(context).textTheme.labelLarge
                               ?.copyWith(
-                                color: const Color(0xFF38BDF8),
+                                color: const Color(0xFFE58A47),
                                 fontWeight: FontWeight.w900,
                               ),
                         ),
@@ -1087,7 +1087,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                             .map(
                               (entry) => _ReadinessNoteRow(
                                 message: entry.summaryLine,
-                                tone: const Color(0xFF38BDF8),
+                                tone: const Color(0xFFE58A47),
                               ),
                             ),
                         const SizedBox(height: 14),
@@ -1164,7 +1164,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                           'Still missing before handoff:',
                           style: Theme.of(context).textTheme.labelLarge
                               ?.copyWith(
-                                color: const Color(0xFFF59E0B),
+                                color: const Color(0xFFF0C879),
                                 fontWeight: FontWeight.w900,
                               ),
                         ),
@@ -1172,7 +1172,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                         ...evidenceTracker.missingCoreArtifacts.map(
                           (artifact) => _ReadinessNoteRow(
                             message: artifact.label,
-                            tone: const Color(0xFFF59E0B),
+                            tone: const Color(0xFFF0C879),
                           ),
                         ),
                       ] else ...<Widget>[
@@ -1180,7 +1180,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                           'All core handoff artifacts have been captured on this device.',
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
-                                color: const Color(0xFF22C55E),
+                                color: const Color(0xFF4EB79B),
                                 fontWeight: FontWeight.w700,
                                 height: 1.45,
                               ),
@@ -1288,12 +1288,12 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                         ? Icons.visibility_rounded
                         : Icons.block_rounded,
                     accent: readinessReport == null
-                        ? const Color(0xFFF59E0B)
+                        ? const Color(0xFFF0C879)
                         : readinessReport.isReadyForShift
-                        ? const Color(0xFF22C55E)
+                        ? const Color(0xFF4EB79B)
                         : readinessReport.shouldMonitor
-                        ? const Color(0xFFF59E0B)
-                        : const Color(0xFFFB7185),
+                        ? const Color(0xFFF0C879)
+                        : const Color(0xFFEF6B67),
                   ),
                   child: readinessReport == null
                       ? const MobileEmptyState(
@@ -1322,7 +1322,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                                 'Blockers',
                                 style: Theme.of(context).textTheme.titleSmall
                                     ?.copyWith(
-                                      color: const Color(0xFFFB7185),
+                                      color: const Color(0xFFEF6B67),
                                       fontWeight: FontWeight.w900,
                                     ),
                               ),
@@ -1330,7 +1330,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                               ...readinessReport.blockers.map(
                                 (item) => _ReadinessNoteRow(
                                   message: item,
-                                  tone: const Color(0xFFFB7185),
+                                  tone: const Color(0xFFEF6B67),
                                 ),
                               ),
                             ],
@@ -1342,7 +1342,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                                 'Warnings',
                                 style: Theme.of(context).textTheme.titleSmall
                                     ?.copyWith(
-                                      color: const Color(0xFFF59E0B),
+                                      color: const Color(0xFFF0C879),
                                       fontWeight: FontWeight.w900,
                                     ),
                               ),
@@ -1350,7 +1350,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                               ...readinessReport.warnings.map(
                                 (item) => _ReadinessNoteRow(
                                   message: item,
-                                  tone: const Color(0xFFF59E0B),
+                                  tone: const Color(0xFFF0C879),
                                 ),
                               ),
                             ],
@@ -1418,8 +1418,8 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                         ? Icons.sync_rounded
                         : Icons.playlist_add_check_circle_rounded,
                     accent: readinessReport == null
-                        ? const Color(0xFFF59E0B)
-                        : const Color(0xFF38BDF8),
+                        ? const Color(0xFFF0C879)
+                        : const Color(0xFFE58A47),
                   ),
                   child: diagnostics == null || readinessReport == null
                       ? const MobileEmptyState(
@@ -1494,8 +1494,8 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                         ? Icons.health_and_safety_rounded
                         : Icons.build_circle_rounded,
                     accent: attentionEntries.isEmpty
-                        ? const Color(0xFF22C55E)
-                        : const Color(0xFFFB7185),
+                        ? const Color(0xFF4EB79B)
+                        : const Color(0xFFEF6B67),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1645,8 +1645,8 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                         diagnostics == null ||
                             readinessReport == null ||
                             recoveryReport == null
-                        ? const Color(0xFFF59E0B)
-                        : const Color(0xFFA78BFA),
+                        ? const Color(0xFFF0C879)
+                        : const Color(0xFF7CA4F8),
                   ),
                   child:
                       diagnostics == null ||
@@ -1734,14 +1734,14 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                         ? Icons.visibility_rounded
                         : Icons.trending_up_rounded,
                     accent: rolloutDecisionSummary == null
-                        ? const Color(0xFFF59E0B)
+                        ? const Color(0xFFF0C879)
                         : rolloutDecisionSummary.shouldRollbackAndEscalate
-                        ? const Color(0xFFFB7185)
+                        ? const Color(0xFFEF6B67)
                         : rolloutDecisionSummary.shouldInvestigateBeforeExpand
-                        ? const Color(0xFFF59E0B)
+                        ? const Color(0xFFF0C879)
                         : rolloutDecisionSummary.shouldHoldAndMonitor
-                        ? const Color(0xFF38BDF8)
-                        : const Color(0xFF22C55E),
+                        ? const Color(0xFFE58A47)
+                        : const Color(0xFF4EB79B),
                   ),
                   child: rolloutDecisionSummary == null
                       ? const MobileEmptyState(
@@ -1784,14 +1784,14 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                                 tone:
                                     rolloutDecisionSummary
                                         .shouldRollbackAndEscalate
-                                    ? const Color(0xFFFB7185)
+                                    ? const Color(0xFFEF6B67)
                                     : rolloutDecisionSummary
                                           .shouldInvestigateBeforeExpand
-                                    ? const Color(0xFFF59E0B)
+                                    ? const Color(0xFFF0C879)
                                     : rolloutDecisionSummary
                                           .shouldHoldAndMonitor
-                                    ? const Color(0xFF38BDF8)
-                                    : const Color(0xFF22C55E),
+                                    ? const Color(0xFFE58A47)
+                                    : const Color(0xFF4EB79B),
                               ),
                             ),
                             const SizedBox(height: 14),
@@ -1842,14 +1842,14 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                         ? Icons.visibility_rounded
                         : Icons.task_alt_rounded,
                     accent: waveCloseoutReadiness == null
-                        ? const Color(0xFFF59E0B)
+                        ? const Color(0xFFF0C879)
                         : waveCloseoutReadiness.shouldNotClose
-                        ? const Color(0xFFFB7185)
+                        ? const Color(0xFFEF6B67)
                         : waveCloseoutReadiness.shouldCaptureMoreEvidence
-                        ? const Color(0xFFF59E0B)
+                        ? const Color(0xFFF0C879)
                         : waveCloseoutReadiness.isCloseoutWithMonitoring
-                        ? const Color(0xFF38BDF8)
-                        : const Color(0xFF22C55E),
+                        ? const Color(0xFFE58A47)
+                        : const Color(0xFF4EB79B),
                   ),
                   child: waveCloseoutReadiness == null
                       ? const MobileEmptyState(
@@ -1891,14 +1891,14 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                               (reason) => _ReadinessNoteRow(
                                 message: reason,
                                 tone: waveCloseoutReadiness.shouldNotClose
-                                    ? const Color(0xFFFB7185)
+                                    ? const Color(0xFFEF6B67)
                                     : waveCloseoutReadiness
                                           .shouldCaptureMoreEvidence
-                                    ? const Color(0xFFF59E0B)
+                                    ? const Color(0xFFF0C879)
                                     : waveCloseoutReadiness
                                           .isCloseoutWithMonitoring
-                                    ? const Color(0xFF38BDF8)
-                                    : const Color(0xFF22C55E),
+                                    ? const Color(0xFFE58A47)
+                                    : const Color(0xFF4EB79B),
                               ),
                             ),
                             if (waveCloseoutReadiness
@@ -1909,7 +1909,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                                 'Still missing for closeout:',
                                 style: Theme.of(context).textTheme.labelLarge
                                     ?.copyWith(
-                                      color: const Color(0xFFF59E0B),
+                                      color: const Color(0xFFF0C879),
                                       fontWeight: FontWeight.w900,
                                     ),
                               ),
@@ -1918,7 +1918,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                                   .map(
                                     (artifact) => _ReadinessNoteRow(
                                       message: artifact.label,
-                                      tone: const Color(0xFFF59E0B),
+                                      tone: const Color(0xFFF0C879),
                                     ),
                                   ),
                             ],
@@ -1970,14 +1970,14 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                         ? Icons.visibility_rounded
                         : Icons.verified_rounded,
                     accent: waveSignoffPack == null
-                        ? const Color(0xFFF59E0B)
+                        ? const Color(0xFFF0C879)
                         : waveSignoffPack.isSignoffBlocked
-                        ? const Color(0xFFFB7185)
+                        ? const Color(0xFFEF6B67)
                         : waveSignoffPack.isSignoffIncomplete
-                        ? const Color(0xFFF59E0B)
+                        ? const Color(0xFFF0C879)
                         : waveSignoffPack.isSignoffWithMonitoring
-                        ? const Color(0xFF38BDF8)
-                        : const Color(0xFF22C55E),
+                        ? const Color(0xFFE58A47)
+                        : const Color(0xFF4EB79B),
                   ),
                   child: waveSignoffPack == null
                       ? const MobileEmptyState(
@@ -2018,12 +2018,12 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                               (reason) => _ReadinessNoteRow(
                                 message: reason,
                                 tone: waveSignoffPack.isSignoffBlocked
-                                    ? const Color(0xFFFB7185)
+                                    ? const Color(0xFFEF6B67)
                                     : waveSignoffPack.isSignoffIncomplete
-                                    ? const Color(0xFFF59E0B)
+                                    ? const Color(0xFFF0C879)
                                     : waveSignoffPack.isSignoffWithMonitoring
-                                    ? const Color(0xFF38BDF8)
-                                    : const Color(0xFF22C55E),
+                                    ? const Color(0xFFE58A47)
+                                    : const Color(0xFF4EB79B),
                               ),
                             ),
                             const SizedBox(height: 14),
@@ -2071,14 +2071,14 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                         ? Icons.archive_rounded
                         : Icons.inventory_2_rounded,
                     accent: waveArchivePack == null
-                        ? const Color(0xFFF59E0B)
+                        ? const Color(0xFFF0C879)
                         : waveArchivePack.isArchiveBlocked
-                        ? const Color(0xFFFB7185)
+                        ? const Color(0xFFEF6B67)
                         : waveArchivePack.isArchiveIncomplete
-                        ? const Color(0xFFF59E0B)
+                        ? const Color(0xFFF0C879)
                         : waveArchivePack.isArchiveWithAttention
-                        ? const Color(0xFF38BDF8)
-                        : const Color(0xFF22C55E),
+                        ? const Color(0xFFE58A47)
+                        : const Color(0xFF4EB79B),
                   ),
                   child: waveArchivePack == null
                       ? const MobileEmptyState(
@@ -2122,12 +2122,12 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                               (reason) => _ReadinessNoteRow(
                                 message: reason,
                                 tone: waveArchivePack.isArchiveBlocked
-                                    ? const Color(0xFFFB7185)
+                                    ? const Color(0xFFEF6B67)
                                     : waveArchivePack.isArchiveIncomplete
-                                    ? const Color(0xFFF59E0B)
+                                    ? const Color(0xFFF0C879)
                                     : waveArchivePack.isArchiveWithAttention
-                                    ? const Color(0xFF38BDF8)
-                                    : const Color(0xFF22C55E),
+                                    ? const Color(0xFFE58A47)
+                                    : const Color(0xFF4EB79B),
                               ),
                             ),
                             const SizedBox(height: 14),
@@ -2176,8 +2176,8 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                         diagnostics == null ||
                             readinessReport == null ||
                             recoveryReport == null
-                        ? const Color(0xFFF59E0B)
-                        : const Color(0xFF38BDF8),
+                        ? const Color(0xFFF0C879)
+                        : const Color(0xFFE58A47),
                   ),
                   child:
                       diagnostics == null ||
@@ -2264,8 +2264,8 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                         diagnostics == null ||
                             readinessReport == null ||
                             recoveryReport == null
-                        ? const Color(0xFFF59E0B)
-                        : const Color(0xFFFB7185),
+                        ? const Color(0xFFF0C879)
+                        : const Color(0xFFEF6B67),
                   ),
                   child:
                       diagnostics == null ||
@@ -2371,10 +2371,10 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
             builder: (context, setDialogState) {
               final preview = buildPreview();
               final verdictTone = switch (preview.verdict) {
-                'pass' => const Color(0xFF22C55E),
-                'monitor' => const Color(0xFFF59E0B),
-                'blocked' => const Color(0xFFFB7185),
-                _ => const Color(0xFF38BDF8),
+                'pass' => const Color(0xFF4EB79B),
+                'monitor' => const Color(0xFFF0C879),
+                'blocked' => const Color(0xFFEF6B67),
+                _ => const Color(0xFFE58A47),
               };
 
               return AlertDialog(
@@ -2543,9 +2543,9 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
             builder: (context, setDialogState) {
               final preview = buildPreview();
               final tone = switch (preview.decision) {
-                'healthy_handoff' => const Color(0xFF22C55E),
-                'monitor_next_shift' => const Color(0xFFF59E0B),
-                _ => const Color(0xFFFB7185),
+                'healthy_handoff' => const Color(0xFF4EB79B),
+                'monitor_next_shift' => const Color(0xFFF0C879),
+                _ => const Color(0xFFEF6B67),
               };
 
               return AlertDialog(
@@ -2747,10 +2747,10 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
             builder: (context, setDialogState) {
               final preview = buildPreview();
               final tone = switch (preview.answers.rolloutRecommendation) {
-                'advance_wave' => const Color(0xFF22C55E),
-                'hold_wave' => const Color(0xFFF59E0B),
-                'rollback_wave' => const Color(0xFFFB7185),
-                _ => const Color(0xFF38BDF8),
+                'advance_wave' => const Color(0xFF4EB79B),
+                'hold_wave' => const Color(0xFFF0C879),
+                'rollback_wave' => const Color(0xFFEF6B67),
+                _ => const Color(0xFFE58A47),
               };
 
               return AlertDialog(
@@ -3024,9 +3024,9 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
             builder: (context, setDialogState) {
               final preview = buildPreview();
               final tone = switch (preview.escalationDecision) {
-                'immediate_escalation' => const Color(0xFFFB7185),
-                'urgent_review' => const Color(0xFFF59E0B),
-                _ => const Color(0xFF38BDF8),
+                'immediate_escalation' => const Color(0xFFEF6B67),
+                'urgent_review' => const Color(0xFFF0C879),
+                _ => const Color(0xFFE58A47),
               };
 
               return AlertDialog(
@@ -3464,9 +3464,9 @@ class _PilotSmokeCheckCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tone = switch (outcome) {
-      PilotSmokeCheckOutcome.passed => const Color(0xFF22C55E),
-      PilotSmokeCheckOutcome.failed => const Color(0xFFFB7185),
-      PilotSmokeCheckOutcome.pending => const Color(0xFF38BDF8),
+      PilotSmokeCheckOutcome.passed => const Color(0xFF4EB79B),
+      PilotSmokeCheckOutcome.failed => const Color(0xFFEF6B67),
+      PilotSmokeCheckOutcome.pending => const Color(0xFFE58A47),
     };
 
     Widget buildChoice(
@@ -3520,7 +3520,7 @@ class _PilotSmokeCheckCard extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1220),
+        color: const Color(0xFF232A36),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
@@ -3545,8 +3545,8 @@ class _PilotSmokeCheckCard extends StatelessWidget {
                       ? Icons.priority_high_rounded
                       : Icons.rule_rounded,
                   accent: check.isCritical
-                      ? const Color(0xFFFB7185)
-                      : const Color(0xFF38BDF8),
+                      ? const Color(0xFFEF6B67)
+                      : const Color(0xFFE58A47),
                 ),
               ],
             ),
@@ -3599,14 +3599,14 @@ class _CloseoutToggleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tone = value
-        ? (dangerWhenTrue ? const Color(0xFFFB7185) : const Color(0xFF22C55E))
-        : (dangerWhenTrue ? const Color(0xFF22C55E) : const Color(0xFFF59E0B));
+        ? (dangerWhenTrue ? const Color(0xFFEF6B67) : const Color(0xFF4EB79B))
+        : (dangerWhenTrue ? const Color(0xFF4EB79B) : const Color(0xFFF0C879));
 
     final labelText = value ? trueLabel : falseLabel;
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1220),
+        color: const Color(0xFF232A36),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
@@ -3687,10 +3687,10 @@ class _OutboxAttentionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tone = entry.isFailed
-        ? const Color(0xFFFB7185)
+        ? const Color(0xFFEF6B67)
         : entry.isSyncing
-        ? const Color(0xFF38BDF8)
-        : const Color(0xFFF59E0B);
+        ? const Color(0xFFE58A47)
+        : const Color(0xFFF0C879);
     final customerLabel = entry.customerName?.trim().isNotEmpty == true
         ? entry.customerName!.trim()
         : 'Walk-in customer';
@@ -3700,7 +3700,7 @@ class _OutboxAttentionRow extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1220),
+        color: const Color(0xFF232A36),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: tone.withValues(alpha: 0.18)),
       ),
@@ -3786,7 +3786,7 @@ class _SettingsRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: const Color(0xFF0A1220),
+          color: const Color(0xFF232A36),
           borderRadius: BorderRadius.circular(22),
           border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
         ),
@@ -3798,10 +3798,10 @@ class _SettingsRow extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFA78BFA).withValues(alpha: 0.12),
+                  color: const Color(0xFF7CA4F8).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon, color: const Color(0xFFA78BFA)),
+                child: Icon(icon, color: const Color(0xFF7CA4F8)),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -3842,18 +3842,18 @@ class _DomainSettingsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tone = switch (state.pilotSignoffStatus) {
-      'production_safe' => const Color(0xFF22C55E),
-      'ready_for_cutover' => const Color(0xFF38BDF8),
-      'rollback_recommended' => const Color(0xFFFB7185),
+      'production_safe' => const Color(0xFF4EB79B),
+      'ready_for_cutover' => const Color(0xFFE58A47),
+      'rollback_recommended' => const Color(0xFFEF6B67),
       _ =>
         state.isPostgresPrimary
-            ? const Color(0xFF22C55E)
-            : const Color(0xFFF59E0B),
+            ? const Color(0xFF4EB79B)
+            : const Color(0xFFF0C879),
     };
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1220),
+        color: const Color(0xFF232A36),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),

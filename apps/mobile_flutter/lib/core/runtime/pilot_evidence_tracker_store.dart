@@ -3,10 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/mobile_repository.dart';
 import 'pilot_evidence_tracker.dart';
 
-final pilotEvidenceTrackerProvider =
-    StreamProvider<PilotEvidenceTrackerState>((ref) {
-      return ref.watch(shopRepositoryProvider).watchPilotEvidenceTracker();
-    });
+final pilotEvidenceTrackerProvider = StreamProvider<PilotEvidenceTrackerState>((
+  ref,
+) {
+  return ref.watch(shopRepositoryProvider).watchPilotEvidenceTracker();
+});
 
 final pilotEvidenceTrackerControllerProvider =
     Provider<PilotEvidenceTrackerController>((ref) {

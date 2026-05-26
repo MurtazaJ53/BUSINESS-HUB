@@ -31,8 +31,7 @@ class PilotRolloutDecisionSummary {
   bool get shouldHoldAndMonitor => verdict == 'hold_and_monitor';
   bool get shouldInvestigateBeforeExpand =>
       verdict == 'investigate_before_expand';
-  bool get shouldRollbackAndEscalate =>
-      verdict == 'rollback_and_escalate';
+  bool get shouldRollbackAndEscalate => verdict == 'rollback_and_escalate';
 
   String get verdictLabel {
     switch (verdict) {
