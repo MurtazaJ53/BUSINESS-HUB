@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -155,7 +157,7 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
             subtitle:
                 'Acknowledge, resolve, or reopen workspace signals before stock, sync, or behavior issues spread into the day.',
             icon: Icons.auto_awesome_rounded,
-            accent: const Color(0xFFE58A47),
+            accent: AppPalette.primary,
             primaryTag: MobileTag(
               label: openSignals.isEmpty
                   ? 'Desk calm'
@@ -164,8 +166,8 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
                   ? Icons.check_circle_rounded
                   : Icons.notification_important_rounded,
               accent: openSignals.isEmpty
-                  ? const Color(0xFF4EB79B)
-                  : const Color(0xFFE58A47),
+                  ? AppPalette.success
+                  : AppPalette.primary,
             ),
             secondaryTag: MobileTag(
               label: pulse == null
@@ -179,10 +181,10 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
                   ? Icons.crisis_alert_rounded
                   : Icons.monitor_heart_rounded,
               accent: pulse == null
-                  ? const Color(0xFFE58A47)
+                  ? AppPalette.primary
                   : pulse.stats.criticalAnomalyCount > 0
-                  ? const Color(0xFFEF6B67)
-                  : const Color(0xFFF0C879),
+                  ? AppPalette.error
+                  : AppPalette.warning,
             ),
           ),
           const SizedBox(height: 18),
@@ -270,23 +272,23 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
                             MobileTag(
                               label: '${pulse.stats.openTaskCount} tasks',
                               icon: Icons.assignment_late_rounded,
-                              accent: const Color(0xFFE58A47),
+                              accent: AppPalette.primary,
                             ),
                             MobileTag(
                               label:
                                   '${pulse.stats.criticalAnomalyCount} critical',
                               icon: Icons.crisis_alert_rounded,
                               accent: pulse.stats.criticalAnomalyCount > 0
-                                  ? const Color(0xFFEF6B67)
-                                  : const Color(0xFF4EB79B),
+                                  ? AppPalette.error
+                                  : AppPalette.success,
                             ),
                             MobileTag(
                               label:
                                   '${pulse.stats.warningAnomalyCount} warning',
                               icon: Icons.warning_amber_rounded,
                               accent: pulse.stats.warningAnomalyCount > 0
-                                  ? const Color(0xFFF0C879)
-                                  : const Color(0xFF4EB79B),
+                                  ? AppPalette.warning
+                                  : AppPalette.success,
                             ),
                           ],
                         ),
@@ -304,8 +306,8 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
                     ? Icons.done_all_rounded
                     : Icons.priority_high_rounded,
                 accent: openSignals.isEmpty
-                    ? const Color(0xFF4EB79B)
-                    : const Color(0xFFE58A47),
+                    ? AppPalette.success
+                    : AppPalette.primary,
               ),
               child: signalsAsync.isLoading
                   ? const MobileEmptyState(
@@ -382,7 +384,7 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
               action: MobileTag(
                 label: '${resolvedSignals.length} shown',
                 icon: Icons.task_alt_rounded,
-                accent: const Color(0xFF4EB79B),
+                accent: AppPalette.success,
               ),
               child: resolvedSignals.isEmpty
                   ? const MobileEmptyState(
@@ -499,7 +501,7 @@ class _PulseSignalCard extends StatelessWidget {
                       : Icons.assignment_late_rounded,
                   accent: signal.signalKind == 'anomaly'
                       ? _signalLevelColor(signal.signalLevel)
-                      : const Color(0xFFE58A47),
+                      : AppPalette.primary,
                 ),
                 MobileTag(
                   label: signal.status.toUpperCase(),
@@ -509,9 +511,9 @@ class _PulseSignalCard extends StatelessWidget {
                       ? Icons.visibility_rounded
                       : Icons.priority_high_rounded,
                   accent: signal.isResolved
-                      ? const Color(0xFF4EB79B)
+                      ? AppPalette.success
                       : signal.isAcknowledged
-                      ? const Color(0xFFE58A47)
+                      ? AppPalette.primary
                       : _signalLevelColor(signal.signalLevel),
                 ),
                 MobileTag(
@@ -523,26 +525,26 @@ class _PulseSignalCard extends StatelessWidget {
                   const MobileTag(
                     label: 'ESCALATED',
                     icon: Icons.vertical_align_top_rounded,
-                    accent: Color(0xFFEF6B67),
+                    accent: AppPalette.error,
                   ),
                 if (signal.assignedMemberName != null)
                   MobileTag(
                     label:
                         '${signal.assignedMemberName}  ·  ${_roleLabel(signal.assignedMemberRole)}',
                     icon: Icons.person_pin_circle_rounded,
-                    accent: const Color(0xFFE58A47),
+                    accent: AppPalette.primary,
                   ),
                 if (signal.metricValue.isNotEmpty)
                   MobileTag(
                     label: signal.metricValue,
                     icon: Icons.speed_rounded,
-                    accent: const Color(0xFFF0C879),
+                    accent: AppPalette.warning,
                   ),
                 if (signal.count > 0)
                   MobileTag(
                     label: 'Count ${signal.count}',
                     icon: Icons.format_list_numbered_rounded,
-                    accent: const Color(0xFF7CA4F8),
+                    accent: AppPalette.info,
                   ),
               ],
             ),
@@ -706,14 +708,14 @@ Color _signalLevelColor(String level) {
   switch (level.trim().toLowerCase()) {
     case 'critical':
     case 'danger':
-      return const Color(0xFFEF6B67);
+      return AppPalette.error;
     case 'high':
     case 'warning':
-      return const Color(0xFFF0C879);
+      return AppPalette.warning;
     case 'healthy':
-      return const Color(0xFF4EB79B);
+      return AppPalette.success;
     default:
-      return const Color(0xFFE58A47);
+      return AppPalette.primary;
   }
 }
 
@@ -729,3 +731,5 @@ String _roleLabel(String? role) {
       return 'Staff';
   }
 }
+
+

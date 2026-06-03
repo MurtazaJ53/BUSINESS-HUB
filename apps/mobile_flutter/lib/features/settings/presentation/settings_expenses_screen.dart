@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/backend/backend_api_client.dart';
@@ -206,7 +208,7 @@ class _SettingsExpensesScreenState
                               errorText!,
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: const Color(0xFFEF6B67),
+                                    color: AppPalette.error,
                                     fontWeight: FontWeight.w700,
                                   ),
                             ),
@@ -358,18 +360,18 @@ class _SettingsExpensesScreenState
             subtitle:
                 'Track outgoing spend, capture payment references, and keep day-to-day business costs visible from the same product.',
             icon: Icons.payments_rounded,
-            accent: const Color(0xFFF0C879),
+            accent: AppPalette.warning,
             primaryTag: MobileTag(
               label: shop.planLabel,
               icon: Icons.workspace_premium_rounded,
-              accent: const Color(0xFFF0C879),
+              accent: AppPalette.warning,
             ),
             secondaryTag: MobileTag(
               label: expenses.isEmpty
                   ? (expensesAsync.isLoading ? 'Refreshing' : 'No entries')
                   : '${expenses.length} entries',
               icon: Icons.receipt_long_rounded,
-              accent: const Color(0xFFE58A47),
+              accent: AppPalette.primary,
             ),
           ),
           const SizedBox(height: 18),
@@ -409,28 +411,28 @@ class _SettingsExpensesScreenState
                       value: '${summary?.totalEntries ?? expenses.length}',
                       caption: 'Tracked spend records',
                       icon: Icons.receipt_long_rounded,
-                      accent: const Color(0xFFE58A47),
+                      accent: AppPalette.primary,
                     ),
                     MobileMetricCard(
                       label: 'Total spend',
                       value: formatCurrency(summary?.totalAmount ?? 0),
                       caption: 'Visible outgoing amount',
                       icon: Icons.currency_rupee_rounded,
-                      accent: const Color(0xFFEF6B67),
+                      accent: AppPalette.error,
                     ),
                     MobileMetricCard(
                       label: 'Categories',
                       value: '${summary?.uniqueCategories ?? 0}',
                       caption: 'Spend buckets tracked',
                       icon: Icons.category_rounded,
-                      accent: const Color(0xFF4EB79B),
+                      accent: AppPalette.success,
                     ),
                     MobileMetricCard(
                       label: 'Top category',
                       value: summary?.biggestCategory ?? 'None',
                       caption: 'Largest spend bucket',
                       icon: Icons.trending_up_rounded,
-                      accent: const Color(0xFF7CA4F8),
+                      accent: AppPalette.info,
                     ),
                   ],
                 );
@@ -445,7 +447,7 @@ class _SettingsExpensesScreenState
               icon: session.isViewer
                   ? Icons.visibility_rounded
                   : Icons.add_circle_rounded,
-              accent: const Color(0xFFE58A47),
+              accent: AppPalette.primary,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -478,7 +480,7 @@ class _SettingsExpensesScreenState
                   ? 'No outflow'
                   : '${topExpenses.length} visible',
               icon: Icons.payments_rounded,
-              accent: const Color(0xFFF0C879),
+              accent: AppPalette.warning,
             ),
             child: expensesAsync.isLoading
                 ? const MobileEmptyState(
@@ -543,7 +545,7 @@ class _ExpenseCard extends StatelessWidget {
                 MobileTag(
                   label: formatCurrency(expense.amount),
                   icon: Icons.currency_rupee_rounded,
-                  accent: const Color(0xFFEF6B67),
+                  accent: AppPalette.error,
                 ),
               ],
             ),
@@ -573,19 +575,19 @@ class _ExpenseCard extends StatelessWidget {
                 MobileTag(
                   label: _paymentMethodLabel(expense.paymentMethod),
                   icon: Icons.account_balance_wallet_rounded,
-                  accent: const Color(0xFFE58A47),
+                  accent: AppPalette.primary,
                 ),
                 if (expense.paymentReference.trim().isNotEmpty)
                   MobileTag(
                     label: expense.paymentReference,
                     icon: Icons.tag_rounded,
-                    accent: const Color(0xFF4EB79B),
+                    accent: AppPalette.success,
                   ),
                 if ((expense.actorName ?? '').trim().isNotEmpty)
                   MobileTag(
                     label: expense.actorName!,
                     icon: Icons.person_rounded,
-                    accent: const Color(0xFF7CA4F8),
+                    accent: AppPalette.info,
                   ),
               ],
             ),
@@ -610,3 +612,5 @@ String _paymentMethodLabel(String value) {
       return 'Cash';
   }
 }
+
+

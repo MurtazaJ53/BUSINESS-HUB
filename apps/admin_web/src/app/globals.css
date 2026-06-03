@@ -1,31 +1,74 @@
 @import "tailwindcss";
 
 :root {
-  --bg-app: #071017;
-  --bg-panel: #0f1824;
-  --bg-panel-strong: #152132;
-  --bg-panel-soft: rgba(15, 24, 36, 0.84);
-  --border-soft: rgba(152, 164, 189, 0.12);
-  --border-strong: rgba(89, 172, 255, 0.22);
-  --text-primary: #edf3fb;
-  --text-secondary: #9dadc4;
-  --text-muted: #70809a;
-  --accent: #47b0ff;
-  --accent-strong: #218cff;
-  --success: #3ad7a2;
-  --warning: #ff8a6a;
-  --glow: 0 0 0 1px rgba(89, 172, 255, 0.16), 0 22px 56px rgba(8, 18, 30, 0.34);
-  --font-geist-sans:
-    "Segoe UI", "Aptos", "Inter", "Helvetica Neue", Arial, sans-serif;
-  --font-geist-mono:
-    "Cascadia Code", "Aptos Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  /* Neutrals (Foundation) */
+  --bg-deep: #0a0e14;
+  --bg-base: #0f141c;
+  --bg-soft: #161b26;
+  --surface: #1c2230;
+  --surface-strong: #242b3d;
+  --border-soft: #2a3342;
+  --border: #3a4556;
+  --border-strong: #4a5568;
+
+  /* Text Hierarchy */
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  --text-disabled: #64748b;
+
+  /* Brand Colors */
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+  --primary-light: #60a5fa;
+  --primary-dark: #1e40af;
+
+  --accent: #8b5cf6;
+  --accent-hover: #7c3aed;
+  --accent-light: #a78bfa;
+
+  /* Semantic Colors */
+  --success: #10b981;
+  --success-light: #34d399;
+  --success-dark: #059669;
+
+  --warning: #f59e0b;
+  --warning-light: #fbbf24;
+  --warning-dark: #d97706;
+
+  --error: #ef4444;
+  --error-light: #f87171;
+  --error-dark: #dc2626;
+
+  --info: #06b6d4;
+  --info-light: #22d3ee;
+  --info-dark: #0891b2;
+
+  /* Domain Colors */
+  --revenue: #10b981;
+  --expense: #ef4444;
+  --inventory: #3b82f6;
+  --customer: #8b5cf6;
+  --alert: #f59e0b;
+
+  /* Shadows */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.12);
+  --shadow-2: 0 2px 8px rgba(0, 0, 0, 0.16);
+  --shadow-3: 0 4px 16px rgba(0, 0, 0, 0.20);
+  --shadow-4: 0 8px 24px rgba(0, 0, 0, 0.24);
+  --shadow-5: 0 16px 48px rgba(0, 0, 0, 0.32);
+  --shadow-glow: 0 0 0 1px rgba(59, 130, 246, 0.2), 0 4px 16px rgba(59, 130, 246, 0.15);
+
+  /* Fonts */
+  --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
 }
 
 @theme inline {
-  --color-background: var(--bg-app);
+  --color-background: var(--bg-base);
   --color-foreground: var(--text-primary);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 }
 
 * {
@@ -33,20 +76,32 @@
 }
 
 html {
-  background:
-    radial-gradient(circle at top left, rgba(34, 124, 214, 0.22), transparent 24%),
-    radial-gradient(circle at top right, rgba(31, 150, 115, 0.14), transparent 18%),
-    linear-gradient(180deg, #071017 0%, #09131d 48%, #050a10 100%);
+  background: linear-gradient(
+    180deg,
+    #0a0e14 0%,
+    #0f141c 50%,
+    #0a0e14 100%
+  );
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at top left, rgba(34, 124, 214, 0.12), transparent 24%),
-    linear-gradient(180deg, rgba(7, 16, 23, 0.98), rgba(5, 10, 16, 1));
+  background: radial-gradient(
+      circle at top left,
+      rgba(59, 130, 246, 0.08),
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(139, 92, 246, 0.06),
+      transparent 40%
+    ),
+    linear-gradient(180deg, rgba(15, 20, 28, 0.98), rgba(10, 14, 20, 1));
   color: var(--text-primary);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 a {
@@ -55,59 +110,78 @@ a {
 }
 
 ::selection {
-  background: rgba(92, 174, 254, 0.22);
+  background: rgba(59, 130, 246, 0.3);
   color: #fff;
 }
 
+/* Component Styles */
+
 .panel {
-  background: linear-gradient(180deg, rgba(18, 28, 42, 0.94), rgba(12, 18, 29, 0.96));
+  background: var(--surface);
   border: 1px solid var(--border-soft);
-  box-shadow: var(--glow);
+  box-shadow: var(--shadow-2);
+  border-radius: 12px;
 }
 
 .panel-soft {
-  background: var(--bg-panel-soft);
-  border: 1px solid rgba(152, 164, 189, 0.12);
+  background: rgba(28, 34, 48, 0.6);
+  border: 1px solid var(--border-soft);
   backdrop-filter: blur(12px);
+  border-radius: 12px;
+}
+
+.panel-strong {
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-3);
+  border-radius: 12px;
 }
 
 .eyebrow {
-  letter-spacing: 0.32em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  font-size: 0.72rem;
-  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
 }
 
 .metric-value {
-  font-size: clamp(1.8rem, 3vw, 3.1rem);
-  line-height: 0.94;
-  font-weight: 800;
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .gridlines {
-  background-image:
-    linear-gradient(rgba(124, 145, 177, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(124, 145, 177, 0.06) 1px, transparent 1px);
-  background-size: 28px 28px;
+  background-image: linear-gradient(var(--border-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-soft) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
 .nav-pill-active {
-  background: linear-gradient(135deg, rgba(71, 176, 255, 0.94), rgba(33, 140, 255, 0.84));
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
   color: #ffffff;
-  box-shadow:
-    0 0 0 1px rgba(71, 176, 255, 0.24),
-    0 16px 42px rgba(21, 83, 165, 0.28);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.3),
+    0 4px 12px rgba(59, 130, 246, 0.25);
+  font-weight: 600;
 }
 
 .nav-pill-idle {
-  background: rgba(12, 18, 29, 0.72);
-  border: 1px solid rgba(152, 164, 189, 0.12);
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
   color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.nav-pill-idle:hover {
+  background: var(--surface-strong);
+  border-color: var(--border);
+  color: var(--text-primary);
 }
 
 .surface-muted {
-  background: rgba(9, 14, 22, 0.56);
-  border: 1px solid rgba(152, 164, 189, 0.1);
+  background: rgba(22, 27, 38, 0.6);
+  border: 1px solid var(--border-soft);
 }
 
 .line-clamp-2 {
@@ -116,3 +190,214 @@ a {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Button Styles */
+
+.btn-primary {
+  background: var(--primary);
+  color: #ffffff;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  border: none;
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-primary:hover {
+  background: var(--primary-hover);
+  box-shadow: var(--shadow-glow);
+}
+
+.btn-primary:active {
+  background: var(--primary-dark);
+}
+
+.btn-primary:disabled {
+  background: var(--surface-strong);
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text-primary);
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 14px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-secondary:hover {
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+
+.btn-secondary:active {
+  background: var(--surface-strong);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-ghost:hover {
+  background: var(--bg-soft);
+  color: var(--text-primary);
+}
+
+/* Input Styles */
+
+.input {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  color: var(--text-primary);
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-family: var(--font-sans);
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: var(--shadow-glow);
+}
+
+.input:disabled {
+  background: var(--bg-soft);
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+/* Badge Styles */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.badge-primary {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--primary-light);
+}
+
+.badge-success {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success-light);
+}
+
+.badge-warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning-light);
+}
+
+.badge-error {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--error-light);
+}
+
+.badge-neutral {
+  background: var(--surface-strong);
+  color: var(--text-secondary);
+}
+
+/* Table Styles */
+
+.table-container {
+  overflow-x: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table thead {
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.table td {
+  padding: 14px 16px;
+  font-size: 14px;
+  color: var(--text-primary);
+  border-top: 1px solid var(--border-soft);
+}
+
+.table tbody tr:hover {
+  background: var(--bg-soft);
+}
+
+/* Utility Classes */
+
+.text-primary {
+  color: var(--text-primary);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-tertiary {
+  color: var(--text-tertiary);
+}
+
+.text-success {
+  color: var(--success);
+}
+
+.text-warning {
+  color: var(--warning);
+}
+
+.text-error {
+  color: var(--error);
+}
+
+.text-info {
+  color: var(--info);
+}
+

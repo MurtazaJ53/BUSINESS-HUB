@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -66,28 +68,28 @@ class DashboardScreen extends ConsumerWidget {
         icon: Icons.point_of_sale_rounded,
         title: roleProfile.primaryActionTitle,
         subtitle: roleProfile.primaryActionSubtitle,
-        accent: const Color(0xFFF0C879),
+        accent: AppPalette.primary,
         onTap: () => context.go('/pos'),
       ),
       _QuickActionTile(
         icon: Icons.inventory_2_rounded,
         title: 'Stock',
         subtitle: roleProfile.stockActionSubtitle,
-        accent: const Color(0xFF1D4ED8),
+        accent: AppPalette.inventory,
         onTap: () => context.go('/inventory'),
       ),
       _QuickActionTile(
         icon: Icons.groups_rounded,
         title: 'Customers',
         subtitle: roleProfile.customerActionSubtitle,
-        accent: const Color(0xFF4EB79B),
+        accent: AppPalette.customer,
         onTap: () => context.go('/customers'),
       ),
       _QuickActionTile(
         icon: Icons.receipt_long_rounded,
         title: 'History',
         subtitle: roleProfile.historyActionSubtitle,
-        accent: const Color(0xFFF0C879),
+        accent: AppPalette.info,
         onTap: () => context.go('/history'),
       ),
       if (shop.supportsAttendance)
@@ -97,7 +99,7 @@ class DashboardScreen extends ConsumerWidget {
           subtitle: session?.isOwnerLike ?? false
               ? 'Review the floor and mark shifts'
               : 'Mark your day and review shifts',
-          accent: const Color(0xFF4EB79B),
+          accent: AppPalette.success,
           onTap: () => context.push('/settings/attendance'),
         ),
       if (shop.supportsExpenses)
@@ -107,7 +109,7 @@ class DashboardScreen extends ConsumerWidget {
           subtitle: session?.isOwnerLike ?? false
               ? 'Review spend and capture costs'
               : 'Log store spending',
-          accent: const Color(0xFFEF6B67),
+          accent: AppPalette.expense,
           onTap: () => context.push('/settings/expenses'),
         ),
     ];
@@ -123,7 +125,7 @@ class DashboardScreen extends ConsumerWidget {
               value: '${overview.todaySalesCount}',
               caption: 'Receipts created',
               icon: Icons.shopping_bag_rounded,
-              accent: const Color(0xFFE58A47),
+              accent: AppPalette.revenue,
             ),
             MobileMetricCard(
               label: 'Low stock',
@@ -133,8 +135,8 @@ class DashboardScreen extends ConsumerWidget {
                   : 'Healthy',
               icon: Icons.warning_amber_rounded,
               accent: overview.metrics.lowStock > 0
-                  ? const Color(0xFFEF6B67)
-                  : const Color(0xFF4EB79B),
+                  ? AppPalette.warning
+                  : AppPalette.success,
             ),
             MobileMetricCard(
               label: 'Queue',
@@ -144,15 +146,15 @@ class DashboardScreen extends ConsumerWidget {
                   : 'Everything sent',
               icon: Icons.cloud_upload_rounded,
               accent: history.queuedSales > 0
-                  ? const Color(0xFFF0C879)
-                  : const Color(0xFF4EB79B),
+                  ? AppPalette.warning
+                  : AppPalette.success,
             ),
             MobileMetricCard(
               label: 'Catalog',
               value: '${overview.metrics.totalItems}',
               caption: 'Products loaded',
               icon: Icons.inventory_2_rounded,
-              accent: const Color(0xFF7CA4F8),
+              accent: AppPalette.inventory,
             ),
           ]
         : metricCards;
@@ -173,8 +175,8 @@ class DashboardScreen extends ConsumerWidget {
                 ? Icons.cloud_upload_rounded
                 : Icons.check_circle_rounded,
             accent: history.queuedSales > 0
-                ? const Color(0xFFF0C879)
-                : const Color(0xFF4EB79B),
+                ? AppPalette.warning
+                : AppPalette.success,
           ),
           secondaryTag: MobileTag(
             label: syncStatus == MobileSyncStatus.syncing ? 'Syncing' : 'Live',
@@ -182,8 +184,8 @@ class DashboardScreen extends ConsumerWidget {
                 ? Icons.sync_rounded
                 : Icons.wifi_tethering_rounded,
             accent: syncStatus == MobileSyncStatus.error
-                ? const Color(0xFFEF6B67)
-                : const Color(0xFFE58A47),
+                ? AppPalette.error
+                : AppPalette.primary,
           ),
         ),
         const SizedBox(height: 18),
@@ -212,7 +214,7 @@ class DashboardScreen extends ConsumerWidget {
           action: MobileTag(
             label: roleProfile.quickActionsTag,
             icon: Icons.flash_on_rounded,
-            accent: const Color(0xFFE58A47),
+            accent: AppPalette.primary,
           ),
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -252,7 +254,7 @@ class DashboardScreen extends ConsumerWidget {
             action: MobileTag(
               label: '${shop.planLabel} now',
               icon: Icons.workspace_premium_rounded,
-              accent: const Color(0xFFF0C879),
+              accent: AppPalette.warning,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -290,8 +292,8 @@ class DashboardScreen extends ConsumerWidget {
                 ? Icons.warning_amber_rounded
                 : Icons.verified_rounded,
             accent: overview.metrics.lowStock > 0
-                ? const Color(0xFFEF6B67)
-                : const Color(0xFF4EB79B),
+                ? AppPalette.error
+                : AppPalette.success,
           ),
           child: lowStock.isEmpty
               ? MobileEmptyState(
@@ -315,7 +317,7 @@ class DashboardScreen extends ConsumerWidget {
                               ? '${item.category} | ${item.size}'
                               : item.category,
                           trailing: 'Stock ${item.stock}',
-                          accent: const Color(0xFFEF6B67),
+                          accent: AppPalette.error,
                           onTap: () => context.go('/inventory'),
                         ),
                       )
@@ -328,7 +330,7 @@ class DashboardScreen extends ConsumerWidget {
           action: MobileTag(
             label: sales.isEmpty ? 'Waiting' : '${sales.length} recent',
             icon: Icons.receipt_long_rounded,
-            accent: const Color(0xFFF0C879),
+            accent: AppPalette.warning,
           ),
           child: sales.isEmpty
               ? MobileEmptyState(
@@ -350,7 +352,7 @@ class DashboardScreen extends ConsumerWidget {
                           subtitle:
                               '${sale.customerName?.isNotEmpty == true ? sale.customerName : 'Walk-in customer'} | ${sale.date}',
                           trailing: sale.paymentMode,
-                          accent: const Color(0xFF4EB79B),
+                          accent: AppPalette.success,
                           onTap: () =>
                               _openSaleDetail(context, salesRepository, sale),
                         ),
@@ -408,7 +410,7 @@ class DashboardScreen extends ConsumerWidget {
                         subtitle:
                             '${detail.customerName?.isNotEmpty == true ? detail.customerName : 'Walk-in customer'} | ${detail.date}',
                         icon: Icons.receipt_long_rounded,
-                        accent: const Color(0xFFF0C879),
+                        accent: AppPalette.warning,
                         tags: <Widget>[
                           MobileTag(
                             label: _syncLabel(detail.syncState),
@@ -418,18 +420,18 @@ class DashboardScreen extends ConsumerWidget {
                           MobileTag(
                             label: detail.paymentMode,
                             icon: Icons.payments_rounded,
-                            accent: const Color(0xFFE58A47),
+                            accent: AppPalette.primary,
                           ),
                           MobileTag(
                             label: '${detail.itemCount} items',
                             icon: Icons.shopping_bag_rounded,
-                            accent: const Color(0xFF7CA4F8),
+                            accent: AppPalette.info,
                           ),
                           if (detail.hasOutstandingDue)
                             MobileTag(
                               label: 'Due ${formatCurrency(detail.amountDue)}',
                               icon: Icons.warning_amber_rounded,
-                              accent: const Color(0xFFF0C879),
+                              accent: AppPalette.warning,
                             ),
                         ],
                       ),
@@ -536,7 +538,7 @@ class _DashboardBootstrapPanel extends StatelessWidget {
       action: const MobileTag(
         label: 'LOADING',
         icon: Icons.sync_rounded,
-        accent: Color(0xFFE58A47),
+        accent: AppPalette.primary,
       ),
       child: const MobileEmptyState(
         icon: Icons.dashboard_customize_rounded,
@@ -558,7 +560,7 @@ class _DashboardUnavailablePanel extends StatelessWidget {
       action: const MobileTag(
         label: 'CHECK DATA',
         icon: Icons.wifi_tethering_error_rounded,
-        accent: Color(0xFFEF6B67),
+        accent: AppPalette.error,
       ),
       child: const MobileEmptyState(
         icon: Icons.cloud_off_rounded,
@@ -592,10 +594,10 @@ class _OwnerPulsePanel extends ConsumerWidget {
             ? Icons.crisis_alert_rounded
             : Icons.auto_awesome_rounded,
         accent: pulse == null
-            ? const Color(0xFFE58A47)
+            ? AppPalette.primary
             : pulse.stats.criticalAnomalyCount > 0
-            ? const Color(0xFFEF6B67)
-            : const Color(0xFFE58A47),
+            ? AppPalette.error
+            : AppPalette.primary,
       ),
       child: pulse == null
           ? MobileEmptyState(
@@ -718,7 +720,7 @@ class _DashboardRoleProfile {
             ? 'Checkout is ready. Clear the queued receipts when the line is calm, then keep billing without leaving the floor flow.'
             : 'Open POS, scan products quickly, and keep the line moving. Your stock watch and recent receipts stay close by.',
         leadIcon: Icons.point_of_sale_rounded,
-        leadAccent: const Color(0xFFE58A47),
+        leadAccent: AppPalette.primary,
         quickActionsTitle: 'Shift shortcuts',
         quickActionsTag: 'FLOOR READY',
         primaryActionTitle: 'Open POS',
@@ -755,7 +757,7 @@ class _DashboardRoleProfile {
             ? '$receiptsToday receipts have already landed. Watch low stock, queue pressure, and recent activity without digging through extra screens.'
             : 'Sales, stock pressure, and recent receipts stay grouped here so the day can start without dashboard clutter.',
         leadIcon: Icons.assessment_rounded,
-        leadAccent: const Color(0xFFE58A47),
+        leadAccent: AppPalette.primary,
         quickActionsTitle: 'Manager shortcuts',
         quickActionsTag: 'DAILY CONTROL',
         primaryActionTitle: 'New sale',
@@ -793,7 +795,7 @@ class _DashboardRoleProfile {
           ? '$receiptsToday sale${receiptsToday == 1 ? '' : 's'} are already recorded. Revenue, stock pressure, and receipt flow are grouped here in one owner-ready view.'
           : 'See todayâ€™s business pulse, stock pressure, and recent activity without opening dense management screens.',
       leadIcon: Icons.storefront_rounded,
-      leadAccent: const Color(0xFFE58A47),
+      leadAccent: AppPalette.primary,
       quickActionsTitle: 'Owner shortcuts',
       quickActionsTag: 'BUSINESS PULSE',
       primaryActionTitle: 'New sale',
@@ -933,7 +935,7 @@ class _MetricBlueprint {
   static Color _salesTodayAccent({
     required DashboardOverview overview,
     required HistoryOverview history,
-  }) => const Color(0xFFE58A47);
+  }) => AppPalette.primary;
 
   static String _revenueValue({
     required DashboardOverview overview,
@@ -948,7 +950,7 @@ class _MetricBlueprint {
   static Color _revenueAccent({
     required DashboardOverview overview,
     required HistoryOverview history,
-  }) => const Color(0xFF4EB79B);
+  }) => AppPalette.success;
 
   static String _lowStockValue({
     required DashboardOverview overview,
@@ -964,8 +966,8 @@ class _MetricBlueprint {
     required DashboardOverview overview,
     required HistoryOverview history,
   }) => overview.metrics.lowStock > 0
-      ? const Color(0xFFEF6B67)
-      : const Color(0xFF4EB79B);
+      ? AppPalette.error
+      : AppPalette.success;
 
   static String _queueValue({
     required DashboardOverview overview,
@@ -981,8 +983,8 @@ class _MetricBlueprint {
     required DashboardOverview overview,
     required HistoryOverview history,
   }) => history.queuedSales > 0
-      ? const Color(0xFFF0C879)
-      : const Color(0xFF4EB79B);
+      ? AppPalette.warning
+      : AppPalette.success;
 
   static String _syncedSalesValue({
     required DashboardOverview overview,
@@ -997,7 +999,7 @@ class _MetricBlueprint {
   static Color _syncedSalesAccent({
     required DashboardOverview overview,
     required HistoryOverview history,
-  }) => const Color(0xFF4EB79B);
+  }) => AppPalette.success;
 
   static String _catalogValue({
     required DashboardOverview overview,
@@ -1012,7 +1014,7 @@ class _MetricBlueprint {
   static Color _catalogAccent({
     required DashboardOverview overview,
     required HistoryOverview history,
-  }) => const Color(0xFF7CA4F8);
+  }) => AppPalette.info;
 }
 
 String _dashboardCurrentPlanTitle(ShopInfo shop) {
@@ -1088,7 +1090,7 @@ class _DashboardPlanBlock extends StatelessWidget {
     final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF232A36),
+        color: AppPalette.surfaceStrong.withValues(alpha: 0.66),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
@@ -1150,7 +1152,7 @@ class _QuickActionTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         child: Ink(
           decoration: BoxDecoration(
-            color: const Color(0xFF232A36),
+            color: AppPalette.surfaceStrong.withValues(alpha: 0.66),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
           ),
@@ -1225,7 +1227,7 @@ class _DashboardFocus {
         subtitle:
             '${history.failedSales} receipt${history.failedSales == 1 ? '' : 's'} still need attention. Open History and clear the blocked replay path first.',
         icon: Icons.error_outline_rounded,
-        accent: const Color(0xFFEF6B67),
+        accent: AppPalette.error,
         route: '/history',
       );
     }
@@ -1236,7 +1238,7 @@ class _DashboardFocus {
         subtitle:
             '${history.queuedSales} receipt${history.queuedSales == 1 ? '' : 's'} are waiting to upload. Retry sync before the queue grows.',
         icon: Icons.cloud_upload_rounded,
-        accent: const Color(0xFFF0C879),
+        accent: AppPalette.warning,
         route: '/history',
       );
     }
@@ -1247,7 +1249,7 @@ class _DashboardFocus {
         subtitle:
             '${overview.metrics.lowStock} product${overview.metrics.lowStock == 1 ? '' : 's'} need refill attention. Jump into Inventory and scan the affected items.',
         icon: Icons.inventory_2_rounded,
-        accent: const Color(0xFFEF6B67),
+        accent: AppPalette.error,
         route: '/inventory',
       );
     }
@@ -1258,7 +1260,7 @@ class _DashboardFocus {
         subtitle:
             '${roleProfile.primaryActionSubtitle}. The day is still quiet, so this is the fastest place to begin.',
         icon: Icons.flash_on_rounded,
-        accent: const Color(0xFFE58A47),
+        accent: AppPalette.primary,
         route: '/pos',
       );
     }
@@ -1269,7 +1271,7 @@ class _DashboardFocus {
         subtitle:
             'Sales are already moving. Open POS and keep the next customer flow fast.',
         icon: Icons.point_of_sale_rounded,
-        accent: Color(0xFFE58A47),
+        accent: AppPalette.primary,
         route: '/pos',
       );
     }
@@ -1280,7 +1282,7 @@ class _DashboardFocus {
         subtitle:
             'The app is syncing in the background. Open History to watch recent receipts land cleanly.',
         icon: Icons.sync_rounded,
-        accent: Color(0xFF4EB79B),
+        accent: AppPalette.success,
         route: '/history',
       );
     }
@@ -1290,7 +1292,7 @@ class _DashboardFocus {
       subtitle:
           'Revenue, receipts, and stock look healthy. Use History for a quick business check-in.',
       icon: Icons.query_stats_rounded,
-      accent: Color(0xFF4EB79B),
+      accent: AppPalette.success,
       route: '/history',
     );
   }
@@ -1323,7 +1325,7 @@ class _DashboardRow extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           child: Ink(
             decoration: BoxDecoration(
-              color: const Color(0xFF232A36),
+              color: AppPalette.surfaceStrong.withValues(alpha: 0.66),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
             ),
@@ -1401,7 +1403,7 @@ class _DashboardDetailSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return MobileSheetSection(
       title: title,
-      accent: const Color(0xFFF0C879),
+      accent: AppPalette.warning,
       child: child,
     );
   }
@@ -1440,7 +1442,7 @@ class _DashboardSaleItemRow extends StatelessWidget {
         Text(
           formatCurrency(item.lineTotal),
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: const Color(0xFF4EB79B),
+            color: AppPalette.success,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -1485,7 +1487,7 @@ class _DashboardSalePaymentRow extends StatelessWidget {
         Text(
           formatCurrency(payment.amount),
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: const Color(0xFFE58A47),
+            color: AppPalette.primary,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -1539,10 +1541,10 @@ String _syncLabel(CommerceSyncState state) {
 
 Color _syncTone(CommerceSyncState state) {
   return switch (state) {
-    CommerceSyncState.synced => const Color(0xFF4EB79B),
-    CommerceSyncState.queued => const Color(0xFFF0C879),
-    CommerceSyncState.syncing => const Color(0xFFE58A47),
-    CommerceSyncState.failed => const Color(0xFFEF6B67),
+    CommerceSyncState.synced => AppPalette.success,
+    CommerceSyncState.queued => AppPalette.warning,
+    CommerceSyncState.syncing => AppPalette.primary,
+    CommerceSyncState.failed => AppPalette.error,
     CommerceSyncState.localOnly => Colors.white70,
   };
 }
@@ -1568,23 +1570,25 @@ Color _pulseToneColor(String tone) {
   switch (tone) {
     case 'critical':
     case 'danger':
-      return const Color(0xFFEF6B67);
+      return AppPalette.error;
     case 'warning':
-      return const Color(0xFFF0C879);
+      return AppPalette.warning;
     case 'healthy':
-      return const Color(0xFF4EB79B);
+      return AppPalette.success;
     default:
-      return const Color(0xFFE58A47);
+      return AppPalette.primary;
   }
 }
 
 Color _pulseSeverityColor(String severity) {
   switch (severity) {
     case 'critical':
-      return const Color(0xFFEF6B67);
+      return AppPalette.error;
     case 'warning':
-      return const Color(0xFFF0C879);
+      return AppPalette.warning;
     default:
-      return const Color(0xFFE58A47);
+      return AppPalette.primary;
   }
 }
+
+

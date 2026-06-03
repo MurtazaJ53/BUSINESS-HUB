@@ -27,7 +27,7 @@ class MobileStandaloneScaffold extends StatelessWidget {
             colors: <Color>[
               AppPalette.background,
               AppPalette.backgroundSoft,
-              AppPalette.backgroundAlt,
+              AppPalette.backgroundSoft,
             ],
           ),
         ),
@@ -45,7 +45,7 @@ class MobileStandaloneScaffold extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppPalette.backgroundSoft.withValues(alpha: 0.94),
                     borderRadius: BorderRadius.circular(compact ? 22 : 24),
-                    border: Border.all(color: AppPalette.lineSoft),
+                    border: Border.all(color: AppPalette.borderSoft),
                   ),
                   child: Padding(
                     padding: EdgeInsets.symmetric(
@@ -58,11 +58,11 @@ class MobileStandaloneScaffold extends StatelessWidget {
                           width: compact ? 44 : 48,
                           height: compact ? 44 : 48,
                           decoration: BoxDecoration(
-                            color: AppPalette.panelStrong,
+                            color: AppPalette.surfaceStrong,
                             borderRadius: BorderRadius.circular(
                               compact ? 15 : 18,
                             ),
-                            border: Border.all(color: AppPalette.lineSoft),
+                            border: Border.all(color: AppPalette.borderSoft),
                           ),
                           child: IconButton(
                             onPressed: () => Navigator.of(context).maybePop(),
@@ -128,21 +128,13 @@ class MobileHeroBanner extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(compact ? 24 : 30),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[
-            AppPalette.panel,
-            AppPalette.panelStrong,
-            AppPalette.panelMuted,
-          ],
-        ),
-        border: Border.all(color: AppPalette.line),
+        color: AppPalette.surface,
+        border: Border.all(color: AppPalette.borderSoft),
         boxShadow: const <BoxShadow>[
           BoxShadow(
-            color: Color(0x46000000),
-            blurRadius: 34,
-            offset: Offset(0, 18),
+            color: Color(0x24000000),
+            blurRadius: 24,
+            offset: Offset(0, 12),
           ),
         ],
       ),
@@ -185,7 +177,7 @@ class MobileHeroBanner extends StatelessWidget {
                     Text(
                       eyebrow.toUpperCase(),
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: AppPalette.textMuted,
+                        color: AppPalette.textTertiary,
                         fontWeight: FontWeight.w900,
                         letterSpacing: compact ? 1.4 : 1.8,
                       ),
@@ -282,24 +274,24 @@ class MobilePanel extends StatelessWidget {
     ];
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppPalette.panel,
-        borderRadius: BorderRadius.circular(compact ? 22 : 28),
-        border: Border.all(color: AppPalette.lineSoft),
+        color: AppPalette.surface.withValues(alpha: 0.86),
+        borderRadius: BorderRadius.circular(compact ? 20 : 24),
+        border: Border.all(color: AppPalette.borderSoft.withValues(alpha: 0.72)),
         boxShadow: const <BoxShadow>[
           BoxShadow(
-            color: Color(0x36000000),
-            blurRadius: 24,
-            offset: Offset(0, 14),
+            color: Color(0x22000000),
+            blurRadius: 18,
+            offset: Offset(0, 10),
           ),
         ],
       ),
       child: Padding(
-        padding: EdgeInsets.all(compact ? 16 : 20),
+        padding: EdgeInsets.all(compact ? 14 : 18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Row(children: headerChildren),
-            SizedBox(height: compact ? 12 : 16),
+            SizedBox(height: compact ? 10 : 14),
             child,
           ],
         ),
@@ -332,9 +324,9 @@ class MobileScreenLead extends StatelessWidget {
     final compact = MediaQuery.sizeOf(context).width < 420;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppPalette.panel,
-        borderRadius: BorderRadius.circular(compact ? 22 : 26),
-        border: Border.all(color: AppPalette.lineSoft),
+        color: AppPalette.surface.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(compact ? 20 : 24),
+        border: Border.all(color: AppPalette.borderSoft.withValues(alpha: 0.64)),
       ),
       child: Padding(
         padding: EdgeInsets.all(compact ? 16 : 18),
@@ -373,7 +365,7 @@ class MobileScreenLead extends StatelessWidget {
                       Text(
                         subtitle,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppPalette.textMuted,
+                          color: AppPalette.textTertiary,
                           fontWeight: FontWeight.w600,
                           height: 1.4,
                         ),
@@ -406,7 +398,7 @@ class MobileMetricCard extends StatelessWidget {
     required this.label,
     required this.value,
     required this.icon,
-    this.accent = AppPalette.cobalt,
+    this.accent = AppPalette.info,
     this.caption,
     this.onTap,
   });
@@ -429,9 +421,9 @@ class MobileMetricCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(compact ? 20 : 24),
         child: Ink(
           decoration: BoxDecoration(
-            color: AppPalette.panelStrong,
+            color: AppPalette.surfaceStrong,
             borderRadius: BorderRadius.circular(compact ? 20 : 24),
-            border: Border.all(color: AppPalette.lineSoft),
+            border: Border.all(color: AppPalette.borderSoft),
           ),
           child: Padding(
             padding: EdgeInsets.all(compact ? 14 : 18),
@@ -451,7 +443,7 @@ class MobileMetricCard extends StatelessWidget {
                 Text(
                   label.toUpperCase(),
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: AppPalette.textMuted,
+                    color: AppPalette.textTertiary,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 1.25,
                   ),
@@ -473,7 +465,7 @@ class MobileMetricCard extends StatelessWidget {
                   Text(
                     caption!,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppPalette.textMuted,
+                      color: AppPalette.textTertiary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -523,7 +515,7 @@ class MobileActionCard extends StatelessWidget {
               colors: <Color>[
                 accent.withValues(alpha: 0.34),
                 accent.withValues(alpha: 0.14),
-                AppPalette.panelStrong,
+                AppPalette.surfaceStrong,
               ],
             ),
             border: Border.all(color: accent.withValues(alpha: 0.26)),
@@ -654,7 +646,7 @@ class MobileEmptyState extends StatelessWidget {
             width: 58,
             height: 58,
             decoration: BoxDecoration(
-              color: AppPalette.panelMuted,
+              color: AppPalette.backgroundSoft,
               borderRadius: BorderRadius.circular(18),
             ),
             child: Icon(icon, color: AppPalette.textSecondary, size: 26),
@@ -671,7 +663,7 @@ class MobileEmptyState extends StatelessWidget {
           Text(
             body,
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: AppPalette.textMuted,
+              color: AppPalette.textTertiary,
               fontWeight: FontWeight.w600,
             ),
             textAlign: TextAlign.center,
@@ -705,9 +697,9 @@ class MobileSheetHeader extends StatelessWidget {
     final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppPalette.panelStrong,
+        color: AppPalette.surfaceStrong,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppPalette.lineSoft),
+        border: Border.all(color: AppPalette.borderSoft),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -735,7 +727,7 @@ class MobileSheetHeader extends StatelessWidget {
                         Text(
                           eyebrow!.toUpperCase(),
                           style: theme.textTheme.labelSmall?.copyWith(
-                            color: AppPalette.textMuted,
+                            color: AppPalette.textTertiary,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 1.15,
                           ),
@@ -774,12 +766,161 @@ class MobileSheetHeader extends StatelessWidget {
   }
 }
 
+class MobileListTile extends StatelessWidget {
+  const MobileListTile({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    this.leadingIcon,
+    this.trailing,
+    this.accent = AppPalette.primary,
+    this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData? leadingIcon;
+  final Widget? trailing;
+  final Color accent;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: AppPalette.surfaceStrong.withValues(alpha: 0.66),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppPalette.borderSoft.withValues(alpha: 0.62)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: <Widget>[
+                if (leadingIcon != null) ...<Widget>[
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(leadingIcon, color: accent, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.15,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppPalette.textTertiary,
+                          fontWeight: FontWeight.w600,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (trailing != null) ...<Widget>[
+                  const SizedBox(width: 12),
+                  trailing!,
+                ] else if (onTap != null) ...<Widget>[
+                  const SizedBox(width: 10),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppPalette.textTertiary,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class MobileActionBar extends StatelessWidget {
+  const MobileActionBar({
+    super.key,
+    required this.primaryLabel,
+    required this.primaryIcon,
+    required this.onPrimaryPressed,
+    this.secondaryLabel,
+    this.secondaryIcon,
+    this.onSecondaryPressed,
+  });
+
+  final String primaryLabel;
+  final IconData primaryIcon;
+  final VoidCallback? onPrimaryPressed;
+  final String? secondaryLabel;
+  final IconData? secondaryIcon;
+  final VoidCallback? onSecondaryPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 390;
+    final primary = FilledButton.icon(
+      onPressed: onPrimaryPressed,
+      icon: Icon(primaryIcon),
+      label: Text(primaryLabel),
+    );
+    final secondary = secondaryLabel == null
+        ? null
+        : OutlinedButton.icon(
+            onPressed: onSecondaryPressed,
+            icon: Icon(secondaryIcon ?? Icons.arrow_forward_rounded),
+            label: Text(secondaryLabel!),
+          );
+
+    if (secondary == null) {
+      return SizedBox(width: double.infinity, child: primary);
+    }
+
+    if (compact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[primary, const SizedBox(height: 10), secondary],
+      );
+    }
+
+    return Row(
+      children: <Widget>[
+        Expanded(child: primary),
+        const SizedBox(width: 10),
+        Expanded(child: secondary),
+      ],
+    );
+  }
+}
+
 class MobileSheetSection extends StatelessWidget {
   const MobileSheetSection({
     super.key,
     required this.title,
     required this.child,
-    this.accent = AppPalette.gold,
+    this.accent = AppPalette.warning,
   });
 
   final String title;
@@ -790,9 +931,9 @@ class MobileSheetSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppPalette.panelStrong,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppPalette.lineSoft),
+        color: AppPalette.surfaceStrong.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppPalette.borderSoft.withValues(alpha: 0.64)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),

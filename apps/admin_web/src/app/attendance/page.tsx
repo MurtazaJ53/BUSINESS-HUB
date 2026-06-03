@@ -63,21 +63,21 @@ export default async function AttendancePage() {
               label="Present records"
               value={`${attendanceSummary?.present_count ?? 0}`}
               detail="Sessions marked present in the current result set"
-              accent="green"
+              accent="success"
               icon="PRS"
             />
             <MetricCard
               label="Leave records"
               value={`${attendanceSummary?.leave_count ?? 0}`}
               detail="Sessions marked leave in the current result set"
-              accent="rose"
+              accent="error"
               icon="LEV"
             />
             <MetricCard
               label="On floor today"
               value={`${attendanceSummary?.active_workers_today ?? 0}`}
               detail="Present or half-day memberships for today"
-              accent="blue"
+              accent="info"
               icon="DAY"
             />
           </section>

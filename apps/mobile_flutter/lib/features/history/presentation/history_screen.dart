@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/mobile_repository.dart';
@@ -111,7 +113,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   value: '${overview.syncedSales}',
                   caption: 'Accepted by backend',
                   icon: Icons.verified_rounded,
-                  accent: const Color(0xFF4EB79B),
+                  accent: AppPalette.success,
                 ),
                 MobileMetricCard(
                   label: 'Queued',
@@ -120,7 +122,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                       ? formatCurrency(overview.queuedRevenue)
                       : 'Outbox clear',
                   icon: Icons.cloud_upload_rounded,
-                  accent: const Color(0xFFF0C879),
+                  accent: AppPalette.warning,
                 ),
                 MobileMetricCard(
                   label: 'Attention',
@@ -129,7 +131,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                       ? 'Needs replay review'
                       : 'No failed receipts',
                   icon: Icons.error_outline_rounded,
-                  accent: const Color(0xFFEF6B67),
+                  accent: AppPalette.error,
                 ),
               ],
             );
@@ -143,7 +145,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 ? 'ALL STATES'
                 : _syncLabel(_filter.syncState!),
             icon: Icons.tune_rounded,
-            accent: const Color(0xFF7CA4F8),
+            accent: AppPalette.info,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -271,31 +273,31 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                       MobileTag(
                         label: 'Search: ${_filter.search.trim()}',
                         icon: Icons.search_rounded,
-                        accent: const Color(0xFFE58A47),
+                        accent: AppPalette.primary,
                       ),
                     if (_filter.syncState != null)
                       MobileTag(
                         label: _syncLabel(_filter.syncState!),
                         icon: Icons.sync_alt_rounded,
-                        accent: const Color(0xFF7CA4F8),
+                        accent: AppPalette.info,
                       ),
                     if (_filter.paymentMode != null)
                       MobileTag(
                         label: _filter.paymentMode!,
                         icon: Icons.payments_rounded,
-                        accent: const Color(0xFF4EB79B),
+                        accent: AppPalette.success,
                       ),
                     if (_filter.dateWindow != HistoryDateWindow.all)
                       MobileTag(
                         label: _filter.dateWindow.label,
                         icon: Icons.date_range_rounded,
-                        accent: const Color(0xFFF0C879),
+                        accent: AppPalette.warning,
                       ),
                     if (_filter.onlyDueSales)
                       const MobileTag(
                         label: 'Due only',
                         icon: Icons.account_balance_wallet_rounded,
-                        accent: Color(0xFFEF6B67),
+                        accent: AppPalette.error,
                       ),
                   ],
                 ),
@@ -345,8 +347,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 ? Icons.sync_rounded
                 : Icons.wifi_tethering_rounded,
             accent: syncStatus == MobileSyncStatus.error
-                ? const Color(0xFFEF6B67)
-                : const Color(0xFFE58A47),
+                ? AppPalette.error
+                : AppPalette.primary,
           ),
           child: Column(
             children: states
@@ -365,7 +367,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           action: MobileTag(
             label: _filter.dateWindow.label,
             icon: Icons.insights_rounded,
-            accent: const Color(0xFF4EB79B),
+            accent: AppPalette.success,
           ),
           child: sales.isEmpty
               ? const MobileEmptyState(
@@ -384,38 +386,38 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                         _HistoryMetricTile(
                           label: 'Receipts',
                           value: '${report.receiptCount}',
-                          tone: const Color(0xFFF0C879),
+                          tone: AppPalette.warning,
                         ),
                         _HistoryMetricTile(
                           label: 'Gross',
                           value: formatCurrency(report.grossTotal),
-                          tone: const Color(0xFF4EB79B),
+                          tone: AppPalette.success,
                         ),
                         if (showOperationalSummary)
                           _HistoryMetricTile(
                             label: 'Collected',
                             value: formatCurrency(report.collectedTotal),
-                            tone: const Color(0xFFE58A47),
+                            tone: AppPalette.primary,
                           ),
                         if (showOperationalSummary)
                           _HistoryMetricTile(
                             label: 'Due',
                             value: formatCurrency(report.dueTotal),
                             tone: report.dueTotal > 0
-                                ? const Color(0xFFF0C879)
-                                : const Color(0xFF4EB79B),
+                                ? AppPalette.warning
+                                : AppPalette.success,
                           ),
                         if (showAdvancedReport)
                           _HistoryMetricTile(
                             label: 'Avg ticket',
                             value: formatCurrency(report.averageTicketValue),
-                            tone: const Color(0xFF7CA4F8),
+                            tone: AppPalette.info,
                           ),
                         if (showAdvancedReport)
                           _HistoryMetricTile(
                             label: 'Named buyers',
                             value: '${report.namedBuyerCount}',
-                            tone: const Color(0xFF4EB79B),
+                            tone: AppPalette.success,
                           ),
                       ],
                     ),
@@ -469,7 +471,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 ? 'Freshness unknown'
                 : 'Last sync ${formatCompactDate(overview.lastSyncedAt!)}',
             icon: Icons.schedule_rounded,
-            accent: const Color(0xFF7CA4F8),
+            accent: AppPalette.info,
           ),
           child: sales.isEmpty
               ? MobileEmptyState(
@@ -547,7 +549,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                         subtitle:
                             '${detail.customerName?.isNotEmpty == true ? detail.customerName : 'Walk-in customer'} | ${detail.date}',
                         icon: Icons.receipt_long_rounded,
-                        accent: const Color(0xFFF0C879),
+                        accent: AppPalette.warning,
                         tags: <Widget>[
                           MobileTag(
                             label: _syncLabel(detail.syncState),
@@ -557,18 +559,18 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                           MobileTag(
                             label: detail.paymentMode,
                             icon: Icons.payments_rounded,
-                            accent: const Color(0xFFE58A47),
+                            accent: AppPalette.primary,
                           ),
                           MobileTag(
                             label: '${detail.itemCount} items',
                             icon: Icons.shopping_bag_rounded,
-                            accent: const Color(0xFF7CA4F8),
+                            accent: AppPalette.info,
                           ),
                           if (detail.hasOutstandingDue)
                             MobileTag(
                               label: 'Due ${formatCurrency(detail.amountDue)}',
                               icon: Icons.warning_amber_rounded,
-                              accent: const Color(0xFFF0C879),
+                              accent: AppPalette.warning,
                             ),
                         ],
                       ),
@@ -701,7 +703,7 @@ class _HistoryRoleProfile {
   }) {
     final primaryLabel = '${overview.totalSales} receipts';
     final primaryIcon = Icons.receipt_long_rounded;
-    final primaryAccent = const Color(0xFFF0C879);
+    final primaryAccent = AppPalette.warning;
     final secondaryLabel = overview.queuedSales > 0
         ? '${overview.queuedSales} queued'
         : (syncStatus == MobileSyncStatus.syncing ? 'Syncing' : 'Replay clear');
@@ -711,8 +713,8 @@ class _HistoryRoleProfile {
               ? Icons.sync_rounded
               : Icons.verified_rounded);
     final secondaryAccent = overview.queuedSales > 0
-        ? const Color(0xFFF0C879)
-        : const Color(0xFF4EB79B);
+        ? AppPalette.warning
+        : AppPalette.success;
 
     if (session?.isCashierLike ?? false) {
       return _HistoryRoleProfile(
@@ -722,7 +724,7 @@ class _HistoryRoleProfile {
         leadSubtitle:
             'Find receipts fast, check queued sync, and open exact sale details without leaving the floor workflow.',
         leadIcon: Icons.receipt_long_rounded,
-        leadAccent: const Color(0xFFF0C879),
+        leadAccent: AppPalette.warning,
         primaryTagLabel: primaryLabel,
         primaryTagIcon: primaryIcon,
         primaryTagAccent: primaryAccent,
@@ -743,7 +745,7 @@ class _HistoryRoleProfile {
         leadSubtitle:
             'Track recent receipts, queue posture, and filter-driven sales summaries from one cleaner history view.',
         leadIcon: Icons.receipt_long_rounded,
-        leadAccent: const Color(0xFFF0C879),
+        leadAccent: AppPalette.warning,
         primaryTagLabel: primaryLabel,
         primaryTagIcon: primaryIcon,
         primaryTagAccent: primaryAccent,
@@ -763,7 +765,7 @@ class _HistoryRoleProfile {
       leadSubtitle:
           'Review revenue flow, replay posture, and recent sales without turning the mobile app into a dense reporting console.',
       leadIcon: Icons.receipt_long_rounded,
-      leadAccent: const Color(0xFFF0C879),
+      leadAccent: AppPalette.warning,
       primaryTagLabel: primaryLabel,
       primaryTagIcon: primaryIcon,
       primaryTagAccent: primaryAccent,
@@ -790,7 +792,7 @@ class _SyncFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = const Color(0xFF7CA4F8);
+    final activeColor = AppPalette.info;
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: Material(
@@ -826,18 +828,18 @@ class _DomainPostureRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tone = switch (state.pilotSignoffStatus) {
-      'production_safe' => const Color(0xFF4EB79B),
-      'ready_for_cutover' => const Color(0xFFE58A47),
-      'rollback_recommended' => const Color(0xFFEF6B67),
+      'production_safe' => AppPalette.success,
+      'ready_for_cutover' => AppPalette.primary,
+      'rollback_recommended' => AppPalette.error,
       _ =>
         state.isPostgresPrimary
-            ? const Color(0xFF4EB79B)
-            : const Color(0xFFF0C879),
+            ? AppPalette.success
+            : AppPalette.warning,
     };
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF232A36),
+        color: AppPalette.surfaceStrong.withValues(alpha: 0.66),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
@@ -907,7 +909,7 @@ class _HistorySaleRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         child: Ink(
           decoration: BoxDecoration(
-            color: const Color(0xFF232A36),
+            color: AppPalette.surfaceStrong.withValues(alpha: 0.66),
             borderRadius: BorderRadius.circular(22),
             border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
           ),
@@ -951,13 +953,13 @@ class _HistorySaleRow extends StatelessWidget {
                           MobileTag(
                             label: sale.paymentMode,
                             icon: Icons.payments_rounded,
-                            accent: const Color(0xFFE58A47),
+                            accent: AppPalette.primary,
                           ),
                           if (sale.hasOutstandingDue)
                             MobileTag(
                               label: 'Due ${formatCurrency(sale.amountDue)}',
                               icon: Icons.warning_amber_rounded,
-                              accent: const Color(0xFFF0C879),
+                              accent: AppPalette.warning,
                             ),
                           Text(
                             'Tap for detail',
@@ -999,7 +1001,7 @@ class _SaleDetailSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return MobileSheetSection(
       title: title,
-      accent: const Color(0xFFF0C879),
+      accent: AppPalette.warning,
       child: child,
     );
   }
@@ -1038,7 +1040,7 @@ class _SaleItemRow extends StatelessWidget {
         Text(
           formatCurrency(item.lineTotal),
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: const Color(0xFF4EB79B),
+            color: AppPalette.success,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -1083,7 +1085,7 @@ class _SalePaymentRow extends StatelessWidget {
         Text(
           formatCurrency(payment.amount),
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: const Color(0xFFE58A47),
+            color: AppPalette.primary,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -1107,7 +1109,7 @@ class _HistoryMetricTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF232A36),
+        color: AppPalette.surfaceStrong.withValues(alpha: 0.66),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: tone.withValues(alpha: 0.18)),
       ),
@@ -1147,7 +1149,7 @@ class _HistoryPaymentMixRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF232A36),
+        color: AppPalette.surfaceStrong.withValues(alpha: 0.66),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
@@ -1180,7 +1182,7 @@ class _HistoryPaymentMixRow extends StatelessWidget {
             Text(
               formatCurrency(mix.grossAmount),
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: const Color(0xFFE58A47),
+                color: AppPalette.primary,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -1247,10 +1249,12 @@ const List<String> _historyPaymentModes = <String>[
 
 Color _syncTone(CommerceSyncState state) {
   return switch (state) {
-    CommerceSyncState.synced => const Color(0xFF4EB79B),
-    CommerceSyncState.queued => const Color(0xFFF0C879),
-    CommerceSyncState.syncing => const Color(0xFFE58A47),
-    CommerceSyncState.failed => const Color(0xFFEF6B67),
+    CommerceSyncState.synced => AppPalette.success,
+    CommerceSyncState.queued => AppPalette.warning,
+    CommerceSyncState.syncing => AppPalette.primary,
+    CommerceSyncState.failed => AppPalette.error,
     CommerceSyncState.localOnly => Colors.white70,
   };
 }
+
+

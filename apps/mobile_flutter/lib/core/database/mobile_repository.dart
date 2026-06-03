@@ -686,6 +686,47 @@ class InventoryRepository {
         );
   }
 
+  Future<void> mergeBackendInventoryItem(
+    Map<String, dynamic> row, {
+    int? updatedAt,
+  }) async {
+    final id = _asStringOrNull(row['id']);
+    if (id == null) {
+      return;
+    }
+    final resolvedUpdatedAt =
+        updatedAt ??
+        _asEpoch(row['updated_at'] ?? row['created_at']) ??
+        DateTime.now().millisecondsSinceEpoch;
+
+    await mergeInventoryDocument(id, <String, dynamic>{
+      'name': row['name'],
+      'price': row['sell_price'] ?? row['price'],
+      'sku': row['sku'],
+      'category': row['category'],
+      'subcategory': row['subcategory'],
+      'size': row['size'],
+      'description': row['description'],
+      'stock': row['stock_on_hand'] ?? row['stock'],
+      'sourceMeta': row['source_meta_json'] ?? row['sourceMeta'],
+      'createdAt': row['created_at'] ?? resolvedUpdatedAt,
+      'updatedAt': row['updated_at'] ?? resolvedUpdatedAt,
+      'tombstone': row['tombstone'] == true || row['status'] == 'archived',
+    }, updatedAt: resolvedUpdatedAt);
+
+    if (row.containsKey('cost_price') ||
+        row.containsKey('supplier_id') ||
+        row.containsKey('last_purchase_date')) {
+      await mergeInventoryPrivateDocument(id, <String, dynamic>{
+        'costPrice': row['cost_price'],
+        'supplierId': row['supplier_id'],
+        'lastPurchaseDate': row['last_purchase_date'],
+        'updatedAt': row['updated_at'] ?? resolvedUpdatedAt,
+        'tombstone': row['tombstone'] == true,
+      }, updatedAt: resolvedUpdatedAt);
+    }
+  }
+
   InventoryCatalogItem _mapCatalogRow(QueryRow row) {
     return InventoryCatalogItem(
       id: row.read<String>('id'),

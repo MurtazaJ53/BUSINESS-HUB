@@ -101,7 +101,7 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
               colors: <Color>[
                 AppPalette.background,
                 AppPalette.backgroundSoft,
-                AppPalette.backgroundAlt,
+                AppPalette.backgroundSoft,
               ],
             ),
           ),
@@ -114,7 +114,7 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
                 ),
                 _AmbientGlow(
                   alignment: Alignment.bottomRight,
-                  color: AppPalette.gold,
+                  color: AppPalette.warning,
                 ),
               ],
               SafeArea(
@@ -143,38 +143,10 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
                     ),
                     Expanded(
                       child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: horizontalInset,
-                        ),
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: AppPalette.backgroundSoft.withValues(
-                              alpha: 0.94,
-                            ),
-                            borderRadius: BorderRadius.circular(
-                              compactChrome ? 24 : 30,
-                            ),
-                            border: Border.all(
-                              color: compactChrome
-                                  ? AppPalette.lineSoft
-                                  : AppPalette.line,
-                            ),
-                            boxShadow: compactChrome
-                                ? const <BoxShadow>[]
-                                : const <BoxShadow>[
-                                    BoxShadow(
-                                      color: Color(0x4A000000),
-                                      blurRadius: 30,
-                                      offset: Offset(0, 18),
-                                    ),
-                                  ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(
-                              compactChrome ? 24 : 30,
-                            ),
-                            child: widget.navigationShell,
-                          ),
+                        padding: EdgeInsets.symmetric(horizontal: horizontalInset),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(compactChrome ? 20 : 24),
+                          child: widget.navigationShell,
                         ),
                       ),
                     ),
@@ -187,22 +159,18 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
                       ),
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: AppPalette.backgroundSoft.withValues(
-                            alpha: 0.96,
-                          ),
+                          color: AppPalette.surface.withValues(alpha: 0.82),
                           borderRadius: BorderRadius.circular(
-                            compactChrome ? 24 : 28,
+                            compactChrome ? 22 : 26,
                           ),
                           border: Border.all(
-                            color: compactChrome
-                                ? AppPalette.lineSoft
-                                : AppPalette.line,
+                            color: AppPalette.borderSoft.withValues(alpha: 0.7),
                           ),
                         ),
                         child: Padding(
                           padding: EdgeInsets.symmetric(
-                            horizontal: compactChrome ? 4 : 8,
-                            vertical: compactChrome ? 6 : 8,
+                            horizontal: compactChrome ? 3 : 6,
+                            vertical: compactChrome ? 5 : 6,
                           ),
                           child: Row(
                             children: navProfile.items
@@ -269,10 +237,10 @@ class _ShellHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final statusTone = switch (syncStatus) {
-      MobileSyncStatus.syncing => AppPalette.cobalt,
-      MobileSyncStatus.error => AppPalette.coral,
-      MobileSyncStatus.offline => AppPalette.gold,
-      MobileSyncStatus.idle => AppPalette.jade,
+      MobileSyncStatus.syncing => AppPalette.info,
+      MobileSyncStatus.error => AppPalette.error,
+      MobileSyncStatus.offline => AppPalette.warning,
+      MobileSyncStatus.idle => AppPalette.success,
     };
 
     final statusLabel = switch (syncStatus) {
@@ -292,14 +260,14 @@ class _ShellHeader extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppPalette.backgroundSoft.withValues(alpha: 0.96),
-        borderRadius: BorderRadius.circular(compact ? 22 : 24),
-        border: Border.all(color: AppPalette.line),
+        color: AppPalette.surface.withValues(alpha: 0.78),
+        borderRadius: BorderRadius.circular(compact ? 20 : 22),
+        border: Border.all(color: AppPalette.borderSoft.withValues(alpha: 0.72)),
       ),
       child: Padding(
         padding: EdgeInsets.symmetric(
-          horizontal: compact ? 12 : 14,
-          vertical: compact ? 10 : 12,
+          horizontal: compact ? 10 : 12,
+          vertical: compact ? 8 : 10,
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -330,7 +298,7 @@ class _ShellHeader extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: AppPalette.textMuted,
+                      color: AppPalette.textTertiary,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.5,
                     ),
@@ -373,12 +341,12 @@ class _HeaderIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: compact ? 44 : 50,
-      height: compact ? 44 : 50,
+      width: compact ? 40 : 44,
+      height: compact ? 40 : 44,
       decoration: BoxDecoration(
-        color: AppPalette.panelStrong,
-        borderRadius: BorderRadius.circular(compact ? 15 : 18),
-        border: Border.all(color: AppPalette.lineSoft),
+        color: AppPalette.surfaceStrong.withValues(alpha: 0.76),
+        borderRadius: BorderRadius.circular(compact ? 14 : 16),
+        border: Border.all(color: AppPalette.borderSoft.withValues(alpha: 0.62)),
       ),
       child: IconButton(
         onPressed: onPressed,
@@ -459,15 +427,15 @@ class _NavButton extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: compact ? 2 : 4),
       child: Material(
-        color: active ? AppPalette.panelStrong : Colors.transparent,
-        borderRadius: BorderRadius.circular(22),
+        color: active ? AppPalette.primary.withValues(alpha: 0.14) : Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(22),
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: compact ? 4 : 8,
-              vertical: compact ? 10 : 12,
+              vertical: compact ? 8 : 10,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,

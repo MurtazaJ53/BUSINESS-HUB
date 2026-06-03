@@ -328,6 +328,57 @@ class BackendApiClient {
     return _mapExpense(decoded);
   }
 
+  Future<Map<String, dynamic>> createInventoryItem({
+    required User user,
+    required String shopId,
+    required String name,
+    required double sellPrice,
+    required int openingStock,
+    String sku = '',
+    String barcode = '',
+    String category = 'General',
+    String subcategory = '',
+    String size = '',
+    String description = '',
+    double? costPrice,
+  }) async {
+    final body = <String, dynamic>{
+      'name': name,
+      'sell_price': sellPrice.toStringAsFixed(2),
+      'opening_stock': openingStock,
+      'sku': sku,
+      'barcode': barcode,
+      'category': category.trim().isEmpty ? 'General' : category.trim(),
+      'subcategory': subcategory,
+      'size': size,
+      'description': description,
+      'status': 'active',
+    };
+    if (costPrice != null) {
+      body['private_cost_price'] = costPrice.toStringAsFixed(2);
+    }
+
+    return _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/inventory/',
+      body: body,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> fetchInventoryItems({
+    required User user,
+    required String shopId,
+    int limit = 500,
+  }) async {
+    final decoded = await _requestList(
+      user: user,
+      method: 'GET',
+      path: '/shops/$shopId/inventory/',
+    );
+    return decoded.take(limit).toList(growable: false);
+  }
+
   Future<BackendCommandResponse> submitSaleCommand({
     required User user,
     required String shopId,

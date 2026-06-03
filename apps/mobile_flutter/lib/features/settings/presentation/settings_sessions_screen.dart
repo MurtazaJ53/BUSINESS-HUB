@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -153,11 +155,11 @@ class _SettingsSessionsScreenState
             subtitle:
                 'See which phones are trusted, which need review, and revoke or wipe access when a device should no longer touch this workspace.',
             icon: Icons.devices_rounded,
-            accent: const Color(0xFFE58A47),
+            accent: AppPalette.primary,
             primaryTag: MobileTag(
               label: '${sessions.length} known',
               icon: Icons.smartphone_rounded,
-              accent: const Color(0xFFE58A47),
+              accent: AppPalette.primary,
             ),
             secondaryTag: MobileTag(
               label: riskyCount > 0 ? '$riskyCount risky' : 'Trust stable',
@@ -165,8 +167,8 @@ class _SettingsSessionsScreenState
                   ? Icons.crisis_alert_rounded
                   : Icons.verified_rounded,
               accent: riskyCount > 0
-                  ? const Color(0xFFEF6B67)
-                  : const Color(0xFF4EB79B),
+                  ? AppPalette.error
+                  : AppPalette.success,
             ),
           ),
           const SizedBox(height: 18),
@@ -224,17 +226,17 @@ class _SettingsSessionsScreenState
                   MobileTag(
                     label: '$trustedCount trusted',
                     icon: Icons.verified_rounded,
-                    accent: const Color(0xFF4EB79B),
+                    accent: AppPalette.success,
                   ),
                   MobileTag(
                     label: '$reviewCount review',
                     icon: Icons.visibility_rounded,
-                    accent: const Color(0xFFF0C879),
+                    accent: AppPalette.warning,
                   ),
                   MobileTag(
                     label: '$riskyCount risky',
                     icon: Icons.crisis_alert_rounded,
-                    accent: const Color(0xFFEF6B67),
+                    accent: AppPalette.error,
                   ),
                 ],
               ),
@@ -247,7 +249,7 @@ class _SettingsSessionsScreenState
                     ? 'No sessions'
                     : '${sessions.length} devices',
                 icon: Icons.devices_rounded,
-                accent: const Color(0xFFE58A47),
+                accent: AppPalette.primary,
               ),
               child: sessionsAsync.isLoading
                   ? const MobileEmptyState(
@@ -380,8 +382,8 @@ class _WorkspaceSessionCard extends StatelessWidget {
                       ? Icons.wifi_tethering_rounded
                       : Icons.block_rounded,
                   accent: record.isActive
-                      ? const Color(0xFF4EB79B)
-                      : const Color(0xFFEF6B67),
+                      ? AppPalette.success
+                      : AppPalette.error,
                 ),
                 MobileTag(
                   label: record.trustLevel.toUpperCase(),
@@ -391,13 +393,13 @@ class _WorkspaceSessionCard extends StatelessWidget {
                 MobileTag(
                   label: 'Score ${record.trustScore}',
                   icon: Icons.speed_rounded,
-                  accent: const Color(0xFFE58A47),
+                  accent: AppPalette.primary,
                 ),
                 if (record.wipeRequested)
                   const MobileTag(
                     label: 'WIPE PENDING',
                     icon: Icons.delete_sweep_rounded,
-                    accent: Color(0xFFEF6B67),
+                    accent: AppPalette.error,
                   ),
               ],
             ),
@@ -545,14 +547,14 @@ String _deviceMetaLine(WorkspaceAccessSessionRecord record) {
 Color _trustColor(String level) {
   switch (level.trim().toLowerCase()) {
     case 'trusted':
-      return const Color(0xFF4EB79B);
+      return AppPalette.success;
     case 'review':
-      return const Color(0xFFF0C879);
+      return AppPalette.warning;
     case 'risky':
     case 'blocked':
-      return const Color(0xFFEF6B67);
+      return AppPalette.error;
     default:
-      return const Color(0xFFE58A47);
+      return AppPalette.primary;
   }
 }
 
@@ -570,3 +572,5 @@ IconData _trustIcon(String level) {
       return Icons.devices_rounded;
   }
 }
+
+

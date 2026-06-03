@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -71,10 +73,10 @@ class SettingsScreen extends ConsumerWidget {
                 MobileSyncStatus.idle => Icons.verified_rounded,
               },
               accent: switch (syncStatus) {
-                MobileSyncStatus.syncing => const Color(0xFFE58A47),
-                MobileSyncStatus.error => const Color(0xFFEF6B67),
-                MobileSyncStatus.offline => const Color(0xFFF0C879),
-                MobileSyncStatus.idle => const Color(0xFF4EB79B),
+                MobileSyncStatus.syncing => AppPalette.primary,
+                MobileSyncStatus.error => AppPalette.error,
+                MobileSyncStatus.offline => AppPalette.warning,
+                MobileSyncStatus.idle => AppPalette.success,
               },
             ),
           ),
@@ -84,7 +86,7 @@ class SettingsScreen extends ConsumerWidget {
             action: MobileTag(
               label: profile.workspaceTag,
               icon: Icons.storefront_rounded,
-              accent: const Color(0xFF4EB79B),
+              accent: AppPalette.success,
             ),
             child: Column(
               children: <Widget>[
@@ -138,7 +140,7 @@ class SettingsScreen extends ConsumerWidget {
               icon: session?.isOwnerLike ?? false
                   ? Icons.groups_rounded
                   : Icons.badge_rounded,
-              accent: const Color(0xFFE58A47),
+              accent: AppPalette.primary,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -163,13 +165,13 @@ class SettingsScreen extends ConsumerWidget {
                           label:
                               '${attendanceSummary?.activeWorkersToday ?? 0} on floor today',
                           icon: Icons.groups_rounded,
-                          accent: const Color(0xFF4EB79B),
+                          accent: AppPalette.success,
                         ),
                       MobileTag(
                         label:
                             '${attendanceSummary?.presentCount ?? 0} present records',
                         icon: Icons.check_circle_rounded,
-                        accent: const Color(0xFFE58A47),
+                        accent: AppPalette.primary,
                       ),
                       if (shop.supportsExpenses)
                         MobileTag(
@@ -179,7 +181,7 @@ class SettingsScreen extends ConsumerWidget {
                                   expenseSummary?.totalAmount ?? 0,
                                 ),
                           icon: Icons.payments_rounded,
-                          accent: const Color(0xFFF0C879),
+                          accent: AppPalette.warning,
                         ),
                     ],
                   ),
@@ -261,7 +263,7 @@ class SettingsScreen extends ConsumerWidget {
             action: MobileTag(
               label: '${shop.planLabel} plan',
               icon: Icons.workspace_premium_rounded,
-              accent: const Color(0xFFF0C879),
+              accent: AppPalette.warning,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -397,10 +399,10 @@ class SettingsScreen extends ConsumerWidget {
                     ? Icons.crisis_alert_rounded
                     : Icons.auto_awesome_rounded,
                 accent: pulse == null
-                    ? const Color(0xFFE58A47)
+                    ? AppPalette.primary
                     : pulse.stats.criticalAnomalyCount > 0
-                    ? const Color(0xFFEF6B67)
-                    : const Color(0xFFE58A47),
+                    ? AppPalette.error
+                    : AppPalette.primary,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -443,8 +445,8 @@ class SettingsScreen extends ConsumerWidget {
                     : Icons.devices_rounded,
                 accent:
                     sessions.any((item) => item.isRisky || item.wipeRequested)
-                    ? const Color(0xFFEF6B67)
-                    : const Color(0xFFE58A47),
+                    ? AppPalette.error
+                    : AppPalette.primary,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -475,7 +477,7 @@ class SettingsScreen extends ConsumerWidget {
               action: MobileTag(
                 label: 'Owner/admin gate',
                 icon: Icons.verified_user_rounded,
-                accent: const Color(0xFFE58A47),
+                accent: AppPalette.primary,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -508,8 +510,8 @@ class SettingsScreen extends ConsumerWidget {
                   ? Icons.cloud_upload_rounded
                   : Icons.check_circle_rounded,
               accent: pending > 0
-                  ? const Color(0xFFF0C879)
-                  : const Color(0xFF4EB79B),
+                  ? AppPalette.warning
+                  : AppPalette.success,
             ),
             child: Column(
               children: <Widget>[
@@ -617,7 +619,7 @@ class SettingsScreen extends ConsumerWidget {
             action: MobileTag(
               label: runtimeInfoAsync.asData?.value.versionLabel ?? 'Loading',
               icon: Icons.new_releases_rounded,
-              accent: const Color(0xFFE58A47),
+              accent: AppPalette.primary,
             ),
             child: runtimeInfoAsync.when(
               data: (runtime) => Column(
@@ -769,14 +771,14 @@ class _SettingsRoleProfile {
         leadSubtitle:
             'Keep the day simple here. Check app health, refresh the workspace, and sign out when the shift ends.',
         leadIcon: Icons.settings_rounded,
-        leadAccent: Color(0xFFE58A47),
+        leadAccent: AppPalette.primary,
         workspaceTag: 'SHIFT READY',
         syncPanelTitle: 'App health',
         refreshButtonLabel: 'Refresh app',
         accountPanelTitle: 'Account',
         accountTag: 'FAST EXIT',
         accountIcon: Icons.flash_on_rounded,
-        accountAccent: Color(0xFF4EB79B),
+        accountAccent: AppPalette.success,
         showAdvancedOpsButton: false,
         showOwnerSyncDetails: false,
       );
@@ -789,14 +791,14 @@ class _SettingsRoleProfile {
         leadSubtitle:
             'Use this space for daily store settings and app health. Heavy platform tooling stays out of the way.',
         leadIcon: Icons.settings_applications_rounded,
-        leadAccent: Color(0xFF4EB79B),
+        leadAccent: AppPalette.success,
         workspaceTag: 'STORE READY',
         syncPanelTitle: 'Workspace health',
         refreshButtonLabel: 'Refresh workspace',
         accountPanelTitle: 'Account',
         accountTag: 'DAILY USE',
         accountIcon: Icons.badge_rounded,
-        accountAccent: Color(0xFF4EB79B),
+        accountAccent: AppPalette.success,
         showAdvancedOpsButton: false,
         showOwnerSyncDetails: false,
       );
@@ -808,14 +810,14 @@ class _SettingsRoleProfile {
       leadSubtitle:
           'Daily controls stay simple here. Advanced recovery, rollout, and technical tooling remain behind the admin-only ops area.',
       leadIcon: Icons.settings_rounded,
-      leadAccent: Color(0xFF7CA4F8),
+      leadAccent: AppPalette.info,
       workspaceTag: 'OWNER VIEW',
       syncPanelTitle: 'Workspace health',
       refreshButtonLabel: 'Refresh workspace',
       accountPanelTitle: 'Owner and support',
       accountTag: 'ADMIN PATH',
       accountIcon: Icons.shield_rounded,
-      accountAccent: Color(0xFF7CA4F8),
+      accountAccent: AppPalette.info,
       showAdvancedOpsButton: shop.supportsAdvancedOps,
       showOwnerSyncDetails: shop.supportsAdvancedOps,
     );
@@ -1106,3 +1108,5 @@ class _SettingsRow extends StatelessWidget {
     );
   }
 }
+
+

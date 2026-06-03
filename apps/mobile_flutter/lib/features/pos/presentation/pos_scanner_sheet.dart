@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_theme.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../shell/presentation/mobile_surface.dart';
@@ -54,17 +56,17 @@ class _PosScannerSheetState extends State<PosScannerSheet> {
               subtitle:
                   'Point the camera at a barcode, QR code, or exact inventory code. You can also type the code manually below.',
               icon: Icons.qr_code_scanner_rounded,
-              accent: Color(0xFFE58A47),
+              accent: AppPalette.primary,
               tags: <Widget>[
                 MobileTag(
                   label: 'Camera ready',
                   icon: Icons.camera_alt_rounded,
-                  accent: Color(0xFF4EB79B),
+                  accent: AppPalette.success,
                 ),
                 MobileTag(
                   label: 'Exact lookup',
                   icon: Icons.keyboard_alt_rounded,
-                  accent: Color(0xFF7CA4F8),
+                  accent: AppPalette.info,
                 ),
               ],
             ),
@@ -138,3 +140,4 @@ class _PosScannerSheetState extends State<PosScannerSheet> {
     );
   }
 }
+

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/mobile_models.dart';
@@ -40,6 +42,277 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     });
   }
 
+  Future<void> _showAddInventoryItemSheet(
+    BuildContext context,
+    dynamic session,
+  ) {
+    final formKey = GlobalKey<FormState>();
+    final nameController = TextEditingController();
+    final priceController = TextEditingController();
+    final stockController = TextEditingController(text: '0');
+    final categoryController = TextEditingController(text: 'General');
+    final skuController = TextEditingController();
+    final sizeController = TextEditingController();
+    final costController = TextEditingController();
+    var isSaving = false;
+
+    final sheetFuture = showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppPalette.backgroundDeep,
+      builder: (sheetContext) {
+        final compact = MediaQuery.sizeOf(sheetContext).width < 420;
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            Future<void> saveItem() async {
+              if (formKey.currentState?.validate() != true || isSaving) {
+                return;
+              }
+              setSheetState(() => isSaving = true);
+              final price = double.parse(priceController.text.trim());
+              final openingStock = int.parse(stockController.text.trim());
+              final costText = costController.text.trim();
+              final costPrice = costText.isEmpty
+                  ? null
+                  : double.tryParse(costText);
+
+              try {
+                await ref
+                    .read(mobileSyncCoordinatorProvider)
+                    .createInventoryItem(
+                      name: nameController.text,
+                      sellPrice: price,
+                      openingStock: openingStock,
+                      category: categoryController.text,
+                      sku: skuController.text,
+                      size: sizeController.text,
+                      costPrice: costPrice,
+                    );
+                if (!sheetContext.mounted) {
+                  return;
+                }
+                Navigator.of(sheetContext).pop();
+                if (mounted) {
+                  setState(() {
+                    _search = '';
+                    _selectedCategory = null;
+                    _lowStockOnly = false;
+                    _page = 1;
+                    _searchController.clear();
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${nameController.text.trim()} added.'),
+                    ),
+                  );
+                }
+              } catch (error) {
+                if (!sheetContext.mounted) {
+                  return;
+                }
+                setSheetState(() => isSaving = false);
+                ScaffoldMessenger.of(
+                  sheetContext,
+                ).showSnackBar(SnackBar(content: Text(error.toString())));
+              }
+            }
+
+            return SafeArea(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.only(
+                  left: compact ? 16 : 18,
+                  right: compact ? 16 : 18,
+                  top: compact ? 16 : 18,
+                  bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+                ),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      MobileSheetHeader(
+                        eyebrow: 'Inventory',
+                        title: 'Add item',
+                        subtitle:
+                            'Create a product with selling price, opening stock, and catalog identity.',
+                        icon: Icons.add_box_rounded,
+                        accent: AppPalette.inventory,
+                      ),
+                      const SizedBox(height: 16),
+                      MobileSheetSection(
+                        title: 'Product basics',
+                        child: Column(
+                          children: <Widget>[
+                            TextFormField(
+                              controller: nameController,
+                              textInputAction: TextInputAction.next,
+                              decoration: const InputDecoration(
+                                labelText: 'Product name',
+                                prefixIcon: Icon(Icons.inventory_2_rounded),
+                              ),
+                              validator: (value) => (value ?? '').trim().isEmpty
+                                  ? 'Enter product name'
+                                  : null,
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: categoryController,
+                              textInputAction: TextInputAction.next,
+                              decoration: const InputDecoration(
+                                labelText: 'Category',
+                                prefixIcon: Icon(Icons.category_rounded),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: skuController,
+                              textInputAction: TextInputAction.next,
+                              decoration: const InputDecoration(
+                                labelText: 'SKU or code',
+                                prefixIcon: Icon(Icons.qr_code_2_rounded),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: sizeController,
+                              textInputAction: TextInputAction.next,
+                              decoration: const InputDecoration(
+                                labelText: 'Size or variant',
+                                prefixIcon: Icon(Icons.straighten_rounded),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      MobileSheetSection(
+                        title: 'Price and stock',
+                        child: Column(
+                          children: <Widget>[
+                            TextFormField(
+                              controller: priceController,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              textInputAction: TextInputAction.next,
+                              decoration: const InputDecoration(
+                                labelText: 'Selling price',
+                                prefixIcon: Icon(Icons.currency_rupee_rounded),
+                              ),
+                              validator: (value) {
+                                final parsed = double.tryParse(
+                                  (value ?? '').trim(),
+                                );
+                                if (parsed == null || parsed < 0) {
+                                  return 'Enter valid selling price';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: stockController,
+                              keyboardType: TextInputType.number,
+                              textInputAction: session?.canViewCost == true
+                                  ? TextInputAction.next
+                                  : TextInputAction.done,
+                              decoration: const InputDecoration(
+                                labelText: 'Opening stock',
+                                prefixIcon: Icon(Icons.add_chart_rounded),
+                              ),
+                              validator: (value) {
+                                final parsed = int.tryParse(
+                                  (value ?? '').trim(),
+                                );
+                                if (parsed == null || parsed < 0) {
+                                  return 'Enter valid stock quantity';
+                                }
+                                return null;
+                              },
+                            ),
+                            if (session?.canViewCost == true) ...<Widget>[
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: costController,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
+                                textInputAction: TextInputAction.done,
+                                decoration: const InputDecoration(
+                                  labelText: 'Cost price optional',
+                                  prefixIcon: Icon(
+                                    Icons.account_balance_wallet_rounded,
+                                  ),
+                                ),
+                                validator: (value) {
+                                  final text = (value ?? '').trim();
+                                  if (text.isEmpty) {
+                                    return null;
+                                  }
+                                  final parsed = double.tryParse(text);
+                                  if (parsed == null || parsed < 0) {
+                                    return 'Enter valid cost price';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: isSaving
+                                  ? null
+                                  : () => Navigator.of(sheetContext).pop(),
+                              icon: const Icon(Icons.close_rounded),
+                              label: const Text('Cancel'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: isSaving ? null : saveItem,
+                              icon: isSaving
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.check_rounded),
+                              label: Text(isSaving ? 'Saving' : 'Add item'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    return sheetFuture.whenComplete(() {
+      nameController.dispose();
+      priceController.dispose();
+      stockController.dispose();
+      categoryController.dispose();
+      skuController.dispose();
+      sizeController.dispose();
+      costController.dispose();
+    });
+  }
+
   Future<void> _showInventoryDetailSheet(
     BuildContext context,
     InventoryCatalogItem item,
@@ -47,14 +320,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     dynamic session,
   ) {
     final compact = MediaQuery.sizeOf(context).width < 420;
-    final stockAccent = item.stock <= 5
-        ? const Color(0xFFEF6B67)
-        : const Color(0xFF4EB79B);
+    final stockAccent = item.stock <= 5 ? AppPalette.error : AppPalette.success;
     final tags = <Widget>[
       MobileTag(
         label: formatCurrency(item.price),
         icon: Icons.currency_rupee_rounded,
-        accent: const Color(0xFFE58A47),
+        accent: AppPalette.primary,
       ),
       MobileTag(
         label: 'Stock ${item.stock}',
@@ -64,7 +335,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       MobileTag(
         label: item.category,
         icon: Icons.category_rounded,
-        accent: const Color(0xFF7CA4F8),
+        accent: AppPalette.info,
       ),
     ];
     if ((item.size ?? '').isNotEmpty) {
@@ -72,7 +343,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         MobileTag(
           label: item.size!,
           icon: Icons.straighten_rounded,
-          accent: const Color(0xFF4EB79B),
+          accent: AppPalette.success,
         ),
       );
     }
@@ -81,7 +352,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         MobileTag(
           label: item.sku!,
           icon: Icons.qr_code_2_rounded,
-          accent: const Color(0xFFF0C879),
+          accent: AppPalette.warning,
         ),
       );
     }
@@ -116,7 +387,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   subtitle:
                       'Review stock posture, sell price, and product identity without leaving the inventory flow.',
                   icon: Icons.inventory_2_rounded,
-                  accent: const Color(0xFFE58A47),
+                  accent: AppPalette.primary,
                   tags: tags,
                 ),
                 const SizedBox(height: 16),
@@ -249,6 +520,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     final totalPages = totalCount == 0 ? 1 : (totalCount / _pageSize).ceil();
     final hasActiveFilters =
         _search.trim().isNotEmpty || _selectedCategory != null || _lowStockOnly;
+    final canAddItem =
+        session != null && session.hasShop && !session.isReadOnly;
     final roleProfile = _InventoryRoleProfile.fromSession(
       session: session,
       metrics: metrics,
@@ -275,6 +548,17 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           ),
         ),
         const SizedBox(height: 18),
+        if (canAddItem) ...<Widget>[
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => _showAddInventoryItemSheet(context, session),
+              icon: const Icon(Icons.add_box_rounded),
+              label: const Text('Add item'),
+            ),
+          ),
+          const SizedBox(height: 18),
+        ],
         LayoutBuilder(
           builder: (context, constraints) {
             final count = constraints.maxWidth > 520 ? 3 : 2;
@@ -291,14 +575,14 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   value: '${metrics.totalItems}',
                   caption: 'Products available',
                   icon: Icons.apps_rounded,
-                  accent: const Color(0xFFE58A47),
+                  accent: AppPalette.primary,
                 ),
                 MobileMetricCard(
                   label: 'Low stock',
                   value: '${metrics.lowStock}',
                   caption: _lowStockOnly ? 'Filtered now' : 'Needs refill',
                   icon: Icons.error_outline_rounded,
-                  accent: const Color(0xFFEF6B67),
+                  accent: AppPalette.error,
                 ),
                 MobileMetricCard(
                   label: 'Stock value',
@@ -307,7 +591,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       ? 'Refreshing locally'
                       : 'Local inventory total',
                   icon: Icons.currency_rupee_rounded,
-                  accent: const Color(0xFF4EB79B),
+                  accent: AppPalette.success,
                 ),
               ],
             );
@@ -401,19 +685,19 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       MobileTag(
                         label: 'Search: ${_search.trim()}',
                         icon: Icons.search_rounded,
-                        accent: const Color(0xFFE58A47),
+                        accent: AppPalette.primary,
                       ),
                     if (_selectedCategory != null)
                       MobileTag(
                         label: _selectedCategory!,
                         icon: Icons.inventory_2_rounded,
-                        accent: const Color(0xFF7CA4F8),
+                        accent: AppPalette.info,
                       ),
                     if (_lowStockOnly)
                       const MobileTag(
                         label: 'Low stock only',
                         icon: Icons.error_outline_rounded,
-                        accent: Color(0xFFEF6B67),
+                        accent: AppPalette.error,
                       ),
                   ],
                 ),
@@ -556,12 +840,10 @@ class _InventoryRoleProfile {
         ? '${metrics.lowStock} low stock'
         : '${metrics.totalItems} products';
     final primaryAccent = metrics.lowStock > 0
-        ? const Color(0xFFEF6B67)
-        : const Color(0xFFE58A47);
+        ? AppPalette.error
+        : AppPalette.primary;
     final secondaryLabel = syncing ? 'Refreshing' : 'Stock view ready';
-    final secondaryAccent = syncing
-        ? const Color(0xFFE58A47)
-        : const Color(0xFF4EB79B);
+    final secondaryAccent = syncing ? AppPalette.primary : AppPalette.success;
 
     if (session?.isCashierLike ?? false) {
       return _InventoryRoleProfile(
@@ -571,7 +853,7 @@ class _InventoryRoleProfile {
         leadSubtitle:
             'Search products, check available stock, and spot refill risk without leaving the selling flow.',
         leadIcon: Icons.inventory_2_rounded,
-        leadAccent: const Color(0xFF1D4ED8),
+        leadAccent: AppPalette.inventory,
         primaryTagLabel: primaryLabel,
         primaryTagIcon: Icons.inventory_2_rounded,
         primaryTagAccent: primaryAccent,
@@ -590,7 +872,7 @@ class _InventoryRoleProfile {
         leadSubtitle:
             'Use one fast surface to search the catalog, scan refill risk, and monitor local stock value.',
         leadIcon: Icons.inventory_2_rounded,
-        leadAccent: const Color(0xFF1D4ED8),
+        leadAccent: AppPalette.inventory,
         primaryTagLabel: primaryLabel,
         primaryTagIcon: Icons.error_outline_rounded,
         primaryTagAccent: primaryAccent,
@@ -610,7 +892,7 @@ class _InventoryRoleProfile {
       leadSubtitle:
           'Track stock health, product count, and local inventory value from one cleaner catalog view.',
       leadIcon: Icons.inventory_2_rounded,
-      leadAccent: const Color(0xFF1D4ED8),
+      leadAccent: AppPalette.inventory,
       primaryTagLabel: primaryLabel,
       primaryTagIcon: Icons.inventory_2_rounded,
       primaryTagAccent: primaryAccent,
@@ -637,7 +919,7 @@ class _CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = const Color(0xFFE58A47);
+    final activeColor = AppPalette.primary;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: Material(
@@ -673,9 +955,7 @@ class _InventoryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final priceTone = item.stock <= 5
-        ? const Color(0xFFEF6B67)
-        : const Color(0xFFE58A47);
+    final priceTone = item.stock <= 5 ? AppPalette.error : AppPalette.primary;
     final secondary = [
       item.category,
       if ((item.size ?? '').isNotEmpty) item.size!,
@@ -689,7 +969,7 @@ class _InventoryRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         child: Ink(
           decoration: BoxDecoration(
-            color: const Color(0xFF232A36),
+            color: AppPalette.surfaceStrong.withValues(alpha: 0.66),
             borderRadius: BorderRadius.circular(22),
             border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
           ),

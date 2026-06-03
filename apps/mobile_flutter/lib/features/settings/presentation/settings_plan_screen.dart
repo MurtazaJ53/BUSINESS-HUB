@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -34,16 +36,16 @@ class SettingsPlanScreen extends ConsumerWidget {
             subtitle:
                 'See what this workspace includes now, what the next plan unlocks, and when an upgrade is actually worth it.',
             icon: Icons.workspace_premium_rounded,
-            accent: const Color(0xFFF0C879),
+            accent: AppPalette.warning,
             primaryTag: MobileTag(
               label: '${shop.planLabel} plan',
               icon: Icons.workspace_premium_rounded,
-              accent: const Color(0xFFF0C879),
+              accent: AppPalette.warning,
             ),
             secondaryTag: MobileTag(
               label: session?.displayRoleLabel ?? 'GUEST',
               icon: Icons.badge_rounded,
-              accent: const Color(0xFFE58A47),
+              accent: AppPalette.primary,
             ),
           ),
           const SizedBox(height: 18),
@@ -87,7 +89,7 @@ class SettingsPlanScreen extends ConsumerWidget {
               action: MobileTag(
                 label: _nextPlanLabel(shop),
                 icon: Icons.trending_up_rounded,
-                accent: const Color(0xFF4EB79B),
+                accent: AppPalette.success,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -115,7 +117,7 @@ class SettingsPlanScreen extends ConsumerWidget {
               action: MobileTag(
                 label: _nextPlanSectionTitle(shop),
                 icon: Icons.compare_arrows_rounded,
-                accent: const Color(0xFFE58A47),
+                accent: AppPalette.primary,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,7 +140,7 @@ class SettingsPlanScreen extends ConsumerWidget {
               action: MobileTag(
                 label: '3 tiers',
                 icon: Icons.view_carousel_rounded,
-                accent: const Color(0xFF4EB79B),
+                accent: AppPalette.success,
               ),
               child: Column(
                 children: const <Widget>[
@@ -156,7 +158,7 @@ class SettingsPlanScreen extends ConsumerWidget {
               action: MobileTag(
                 label: 'Owner action',
                 icon: Icons.campaign_rounded,
-                accent: const Color(0xFFF0C879),
+                accent: AppPalette.warning,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -564,3 +566,5 @@ String _buildUpgradeBriefText(ShopInfo shop, MobileSession? session) {
 
   return buffer.toString().trimRight();
 }
+
+

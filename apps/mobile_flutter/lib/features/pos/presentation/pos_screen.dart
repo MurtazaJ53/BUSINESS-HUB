@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 
@@ -104,7 +106,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 customerDomainState: customerDomainState,
                 activeShopId: session?.shopId,
               ),
-              backgroundColor: const Color(0xFFE58A47),
+              backgroundColor: AppPalette.primary,
               icon: const Icon(Icons.shopping_bag_rounded),
               label: Text(
                 'Checkout ${formatCurrency(_cartTotal)}',
@@ -139,8 +141,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   ? Icons.hourglass_top_rounded
                   : Icons.shopping_bag_rounded,
               accent: _cart.isEmpty
-                  ? const Color(0xFF7CA4F8)
-                  : const Color(0xFF4EB79B),
+                  ? AppPalette.info
+                  : AppPalette.success,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -156,7 +158,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                             ? 'Ready for the first bill'
                             : '${_cart.length} line${_cart.length == 1 ? '' : 's'} ready',
                         icon: Icons.currency_rupee_rounded,
-                        accent: const Color(0xFF4EB79B),
+                        accent: AppPalette.success,
                       ),
                       _PosPulseCard(
                         label: 'Customer',
@@ -167,7 +169,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                   _selectedCustomer?.email ??
                                   'Ledger linked'),
                         icon: Icons.groups_rounded,
-                        accent: const Color(0xFFE58A47),
+                        accent: AppPalette.primary,
                       ),
                     ];
                     if (stacked) {
@@ -350,13 +352,13 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                         MobileTag(
                           label: 'Search: ${_search.trim()}',
                           icon: Icons.search_rounded,
-                          accent: const Color(0xFFE58A47),
+                          accent: AppPalette.primary,
                         ),
                       if (_selectedCategory != null)
                         MobileTag(
                           label: _selectedCategory!,
                           icon: Icons.inventory_2_rounded,
-                          accent: const Color(0xFF7CA4F8),
+                          accent: AppPalette.info,
                         ),
                     ],
                   ),
@@ -498,7 +500,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   subtitle:
                       'Use the camera for live scanning or run an exact lookup against the code already typed into search.',
                   icon: Icons.qr_code_scanner_rounded,
-                  accent: const Color(0xFFE58A47),
+                  accent: AppPalette.primary,
                   tags: <Widget>[
                     MobileTag(
                       label: typedCode.isEmpty
@@ -508,15 +510,15 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                           ? Icons.keyboard_alt_rounded
                           : Icons.verified_rounded,
                       accent: typedCode.isEmpty
-                          ? const Color(0xFF7CA4F8)
-                          : const Color(0xFF4EB79B),
+                          ? AppPalette.info
+                          : AppPalette.success,
                     ),
                   ],
                 ),
                 const SizedBox(height: 18),
                 MobileSheetSection(
                   title: 'Choose action',
-                  accent: const Color(0xFFE58A47),
+                  accent: AppPalette.primary,
                   child: Column(
                     children: <Widget>[
                       ListTile(
@@ -721,7 +723,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                             MobileTag(
                               label: '${_cart.length} lines',
                               icon: Icons.shopping_basket_rounded,
-                              accent: const Color(0xFF4EB79B),
+                              accent: AppPalette.success,
                             ),
                           ],
                         ),
@@ -1103,7 +1105,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                       .textTheme
                                       .headlineSmall
                                       ?.copyWith(
-                                        color: const Color(0xFF4EB79B),
+                                        color: AppPalette.success,
                                         fontWeight: FontWeight.w900,
                                       ),
                                 ),
@@ -1114,7 +1116,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                         const SizedBox(height: 12),
                         DecoratedBox(
                           decoration: BoxDecoration(
-                            color: const Color(0xFF232A36),
+                            color: AppPalette.surfaceStrong.withValues(alpha: 0.66),
                             borderRadius: BorderRadius.circular(22),
                             border: Border.all(
                               color: Colors.white.withValues(alpha: 0.05),
@@ -1127,7 +1129,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                 _CheckoutSummaryRow(
                                   label: 'Collected now',
                                   value: formatCurrency(checkoutCollected),
-                                  tone: const Color(0xFFE58A47),
+                                  tone: AppPalette.primary,
                                 ),
                                 const SizedBox(height: 10),
                                 _CheckoutSummaryRow(
@@ -1136,8 +1138,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                     checkoutDue > 0 ? checkoutDue : 0,
                                   ),
                                   tone: checkoutDue > 0
-                                      ? const Color(0xFFF0C879)
-                                      : const Color(0xFF4EB79B),
+                                      ? AppPalette.warning
+                                      : AppPalette.success,
                                 ),
                               ],
                             ),
@@ -1148,13 +1150,13 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                           const SizedBox(height: 12),
                           DecoratedBox(
                             decoration: BoxDecoration(
-                              color: const Color(0xFF232A36),
+                              color: AppPalette.surfaceStrong.withValues(alpha: 0.66),
                               borderRadius: BorderRadius.circular(22),
                               border: Border.all(
                                 color:
                                     (checkoutDue > 0
-                                            ? const Color(0xFFF0C879)
-                                            : const Color(0xFF4EB79B))
+                                            ? AppPalette.warning
+                                            : AppPalette.success)
                                         .withValues(alpha: 0.2),
                               ),
                             ),
@@ -1185,8 +1187,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                                   .account_balance_wallet_rounded
                                             : Icons.verified_rounded,
                                         accent: checkoutDue > 0
-                                            ? const Color(0xFFF0C879)
-                                            : const Color(0xFF4EB79B),
+                                            ? AppPalette.warning
+                                            : AppPalette.success,
                                       ),
                                     ],
                                   ),
@@ -1197,8 +1199,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                       currentCustomerBalance,
                                     ),
                                     tone: currentCustomerBalance > 0
-                                        ? const Color(0xFFF0C879)
-                                        : const Color(0xFFE58A47),
+                                        ? AppPalette.warning
+                                        : AppPalette.primary,
                                   ),
                                   const SizedBox(height: 10),
                                   _CheckoutSummaryRow(
@@ -1207,8 +1209,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                       projectedCustomerBalance,
                                     ),
                                     tone: projectedCustomerBalance > 0
-                                        ? const Color(0xFFF0C879)
-                                        : const Color(0xFF4EB79B),
+                                        ? AppPalette.warning
+                                        : AppPalette.success,
                                   ),
                                   if (checkoutDue > 0) ...<Widget>[
                                     const SizedBox(height: 10),
@@ -1477,13 +1479,13 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                       subtitle:
                           '${customer.name} already carries ${formatCurrency(currentBalance)} due. This sale adds ${formatCurrency(additionalDue)} more and moves the projected balance to ${formatCurrency(projectedBalance)}.',
                       icon: Icons.warning_amber_rounded,
-                      accent: const Color(0xFFF0C879),
+                      accent: AppPalette.warning,
                       tags: <Widget>[
                         MobileTag(
                           label:
                               'Projected ${formatCurrency(projectedBalance)}',
                           icon: Icons.account_balance_wallet_rounded,
-                          accent: const Color(0xFFEF6B67),
+                          accent: AppPalette.error,
                         ),
                       ],
                     ),
@@ -1571,12 +1573,12 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                         subtitle:
                             'Search the migrated customer list and attach the right buyer before checkout.',
                         icon: Icons.groups_rounded,
-                        accent: const Color(0xFF4EB79B),
+                        accent: AppPalette.success,
                         tags: const <Widget>[
                           MobileTag(
                             label: 'Live customer mode',
                             icon: Icons.verified_rounded,
-                            accent: Color(0xFF4EB79B),
+                            accent: AppPalette.success,
                           ),
                         ],
                       ),
@@ -1648,7 +1650,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                           ),
                                           child: Ink(
                                             decoration: BoxDecoration(
-                                              color: const Color(0xFF232A36),
+                                              color: AppPalette.surfaceStrong.withValues(alpha: 0.66),
                                               borderRadius:
                                                   BorderRadius.circular(20),
                                               border: Border.all(
@@ -1816,12 +1818,12 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                       subtitle:
                           'This cart needs more quantity than current stock. Force sale no longer needs a PIN, but we still want a clear confirmation.',
                       icon: Icons.inventory_2_rounded,
-                      accent: const Color(0xFFEF6B67),
+                      accent: AppPalette.error,
                       tags: <Widget>[
                         MobileTag(
                           label: '${shortages.length} short lines',
                           icon: Icons.priority_high_rounded,
-                          accent: const Color(0xFFF0C879),
+                          accent: AppPalette.warning,
                         ),
                       ],
                     ),
@@ -1956,13 +1958,13 @@ class _PosRoleProfile {
         ? Icons.shopping_cart_checkout_rounded
         : Icons.flash_on_rounded;
     final primaryAccent = pending > 0
-        ? const Color(0xFFF0C879)
-        : const Color(0xFF4EB79B);
+        ? AppPalette.warning
+        : AppPalette.success;
     final secondaryLabel = syncing ? 'Syncing' : 'Local fast path';
     final secondaryIcon = syncing ? Icons.sync_rounded : Icons.bolt_rounded;
     final secondaryAccent = syncing
-        ? const Color(0xFFE58A47)
-        : const Color(0xFF7CA4F8);
+        ? AppPalette.primary
+        : AppPalette.info;
 
     if (session?.isCashierLike ?? false) {
       return _PosRoleProfile(
@@ -1973,7 +1975,7 @@ class _PosRoleProfile {
             ? 'The cart is live. Review it when you are ready to collect payment, or keep adding products without losing pace.'
             : 'Search, scan, and add products with the fewest taps possible. Checkout stays one step away.',
         leadIcon: Icons.point_of_sale_rounded,
-        leadAccent: const Color(0xFFF0C879),
+        leadAccent: AppPalette.warning,
         primaryTagLabel: primaryLabel,
         primaryTagIcon: primaryIcon,
         primaryTagAccent: primaryAccent,
@@ -1994,7 +1996,7 @@ class _PosRoleProfile {
             ? 'This cart is ready for payment. Keep the line moving while stock and customer context stay close.'
             : 'Use the same fast checkout surface while keeping customer and stock context within one screen.',
         leadIcon: Icons.payments_rounded,
-        leadAccent: const Color(0xFF4EB79B),
+        leadAccent: AppPalette.success,
         primaryTagLabel: primaryLabel,
         primaryTagIcon: primaryIcon,
         primaryTagAccent: primaryAccent,
@@ -2014,7 +2016,7 @@ class _PosRoleProfile {
           ? 'Billing is active. Revenue, customers, and stock movement stay inside one clean checkout flow.'
           : 'Use the checkout surface to bill quickly without dragging admin complexity into the sales counter.',
       leadIcon: Icons.point_of_sale_rounded,
-      leadAccent: const Color(0xFFF0C879),
+      leadAccent: AppPalette.warning,
       primaryTagLabel: primaryLabel,
       primaryTagIcon: primaryIcon,
       primaryTagAccent: primaryAccent,
@@ -2046,7 +2048,7 @@ class _PosPulseCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF232A36),
+        color: AppPalette.surfaceStrong.withValues(alpha: 0.66),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
@@ -2108,7 +2110,7 @@ class _PosCartPreviewRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF232A36),
+        color: AppPalette.surfaceStrong.withValues(alpha: 0.66),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
@@ -2143,7 +2145,7 @@ class _PosCartPreviewRow extends StatelessWidget {
             Text(
               formatCurrency(item.lineTotal),
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: const Color(0xFF4EB79B),
+                color: AppPalette.success,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -2163,8 +2165,8 @@ class _PosCatalogRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stockTone = item.stock <= 5
-        ? const Color(0xFFEF6B67)
-        : const Color(0xFF4EB79B);
+        ? AppPalette.error
+        : AppPalette.success;
     final secondary = [
       if ((item.sku ?? '').isNotEmpty) item.sku!,
       item.category,
@@ -2174,7 +2176,7 @@ class _PosCatalogRow extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF232A36),
+        color: AppPalette.surfaceStrong.withValues(alpha: 0.66),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
@@ -2272,7 +2274,7 @@ class _PosCategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = const Color(0xFFE58A47);
+    final activeColor = AppPalette.primary;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: Material(
@@ -2373,7 +2375,7 @@ class _SplitPaymentPanel extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF232A36),
+        color: AppPalette.surfaceStrong.withValues(alpha: 0.66),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
@@ -2501,3 +2503,5 @@ class _CheckoutSummaryRow extends StatelessWidget {
     );
   }
 }
+
+

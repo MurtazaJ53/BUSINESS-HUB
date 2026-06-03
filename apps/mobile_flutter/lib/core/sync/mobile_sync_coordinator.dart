@@ -80,6 +80,7 @@ class MobileSyncCoordinator {
   final void Function(MobileSyncStatus status) setStatus;
 
   MobileSession? _session;
+  bool _inventoryReadsUseBackend = false;
   bool _customersReadUseBackend = false;
   bool _salesReadsUseBackend = false;
   bool _isFlushingOutbox = false;
@@ -129,8 +130,10 @@ class MobileSyncCoordinator {
       _refreshBackendDomainEpochs(session, shopId),
     ]);
     final domainStates = setupResults[1] as Map<String, DomainControlState>;
+    final inventoryState = domainStates['inventory'];
     final customerState = domainStates['customers'];
     final salesState = domainStates['sales'];
+    _inventoryReadsUseBackend = inventoryState?.isPostgresPrimary ?? false;
     _customersReadUseBackend = customerState?.isPostgresPrimary ?? false;
     _salesReadsUseBackend = salesState?.isPostgresPrimary ?? false;
     await _primeWorkspaceSnapshot(
@@ -139,6 +142,10 @@ class MobileSyncCoordinator {
       includeFirestoreCustomers: !_customersReadUseBackend,
       includeFirestoreSales: !_salesReadsUseBackend,
     );
+
+    if (_inventoryReadsUseBackend) {
+      await _syncBackendInventorySnapshot(session, shopId);
+    }
 
     _subscriptions.add(
       _firestore
@@ -289,6 +296,98 @@ class MobileSyncCoordinator {
       setStatus(MobileSyncStatus.idle);
     } catch (error) {
       debugPrint('Workspace settings update failed: $error');
+      setStatus(MobileSyncStatus.error);
+      rethrow;
+    }
+  }
+
+  Future<void> createInventoryItem({
+    required String name,
+    required double sellPrice,
+    required int openingStock,
+    String sku = '',
+    String barcode = '',
+    String category = 'General',
+    String subcategory = '',
+    String size = '',
+    String description = '',
+    double? costPrice,
+  }) async {
+    final session = _session;
+    if (session == null || !session.hasShop) {
+      throw StateError('Sign in to a workspace before adding inventory.');
+    }
+    if (session.isReadOnly) {
+      throw StateError('Viewer access cannot add inventory items.');
+    }
+
+    setStatus(MobileSyncStatus.syncing);
+    final now = DateTime.now();
+    final updatedAt = now.millisecondsSinceEpoch;
+    final normalizedCategory = category.trim().isEmpty
+        ? 'General'
+        : category.trim();
+
+    try {
+      final created = await _backendApiClient.createInventoryItem(
+        user: session.user,
+        shopId: session.shopId!,
+        name: name.trim(),
+        sellPrice: sellPrice,
+        openingStock: openingStock,
+        sku: sku.trim(),
+        barcode: barcode.trim(),
+        category: normalizedCategory,
+        subcategory: subcategory.trim(),
+        size: size.trim(),
+        description: description.trim(),
+        costPrice: session.canViewCost ? costPrice : null,
+      );
+      await _inventoryRepository.mergeBackendInventoryItem(
+        created,
+        updatedAt: updatedAt,
+      );
+      setStatus(MobileSyncStatus.idle);
+    } on BackendApiException catch (error) {
+      final canUseLocalFallback =
+          error.statusCode == null || error.statusCode == 409;
+      if (!canUseLocalFallback) {
+        setStatus(MobileSyncStatus.error);
+        rethrow;
+      }
+      await _createInventoryItemOnFirestore(
+        session: session,
+        name: name.trim(),
+        sellPrice: sellPrice,
+        openingStock: openingStock,
+        sku: sku.trim(),
+        barcode: barcode.trim(),
+        category: normalizedCategory,
+        subcategory: subcategory.trim(),
+        size: size.trim(),
+        description: description.trim(),
+        costPrice: session.canViewCost ? costPrice : null,
+        timestamp: now,
+      );
+      setStatus(MobileSyncStatus.idle);
+    } on IOException catch (error) {
+      debugPrint('Inventory backend unavailable, using local fallback: $error');
+      await _createInventoryItemOnFirestore(
+        session: session,
+        name: name.trim(),
+        sellPrice: sellPrice,
+        openingStock: openingStock,
+        sku: sku.trim(),
+        barcode: barcode.trim(),
+        category: normalizedCategory,
+        subcategory: subcategory.trim(),
+        size: size.trim(),
+        description: description.trim(),
+        costPrice: session.canViewCost ? costPrice : null,
+        timestamp: now,
+      );
+      setStatus(MobileSyncStatus.idle);
+    } catch (_) {
       setStatus(MobileSyncStatus.error);
       rethrow;
     }
@@ -719,6 +818,108 @@ class MobileSyncCoordinator {
       if (updateStatus) {
         setStatus(MobileSyncStatus.error);
       }
+    }
+  }
+
+  Future<void> _syncBackendInventorySnapshot(
+    MobileSession session,
+    String shopId, {
+    bool updateStatus = true,
+  }) async {
+    try {
+      final backendItems = await _backendApiClient.fetchInventoryItems(
+        user: session.user,
+        shopId: shopId,
+      );
+      final updatedAt = DateTime.now().millisecondsSinceEpoch;
+      for (final item in backendItems) {
+        await _inventoryRepository.mergeBackendInventoryItem(
+          item,
+          updatedAt: updatedAt,
+        );
+      }
+      if (updateStatus) {
+        setStatus(MobileSyncStatus.idle);
+      }
+    } catch (error) {
+      debugPrint('Backend inventory snapshot sync failed: $error');
+      if (updateStatus) {
+        setStatus(MobileSyncStatus.error);
+      }
+    }
+  }
+
+  Future<void> _createInventoryItemOnFirestore({
+    required MobileSession session,
+    required String name,
+    required double sellPrice,
+    required int openingStock,
+    required String sku,
+    required String barcode,
+    required String category,
+    required String subcategory,
+    required String size,
+    required String description,
+    required double? costPrice,
+    required DateTime timestamp,
+  }) async {
+    final itemRef = _firestore
+        .collection('shops/${session.shopId!}/inventory')
+        .doc();
+    final isoTimestamp = timestamp.toIso8601String();
+    final payload = <String, dynamic>{
+      'name': name,
+      'price': sellPrice,
+      'sell_price': sellPrice,
+      'sku': sku,
+      'barcode': barcode,
+      'category': category,
+      'subcategory': subcategory,
+      'size': size,
+      'description': description,
+      'stock': openingStock,
+      'status': 'active',
+      'tombstone': false,
+      'sourceMeta': <String, dynamic>{
+        'created_from': 'mobile_inventory',
+        'actor_uid': session.uid,
+      },
+      'createdAt': isoTimestamp,
+      'updatedAt': isoTimestamp,
+    };
+
+    await _inventoryRepository.mergeInventoryDocument(
+      itemRef.id,
+      payload,
+      updatedAt: timestamp.millisecondsSinceEpoch,
+    );
+
+    if (costPrice != null) {
+      final privatePayload = <String, dynamic>{
+        'costPrice': costPrice,
+        'updatedAt': isoTimestamp,
+        'tombstone': false,
+      };
+      await _inventoryRepository.mergeInventoryPrivateDocument(
+        itemRef.id,
+        privatePayload,
+        updatedAt: timestamp.millisecondsSinceEpoch,
+      );
+    }
+
+    try {
+      await itemRef.set(payload);
+      if (costPrice != null) {
+        await _firestore
+            .doc('shops/${session.shopId!}/inventory_private/${itemRef.id}')
+            .set(<String, dynamic>{
+              'costPrice': costPrice,
+              'updatedAt': timestamp.toIso8601String(),
+              'tombstone': false,
+            });
+      }
+    } catch (error) {
+      debugPrint('Inventory cloud fallback write skipped: $error');
     }
   }
 

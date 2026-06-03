@@ -84,7 +84,7 @@ function buildAttentionCard(
       body: "Once a shop is active, this page will highlight the next thing that needs action.",
       ctaLabel: "View settings",
       href: "/",
-      tone: "text-[var(--accent)] border-[rgba(71,176,255,0.18)] bg-[rgba(11,24,41,0.72)]",
+      tone: "text-[var(--primary)] border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)]",
     };
   }
 
@@ -94,7 +94,7 @@ function buildAttentionCard(
       body: `${snapshot.low_stock_items_count} products are running low. Review stock before the next rush.`,
       ctaLabel: "Open inventory",
       href: "/inventory",
-      tone: "text-[var(--warning)] border-[rgba(255,138,106,0.18)] bg-[rgba(38,16,12,0.72)]",
+      tone: "text-[var(--warning)] border-[rgba(245,158,11,0.2)] bg-[rgba(245,158,11,0.08)]",
     };
   }
 
@@ -104,7 +104,7 @@ function buildAttentionCard(
       body: `Outstanding balances are now at ${formatCurrency(Number(snapshot.total_outstanding_balance), currencyCode)}.`,
       ctaLabel: "Open customers",
       href: "/customers",
-      tone: "text-[var(--accent)] border-[rgba(71,176,255,0.18)] bg-[rgba(11,24,41,0.72)]",
+      tone: "text-[var(--info)] border-[rgba(6,182,212,0.2)] bg-[rgba(6,182,212,0.08)]",
     };
   }
 
@@ -114,7 +114,7 @@ function buildAttentionCard(
       body: `${snapshot.active_credit_customers_count} customer accounts still need balance follow-up.`,
       ctaLabel: "Open customers",
       href: "/customers",
-      tone: "text-[var(--accent)] border-[rgba(71,176,255,0.18)] bg-[rgba(11,24,41,0.72)]",
+      tone: "text-[var(--info)] border-[rgba(6,182,212,0.2)] bg-[rgba(6,182,212,0.08)]",
     };
   }
 
@@ -124,7 +124,7 @@ function buildAttentionCard(
       body: "Open sales and confirm the shop has started recording today's activity.",
       ctaLabel: "Open sales",
       href: "/sales",
-      tone: "text-[var(--accent)] border-[rgba(71,176,255,0.18)] bg-[rgba(11,24,41,0.72)]",
+      tone: "text-[var(--primary)] border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)]",
     };
   }
 
@@ -133,7 +133,7 @@ function buildAttentionCard(
     body: "Stock, dues, and sales are all within a healthy range right now.",
     ctaLabel: "Review receipts",
     href: "/sales",
-    tone: "text-[var(--success)] border-[rgba(58,215,162,0.18)] bg-[rgba(8,34,26,0.72)]",
+    tone: "text-[var(--success)] border-[rgba(16,185,129,0.2)] bg-[rgba(16,185,129,0.08)]",
   };
 }
 
@@ -144,12 +144,12 @@ function buildAttentionCardFromPulse(pulse: WorkspacePulseSnapshot | null) {
 
   const tone =
     pulse.headline.tone === "critical" || pulse.headline.tone === "danger"
-      ? "text-[var(--warning)] border-[rgba(251,113,133,0.18)] bg-[rgba(40,12,19,0.72)]"
+      ? "text-[var(--error)] border-[rgba(239,68,68,0.2)] bg-[rgba(239,68,68,0.08)]"
       : pulse.headline.tone === "warning"
-      ? "text-[var(--warning)] border-[rgba(245,158,11,0.18)] bg-[rgba(77,49,9,0.34)]"
+      ? "text-[var(--warning)] border-[rgba(245,158,11,0.2)] bg-[rgba(245,158,11,0.08)]"
       : pulse.headline.tone === "healthy"
-      ? "text-[var(--success)] border-[rgba(58,215,162,0.18)] bg-[rgba(8,34,26,0.72)]"
-      : "text-[var(--accent)] border-[rgba(71,176,255,0.18)] bg-[rgba(11,24,41,0.72)]";
+      ? "text-[var(--success)] border-[rgba(16,185,129,0.2)] bg-[rgba(16,185,129,0.08)]"
+      : "text-[var(--primary)] border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)]";
 
   return {
     title: pulse.headline.title,
@@ -169,7 +169,7 @@ function buildPlanGuidance(activeShop: ShopMembership | null) {
     return {
       title: "Starter keeps the workspace lean",
       body: "This plan focuses on selling, stock, customers, and receipts. Expenses and attendance stay hidden until the shop upgrades.",
-      tone: "text-[var(--accent)] border-[rgba(71,176,255,0.18)] bg-[rgba(11,24,41,0.72)]",
+      tone: "text-[var(--primary)] border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)]",
     };
   }
 
@@ -177,14 +177,14 @@ function buildPlanGuidance(activeShop: ShopMembership | null) {
     return {
       title: "Growth adds store operations",
       body: "This workspace includes daily operations like expenses and attendance while still avoiding heavier back-office clutter.",
-      tone: "text-[var(--success)] border-[rgba(58,215,162,0.18)] bg-[rgba(8,34,26,0.72)]",
+      tone: "text-[var(--success)] border-[rgba(16,185,129,0.2)] bg-[rgba(16,185,129,0.08)]",
     };
   }
 
   return {
     title: "Pro unlocks deeper control",
     body: "This workspace can open stronger operations and support paths while still keeping ERP internals out of normal store flows.",
-    tone: "text-[var(--warning)] border-[rgba(245,158,11,0.18)] bg-[rgba(52,34,8,0.72)]",
+    tone: "text-[var(--warning)] border-[rgba(245,158,11,0.2)] bg-[rgba(245,158,11,0.08)]",
   };
 }
 

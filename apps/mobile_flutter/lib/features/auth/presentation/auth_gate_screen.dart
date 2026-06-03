@@ -232,7 +232,7 @@ class _AuthScaffold extends StatelessWidget {
             colors: <Color>[
               AppPalette.background,
               AppPalette.backgroundSoft,
-              AppPalette.backgroundAlt,
+              AppPalette.backgroundSoft,
             ],
           ),
         ),
@@ -279,7 +279,7 @@ class _AuthHero extends StatelessWidget {
       action: const MobileTag(
         label: 'LIVE LINK ACTIVE',
         icon: Icons.wifi_tethering_rounded,
-        accent: AppPalette.jade,
+        accent: AppPalette.success,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -292,7 +292,7 @@ class _AuthHero extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   gradient: const LinearGradient(
-                    colors: <Color>[AppPalette.gold, AppPalette.primary],
+                    colors: <Color>[AppPalette.warning, AppPalette.primary],
                   ),
                 ),
                 child: const Icon(
@@ -317,7 +317,7 @@ class _AuthHero extends StatelessWidget {
                     Text(
                       'ZARRA ECOSYSTEM',
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: AppPalette.textMuted,
+                        color: AppPalette.textTertiary,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 2.2,
                       ),
@@ -348,12 +348,12 @@ class _AuthHero extends StatelessWidget {
               MobileTag(
                 label: 'FIREBASE SECURED',
                 icon: Icons.shield_rounded,
-                accent: AppPalette.jade,
+                accent: AppPalette.success,
               ),
               MobileTag(
                 label: 'PREMIUM CHECKOUT FLOW',
                 icon: Icons.point_of_sale_rounded,
-                accent: AppPalette.gold,
+                accent: AppPalette.warning,
               ),
             ],
           ),
@@ -396,7 +396,7 @@ class _AuthCard extends StatelessWidget {
       action: MobileTag(
         label: recoveryMode ? 'RECOVERY MODE' : 'SECURE LOGIN',
         icon: recoveryMode ? Icons.key_rounded : Icons.lock_rounded,
-        accent: recoveryMode ? AppPalette.gold : AppPalette.primary,
+        accent: recoveryMode ? AppPalette.warning : AppPalette.primary,
       ),
       child: Form(
         key: formKey,
@@ -405,9 +405,9 @@ class _AuthCard extends StatelessWidget {
           children: <Widget>[
             DecoratedBox(
               decoration: BoxDecoration(
-                color: AppPalette.panelStrong,
+                color: AppPalette.surfaceStrong,
                 borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: AppPalette.lineSoft),
+                border: Border.all(color: AppPalette.borderSoft),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(6),
@@ -493,7 +493,7 @@ class _AuthCard extends StatelessWidget {
                   color: const Color(0xFF2D1819),
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(
-                    color: AppPalette.coral.withValues(alpha: 0.3),
+                    color: AppPalette.error.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(
@@ -501,7 +501,7 @@ class _AuthCard extends StatelessWidget {
                   children: <Widget>[
                     const Icon(
                       Icons.warning_amber_rounded,
-                      color: AppPalette.coral,
+                      color: AppPalette.error,
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -540,7 +540,7 @@ class _AuthCard extends StatelessWidget {
             Text(
               'The mobile app mounts local SQLite first, then syncs your live workspace after sign-in.',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: AppPalette.textMuted,
+                color: AppPalette.textTertiary,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -627,7 +627,7 @@ class _BrandedStatus extends StatelessWidget {
             width: 72,
             height: 72,
             decoration: BoxDecoration(
-              color: AppPalette.panelMuted,
+              color: AppPalette.backgroundSoft,
               borderRadius: BorderRadius.circular(24),
             ),
             child: Icon(icon, color: Colors.white, size: 34),

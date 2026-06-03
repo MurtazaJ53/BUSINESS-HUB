@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -208,7 +210,7 @@ class _SettingsAttendanceScreenState
                               errorText!,
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: const Color(0xFFEF6B67),
+                                    color: AppPalette.error,
                                     fontWeight: FontWeight.w700,
                                   ),
                             ),
@@ -356,11 +358,11 @@ class _SettingsAttendanceScreenState
                 ? 'Review who is on the floor, mark today for the team, and keep staffing visible without opening a separate HR system.'
                 : 'Mark your shift, review your recent attendance, and keep your daily operator access connected to this workspace.',
             icon: Icons.fact_check_rounded,
-            accent: const Color(0xFFE58A47),
+            accent: AppPalette.primary,
             primaryTag: MobileTag(
               label: session.displayRoleLabel,
               icon: Icons.badge_rounded,
-              accent: const Color(0xFF4EB79B),
+              accent: AppPalette.success,
             ),
             secondaryTag: MobileTag(
               label: todayRecord == null
@@ -370,8 +372,8 @@ class _SettingsAttendanceScreenState
                   ? Icons.event_busy_rounded
                   : Icons.event_available_rounded,
               accent: todayRecord == null
-                  ? const Color(0xFFF0C879)
-                  : const Color(0xFF4EB79B),
+                  ? AppPalette.warning
+                  : AppPalette.success,
             ),
           ),
           const SizedBox(height: 18),
@@ -397,7 +399,7 @@ class _SettingsAttendanceScreenState
               icon: session.isOwnerLike
                   ? Icons.groups_rounded
                   : Icons.person_pin_circle_rounded,
-              accent: const Color(0xFFE58A47),
+              accent: AppPalette.primary,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -455,21 +457,21 @@ class _SettingsAttendanceScreenState
                     value: '${summary?.totalSessions ?? sessions.length}',
                     caption: 'Attendance sessions visible',
                     icon: Icons.list_alt_rounded,
-                    accent: const Color(0xFFE58A47),
+                    accent: AppPalette.primary,
                   ),
                   MobileMetricCard(
                     label: 'Present',
                     value: '${summary?.presentCount ?? 0}',
                     caption: 'Marked present',
                     icon: Icons.check_circle_rounded,
-                    accent: const Color(0xFF4EB79B),
+                    accent: AppPalette.success,
                   ),
                   MobileMetricCard(
                     label: 'Leave',
                     value: '${summary?.leaveCount ?? 0}',
                     caption: 'Leave sessions',
                     icon: Icons.beach_access_rounded,
-                    accent: const Color(0xFFF0C879),
+                    accent: AppPalette.warning,
                   ),
                   MobileMetricCard(
                     label: 'On floor today',
@@ -478,7 +480,7 @@ class _SettingsAttendanceScreenState
                         ? 'Team active today'
                         : 'Active workers today',
                     icon: Icons.groups_rounded,
-                    accent: const Color(0xFF7CA4F8),
+                    accent: AppPalette.info,
                   ),
                 ],
               );
@@ -493,8 +495,8 @@ class _SettingsAttendanceScreenState
                   ? Icons.edit_calendar_rounded
                   : Icons.verified_rounded,
               accent: todayRecord == null
-                  ? const Color(0xFFF0C879)
-                  : const Color(0xFF4EB79B),
+                  ? AppPalette.warning
+                  : AppPalette.success,
             ),
             child: currentMembershipId == null && !session.isOwnerLike
                 ? const MobileEmptyState(
@@ -567,7 +569,7 @@ class _SettingsAttendanceScreenState
               icon: sessionsAsync.isLoading
                   ? Icons.sync_rounded
                   : Icons.receipt_long_rounded,
-              accent: const Color(0xFFE58A47),
+              accent: AppPalette.primary,
             ),
             child: sessionsAsync.isLoading
                 ? const MobileEmptyState(
@@ -612,10 +614,10 @@ class _AttendanceSessionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = switch (record.status) {
-      'PRESENT' => const Color(0xFF4EB79B),
-      'HALF_DAY' => const Color(0xFFE58A47),
-      'LEAVE' => const Color(0xFFF0C879),
-      _ => const Color(0xFFEF6B67),
+      'PRESENT' => AppPalette.success,
+      'HALF_DAY' => AppPalette.primary,
+      'LEAVE' => AppPalette.warning,
+      _ => AppPalette.error,
     };
 
     return DecoratedBox(
@@ -664,20 +666,20 @@ class _AttendanceSessionCard extends StatelessWidget {
                       ? 'No clock-in'
                       : 'In ${_formatTime(record.clockInAt!)}',
                   icon: Icons.login_rounded,
-                  accent: const Color(0xFFE58A47),
+                  accent: AppPalette.primary,
                 ),
                 MobileTag(
                   label: record.clockOutAt == null
                       ? 'Open shift'
                       : 'Out ${_formatTime(record.clockOutAt!)}',
                   icon: Icons.logout_rounded,
-                  accent: const Color(0xFFF0C879),
+                  accent: AppPalette.warning,
                 ),
                 if (record.totalHours != null)
                   MobileTag(
                     label: '${record.totalHours!.toStringAsFixed(1)} h',
                     icon: Icons.schedule_rounded,
-                    accent: const Color(0xFF7CA4F8),
+                    accent: AppPalette.info,
                   ),
               ],
             ),
@@ -805,3 +807,5 @@ String _friendlyAttendanceError(String raw) {
   }
   return message;
 }
+
+

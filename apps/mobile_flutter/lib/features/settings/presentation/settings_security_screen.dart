@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -275,7 +277,7 @@ class _SettingsSecurityScreenState
             subtitle:
                 'Use an authenticator app before opening Workspace plan, Advanced ops, or other sensitive business-control surfaces.',
             icon: Icons.verified_user_rounded,
-            accent: const Color(0xFFE58A47),
+            accent: AppPalette.primary,
             primaryTag: MobileTag(
               label: status == null
                   ? 'Loading'
@@ -285,7 +287,7 @@ class _SettingsSecurityScreenState
                   ? 'Setup pending'
                   : 'MFA not set',
               icon: Icons.security_rounded,
-              accent: const Color(0xFFE58A47),
+              accent: AppPalette.primary,
             ),
             secondaryTag: MobileTag(
               label: hasFreshWindow ? 'Window open' : 'Verify needed',
@@ -293,8 +295,8 @@ class _SettingsSecurityScreenState
                   ? Icons.verified_rounded
                   : Icons.lock_clock_rounded,
               accent: hasFreshWindow
-                  ? const Color(0xFF4EB79B)
-                  : const Color(0xFFF0C879),
+                  ? AppPalette.success
+                  : AppPalette.warning,
             ),
           ),
           const SizedBox(height: 18),
@@ -317,8 +319,8 @@ class _SettingsSecurityScreenState
                   ? Icons.lock_open_rounded
                   : Icons.lock_outline_rounded,
               accent: hasFreshWindow
-                  ? const Color(0xFF4EB79B)
-                  : const Color(0xFFF0C879),
+                  ? AppPalette.success
+                  : AppPalette.warning,
             ),
             child: Column(
               children: <Widget>[
@@ -603,3 +605,5 @@ class _SecurityValueBlock extends StatelessWidget {
     );
   }
 }
+
+
