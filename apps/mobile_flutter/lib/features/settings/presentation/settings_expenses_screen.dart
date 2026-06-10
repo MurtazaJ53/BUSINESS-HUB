@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/backend/backend_api_client.dart';
 import '../../../core/models/mobile_models.dart';
+import '../../../core/runtime/mobile_runtime_config.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/utils/formatters.dart';
@@ -43,6 +44,14 @@ class _SettingsExpensesScreenState
   }) async {
     final session = ref.read(mobileSessionProvider).asData?.value;
     if (session == null || !session.hasShop) {
+      return false;
+    }
+    if (!MobileRuntimeConfig.backendSyncEnabled) {
+      setState(() {
+        _messageIsError = false;
+        _message =
+            'Expense capture needs backend sync for shared owner/admin reporting. Local mode keeps POS, inventory, customers, and history active.';
+      });
       return false;
     }
     setState(() {
@@ -612,5 +621,3 @@ String _paymentMethodLabel(String value) {
       return 'Cash';
   }
 }
-
-

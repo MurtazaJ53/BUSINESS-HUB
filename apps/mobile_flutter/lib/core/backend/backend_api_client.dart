@@ -2,10 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/mobile_auth_user.dart';
 import '../models/mobile_models.dart';
+import '../runtime/mobile_runtime_config.dart';
 
 final backendApiClientProvider = Provider<BackendApiClient>((ref) {
   return BackendApiClient(
@@ -94,7 +95,9 @@ class BackendApiClient {
   BackendApiClient({required this.baseUrl});
 
   final String baseUrl;
-  static const Duration _requestTimeout = Duration(seconds: 8);
+  static const Duration _requestTimeout = Duration(
+    milliseconds: MobileRuntimeConfig.backendTimeoutMs,
+  );
 
   Future<DomainControlState> getDomainState({
     required User user,
@@ -934,13 +937,6 @@ class BackendApiClient {
     required String path,
     Map<String, dynamic>? body,
   }) async {
-    final token = await user.getIdToken();
-    if (token == null || token.isEmpty) {
-      throw BackendApiException(
-        'Missing Firebase auth token for backend request.',
-      );
-    }
-
     if (baseUrl.trim().isEmpty) {
       throw BackendApiException(
         'BUSINESS_HUB_API_BASE_URL is not configured for Flutter mobile.',
@@ -955,7 +951,7 @@ class BackendApiClient {
           .openUrl(method, url)
           .timeout(_requestTimeout);
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      await _attachAuthHeaders(request, user);
       if (body != null) {
         request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
         request.write(jsonEncode(body));
@@ -992,13 +988,6 @@ class BackendApiClient {
     required String method,
     required String path,
   }) async {
-    final token = await user.getIdToken();
-    if (token == null || token.isEmpty) {
-      throw BackendApiException(
-        'Missing Firebase auth token for backend request.',
-      );
-    }
-
     if (baseUrl.trim().isEmpty) {
       throw BackendApiException(
         'BUSINESS_HUB_API_BASE_URL is not configured for Flutter mobile.',
@@ -1013,7 +1002,7 @@ class BackendApiClient {
           .openUrl(method, url)
           .timeout(_requestTimeout);
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      await _attachAuthHeaders(request, user);
 
       final response = await request.close().timeout(_requestTimeout);
       final bodyText = await utf8
@@ -1047,6 +1036,25 @@ class BackendApiClient {
     } finally {
       client.close(force: true);
     }
+  }
+
+  Future<void> _attachAuthHeaders(HttpClientRequest request, User user) async {
+    final token = await user.getIdToken();
+    if (token != null && token.isNotEmpty) {
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      return;
+    }
+
+    if (MobileRuntimeConfig.backendAuthMode == 'dev_header') {
+      request.headers.set('X-Dev-User-Email', user.email);
+      request.headers.set('X-Dev-User-Name', user.displayName);
+      request.headers.set('X-Dev-Platform-Admin', 'true');
+      return;
+    }
+
+    throw BackendApiException(
+      'Missing Business Hub auth token for backend request.',
+    );
   }
 
   BackendCustomerSummary _mapCustomerSummary(Map<String, dynamic> row) {

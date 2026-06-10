@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -379,9 +378,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
               icon: pending > 0
                   ? Icons.cloud_upload_rounded
                   : Icons.check_circle_rounded,
-              accent: pending > 0
-                  ? AppPalette.warning
-                  : AppPalette.success,
+              accent: pending > 0 ? AppPalette.warning : AppPalette.success,
             ),
             child: Column(
               children: <Widget>[
@@ -506,9 +503,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
               icon: _showAdvancedTools
                   ? Icons.admin_panel_settings_rounded
                   : Icons.favorite_rounded,
-              accent: _showAdvancedTools
-                  ? AppPalette.info
-                  : AppPalette.success,
+              accent: _showAdvancedTools ? AppPalette.info : AppPalette.success,
             ),
             child: Column(
               children: <Widget>[
@@ -569,14 +564,16 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                       Expanded(
                         child: FilledButton.tonalIcon(
                           onPressed: () async {
-                            await FirebaseAuth.instance.signOut();
+                            await ref
+                                .read(mobileSyncCoordinatorProvider)
+                                .refresh();
                             if (!context.mounted) {
                               return;
                             }
-                            context.go('/');
+                            context.go('/dashboard');
                           },
-                          icon: const Icon(Icons.logout_rounded),
-                          label: const Text('Sign out'),
+                          icon: const Icon(Icons.offline_bolt_rounded),
+                          label: const Text('Reload workspace'),
                         ),
                       ),
                     ];
@@ -3847,10 +3844,7 @@ class _DomainSettingsRow extends StatelessWidget {
       'production_safe' => AppPalette.success,
       'ready_for_cutover' => AppPalette.primary,
       'rollback_recommended' => AppPalette.error,
-      _ =>
-        state.isPostgresPrimary
-            ? AppPalette.success
-            : AppPalette.warning,
+      _ => state.isPostgresPrimary ? AppPalette.success : AppPalette.warning,
     };
 
     return DecoratedBox(
@@ -3909,5 +3903,3 @@ class _DomainSettingsRow extends StatelessWidget {
     );
   }
 }
-
-

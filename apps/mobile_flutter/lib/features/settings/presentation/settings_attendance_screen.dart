@@ -8,6 +8,7 @@ import '../../../core/backend/backend_api_client.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/models/mobile_session.dart';
 import '../../../core/providers/mobile_data_providers.dart';
+import '../../../core/runtime/mobile_runtime_config.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/utils/formatters.dart';
 import '../../shell/presentation/mobile_surface.dart';
@@ -49,6 +50,15 @@ class _SettingsAttendanceScreenState
     final normalizedStatus = status.trim().toUpperCase();
     final shouldClockIn =
         normalizedStatus == 'PRESENT' || normalizedStatus == 'HALF_DAY';
+
+    if (!MobileRuntimeConfig.backendSyncEnabled) {
+      setState(() {
+        _messageIsError = false;
+        _message =
+            'Attendance needs backend sync because multiple staff devices must share the same roster and shift records. Local mode keeps POS, inventory, customers, and history active.';
+      });
+      return false;
+    }
 
     setState(() {
       _busy = true;
@@ -807,5 +817,3 @@ String _friendlyAttendanceError(String raw) {
   }
   return message;
 }
-
-

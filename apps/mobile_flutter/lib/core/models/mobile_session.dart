@@ -1,4 +1,5 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import '../runtime/mobile_runtime_config.dart';
+import 'mobile_auth_user.dart';
 
 class MobileSession {
   const MobileSession({
@@ -12,7 +13,47 @@ class MobileSession {
     required this.isElevatedAdmin,
   });
 
-  final User user;
+  factory MobileSession.localOwner() {
+    final user = MobileAuthUser.localOwner();
+    return MobileSession(
+      user: user,
+      email: user.email,
+      uid: user.uid,
+      role: 'owner',
+      membershipId: 'local-owner-membership',
+      permissions: const <String, dynamic>{
+        'inventory': {
+          'view': true,
+          'create': true,
+          'edit': true,
+          'delete': true,
+          'view_cost': true,
+        },
+        'sales': {
+          'view': true,
+          'create': true,
+          'edit': true,
+          'void_sale': true,
+          'view_profit': true,
+          'override_price': true,
+        },
+        'customers': {
+          'view': true,
+          'create': true,
+          'edit': true,
+          'delete': true,
+        },
+        'expenses': {'view': true, 'create': true, 'delete': true},
+        'team': {'view': true, 'edit': true, 'view_cost': true},
+        'analytics': {'view': true},
+        'settings': {'view': true, 'edit': true},
+      },
+      shopId: MobileRuntimeConfig.localShopId,
+      isElevatedAdmin: true,
+    );
+  }
+
+  final MobileAuthUser user;
   final String email;
   final String uid;
   final String? role;
@@ -84,31 +125,5 @@ class MobileSession {
       return 'Read-only lookup and oversight access.';
     }
     return 'Daily sales, stock, and customer work.';
-  }
-
-  static MobileSession fromClaims(
-    User user,
-    Map<String, dynamic>? claims, {
-    String? fallbackRole,
-    String? fallbackMembershipId,
-    Map<String, dynamic>? fallbackPermissions,
-    String? fallbackShopId,
-    bool fallbackIsElevatedAdmin = false,
-  }) {
-    return MobileSession(
-      user: user,
-      email: user.email ?? '',
-      uid: user.uid,
-      role: claims?['role']?.toString() ?? fallbackRole,
-      membershipId: claims?['membershipId']?.toString() ?? fallbackMembershipId,
-      permissions: claims?['perms'] is Map<String, dynamic>
-          ? Map<String, dynamic>.from(claims!['perms'] as Map)
-          : fallbackPermissions,
-      shopId: claims?['shopId']?.toString() ?? fallbackShopId,
-      isElevatedAdmin:
-          claims?['shopAdmin'] == true ||
-          claims?['role']?.toString().trim().toLowerCase() == 'owner' ||
-          fallbackIsElevatedAdmin,
-    );
   }
 }

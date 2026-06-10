@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -509,9 +508,7 @@ class SettingsScreen extends ConsumerWidget {
               icon: pending > 0
                   ? Icons.cloud_upload_rounded
                   : Icons.check_circle_rounded,
-              accent: pending > 0
-                  ? AppPalette.warning
-                  : AppPalette.success,
+              accent: pending > 0 ? AppPalette.warning : AppPalette.success,
             ),
             child: Column(
               children: <Widget>[
@@ -685,14 +682,14 @@ class SettingsScreen extends ConsumerWidget {
                   Expanded(
                     child: FilledButton.tonalIcon(
                       onPressed: () async {
-                        await FirebaseAuth.instance.signOut();
+                        await syncCoordinator.refresh();
                         if (!context.mounted) {
                           return;
                         }
-                        context.go('/');
+                        context.go('/dashboard');
                       },
-                      icon: const Icon(Icons.logout_rounded),
-                      label: const Text('Sign out'),
+                      icon: const Icon(Icons.offline_bolt_rounded),
+                      label: const Text('Reload local workspace'),
                     ),
                   ),
                 ];
@@ -1108,5 +1105,3 @@ class _SettingsRow extends StatelessWidget {
     );
   }
 }
-
-

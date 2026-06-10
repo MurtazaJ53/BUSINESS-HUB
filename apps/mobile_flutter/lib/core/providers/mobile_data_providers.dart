@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/mobile_repository.dart';
 import '../backend/backend_api_client.dart';
 import '../models/mobile_models.dart';
+import '../models/mobile_session.dart';
+import '../runtime/mobile_runtime_config.dart';
 import '../session/mobile_session_controller.dart';
 
 final shopInfoProvider = StreamProvider<ShopInfo>((ref) {
@@ -31,6 +33,9 @@ final shopMembershipsProvider =
       if (session == null) {
         return const <ShopMembershipAccessRecord>[];
       }
+      if (!MobileRuntimeConfig.backendSyncEnabled) {
+        return _localMemberships(session);
+      }
 
       return ref
           .read(backendApiClientProvider)
@@ -44,6 +49,9 @@ final workspacePulseProvider = FutureProvider<WorkspacePulseSnapshot?>((
   if (session == null || !session.isOwnerLike || !session.hasShop) {
     return null;
   }
+  if (!MobileRuntimeConfig.backendSyncEnabled) {
+    return _localPulseSnapshot();
+  }
 
   return ref
       .read(backendApiClientProvider)
@@ -54,6 +62,9 @@ final workspacePulseSignalsProvider =
     FutureProvider<List<WorkspacePulseSignal>>((ref) async {
       final session = await ref.watch(mobileSessionProvider.future);
       if (session == null || !session.isOwnerLike || !session.hasShop) {
+        return const <WorkspacePulseSignal>[];
+      }
+      if (!MobileRuntimeConfig.backendSyncEnabled) {
         return const <WorkspacePulseSignal>[];
       }
 
@@ -71,6 +82,9 @@ final workspaceAccessSessionsProvider =
       if (session == null || !session.isOwnerLike || !session.hasShop) {
         return const <WorkspaceAccessSessionRecord>[];
       }
+      if (!MobileRuntimeConfig.backendSyncEnabled) {
+        return _localAccessSessions(session);
+      }
 
       return ref
           .read(backendApiClientProvider)
@@ -86,6 +100,9 @@ final workspaceTeamMembersProvider =
       if (session == null || !session.isOwnerLike || !session.hasShop) {
         return const <WorkspaceTeamMemberRecord>[];
       }
+      if (!MobileRuntimeConfig.backendSyncEnabled) {
+        return _localTeamMembers(session);
+      }
 
       return ref
           .read(backendApiClientProvider)
@@ -99,6 +116,14 @@ final attendanceSummaryProvider = FutureProvider<AttendanceSummarySnapshot?>((
   final memberships = await ref.watch(shopMembershipsProvider.future);
   if (session == null || !session.hasShop) {
     return null;
+  }
+  if (!MobileRuntimeConfig.backendSyncEnabled) {
+    return const AttendanceSummarySnapshot(
+      totalSessions: 0,
+      presentCount: 0,
+      leaveCount: 0,
+      activeWorkersToday: 0,
+    );
   }
 
   final scopedMembershipId = session.isOwnerLike
@@ -125,6 +150,9 @@ final attendanceSessionsProvider =
       final session = await ref.watch(mobileSessionProvider.future);
       final memberships = await ref.watch(shopMembershipsProvider.future);
       if (session == null || !session.hasShop) {
+        return const <AttendanceSessionRecord>[];
+      }
+      if (!MobileRuntimeConfig.backendSyncEnabled) {
         return const <AttendanceSessionRecord>[];
       }
 
@@ -154,6 +182,14 @@ final expenseSummaryProvider = FutureProvider<ExpenseSummarySnapshot?>((
   if (session == null || !session.hasShop) {
     return null;
   }
+  if (!MobileRuntimeConfig.backendSyncEnabled) {
+    return const ExpenseSummarySnapshot(
+      totalEntries: 0,
+      totalAmount: 0,
+      uniqueCategories: 0,
+      biggestCategory: null,
+    );
+  }
 
   return ref
       .read(backendApiClientProvider)
@@ -163,6 +199,9 @@ final expenseSummaryProvider = FutureProvider<ExpenseSummarySnapshot?>((
 final expensesProvider = FutureProvider<List<ExpenseRecord>>((ref) async {
   final session = await ref.watch(mobileSessionProvider.future);
   if (session == null || !session.hasShop) {
+    return const <ExpenseRecord>[];
+  }
+  if (!MobileRuntimeConfig.backendSyncEnabled) {
     return const <ExpenseRecord>[];
   }
 
@@ -222,6 +261,124 @@ final settingsOpsDomainStatesProvider =
         'payments',
       ]);
     });
+
+List<ShopMembershipAccessRecord> _localMemberships(MobileSession session) {
+  return <ShopMembershipAccessRecord>[
+    ShopMembershipAccessRecord(
+      id: session.membershipId ?? 'local-owner-membership',
+      role: session.normalizedRole.isEmpty ? 'owner' : session.normalizedRole,
+      roleLabel: session.displayRoleLabel,
+      roleSummary: session.roleSummary,
+      roleProfile: session.roleProfileKey,
+      status: 'active',
+      shopId: session.shopId ?? MobileRuntimeConfig.localShopId,
+      shopName: MobileRuntimeConfig.localShopName,
+      shopSlug: 'local-business-hub',
+      shopCurrencyCode: 'INR',
+      shopTimezone: 'Asia/Kolkata',
+      shopPlanTier: 'growth',
+      shopEnabledFeatures: const <String, bool>{
+        'inventory': true,
+        'pos': true,
+        'customers': true,
+        'history': true,
+        'team': true,
+        'attendance': true,
+        'expenses': true,
+        'advanced_ops': true,
+      },
+    ),
+  ];
+}
+
+List<WorkspaceTeamMemberRecord> _localTeamMembers(MobileSession session) {
+  final now = DateTime.now();
+  return <WorkspaceTeamMemberRecord>[
+    WorkspaceTeamMemberRecord(
+      id: session.membershipId ?? 'local-owner-membership',
+      memberName: session.user.displayName.isEmpty
+          ? 'Business Hub Owner'
+          : session.user.displayName,
+      memberEmail: session.email,
+      phone: '',
+      role: session.normalizedRole.isEmpty ? 'owner' : session.normalizedRole,
+      roleLabel: session.displayRoleLabel,
+      roleSummary: session.roleSummary,
+      roleProfile: session.roleProfileKey,
+      status: 'active',
+      permissionsVersion: 1,
+      permissions: session.permissions ?? const <String, dynamic>{},
+      isCurrentUser: true,
+      canManage: true,
+      createdAt: now,
+      updatedAt: now,
+    ),
+  ];
+}
+
+List<WorkspaceAccessSessionRecord> _localAccessSessions(MobileSession session) {
+  final now = DateTime.now();
+  return <WorkspaceAccessSessionRecord>[
+    WorkspaceAccessSessionRecord(
+      id: 'local-device-session',
+      memberName: session.user.displayName.isEmpty
+          ? 'Business Hub Owner'
+          : session.user.displayName,
+      memberEmail: session.email,
+      membershipRoleSnapshot: session.normalizedRole.isEmpty
+          ? 'owner'
+          : session.normalizedRole,
+      roleLabel: session.displayRoleLabel,
+      status: 'active',
+      deviceLabel: 'Local device',
+      platformName: 'android',
+      packageName: 'business_hub_mobile',
+      appVersion: 'local',
+      buildNumber: 'local',
+      releaseChannel: 'local-first',
+      releaseTag: 'local-first',
+      lastSeenAt: now,
+      revokedAt: null,
+      revokeReason: null,
+      wipeRequested: false,
+      wipeRequestedAt: null,
+      wipeAcknowledgedAt: null,
+      trustScore: 100,
+      trustLevel: 'trusted',
+      trustSummary: 'Local owner session. Backend session governance is off.',
+      trustReasons: const <String>['Local-first build'],
+      metadata: const <String, dynamic>{'mode': 'local_first'},
+      canManage: true,
+      createdAt: now,
+      updatedAt: now,
+    ),
+  ];
+}
+
+WorkspacePulseSnapshot _localPulseSnapshot() {
+  return WorkspacePulseSnapshot(
+    refreshedAt: DateTime.now(),
+    headline: const WorkspacePulseHeadline(
+      title: 'Local workspace is ready',
+      body:
+          'Inventory, POS, customers, and history run from the device vault. Live backend sync is paused for this build.',
+      route: '/inventory',
+      ctaLabel: 'Open inventory',
+      tone: 'success',
+    ),
+    stats: const WorkspacePulseStats(
+      openTaskCount: 0,
+      criticalAnomalyCount: 0,
+      warningAnomalyCount: 0,
+      staleSessionCount: 0,
+      wipePendingCount: 0,
+      openPlanRequestCount: 0,
+      lowStockCount: 0,
+    ),
+    tasks: const <WorkspacePulseTask>[],
+    anomalies: const <WorkspacePulseAnomaly>[],
+  );
+}
 
 final outboxAttentionEntriesProvider =
     StreamProvider<List<CommerceOutboxAttentionEntry>>((ref) {

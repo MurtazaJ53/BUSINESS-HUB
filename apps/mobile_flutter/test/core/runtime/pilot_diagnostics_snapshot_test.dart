@@ -72,7 +72,7 @@ void main() {
           domain: 'inventory',
           currentEpoch: 4,
           cutoverStatus: 'pilot',
-          writeMaster: 'firebase',
+          writeMaster: 'local',
           controlPresent: true,
           shadowReadsEnabled: true,
           isEnabled: true,
@@ -96,7 +96,17 @@ void main() {
     expect(text, contains('Sync posture: ERROR'));
     expect(text, contains('Queued commerce commands: 2'));
     expect(text, contains('Domain posture: 1/2 primary'));
-    expect(text, contains('- inventory: Pilot active | master=firebase | epoch=4 | next=verify_pilot'));
-    expect(text, contains('- sales: Postgres primary | master=postgres | epoch=7 | next=hold_steady_state'));
+    expect(
+      text,
+      contains(
+        '- inventory: Pilot active | master=local | epoch=4 | next=verify_pilot',
+      ),
+    );
+    expect(
+      text,
+      contains(
+        '- sales: Postgres primary | master=postgres | epoch=7 | next=hold_steady_state',
+      ),
+    );
   });
 }

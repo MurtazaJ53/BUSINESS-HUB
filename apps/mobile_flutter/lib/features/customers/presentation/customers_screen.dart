@@ -1525,7 +1525,7 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
                   subtitle:
                       customer.phone ??
                       customer.email ??
-                      'Loaded from the old cloud customer collection.',
+                      'Loaded from the legacy customer collection.',
                   icon: Icons.cloud_sync_rounded,
                   accent: AppPalette.success,
                   tags: <Widget>[
@@ -1628,7 +1628,7 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
                   title: customer.name,
                   subtitle:
                       customer.phone ??
-                      'Rebuilt from local sales history because the cloud customer master is empty for this view.',
+                      'Rebuilt from local sales history because the shared customer master is empty for this view.',
                   icon: Icons.person_search_rounded,
                   accent: AppPalette.success,
                   tags: <Widget>[
@@ -1828,7 +1828,7 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
                       icon: Icons.groups_outlined,
                       title: 'No known buyers matched',
                       body:
-                          'No Firestore customer records or named local receipts matched this lookup yet.',
+                          'No saved customer records or named local receipts matched this lookup yet.',
                     );
                   }
 
@@ -1836,7 +1836,7 @@ class _LocalCustomersFallbackPanel extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        'The cloud customer master is empty for this view, so the app is rebuilding buyer recall from local sales history.',
+                        'The shared customer master is empty for this view, so the app is rebuilding buyer recall from local sales history.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Colors.white.withValues(alpha: 0.68),
                           fontWeight: FontWeight.w600,
@@ -1984,9 +1984,7 @@ class _CollectionsQueuePanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF232A36),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: AppPalette.warning.withValues(alpha: 0.18),
-        ),
+        border: Border.all(color: AppPalette.warning.withValues(alpha: 0.18)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -2436,5 +2434,3 @@ const List<_CustomerStatusFilterOption> _customerSortModes =
       _CustomerStatusFilterOption(value: 'spent_desc', label: 'Spent high'),
       _CustomerStatusFilterOption(value: 'name_asc', label: 'A-Z'),
     ];
-
-

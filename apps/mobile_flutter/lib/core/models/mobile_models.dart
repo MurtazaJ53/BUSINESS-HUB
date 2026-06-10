@@ -601,7 +601,7 @@ class DomainControlState {
           ? epoch.toInt()
           : int.tryParse('$epoch') ?? 1,
       cutoverStatus: (json['cutover_status'] ?? 'legacy').toString(),
-      writeMaster: (json['write_master'] ?? 'firebase').toString(),
+      writeMaster: (json['write_master'] ?? 'local').toString(),
       controlPresent: json['control_present'] == true,
       shadowReadsEnabled: json['shadow_reads_enabled'] == true,
       isEnabled: json['is_enabled'] != false,
@@ -620,7 +620,7 @@ class DomainControlState {
       domain: domain,
       currentEpoch: 1,
       cutoverStatus: 'legacy',
-      writeMaster: 'firebase',
+      writeMaster: 'local',
       controlPresent: false,
       shadowReadsEnabled: false,
       isEnabled: true,
@@ -1372,7 +1372,7 @@ class LocalSaleCommit {
     },
   };
 
-  Map<String, dynamic> toFirestorePayload({String? staffId}) => {
+  Map<String, dynamic> toRemotePayload({String? staffId}) => {
     'id': saleId,
     'items': items,
     'total': total,

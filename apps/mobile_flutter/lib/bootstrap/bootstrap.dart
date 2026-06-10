@@ -4,27 +4,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app/app.dart';
-import '../core/firebase/firebase_bootstrap.dart';
 
 Future<void> bootstrapApplication() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   ErrorWidget.builder = (details) {
-    FirebaseBootstrap.recordError(
-      details.exception,
-      details.stack ?? StackTrace.current,
-      fatal: false,
-    );
+    debugPrint('Business Hub widget error: ${details.exception}');
     return const _FatalSurfaceFallback();
   };
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
-    FirebaseBootstrap.recordFlutterError(details);
+    debugPrint('Business Hub Flutter error: ${details.exception}');
   };
 
   PlatformDispatcher.instance.onError = (error, stackTrace) {
-    FirebaseBootstrap.recordError(error, stackTrace, fatal: true);
+    debugPrint('Business Hub platform error: $error');
     return true;
   };
 

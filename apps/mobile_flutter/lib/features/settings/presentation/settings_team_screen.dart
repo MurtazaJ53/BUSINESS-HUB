@@ -7,6 +7,7 @@ import '../../../core/backend/backend_api_client.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/models/mobile_session.dart';
 import '../../../core/providers/mobile_data_providers.dart';
+import '../../../core/runtime/mobile_runtime_config.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../shell/presentation/mobile_surface.dart';
 
@@ -170,11 +171,23 @@ class SettingsTeamScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 14),
                 FilledButton.tonalIcon(
-                  onPressed: () => _openAddMemberSheet(
-                    context: context,
-                    ref: ref,
-                    session: session,
-                  ),
+                  onPressed: () {
+                    if (!MobileRuntimeConfig.backendSyncEnabled) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Staff invites need backend sync. Local mode currently keeps only the owner session active.',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+                    _openAddMemberSheet(
+                      context: context,
+                      ref: ref,
+                      session: session,
+                    );
+                  },
                   icon: const Icon(Icons.person_add_alt_1_rounded),
                   label: const Text('Add workspace member'),
                 ),
@@ -397,6 +410,16 @@ class SettingsTeamScreen extends ConsumerWidget {
     required WorkspaceTeamMemberRecord member,
   }) async {
     if (!session.hasShop) {
+      return;
+    }
+    if (!MobileRuntimeConfig.backendSyncEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Role changes need backend sync. Local mode keeps the owner session active.',
+          ),
+        ),
+      );
       return;
     }
 
@@ -720,5 +743,3 @@ class _TeamBullet extends StatelessWidget {
     );
   }
 }
-
-

@@ -1,10 +1,7 @@
 import 'dart:async';
-import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -13,6 +10,7 @@ import '../database/mobile_repository.dart';
 import '../models/mobile_models.dart';
 import '../models/mobile_session.dart';
 import '../runtime/app_runtime_info.dart';
+import '../runtime/mobile_runtime_config.dart';
 import '../session/mobile_session_controller.dart';
 
 final syncStatusProvider =
@@ -35,7 +33,6 @@ class SyncStatusNotifier extends Notifier<MobileSyncStatus> {
 final mobileSyncCoordinatorProvider = Provider<MobileSyncCoordinator>((ref) {
   final coordinator = MobileSyncCoordinator(
     backendApiClient: ref.read(backendApiClientProvider),
-    firestore: FirebaseFirestore.instance,
     shopRepository: ref.read(shopRepositoryProvider),
     inventoryRepository: ref.read(inventoryRepositoryProvider),
     customerRepository: ref.read(customerRepositoryProvider),
@@ -58,21 +55,18 @@ enum MobileSyncStatus { idle, syncing, offline, error }
 class MobileSyncCoordinator {
   MobileSyncCoordinator({
     required BackendApiClient backendApiClient,
-    required FirebaseFirestore firestore,
     required ShopRepository shopRepository,
     required InventoryRepository inventoryRepository,
     required CustomerRepository customerRepository,
     required SalesRepository salesRepository,
     required this.setStatus,
   }) : _backendApiClient = backendApiClient,
-       _firestore = firestore,
        _shopRepository = shopRepository,
        _inventoryRepository = inventoryRepository,
        _customerRepository = customerRepository,
        _salesRepository = salesRepository;
 
   final BackendApiClient _backendApiClient;
-  final FirebaseFirestore _firestore;
   final ShopRepository _shopRepository;
   final InventoryRepository _inventoryRepository;
   final CustomerRepository _customerRepository;
@@ -81,7 +75,6 @@ class MobileSyncCoordinator {
 
   MobileSession? _session;
   bool _inventoryReadsUseBackend = false;
-  bool _customersReadUseBackend = false;
   bool _salesReadsUseBackend = false;
   bool _isFlushingOutbox = false;
   Timer? _outboxRetryTimer;
@@ -121,122 +114,30 @@ class MobileSyncCoordinator {
 
     setStatus(MobileSyncStatus.syncing);
     final shopId = session.shopId!;
+    await _ensureLocalWorkspace(session, shopId);
+    if (!MobileRuntimeConfig.backendSyncEnabled) {
+      _inventoryReadsUseBackend = false;
+      _salesReadsUseBackend = false;
+      setStatus(MobileSyncStatus.idle);
+      return;
+    }
+
     final hasAccess = await _syncWorkspaceAccessSession(session);
     if (!hasAccess) {
       return;
     }
-    final setupResults = await Future.wait<Object?>(<Future<Object?>>[
-      _ensureAdminBootstrap(session, shopId),
-      _refreshBackendDomainEpochs(session, shopId),
-    ]);
-    final domainStates = setupResults[1] as Map<String, DomainControlState>;
+    final domainStates = await _refreshBackendDomainEpochs(session, shopId);
     final inventoryState = domainStates['inventory'];
-    final customerState = domainStates['customers'];
     final salesState = domainStates['sales'];
     _inventoryReadsUseBackend = inventoryState?.isPostgresPrimary ?? false;
-    _customersReadUseBackend = customerState?.isPostgresPrimary ?? false;
     _salesReadsUseBackend = salesState?.isPostgresPrimary ?? false;
-    await _primeWorkspaceSnapshot(
-      shopId,
-      includeCost: session.canViewCost,
-      includeFirestoreCustomers: !_customersReadUseBackend,
-      includeFirestoreSales: !_salesReadsUseBackend,
-    );
 
     if (_inventoryReadsUseBackend) {
       await _syncBackendInventorySnapshot(session, shopId);
     }
 
-    _subscriptions.add(
-      _firestore
-          .doc('shops/$shopId')
-          .snapshots()
-          .listen(
-            (snapshot) async {
-              if (!snapshot.exists || snapshot.data() == null) return;
-              await _shopRepository.saveShopDocument(snapshot.data()!);
-              setStatus(MobileSyncStatus.idle);
-            },
-            onError: (error, stackTrace) {
-              debugPrint('Shop sync failed: $error');
-              setStatus(MobileSyncStatus.error);
-            },
-          ),
-    );
-
-    _subscriptions.add(
-      _firestore
-          .collection('shops/$shopId/inventory')
-          .snapshots()
-          .listen(
-            (snapshot) async {
-              await _mergeInventoryChanges(snapshot.docChanges);
-              setStatus(MobileSyncStatus.idle);
-            },
-            onError: (error, stackTrace) {
-              debugPrint('Inventory sync failed: $error');
-              setStatus(MobileSyncStatus.error);
-            },
-          ),
-    );
-
-    if (session.canViewCost) {
-      _subscriptions.add(
-        _firestore
-            .collection('shops/$shopId/inventory_private')
-            .snapshots()
-            .listen(
-              (snapshot) async {
-                await _mergeInventoryPrivateChanges(snapshot.docChanges);
-                setStatus(MobileSyncStatus.idle);
-              },
-              onError: (error, stackTrace) {
-                debugPrint('Inventory private sync failed: $error');
-                setStatus(MobileSyncStatus.error);
-              },
-            ),
-      );
-    }
-
-    if (!_customersReadUseBackend) {
-      _subscriptions.add(
-        _firestore
-            .collection('shops/$shopId/customers')
-            .limit(1500)
-            .snapshots()
-            .listen(
-              (snapshot) async {
-                await _mergeCustomerChanges(snapshot.docChanges);
-                setStatus(MobileSyncStatus.idle);
-              },
-              onError: (error, stackTrace) {
-                debugPrint('Customer sync failed: $error');
-                setStatus(MobileSyncStatus.error);
-              },
-            ),
-      );
-    }
-
     if (_salesReadsUseBackend) {
       await _syncBackendSalesSnapshot(session, shopId);
-    } else {
-      _subscriptions.add(
-        _firestore
-            .collection('shops/$shopId/sales')
-            .orderBy('date', descending: true)
-            .limit(1500)
-            .snapshots()
-            .listen(
-              (snapshot) async {
-                await _mergeSalesChanges(snapshot.docChanges);
-                setStatus(MobileSyncStatus.idle);
-              },
-              onError: (error, stackTrace) {
-                debugPrint('Sales sync failed: $error');
-                setStatus(MobileSyncStatus.error);
-              },
-            ),
-      );
     }
 
     setStatus(MobileSyncStatus.idle);
@@ -286,13 +187,6 @@ class MobileSyncCoordinator {
 
     try {
       await _shopRepository.saveShopDocument(payload);
-      await _firestore.doc('shops/${session.shopId!}').set(<String, dynamic>{
-        ...payload,
-        'settings': <String, dynamic>{
-          ...(payload['settings'] as Map<String, dynamic>),
-          'updatedAt': FieldValue.serverTimestamp(),
-        },
-      }, SetOptions(merge: true));
       setStatus(MobileSyncStatus.idle);
     } catch (error) {
       debugPrint('Workspace settings update failed: $error');
@@ -328,6 +222,25 @@ class MobileSyncCoordinator {
         ? 'General'
         : category.trim();
 
+    if (!MobileRuntimeConfig.backendSyncEnabled) {
+      await _createInventoryItemLocally(
+        session: session,
+        name: name.trim(),
+        sellPrice: sellPrice,
+        openingStock: openingStock,
+        sku: sku.trim(),
+        barcode: barcode.trim(),
+        category: normalizedCategory,
+        subcategory: subcategory.trim(),
+        size: size.trim(),
+        description: description.trim(),
+        costPrice: session.canViewCost ? costPrice : null,
+        timestamp: now,
+      );
+      setStatus(MobileSyncStatus.idle);
+      return;
+    }
+
     try {
       final created = await _backendApiClient.createInventoryItem(
         user: session.user,
@@ -355,7 +268,7 @@ class MobileSyncCoordinator {
         setStatus(MobileSyncStatus.error);
         rethrow;
       }
-      await _createInventoryItemOnFirestore(
+      await _createInventoryItemLocally(
         session: session,
         name: name.trim(),
         sellPrice: sellPrice,
@@ -372,7 +285,7 @@ class MobileSyncCoordinator {
       setStatus(MobileSyncStatus.idle);
     } on IOException catch (error) {
       debugPrint('Inventory backend unavailable, using local fallback: $error');
-      await _createInventoryItemOnFirestore(
+      await _createInventoryItemLocally(
         session: session,
         name: name.trim(),
         sellPrice: sellPrice,
@@ -417,6 +330,15 @@ class MobileSyncCoordinator {
     String? triggerCommandId,
     bool checkAccess = true,
   }) async {
+    if (!MobileRuntimeConfig.backendSyncEnabled) {
+      return CommerceSyncResult(
+        commandId: triggerCommandId ?? 'local-only',
+        state: CommerceSyncState.queued,
+        message:
+            'Sale saved locally. Live backend sync is disabled for this build.',
+      );
+    }
+
     if (_isFlushingOutbox) {
       return CommerceSyncResult(
         commandId: triggerCommandId ?? 'pending',
@@ -567,7 +489,47 @@ class MobileSyncCoordinator {
     await Future.wait<void>(futures);
   }
 
+  Future<void> _ensureLocalWorkspace(
+    MobileSession session,
+    String shopId,
+  ) async {
+    await _shopRepository.saveShopDocument(<String, dynamic>{
+      'name': MobileRuntimeConfig.localShopName,
+      'tagline': 'LOCAL-FIRST COMMAND CENTER',
+      'footer': 'Thank you for your business!',
+      'currency': 'INR',
+      'plan_tier': 'growth',
+      'enabled_features': <String, bool>{
+        'inventory': true,
+        'pos': true,
+        'customers': true,
+        'history': true,
+        'team': true,
+        'attendance': true,
+        'expenses': true,
+        'advanced_ops': true,
+      },
+      'settings': <String, dynamic>{
+        'name': MobileRuntimeConfig.localShopName,
+        'tagline': 'LOCAL-FIRST COMMAND CENTER',
+        'footer': 'Thank you for your business!',
+        'currency': 'INR',
+        'plan_tier': 'growth',
+      },
+      'sourceMeta': <String, dynamic>{
+        'shop_id': shopId,
+        'session_uid': session.uid,
+        'mode': MobileRuntimeConfig.backendSyncEnabled
+            ? 'backend_sync'
+            : 'local_first',
+      },
+    });
+  }
+
   Future<bool> _syncWorkspaceAccessSession(MobileSession session) async {
+    if (!MobileRuntimeConfig.backendSyncEnabled) {
+      return true;
+    }
     if (!session.hasShop) {
       return true;
     }
@@ -646,84 +608,22 @@ class MobileSyncCoordinator {
 
   Future<void> _finalizeLocalSignOut() async {
     _session = null;
-    _customersReadUseBackend = false;
     _salesReadsUseBackend = false;
     setStatus(MobileSyncStatus.idle);
-    try {
-      await FirebaseAuth.instance.signOut();
-    } catch (error) {
-      debugPrint('Workspace sign-out skipped: $error');
-    }
   }
 
   Future<AppRuntimeInfo> _loadRuntimeInfo() {
     return _runtimeInfoFuture ??= AppRuntimeInfo.load();
   }
 
-  Future<void> _primeWorkspaceSnapshot(
-    String shopId, {
-    required bool includeCost,
-    required bool includeFirestoreCustomers,
-    required bool includeFirestoreSales,
-  }) async {
-    try {
-      final snapshotFutures = await Future.wait([
-        _firestore.doc('shops/$shopId').get(),
-        _firestore.collection('shops/$shopId/inventory').get(),
-        if (includeFirestoreCustomers)
-          _firestore.collection('shops/$shopId/customers').limit(1500).get(),
-        if (includeFirestoreSales)
-          _firestore
-              .collection('shops/$shopId/sales')
-              .orderBy('date', descending: true)
-              .limit(1500)
-              .get(),
-        if (includeCost)
-          _firestore.collection('shops/$shopId/inventory_private').get(),
-      ]);
-
-      final shopSnapshot =
-          snapshotFutures[0] as DocumentSnapshot<Map<String, dynamic>>;
-      final inventorySnapshot =
-          snapshotFutures[1] as QuerySnapshot<Map<String, dynamic>>;
-      final customerSnapshot = includeFirestoreCustomers
-          ? snapshotFutures[2] as QuerySnapshot<Map<String, dynamic>>
-          : null;
-      final salesSnapshot = includeFirestoreSales
-          ? snapshotFutures[includeFirestoreCustomers ? 3 : 2]
-                as QuerySnapshot<Map<String, dynamic>>
-          : null;
-      final inventoryPrivateSnapshot = includeCost
-          ? snapshotFutures[(includeFirestoreCustomers ? 1 : 0) +
-                    (includeFirestoreSales ? 1 : 0) +
-                    2]
-                as QuerySnapshot<Map<String, dynamic>>
-          : null;
-
-      if (shopSnapshot.exists && shopSnapshot.data() != null) {
-        await _shopRepository.saveShopDocument(shopSnapshot.data()!);
-      }
-
-      await _mergeInventoryDocuments(inventorySnapshot.docs);
-      if (customerSnapshot != null) {
-        await _mergeCustomerDocuments(customerSnapshot.docs);
-      }
-      if (inventoryPrivateSnapshot != null) {
-        await _mergeInventoryPrivateDocuments(inventoryPrivateSnapshot.docs);
-      }
-      if (salesSnapshot != null) {
-        await _mergeSalesDocuments(salesSnapshot.docs);
-      }
-    } catch (error) {
-      debugPrint('Initial workspace bootstrap failed: $error');
-      setStatus(MobileSyncStatus.error);
-    }
-  }
-
   Future<Map<String, DomainControlState>> _refreshBackendDomainEpochs(
     MobileSession session,
     String shopId,
   ) async {
+    if (!MobileRuntimeConfig.backendSyncEnabled) {
+      return const <String, DomainControlState>{};
+    }
+
     final domains = <String>[
       'inventory',
       'customers',
@@ -849,7 +749,7 @@ class MobileSyncCoordinator {
     }
   }
 
-  Future<void> _createInventoryItemOnFirestore({
+  Future<void> _createInventoryItemLocally({
     required MobileSession session,
     required String name,
     required double sellPrice,
@@ -863,9 +763,7 @@ class MobileSyncCoordinator {
     required double? costPrice,
     required DateTime timestamp,
   }) async {
-    final itemRef = _firestore
-        .collection('shops/${session.shopId!}/inventory')
-        .doc();
+    final itemId = 'local-${timestamp.microsecondsSinceEpoch}';
     final isoTimestamp = timestamp.toIso8601String();
     final payload = <String, dynamic>{
       'name': name,
@@ -889,7 +787,7 @@ class MobileSyncCoordinator {
     };
 
     await _inventoryRepository.mergeInventoryDocument(
-      itemRef.id,
+      itemId,
       payload,
       updatedAt: timestamp.millisecondsSinceEpoch,
     );
@@ -901,260 +799,14 @@ class MobileSyncCoordinator {
         'tombstone': false,
       };
       await _inventoryRepository.mergeInventoryPrivateDocument(
-        itemRef.id,
+        itemId,
         privatePayload,
         updatedAt: timestamp.millisecondsSinceEpoch,
       );
     }
-
-    try {
-      await itemRef.set(payload);
-      if (costPrice != null) {
-        await _firestore
-            .doc('shops/${session.shopId!}/inventory_private/${itemRef.id}')
-            .set(<String, dynamic>{
-              'costPrice': costPrice,
-              'updatedAt': timestamp.toIso8601String(),
-              'tombstone': false,
-            });
-      }
-    } catch (error) {
-      debugPrint('Inventory cloud fallback write skipped: $error');
-    }
-  }
-
-  Future<void> _ensureAdminBootstrap(
-    MobileSession session,
-    String shopId,
-  ) async {
-    if (!session.isOwnerLike) {
-      return;
-    }
-
-    final roleValue = session.isOwner ? 'owner' : 'admin';
-
-    final timestamp = DateTime.now();
-    final isoTimestamp = timestamp.toIso8601String();
-    final updatedAt = timestamp.millisecondsSinceEpoch;
-
-    try {
-      await _firestore.doc('users/${session.uid}').set({
-        'email': session.email,
-        'shopId': shopId,
-        'role': roleValue,
-        'updatedAt': isoTimestamp,
-      }, SetOptions(merge: true));
-    } catch (error) {
-      debugPrint('User profile sync skipped: $error');
-    }
-
-    try {
-      await _firestore.doc('shops/$shopId/staff/${session.uid}').set({
-        'id': session.uid,
-        'name':
-            session.user.displayName ??
-            (session.email.isNotEmpty
-                ? session.email.split('@').first
-                : 'Admin'),
-        'email': session.email,
-        'phone': '-',
-        'role': roleValue,
-        'status': 'active',
-        'joinedAt': isoTimestamp,
-        'permissions': _adminPermissionTemplate,
-        'updatedAt': updatedAt,
-      }, SetOptions(merge: true));
-    } catch (error) {
-      debugPrint('Admin staff heal skipped: $error');
-    }
-  }
-
-  Future<void> _mergeInventoryChanges(
-    List<DocumentChange<Map<String, dynamic>>> changes,
-  ) async {
-    final tasks = <Future<void>>[];
-    for (final change in changes) {
-      if (change.doc.metadata.hasPendingWrites) {
-        continue;
-      }
-      final data = Map<String, dynamic>.from(
-        change.doc.data() ?? const <String, dynamic>{},
-      );
-      if (change.type == DocumentChangeType.removed) {
-        data['tombstone'] = true;
-      }
-      tasks.add(
-        _inventoryRepository.mergeInventoryDocument(
-          change.doc.id,
-          data,
-          updatedAt: _toEpoch(data['updatedAt'] ?? data['createdAt']),
-        ),
-      );
-    }
-    if (tasks.isNotEmpty) {
-      await Future.wait(tasks);
-    }
-  }
-
-  Future<void> _mergeInventoryDocuments(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
-  ) async {
-    final tasks = <Future<void>>[];
-    for (final doc in docs) {
-      final data = Map<String, dynamic>.from(doc.data());
-      tasks.add(
-        _inventoryRepository.mergeInventoryDocument(
-          doc.id,
-          data,
-          updatedAt: _toEpoch(data['updatedAt'] ?? data['createdAt']),
-        ),
-      );
-    }
-    if (tasks.isNotEmpty) {
-      await Future.wait(tasks);
-    }
-  }
-
-  Future<void> _mergeInventoryPrivateChanges(
-    List<DocumentChange<Map<String, dynamic>>> changes,
-  ) async {
-    final tasks = <Future<void>>[];
-    for (final change in changes) {
-      if (change.doc.metadata.hasPendingWrites) {
-        continue;
-      }
-      final data = Map<String, dynamic>.from(
-        change.doc.data() ?? const <String, dynamic>{},
-      );
-      if (change.type == DocumentChangeType.removed) {
-        data['tombstone'] = true;
-      }
-      tasks.add(
-        _inventoryRepository.mergeInventoryPrivateDocument(
-          change.doc.id,
-          data,
-          updatedAt: _toEpoch(data['updatedAt'] ?? data['lastPurchaseDate']),
-        ),
-      );
-    }
-    if (tasks.isNotEmpty) {
-      await Future.wait(tasks);
-    }
-  }
-
-  Future<void> _mergeInventoryPrivateDocuments(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
-  ) async {
-    final tasks = <Future<void>>[];
-    for (final doc in docs) {
-      final data = Map<String, dynamic>.from(doc.data());
-      tasks.add(
-        _inventoryRepository.mergeInventoryPrivateDocument(
-          doc.id,
-          data,
-          updatedAt: _toEpoch(data['updatedAt'] ?? data['lastPurchaseDate']),
-        ),
-      );
-    }
-    if (tasks.isNotEmpty) {
-      await Future.wait(tasks);
-    }
-  }
-
-  Future<void> _mergeSalesChanges(
-    List<DocumentChange<Map<String, dynamic>>> changes,
-  ) async {
-    final tasks = <Future<void>>[];
-    for (final change in changes) {
-      if (change.doc.metadata.hasPendingWrites) {
-        continue;
-      }
-      final data = Map<String, dynamic>.from(
-        change.doc.data() ?? const <String, dynamic>{},
-      );
-      if (change.type == DocumentChangeType.removed) {
-        data['tombstone'] = true;
-      }
-      tasks.add(
-        _salesRepository.mergeRemoteSaleDocument(
-          change.doc.id,
-          data,
-          updatedAt: _toEpoch(data['updatedAt'] ?? data['createdAt']),
-        ),
-      );
-    }
-    if (tasks.isNotEmpty) {
-      await Future.wait(tasks);
-    }
-  }
-
-  Future<void> _mergeSalesDocuments(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
-  ) async {
-    final tasks = <Future<void>>[];
-    for (final doc in docs) {
-      final data = Map<String, dynamic>.from(doc.data());
-      tasks.add(
-        _salesRepository.mergeRemoteSaleDocument(
-          doc.id,
-          data,
-          updatedAt: _toEpoch(data['updatedAt'] ?? data['createdAt']),
-        ),
-      );
-    }
-    if (tasks.isNotEmpty) {
-      await Future.wait(tasks);
-    }
-  }
-
-  Future<void> _mergeCustomerChanges(
-    List<DocumentChange<Map<String, dynamic>>> changes,
-  ) async {
-    final tasks = <Future<void>>[];
-    for (final change in changes) {
-      if (change.doc.metadata.hasPendingWrites) {
-        continue;
-      }
-      final data = Map<String, dynamic>.from(
-        change.doc.data() ?? const <String, dynamic>{},
-      );
-      if (change.type == DocumentChangeType.removed) {
-        data['tombstone'] = true;
-      }
-      tasks.add(
-        _customerRepository.mergeRemoteCustomerDocument(
-          change.doc.id,
-          data,
-          updatedAt: _toEpoch(data['updatedAt'] ?? data['createdAt']),
-        ),
-      );
-    }
-    if (tasks.isNotEmpty) {
-      await Future.wait(tasks);
-    }
-  }
-
-  Future<void> _mergeCustomerDocuments(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
-  ) async {
-    final tasks = <Future<void>>[];
-    for (final doc in docs) {
-      final data = Map<String, dynamic>.from(doc.data());
-      tasks.add(
-        _customerRepository.mergeRemoteCustomerDocument(
-          doc.id,
-          data,
-          updatedAt: _toEpoch(data['updatedAt'] ?? data['createdAt']),
-        ),
-      );
-    }
-    if (tasks.isNotEmpty) {
-      await Future.wait(tasks);
-    }
   }
 
   int _toEpoch(Object? value) {
-    if (value is Timestamp) return value.millisecondsSinceEpoch;
     if (value is int) return value;
     if (value is num) return value.toInt();
     if (value is String) {
@@ -1165,26 +817,3 @@ class MobileSyncCoordinator {
     return DateTime.now().millisecondsSinceEpoch;
   }
 }
-
-final Map<String, dynamic> _adminPermissionTemplate = UnmodifiableMapView({
-  'inventory': {
-    'view': true,
-    'create': true,
-    'edit': true,
-    'delete': true,
-    'view_cost': true,
-  },
-  'sales': {
-    'view': true,
-    'create': true,
-    'edit': true,
-    'void_sale': true,
-    'view_profit': true,
-    'override_price': true,
-  },
-  'customers': {'view': true, 'create': true, 'edit': true, 'delete': true},
-  'expenses': {'view': true, 'create': true, 'delete': true},
-  'team': {'view': true, 'edit': true, 'view_cost': true},
-  'analytics': {'view': true},
-  'settings': {'view': true, 'edit': true},
-});

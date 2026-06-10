@@ -9,6 +9,7 @@ import '../../../core/backend/backend_api_client.dart';
 import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
+import '../../../core/runtime/mobile_runtime_config.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../shell/presentation/mobile_surface.dart';
 
@@ -238,6 +239,39 @@ class _SettingsSecurityScreenState
       );
     }
 
+    if (!MobileRuntimeConfig.backendSyncEnabled) {
+      return MobileStandaloneScaffold(
+        title: 'Security',
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
+          children: const <Widget>[
+            MobileScreenLead(
+              title: 'Local owner mode is active',
+              subtitle:
+                  'Backend deployment is paused, so MFA, passkeys, remote session wipe, and server-side session invalidation stay disabled in this APK.',
+              icon: Icons.offline_bolt_rounded,
+              accent: AppPalette.warning,
+              primaryTag: MobileTag(
+                label: 'LOCAL-FIRST',
+                icon: Icons.lock_open_rounded,
+                accent: AppPalette.warning,
+              ),
+            ),
+            SizedBox(height: 18),
+            MobilePanel(
+              title: 'What works now',
+              child: MobileEmptyState(
+                icon: Icons.phone_android_rounded,
+                title: 'Device vault is unlocked locally',
+                body:
+                    'Inventory, POS, customers, history, owner role, and local team baseline are available without cloud auth. Turn on backend sync later to enable enterprise security controls.',
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (_status == null && !_busy) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -294,9 +328,7 @@ class _SettingsSecurityScreenState
               icon: hasFreshWindow
                   ? Icons.verified_rounded
                   : Icons.lock_clock_rounded,
-              accent: hasFreshWindow
-                  ? AppPalette.success
-                  : AppPalette.warning,
+              accent: hasFreshWindow ? AppPalette.success : AppPalette.warning,
             ),
           ),
           const SizedBox(height: 18),
@@ -318,9 +350,7 @@ class _SettingsSecurityScreenState
               icon: hasFreshWindow
                   ? Icons.lock_open_rounded
                   : Icons.lock_outline_rounded,
-              accent: hasFreshWindow
-                  ? AppPalette.success
-                  : AppPalette.warning,
+              accent: hasFreshWindow ? AppPalette.success : AppPalette.warning,
             ),
             child: Column(
               children: <Widget>[
@@ -605,5 +635,3 @@ class _SecurityValueBlock extends StatelessWidget {
     );
   }
 }
-
-
