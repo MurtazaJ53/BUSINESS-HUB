@@ -22,10 +22,13 @@ from platform_apps.payments.models import SalePayment
 from platform_apps.projections.services import refresh_shop_dashboard_projection
 from platform_apps.sales.models import Sale, SaleItem
 from platform_apps.sales.models import SaleCommandReceipt
+from platform_apps.inventory.models import InventoryStockLedger
+from platform_apps.customers.models import CustomerLedgerEntry
 from platform_apps.sales.serializers import (
     SaleCommandCreateSerializer,
     SaleSerializer,
     SaleSummarySerializer,
+    SaleGstSummarySerializer,
 )
 from platform_apps.shops.models import ShopMembership
 from platform_apps.shops.permissions import get_membership_or_403, has_feature_enabled
@@ -142,6 +145,96 @@ class SaleDetailView(ShopScopedMixin, generics.RetrieveAPIView):
         )
 
 
+class SaleVoidView(ShopScopedMixin, APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    minimum_role = ShopMembership.Role.STAFF
+
+    def patch(self, request, shop_id, sale_id):
+        membership = self.get_membership()
+        
+        guarded_domains = [MigrationDomain.SALES, MigrationDomain.STOCK_LEDGER, MigrationDomain.CUSTOMER_LEDGER]
+        assert_postgres_primary_write_enabled_multi(shop_id=str(shop_id), domains=guarded_domains)
+
+        sale = generics.get_object_or_404(
+            Sale.objects.filter(shop=membership.shop, tombstone=False),
+            id=sale_id,
+        )
+
+        if sale.status == Sale.Status.VOID:
+            return Response({"detail": "Sale is already void."}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            sale = Sale.objects.select_for_update().get(pk=sale.id)
+            if sale.status == Sale.Status.VOID:
+                return Response({"detail": "Sale is already void."}, status=status.HTTP_400_BAD_REQUEST)
+                
+            sale.status = Sale.Status.VOID
+            sale.save(update_fields=["status", "updated_at"])
+
+            occurred_at = timezone.now()
+
+            # Reverse inventory stock ledger
+            for item in sale.items.all():
+                if item.inventory_item_id:
+                    InventoryStockLedger.objects.create(
+                        shop=membership.shop,
+                        item_id=item.inventory_item_id,
+                        actor_user=request.user,
+                        event_type=InventoryStockLedger.EventType.RETURN,
+                        quantity_delta=item.quantity if not item.is_return else -item.quantity,
+                        unit_cost=item.unit_cost,
+                        unit_price=item.unit_price,
+                        note=f"Void Sale {sale.receipt_number}",
+                        occurred_at=occurred_at,
+                        source_system=sale.source_system,
+                        source_id=str(sale.id),
+                        source_shop_id=sale.source_shop_id,
+                        source_path=f"sales/{sale.id}/void",
+                        domain_epoch=sale.domain_epoch,
+                    )
+
+            # Reverse customer ledger
+            if sale.customer_id:
+                customer = sale.customer
+                computed_due = sale.amount_due
+                computed_total = sale.total_amount
+                
+                CustomerLedgerEntry.objects.create(
+                    shop=membership.shop,
+                    customer=customer,
+                    actor_user=request.user,
+                    event_type=CustomerLedgerEntry.EventType.PAYMENT, # Reverse sale with a payment equivalent
+                    amount_delta=-computed_due,
+                    total_spent_delta=-computed_total,
+                    note=f"Void Sale {sale.receipt_number}",
+                    occurred_at=occurred_at,
+                    source_system=sale.source_system,
+                    source_id=str(sale.id),
+                    source_shop_id=sale.source_shop_id,
+                    source_path=f"sales/{sale.id}/void",
+                    domain_epoch=sale.domain_epoch,
+                )
+                customer.balance -= computed_due
+                customer.total_spent -= computed_total
+                customer.save(update_fields=["balance", "total_spent", "updated_at"])
+
+        create_workspace_audit_event(
+            shop=membership.shop,
+            actor_user=request.user,
+            actor_role=membership.role,
+            category="sale",
+            event_type="sale.voided",
+            entity_type="sale",
+            entity_id=sale.id,
+            entity_label=sale.receipt_number,
+            summary=f"Voided sale {sale.receipt_number}.",
+            source_surface="backend_api",
+            after=snapshot_sale(sale),
+        )
+
+        return Response(SaleSerializer(sale).data)
+
+
 class SaleSummaryView(ShopScopedMixin, APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -172,6 +265,63 @@ class SaleSummaryView(ShopScopedMixin, APIView):
         }
 
         serializer = SaleSummarySerializer(payload)
+        return Response(serializer.data)
+
+
+class SaleGstSummaryView(ShopScopedMixin, APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, shop_id):
+        membership = self.get_membership()
+        queryset = Sale.objects.filter(shop=membership.shop, tombstone=False)
+        
+        date_from = request.query_params.get("date_from", "").strip()
+        date_to = request.query_params.get("date_to", "").strip()
+        
+        if date_from:
+            queryset = queryset.filter(sale_date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(sale_date__lte=date_to)
+
+        aggregates = queryset.aggregate(
+            total_taxable=Coalesce(Sum("taxable_amount"), Decimal("0.00")),
+            total_tax=Coalesce(Sum("tax_amount"), Decimal("0.00")),
+            total_cgst=Coalesce(Sum("cgst_amount"), Decimal("0.00")),
+            total_sgst=Coalesce(Sum("sgst_amount"), Decimal("0.00")),
+            total_igst=Coalesce(Sum("igst_amount"), Decimal("0.00")),
+            total_gross=Coalesce(Sum("total_amount"), Decimal("0.00")),
+        )
+
+        # B2C small aggregation: by gst_rate
+        b2c_rates = queryset.values("items__gst_rate").annotate(
+            taxable_amount=Coalesce(Sum("items__taxable_amount"), Decimal("0.00")),
+            tax_amount=Coalesce(Sum("items__tax_amount"), Decimal("0.00")),
+            cgst_amount=Coalesce(Sum("items__cgst_amount"), Decimal("0.00")),
+            sgst_amount=Coalesce(Sum("items__sgst_amount"), Decimal("0.00")),
+            igst_amount=Coalesce(Sum("items__igst_amount"), Decimal("0.00")),
+        ).order_by("items__gst_rate")
+        
+        # HSN summary: by hsn_snapshot
+        hsn_summary = queryset.exclude(items__hsn_snapshot="").values("items__hsn_snapshot").annotate(
+            taxable_amount=Coalesce(Sum("items__taxable_amount"), Decimal("0.00")),
+            tax_amount=Coalesce(Sum("items__tax_amount"), Decimal("0.00")),
+            cgst_amount=Coalesce(Sum("items__cgst_amount"), Decimal("0.00")),
+            sgst_amount=Coalesce(Sum("items__sgst_amount"), Decimal("0.00")),
+            igst_amount=Coalesce(Sum("items__igst_amount"), Decimal("0.00")),
+        ).order_by("items__hsn_snapshot")
+
+        payload = {
+            "taxable_amount": aggregates["total_taxable"],
+            "tax_amount": aggregates["total_tax"],
+            "cgst_amount": aggregates["total_cgst"],
+            "sgst_amount": aggregates["total_sgst"],
+            "igst_amount": aggregates["total_igst"],
+            "gross_amount": aggregates["total_gross"],
+            "b2c_small": list(b2c_rates),
+            "hsn_summary": list(hsn_summary),
+        }
+
+        serializer = SaleGstSummarySerializer(payload)
         return Response(serializer.data)
 
 

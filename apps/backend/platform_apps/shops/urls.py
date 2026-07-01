@@ -27,8 +27,7 @@ from platform_apps.projections.views import (
     ShopPulseSignalListView,
     ShopPulseSnapshotView,
 )
-from platform_apps.sales.views import SaleCommandIngestionView, SaleDetailView, SaleListCreateView
-from platform_apps.sales.views import SaleSummaryView
+from platform_apps.sales.views import SaleCommandIngestionView, SaleDetailView, SaleListCreateView, SaleVoidView, SaleSummaryView, SaleGstSummaryView
 from platform_apps.shops.views import (
     ShopDomainStateView,
     ShopMembershipListView,
@@ -120,8 +119,10 @@ urlpatterns = [
     ),
     path("<uuid:shop_id>/sales/", SaleListCreateView.as_view(), name="sale-list"),
     path("<uuid:shop_id>/sales/summary/", SaleSummaryView.as_view(), name="sale-summary"),
+    path("<uuid:shop_id>/sales/summary/gst/", SaleGstSummaryView.as_view(), name="sale-gst-summary"),
     path("<uuid:shop_id>/sales/commands/", SaleCommandIngestionView.as_view(), name="sale-command-ingestion"),
     path("<uuid:shop_id>/sales/<uuid:sale_id>/", SaleDetailView.as_view(), name="sale-detail"),
+    path("<uuid:shop_id>/sales/<uuid:sale_id>/void/", SaleVoidView.as_view(), name="sale-void"),
     path(
         "<uuid:shop_id>/inventory/<uuid:item_id>/adjust-stock/",
         InventoryItemAdjustmentView.as_view(),

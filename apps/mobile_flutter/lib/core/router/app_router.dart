@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/auth_gate_screen.dart';
-import '../../features/customers/presentation/customers_screen.dart';
-import '../../features/dashboard/presentation/dashboard_screen.dart';
+import '../../features/customers/presentation/customers_screen_v3.dart';
+import '../../features/dashboard/presentation/dashboard_screen_v3.dart';
 import '../../features/history/presentation/history_screen.dart';
-import '../../features/inventory/presentation/inventory_screen.dart';
-import '../../features/pos/presentation/pos_screen.dart';
+import '../../features/inventory/presentation/inventory_screen_v3.dart';
+import '../../features/pos/presentation/pos_screen_v3.dart';
 import '../../features/settings/presentation/settings_ops_screen.dart';
 import '../../features/settings/presentation/settings_attendance_screen.dart';
 import '../../features/settings/presentation/settings_expenses_screen.dart';
@@ -37,7 +37,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/dashboard',
-                builder: (context, state) => const DashboardScreen(),
+                builder: (context, state) => const DashboardScreenV3(),
               ),
             ],
           ),
@@ -46,7 +46,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/inventory',
-                builder: (context, state) => const InventoryScreen(),
+                builder: (context, state) => const InventoryScreenV3(),
               ),
             ],
           ),
@@ -55,7 +55,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/customers',
-                builder: (context, state) => const CustomersScreen(),
+                builder: (context, state) => const CustomersScreenV3(),
               ),
             ],
           ),
@@ -73,7 +73,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/pos',
-                builder: (context, state) => const PosScreen(),
+                builder: (context, state) => const PosScreenV3(),
               ),
             ],
           ),

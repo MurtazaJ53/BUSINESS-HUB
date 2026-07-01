@@ -45,6 +45,14 @@ class Sale(SourceTrackedModel):
     subtotal_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    # GST totals (India). taxable_amount = net of tax; tax_amount = cgst+sgst+igst.
+    # place_of_supply_state drives the intra/inter-state split at sale time.
+    taxable_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    cgst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    sgst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    igst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    place_of_supply_state = models.CharField(max_length=2, blank=True)
     amount_received = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     amount_due = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     payment_mode = models.CharField(max_length=16, choices=PaymentMode.choices, default=PaymentMode.CASH)
@@ -94,6 +102,18 @@ class SaleItem(SourceTrackedModel):
     unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     unit_cost = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
     line_total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    # Apportioned share of the sale-level discount for this line.
+    line_discount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    # GST breakdown (India), snapshotted at sale time. taxable_amount is the net
+    # (pre-tax) line value; tax_amount = cgst+sgst+igst. hsn_snapshot preserves
+    # the item's HSN so historical receipts stay correct if the item later changes.
+    hsn_snapshot = models.CharField(max_length=16, blank=True)
+    gst_rate = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
+    taxable_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    cgst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    sgst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    igst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     is_return = models.BooleanField(default=False)
 
     class Meta:

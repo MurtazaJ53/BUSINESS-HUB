@@ -344,6 +344,9 @@ class BackendApiClient {
     String size = '',
     String description = '',
     double? costPrice,
+    String hsnCode = '',
+    double gstRate = 0,
+    bool priceIncludesTax = true,
   }) async {
     final body = <String, dynamic>{
       'name': name,
@@ -355,6 +358,9 @@ class BackendApiClient {
       'subcategory': subcategory,
       'size': size,
       'description': description,
+      'hsn_code': hsnCode.trim(),
+      'gst_rate': gstRate.toStringAsFixed(2),
+      'price_includes_tax': priceIncludesTax,
       'status': 'active',
     };
     if (costPrice != null) {

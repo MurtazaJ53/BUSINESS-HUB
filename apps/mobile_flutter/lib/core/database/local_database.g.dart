@@ -351,6 +351,44 @@ class $InventoryEntriesTable extends InventoryEntries
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _hsnCodeMeta = const VerificationMeta(
+    'hsnCode',
+  );
+  @override
+  late final GeneratedColumn<String> hsnCode = GeneratedColumn<String>(
+    'hsn_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _gstRateMeta = const VerificationMeta(
+    'gstRate',
+  );
+  @override
+  late final GeneratedColumn<double> gstRate = GeneratedColumn<double>(
+    'gst_rate',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _priceIncludesTaxMeta = const VerificationMeta(
+    'priceIncludesTax',
+  );
+  @override
+  late final GeneratedColumn<bool> priceIncludesTax = GeneratedColumn<bool>(
+    'price_includes_tax',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("price_includes_tax" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _stockMeta = const VerificationMeta('stock');
   @override
   late final GeneratedColumn<int> stock = GeneratedColumn<int>(
@@ -420,6 +458,9 @@ class $InventoryEntriesTable extends InventoryEntries
     subcategory,
     size,
     description,
+    hsnCode,
+    gstRate,
+    priceIncludesTax,
     stock,
     sourceMeta,
     createdAt,
@@ -492,6 +533,27 @@ class $InventoryEntriesTable extends InventoryEntries
         description.isAcceptableOrUnknown(
           data['description']!,
           _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('hsn_code')) {
+      context.handle(
+        _hsnCodeMeta,
+        hsnCode.isAcceptableOrUnknown(data['hsn_code']!, _hsnCodeMeta),
+      );
+    }
+    if (data.containsKey('gst_rate')) {
+      context.handle(
+        _gstRateMeta,
+        gstRate.isAcceptableOrUnknown(data['gst_rate']!, _gstRateMeta),
+      );
+    }
+    if (data.containsKey('price_includes_tax')) {
+      context.handle(
+        _priceIncludesTaxMeta,
+        priceIncludesTax.isAcceptableOrUnknown(
+          data['price_includes_tax']!,
+          _priceIncludesTaxMeta,
         ),
       );
     }
@@ -568,6 +630,18 @@ class $InventoryEntriesTable extends InventoryEntries
         DriftSqlType.string,
         data['${effectivePrefix}description'],
       ),
+      hsnCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}hsn_code'],
+      ),
+      gstRate: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}gst_rate'],
+      )!,
+      priceIncludesTax: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}price_includes_tax'],
+      )!,
       stock: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}stock'],
@@ -606,6 +680,9 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
   final String? subcategory;
   final String? size;
   final String? description;
+  final String? hsnCode;
+  final double gstRate;
+  final bool priceIncludesTax;
   final int stock;
   final String? sourceMeta;
   final int createdAt;
@@ -620,6 +697,9 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     this.subcategory,
     this.size,
     this.description,
+    this.hsnCode,
+    required this.gstRate,
+    required this.priceIncludesTax,
     required this.stock,
     this.sourceMeta,
     required this.createdAt,
@@ -645,6 +725,11 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     if (!nullToAbsent || description != null) {
       map['description'] = Variable<String>(description);
     }
+    if (!nullToAbsent || hsnCode != null) {
+      map['hsn_code'] = Variable<String>(hsnCode);
+    }
+    map['gst_rate'] = Variable<double>(gstRate);
+    map['price_includes_tax'] = Variable<bool>(priceIncludesTax);
     map['stock'] = Variable<int>(stock);
     if (!nullToAbsent || sourceMeta != null) {
       map['source_meta'] = Variable<String>(sourceMeta);
@@ -669,6 +754,11 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
       description: description == null && nullToAbsent
           ? const Value.absent()
           : Value(description),
+      hsnCode: hsnCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(hsnCode),
+      gstRate: Value(gstRate),
+      priceIncludesTax: Value(priceIncludesTax),
       stock: Value(stock),
       sourceMeta: sourceMeta == null && nullToAbsent
           ? const Value.absent()
@@ -693,6 +783,9 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
       subcategory: serializer.fromJson<String?>(json['subcategory']),
       size: serializer.fromJson<String?>(json['size']),
       description: serializer.fromJson<String?>(json['description']),
+      hsnCode: serializer.fromJson<String?>(json['hsnCode']),
+      gstRate: serializer.fromJson<double>(json['gstRate']),
+      priceIncludesTax: serializer.fromJson<bool>(json['priceIncludesTax']),
       stock: serializer.fromJson<int>(json['stock']),
       sourceMeta: serializer.fromJson<String?>(json['sourceMeta']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
@@ -712,6 +805,9 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
       'subcategory': serializer.toJson<String?>(subcategory),
       'size': serializer.toJson<String?>(size),
       'description': serializer.toJson<String?>(description),
+      'hsnCode': serializer.toJson<String?>(hsnCode),
+      'gstRate': serializer.toJson<double>(gstRate),
+      'priceIncludesTax': serializer.toJson<bool>(priceIncludesTax),
       'stock': serializer.toJson<int>(stock),
       'sourceMeta': serializer.toJson<String?>(sourceMeta),
       'createdAt': serializer.toJson<int>(createdAt),
@@ -729,6 +825,9 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     Value<String?> subcategory = const Value.absent(),
     Value<String?> size = const Value.absent(),
     Value<String?> description = const Value.absent(),
+    Value<String?> hsnCode = const Value.absent(),
+    double? gstRate,
+    bool? priceIncludesTax,
     int? stock,
     Value<String?> sourceMeta = const Value.absent(),
     int? createdAt,
@@ -743,6 +842,9 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     subcategory: subcategory.present ? subcategory.value : this.subcategory,
     size: size.present ? size.value : this.size,
     description: description.present ? description.value : this.description,
+    hsnCode: hsnCode.present ? hsnCode.value : this.hsnCode,
+    gstRate: gstRate ?? this.gstRate,
+    priceIncludesTax: priceIncludesTax ?? this.priceIncludesTax,
     stock: stock ?? this.stock,
     sourceMeta: sourceMeta.present ? sourceMeta.value : this.sourceMeta,
     createdAt: createdAt ?? this.createdAt,
@@ -763,6 +865,11 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
       description: data.description.present
           ? data.description.value
           : this.description,
+      hsnCode: data.hsnCode.present ? data.hsnCode.value : this.hsnCode,
+      gstRate: data.gstRate.present ? data.gstRate.value : this.gstRate,
+      priceIncludesTax: data.priceIncludesTax.present
+          ? data.priceIncludesTax.value
+          : this.priceIncludesTax,
       stock: data.stock.present ? data.stock.value : this.stock,
       sourceMeta: data.sourceMeta.present
           ? data.sourceMeta.value
@@ -784,6 +891,9 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
           ..write('subcategory: $subcategory, ')
           ..write('size: $size, ')
           ..write('description: $description, ')
+          ..write('hsnCode: $hsnCode, ')
+          ..write('gstRate: $gstRate, ')
+          ..write('priceIncludesTax: $priceIncludesTax, ')
           ..write('stock: $stock, ')
           ..write('sourceMeta: $sourceMeta, ')
           ..write('createdAt: $createdAt, ')
@@ -803,6 +913,9 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     subcategory,
     size,
     description,
+    hsnCode,
+    gstRate,
+    priceIncludesTax,
     stock,
     sourceMeta,
     createdAt,
@@ -821,6 +934,9 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
           other.subcategory == this.subcategory &&
           other.size == this.size &&
           other.description == this.description &&
+          other.hsnCode == this.hsnCode &&
+          other.gstRate == this.gstRate &&
+          other.priceIncludesTax == this.priceIncludesTax &&
           other.stock == this.stock &&
           other.sourceMeta == this.sourceMeta &&
           other.createdAt == this.createdAt &&
@@ -837,6 +953,9 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
   final Value<String?> subcategory;
   final Value<String?> size;
   final Value<String?> description;
+  final Value<String?> hsnCode;
+  final Value<double> gstRate;
+  final Value<bool> priceIncludesTax;
   final Value<int> stock;
   final Value<String?> sourceMeta;
   final Value<int> createdAt;
@@ -852,6 +971,9 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     this.subcategory = const Value.absent(),
     this.size = const Value.absent(),
     this.description = const Value.absent(),
+    this.hsnCode = const Value.absent(),
+    this.gstRate = const Value.absent(),
+    this.priceIncludesTax = const Value.absent(),
     this.stock = const Value.absent(),
     this.sourceMeta = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -868,6 +990,9 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     this.subcategory = const Value.absent(),
     this.size = const Value.absent(),
     this.description = const Value.absent(),
+    this.hsnCode = const Value.absent(),
+    this.gstRate = const Value.absent(),
+    this.priceIncludesTax = const Value.absent(),
     this.stock = const Value.absent(),
     this.sourceMeta = const Value.absent(),
     required int createdAt,
@@ -887,6 +1012,9 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     Expression<String>? subcategory,
     Expression<String>? size,
     Expression<String>? description,
+    Expression<String>? hsnCode,
+    Expression<double>? gstRate,
+    Expression<bool>? priceIncludesTax,
     Expression<int>? stock,
     Expression<String>? sourceMeta,
     Expression<int>? createdAt,
@@ -903,6 +1031,9 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
       if (subcategory != null) 'subcategory': subcategory,
       if (size != null) 'size': size,
       if (description != null) 'description': description,
+      if (hsnCode != null) 'hsn_code': hsnCode,
+      if (gstRate != null) 'gst_rate': gstRate,
+      if (priceIncludesTax != null) 'price_includes_tax': priceIncludesTax,
       if (stock != null) 'stock': stock,
       if (sourceMeta != null) 'source_meta': sourceMeta,
       if (createdAt != null) 'created_at': createdAt,
@@ -921,6 +1052,9 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     Value<String?>? subcategory,
     Value<String?>? size,
     Value<String?>? description,
+    Value<String?>? hsnCode,
+    Value<double>? gstRate,
+    Value<bool>? priceIncludesTax,
     Value<int>? stock,
     Value<String?>? sourceMeta,
     Value<int>? createdAt,
@@ -937,6 +1071,9 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
       subcategory: subcategory ?? this.subcategory,
       size: size ?? this.size,
       description: description ?? this.description,
+      hsnCode: hsnCode ?? this.hsnCode,
+      gstRate: gstRate ?? this.gstRate,
+      priceIncludesTax: priceIncludesTax ?? this.priceIncludesTax,
       stock: stock ?? this.stock,
       sourceMeta: sourceMeta ?? this.sourceMeta,
       createdAt: createdAt ?? this.createdAt,
@@ -973,6 +1110,15 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     if (description.present) {
       map['description'] = Variable<String>(description.value);
     }
+    if (hsnCode.present) {
+      map['hsn_code'] = Variable<String>(hsnCode.value);
+    }
+    if (gstRate.present) {
+      map['gst_rate'] = Variable<double>(gstRate.value);
+    }
+    if (priceIncludesTax.present) {
+      map['price_includes_tax'] = Variable<bool>(priceIncludesTax.value);
+    }
     if (stock.present) {
       map['stock'] = Variable<int>(stock.value);
     }
@@ -1005,6 +1151,9 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
           ..write('subcategory: $subcategory, ')
           ..write('size: $size, ')
           ..write('description: $description, ')
+          ..write('hsnCode: $hsnCode, ')
+          ..write('gstRate: $gstRate, ')
+          ..write('priceIncludesTax: $priceIncludesTax, ')
           ..write('stock: $stock, ')
           ..write('sourceMeta: $sourceMeta, ')
           ..write('createdAt: $createdAt, ')
@@ -4335,6 +4484,9 @@ typedef $$InventoryEntriesTableCreateCompanionBuilder =
       Value<String?> subcategory,
       Value<String?> size,
       Value<String?> description,
+      Value<String?> hsnCode,
+      Value<double> gstRate,
+      Value<bool> priceIncludesTax,
       Value<int> stock,
       Value<String?> sourceMeta,
       required int createdAt,
@@ -4352,6 +4504,9 @@ typedef $$InventoryEntriesTableUpdateCompanionBuilder =
       Value<String?> subcategory,
       Value<String?> size,
       Value<String?> description,
+      Value<String?> hsnCode,
+      Value<double> gstRate,
+      Value<bool> priceIncludesTax,
       Value<int> stock,
       Value<String?> sourceMeta,
       Value<int> createdAt,
@@ -4406,6 +4561,21 @@ class $$InventoryEntriesTableFilterComposer
 
   ColumnFilters<String> get description => $composableBuilder(
     column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get hsnCode => $composableBuilder(
+    column: $table.hsnCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get gstRate => $composableBuilder(
+    column: $table.gstRate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get priceIncludesTax => $composableBuilder(
+    column: $table.priceIncludesTax,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4484,6 +4654,21 @@ class $$InventoryEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get hsnCode => $composableBuilder(
+    column: $table.hsnCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get gstRate => $composableBuilder(
+    column: $table.gstRate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get priceIncludesTax => $composableBuilder(
+    column: $table.priceIncludesTax,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get stock => $composableBuilder(
     column: $table.stock,
     builder: (column) => ColumnOrderings(column),
@@ -4544,6 +4729,17 @@ class $$InventoryEntriesTableAnnotationComposer
 
   GeneratedColumn<String> get description => $composableBuilder(
     column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get hsnCode =>
+      $composableBuilder(column: $table.hsnCode, builder: (column) => column);
+
+  GeneratedColumn<double> get gstRate =>
+      $composableBuilder(column: $table.gstRate, builder: (column) => column);
+
+  GeneratedColumn<bool> get priceIncludesTax => $composableBuilder(
+    column: $table.priceIncludesTax,
     builder: (column) => column,
   );
 
@@ -4610,6 +4806,9 @@ class $$InventoryEntriesTableTableManager
                 Value<String?> subcategory = const Value.absent(),
                 Value<String?> size = const Value.absent(),
                 Value<String?> description = const Value.absent(),
+                Value<String?> hsnCode = const Value.absent(),
+                Value<double> gstRate = const Value.absent(),
+                Value<bool> priceIncludesTax = const Value.absent(),
                 Value<int> stock = const Value.absent(),
                 Value<String?> sourceMeta = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
@@ -4625,6 +4824,9 @@ class $$InventoryEntriesTableTableManager
                 subcategory: subcategory,
                 size: size,
                 description: description,
+                hsnCode: hsnCode,
+                gstRate: gstRate,
+                priceIncludesTax: priceIncludesTax,
                 stock: stock,
                 sourceMeta: sourceMeta,
                 createdAt: createdAt,
@@ -4642,6 +4844,9 @@ class $$InventoryEntriesTableTableManager
                 Value<String?> subcategory = const Value.absent(),
                 Value<String?> size = const Value.absent(),
                 Value<String?> description = const Value.absent(),
+                Value<String?> hsnCode = const Value.absent(),
+                Value<double> gstRate = const Value.absent(),
+                Value<bool> priceIncludesTax = const Value.absent(),
                 Value<int> stock = const Value.absent(),
                 Value<String?> sourceMeta = const Value.absent(),
                 required int createdAt,
@@ -4657,6 +4862,9 @@ class $$InventoryEntriesTableTableManager
                 subcategory: subcategory,
                 size: size,
                 description: description,
+                hsnCode: hsnCode,
+                gstRate: gstRate,
+                priceIncludesTax: priceIncludesTax,
                 stock: stock,
                 sourceMeta: sourceMeta,
                 createdAt: createdAt,

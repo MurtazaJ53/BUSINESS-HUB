@@ -566,6 +566,9 @@ class InventoryRepository {
         i.subcategory,
         i.size,
         i.description,
+        i.hsn_code,
+        COALESCE(i.gst_rate, 0) AS gst_rate,
+        COALESCE(i.price_includes_tax, 1) AS price_includes_tax,
         i.stock,
         i.source_meta,
         i.created_at,
@@ -612,6 +615,9 @@ class InventoryRepository {
           i.subcategory,
           i.size,
           i.description,
+          i.hsn_code,
+          COALESCE(i.gst_rate, 0) AS gst_rate,
+          COALESCE(i.price_includes_tax, 1) AS price_includes_tax,
           i.stock,
           i.source_meta,
           i.created_at,
@@ -658,6 +664,16 @@ class InventoryRepository {
             subcategory: Value(_asStringOrNull(data['subcategory'])),
             size: Value(_asStringOrNull(data['size'])),
             description: Value(_asStringOrNull(data['description'])),
+            hsnCode: Value(
+              _asStringOrNull(data['hsnCode'] ?? data['hsn_code']),
+            ),
+            gstRate: Value(_asDouble(data['gstRate'] ?? data['gst_rate'])),
+            priceIncludesTax: Value(
+              _asBool(
+                data['priceIncludesTax'] ?? data['price_includes_tax'],
+                fallback: true,
+              ),
+            ),
             stock: Value(_asInt(data['stock'])),
             sourceMeta: Value(_encodeNullableJson(data['sourceMeta'])),
             createdAt: createdAt,
@@ -707,6 +723,9 @@ class InventoryRepository {
       'subcategory': row['subcategory'],
       'size': row['size'],
       'description': row['description'],
+      'hsn_code': row['hsn_code'],
+      'gst_rate': row['gst_rate'],
+      'price_includes_tax': row['price_includes_tax'],
       'stock': row['stock_on_hand'] ?? row['stock'],
       'sourceMeta': row['source_meta_json'] ?? row['sourceMeta'],
       'createdAt': row['created_at'] ?? resolvedUpdatedAt,
@@ -737,6 +756,9 @@ class InventoryRepository {
       subcategory: row.readNullable<String>('subcategory'),
       size: row.readNullable<String>('size'),
       description: row.readNullable<String>('description'),
+      hsnCode: row.readNullable<String>('hsn_code'),
+      gstRate: row.read<double>('gst_rate'),
+      priceIncludesTax: row.read<bool>('price_includes_tax'),
       stock: row.read<int>('stock'),
       sourceMeta: row.readNullable<String>('source_meta'),
       createdAt: DateTime.fromMillisecondsSinceEpoch(
@@ -1242,6 +1264,13 @@ class SalesRepository {
                     'costPrice': item['unit_cost'] == null
                         ? null
                         : _asDouble(item['unit_cost']),
+                    'hsnCode': item['hsn_snapshot'],
+                    'gstRate': _asDouble(item['gst_rate']),
+                    'taxableAmount': _asDouble(item['taxable_amount']),
+                    'taxAmount': _asDouble(item['tax_amount']),
+                    'cgstAmount': _asDouble(item['cgst_amount']),
+                    'sgstAmount': _asDouble(item['sgst_amount']),
+                    'igstAmount': _asDouble(item['igst_amount']),
                   },
                 )
                 .toList(growable: false),
@@ -1682,6 +1711,21 @@ double _asDouble(Object? value) {
   return 0;
 }
 
+bool _asBool(Object? value, {bool fallback = false}) {
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final normalized = value.trim().toLowerCase();
+    if (const {'1', 'true', 'yes', 'y', 'on'}.contains(normalized)) {
+      return true;
+    }
+    if (const {'0', 'false', 'no', 'n', 'off'}.contains(normalized)) {
+      return false;
+    }
+  }
+  return fallback;
+}
+
 int _asInt(Object? value) {
   if (value is num) return value.toInt();
   if (value is String) return int.tryParse(value) ?? 0;
@@ -1732,6 +1776,21 @@ List<SaleDetailItem> _parseSaleItems(String raw) {
             unitCost: item['costPrice'] == null && item['unit_cost'] == null
                 ? null
                 : _asDouble(item['costPrice'] ?? item['unit_cost']),
+            hsnCode: _asStringOrNull(
+              item['hsnCode'] ?? item['hsn_code'] ?? item['hsn_snapshot'],
+            ),
+            gstRate: _asDouble(item['gstRate'] ?? item['gst_rate']),
+            taxableAmount: _asDouble(
+              item['taxableAmount'] ?? item['taxable_amount'],
+            ),
+            taxAmount: _asDouble(item['taxAmount'] ?? item['tax_amount']),
+            cgstAmount: _asDouble(item['cgstAmount'] ?? item['cgst_amount']),
+            sgstAmount: _asDouble(item['sgstAmount'] ?? item['sgst_amount']),
+            igstAmount: _asDouble(item['igstAmount'] ?? item['igst_amount']),
+            priceIncludesTax: _asBool(
+              item['priceIncludesTax'] ?? item['price_includes_tax'],
+              fallback: true,
+            ),
           ),
         )
         .toList(growable: false);

@@ -24,6 +24,12 @@ class InventoryItem(SourceTrackedModel):
     size = models.CharField(max_length=64, blank=True)
     description = models.TextField(blank=True)
     sell_price = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    # GST (India). hsn_code = Harmonized System of Nomenclature / SAC for services.
+    # gst_rate is the combined percentage (e.g. 18.00); intra-state splits into
+    # CGST+SGST, inter-state uses IGST — resolved at sale time from place of supply.
+    hsn_code = models.CharField(max_length=16, blank=True)
+    gst_rate = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
+    price_includes_tax = models.BooleanField(default=True)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
     tombstone = models.BooleanField(default=False)
     source_meta_json = models.JSONField(default=dict, blank=True)

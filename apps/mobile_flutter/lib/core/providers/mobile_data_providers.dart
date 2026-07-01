@@ -22,6 +22,11 @@ final pendingOutboxCountProvider = StreamProvider<int>((ref) {
   return salesRepository.watchPendingOutboxCount();
 });
 
+final customersProvider = StreamProvider<List<BackendCustomerSummary>>((ref) {
+  final customerRepository = ref.watch(customerRepositoryProvider);
+  return customerRepository.watchLegacyCustomers();
+});
+
 final mobileMfaVerifiedUntilProvider = StreamProvider<DateTime?>((ref) {
   final shopRepository = ref.watch(shopRepositoryProvider);
   return shopRepository.watchMfaVerifiedUntil();

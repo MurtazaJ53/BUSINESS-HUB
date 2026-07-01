@@ -206,6 +206,9 @@ class MobileSyncCoordinator {
     String size = '',
     String description = '',
     double? costPrice,
+    String hsnCode = '',
+    double gstRate = 0,
+    bool priceIncludesTax = true,
   }) async {
     final session = _session;
     if (session == null || !session.hasShop) {
@@ -235,6 +238,9 @@ class MobileSyncCoordinator {
         size: size.trim(),
         description: description.trim(),
         costPrice: session.canViewCost ? costPrice : null,
+        hsnCode: hsnCode.trim(),
+        gstRate: gstRate,
+        priceIncludesTax: priceIncludesTax,
         timestamp: now,
       );
       setStatus(MobileSyncStatus.idle);
@@ -255,6 +261,9 @@ class MobileSyncCoordinator {
         size: size.trim(),
         description: description.trim(),
         costPrice: session.canViewCost ? costPrice : null,
+        hsnCode: hsnCode.trim(),
+        gstRate: gstRate,
+        priceIncludesTax: priceIncludesTax,
       );
       await _inventoryRepository.mergeBackendInventoryItem(
         created,
@@ -280,6 +289,9 @@ class MobileSyncCoordinator {
         size: size.trim(),
         description: description.trim(),
         costPrice: session.canViewCost ? costPrice : null,
+        hsnCode: hsnCode.trim(),
+        gstRate: gstRate,
+        priceIncludesTax: priceIncludesTax,
         timestamp: now,
       );
       setStatus(MobileSyncStatus.idle);
@@ -297,6 +309,9 @@ class MobileSyncCoordinator {
         size: size.trim(),
         description: description.trim(),
         costPrice: session.canViewCost ? costPrice : null,
+        hsnCode: hsnCode.trim(),
+        gstRate: gstRate,
+        priceIncludesTax: priceIncludesTax,
         timestamp: now,
       );
       setStatus(MobileSyncStatus.idle);
@@ -761,6 +776,9 @@ class MobileSyncCoordinator {
     required String size,
     required String description,
     required double? costPrice,
+    required String hsnCode,
+    required double gstRate,
+    required bool priceIncludesTax,
     required DateTime timestamp,
   }) async {
     final itemId = 'local-${timestamp.microsecondsSinceEpoch}';
@@ -775,6 +793,9 @@ class MobileSyncCoordinator {
       'subcategory': subcategory,
       'size': size,
       'description': description,
+      'hsnCode': hsnCode,
+      'gstRate': gstRate,
+      'priceIncludesTax': priceIncludesTax,
       'stock': openingStock,
       'status': 'active',
       'tombstone': false,

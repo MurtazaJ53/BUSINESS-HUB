@@ -5,6 +5,7 @@ import '../core/database/local_database.dart';
 import '../core/router/app_router.dart';
 import '../core/sync/mobile_sync_coordinator.dart';
 import '../core/theme/app_theme.dart';
+import '../core/theme/theme_mode_controller.dart';
 
 final startupBootstrapProvider = FutureProvider<void>((ref) async {
   await LocalDatabaseController.instance.initialize();
@@ -16,12 +17,13 @@ class BusinessHubMobileApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final startup = ref.watch(startupBootstrapProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return startup.when(
       loading: () => MaterialApp(
         title: 'Business Hub Mobile',
         debugShowCheckedModeBanner: false,
-        themeMode: ThemeMode.dark,
+        themeMode: themeMode,
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         home: const _StartupBootScreen(),
@@ -29,7 +31,7 @@ class BusinessHubMobileApp extends ConsumerWidget {
       error: (error, _) => MaterialApp(
         title: 'Business Hub Mobile',
         debugShowCheckedModeBanner: false,
-        themeMode: ThemeMode.dark,
+        themeMode: themeMode,
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         home: _StartupFailedScreen(
@@ -44,7 +46,7 @@ class BusinessHubMobileApp extends ConsumerWidget {
         return MaterialApp.router(
           title: 'Business Hub Mobile',
           debugShowCheckedModeBanner: false,
-          themeMode: ThemeMode.dark,
+          themeMode: themeMode,
           theme: AppTheme.light,
           darkTheme: AppTheme.dark,
           routerConfig: router,

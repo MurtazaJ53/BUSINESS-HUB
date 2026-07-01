@@ -32,6 +32,11 @@ class InventoryEntries extends Table {
   TextColumn get subcategory => text().nullable()();
   TextColumn get size => text().nullable()();
   TextColumn get description => text().nullable()();
+  TextColumn get hsnCode => text().named('hsn_code').nullable()();
+  RealColumn get gstRate =>
+      real().named('gst_rate').withDefault(const Constant(0))();
+  BoolColumn get priceIncludesTax =>
+      boolean().named('price_includes_tax').withDefault(const Constant(true))();
   IntColumn get stock => integer().withDefault(const Constant(0))();
   TextColumn get sourceMeta => text().named('source_meta').nullable()();
   IntColumn get createdAt => integer().named('created_at')();
@@ -154,7 +159,7 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       );
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -175,6 +180,14 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       }
       if (from < 4) {
         await m.createTable(customerEntries);
+      }
+      if (from < 5) {
+        await m.addColumn(inventoryEntries, inventoryEntries.hsnCode);
+        await m.addColumn(inventoryEntries, inventoryEntries.gstRate);
+        await m.addColumn(
+          inventoryEntries,
+          inventoryEntries.priceIncludesTax,
+        );
       }
     },
   );

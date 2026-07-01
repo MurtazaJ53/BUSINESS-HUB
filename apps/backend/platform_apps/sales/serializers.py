@@ -9,6 +9,7 @@ from rest_framework import serializers
 from platform_apps.customers.models import Customer, CustomerLedgerEntry
 from platform_apps.inventory.models import InventoryItem, InventoryStockLedger
 from platform_apps.payments.models import SalePayment
+from platform_apps.sales.gst import apportion_discount, compute_line_gst
 from platform_apps.sales.models import Sale, SaleItem
 
 
@@ -24,6 +25,23 @@ class SaleSummarySerializer(serializers.Serializer):
         max_digits=12,
         decimal_places=2,
         allow_null=True,
+    )
+
+
+class SaleGstSummarySerializer(serializers.Serializer):
+    taxable_amount = serializers.DecimalField(max_digits=14, decimal_places=2)
+    tax_amount = serializers.DecimalField(max_digits=14, decimal_places=2)
+    cgst_amount = serializers.DecimalField(max_digits=14, decimal_places=2)
+    sgst_amount = serializers.DecimalField(max_digits=14, decimal_places=2)
+    igst_amount = serializers.DecimalField(max_digits=14, decimal_places=2)
+    gross_amount = serializers.DecimalField(max_digits=14, decimal_places=2)
+    
+    # Nested serializers for aggregated lists
+    b2c_small = serializers.ListField(
+        child=serializers.DictField(), required=False, default=list
+    )
+    hsn_summary = serializers.ListField(
+        child=serializers.DictField(), required=False, default=list
     )
 
 
@@ -46,9 +64,29 @@ class SaleItemSerializer(serializers.ModelSerializer):
             "unit_price",
             "unit_cost",
             "line_total",
+            "line_discount",
+            "hsn_snapshot",
+            "gst_rate",
+            "taxable_amount",
+            "tax_amount",
+            "cgst_amount",
+            "sgst_amount",
+            "igst_amount",
             "is_return",
         )
-        read_only_fields = ("id", "line_total")
+        # GST fields are server-computed from the catalog item, never client input.
+        read_only_fields = (
+            "id",
+            "line_total",
+            "line_discount",
+            "hsn_snapshot",
+            "gst_rate",
+            "taxable_amount",
+            "tax_amount",
+            "cgst_amount",
+            "sgst_amount",
+            "igst_amount",
+        )
 
 
 class SalePaymentWriteSerializer(serializers.ModelSerializer):
@@ -92,6 +130,12 @@ class SaleSerializer(serializers.ModelSerializer):
             "subtotal_amount",
             "discount_amount",
             "total_amount",
+            "taxable_amount",
+            "tax_amount",
+            "cgst_amount",
+            "sgst_amount",
+            "igst_amount",
+            "place_of_supply_state",
             "amount_received",
             "amount_due",
             "payment_mode",
@@ -112,6 +156,11 @@ class SaleSerializer(serializers.ModelSerializer):
             "id",
             "receipt_number",
             "payment_mode",
+            "taxable_amount",
+            "tax_amount",
+            "cgst_amount",
+            "sgst_amount",
+            "igst_amount",
             "amount_received",
             "amount_due",
             "status",
@@ -252,11 +301,39 @@ class SaleSerializer(serializers.ModelSerializer):
         sale.receipt_number = sale.receipt_number or f"S-{str(sale.id).replace('-', '')[:8].upper()}"
         sale.save(update_fields=["receipt_number", "updated_at"])
 
-        for item_payload in item_payloads:
+        # GST: supplier state vs place of supply decides CGST+SGST (intra) vs
+        # IGST (inter). Accept place_of_supply_state from the client; default
+        # to the shop's own state (the common counter-sale case). Fall back to
+        # intra-state when state codes are unconfigured so a missing state
+        # never misclassifies as inter-state.
+        supplier_state = (shop.state_code or "").strip()
+        place_of_supply = (
+            validated_data.pop("place_of_supply_state", "") or supplier_state
+        ).strip()
+        from platform_apps.sales.gst import is_intra_state
+        intra_state = (not supplier_state) or is_intra_state(supplier_state, place_of_supply)
+
+        # --- Discount apportionment ---
+        # Distribute the sale-level discount proportionally across lines so
+        # GST is computed on the post-discount value per line.
+        discount_amount = validated_data.get("discount_amount", Decimal("0.00")) or Decimal("0.00")
+        raw_line_totals = [
+            Decimal(ip["quantity"]) * ip["unit_price"] for ip in item_payloads
+        ]
+        line_discounts = apportion_discount(raw_line_totals, discount_amount)
+
+        sale_taxable = Decimal("0.00")
+        sale_tax = Decimal("0.00")
+        sale_cgst = Decimal("0.00")
+        sale_sgst = Decimal("0.00")
+        sale_igst = Decimal("0.00")
+
+        for idx, item_payload in enumerate(item_payloads):
             inventory_item = self._resolve_inventory_item(shop, item_payload)
             quantity = item_payload["quantity"]
             unit_price = item_payload["unit_price"]
             unit_cost = item_payload.get("unit_cost")
+            is_return = item_payload.get("is_return", False)
 
             if inventory_item is not None:
                 item_name = item_payload.get("name_snapshot") or inventory_item.name
@@ -271,6 +348,37 @@ class SaleSerializer(serializers.ModelSerializer):
                 if not item_name:
                     raise serializers.ValidationError({"items": "Non-catalog items must include a name."})
 
+            line_total = Decimal(quantity) * unit_price
+            item_discount = line_discounts[idx]
+
+            # GST is derived from the catalog item; non-catalog lines are
+            # untaxed (rate 0 -> passthrough). hsn/rate are snapshotted so the
+            # receipt stays correct if the item is later edited.
+            if inventory_item is not None:
+                gst_rate = inventory_item.gst_rate
+                hsn_snapshot = inventory_item.hsn_code
+                price_includes_tax = inventory_item.price_includes_tax
+            else:
+                gst_rate = Decimal("0.00")
+                hsn_snapshot = ""
+                price_includes_tax = True
+
+            # Compute GST on the post-discount line value.
+            gst = compute_line_gst(
+                line_total - item_discount,
+                gst_rate,
+                price_includes_tax=price_includes_tax,
+                intra_state=intra_state,
+            )
+
+            # Return items contribute negatively to sale totals.
+            sign = Decimal("-1") if is_return else Decimal("1")
+            sale_taxable += sign * gst.taxable_amount
+            sale_tax += sign * gst.tax_amount
+            sale_cgst += sign * gst.cgst_amount
+            sale_sgst += sign * gst.sgst_amount
+            sale_igst += sign * gst.igst_amount
+
             sale_item = SaleItem.objects.create(
                 sale=sale,
                 inventory_item=inventory_item,
@@ -280,8 +388,16 @@ class SaleSerializer(serializers.ModelSerializer):
                 quantity=quantity,
                 unit_price=unit_price,
                 unit_cost=unit_cost,
-                line_total=Decimal(quantity) * unit_price,
-                is_return=item_payload.get("is_return", False),
+                line_total=line_total,
+                line_discount=item_discount,
+                hsn_snapshot=hsn_snapshot,
+                gst_rate=gst_rate,
+                taxable_amount=sign * gst.taxable_amount,
+                tax_amount=sign * gst.tax_amount,
+                cgst_amount=sign * gst.cgst_amount,
+                sgst_amount=sign * gst.sgst_amount,
+                igst_amount=sign * gst.igst_amount,
+                is_return=is_return,
                 source_system=sale.source_system,
                 source_shop_id=sale.source_shop_id,
                 source_path=f"sales/{sale.id}/items",
@@ -309,6 +425,25 @@ class SaleSerializer(serializers.ModelSerializer):
                     source_path=f"sales/{sale.id}/items/{sale_item.id}",
                     domain_epoch=sale.domain_epoch,
                 )
+
+        # Persist sale-level GST totals computed across the lines above.
+        sale.taxable_amount = sale_taxable
+        sale.tax_amount = sale_tax
+        sale.cgst_amount = sale_cgst
+        sale.sgst_amount = sale_sgst
+        sale.igst_amount = sale_igst
+        sale.place_of_supply_state = place_of_supply
+        sale.save(
+            update_fields=[
+                "taxable_amount",
+                "tax_amount",
+                "cgst_amount",
+                "sgst_amount",
+                "igst_amount",
+                "place_of_supply_state",
+                "updated_at",
+            ]
+        )
 
         for payment_payload in payment_payloads:
             SalePayment.objects.create(

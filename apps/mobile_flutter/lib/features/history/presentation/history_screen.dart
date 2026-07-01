@@ -9,6 +9,7 @@ import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
+import '../../../core/tax/gst.dart';
 import '../../../core/utils/formatters.dart';
 import '../../shell/presentation/mobile_surface.dart';
 
@@ -620,6 +621,76 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                               value: formatCurrency(detail.total),
                               emphasize: true,
                             ),
+                            Builder(
+                              builder: (context) {
+                                // Compute GST locally from items
+                                var taxableAmount = 0.0;
+                                var taxAmount = 0.0;
+                                var cgstAmount = 0.0;
+                                var sgstAmount = 0.0;
+                                var igstAmount = 0.0;
+
+                                // Only apportion discount for local calc if items exist
+                                final discountToApportion = detail.discount;
+                                final lineTotals = detail.items.map((i) => i.lineTotal).toList();
+                                final apportionedDiscounts = apportionDiscount(lineTotals, discountToApportion);
+
+                                for (var i = 0; i < detail.items.length; i++) {
+                                  final item = detail.items[i];
+                                  final postDiscountTotal = item.lineTotal - apportionedDiscounts[i];
+                                  final effectiveTotal = postDiscountTotal < 0 ? 0.0 : postDiscountTotal;
+
+                                  final lineGst = computeLineGst(
+                                    lineTotal: effectiveTotal,
+                                    gstRate: item.gstRate,
+                                    priceIncludesTax: item.priceIncludesTax,
+                                    intraState: true,
+                                  );
+
+                                  // If backend synced fields are available (non-zero), use them, else fallback to local calc
+                                  if (item.taxAmount > 0.009) {
+                                    taxableAmount += item.taxableAmount;
+                                    taxAmount += item.taxAmount;
+                                    cgstAmount += item.cgstAmount;
+                                    sgstAmount += item.sgstAmount;
+                                    igstAmount += item.igstAmount;
+                                  } else {
+                                    taxableAmount += lineGst.taxableAmount;
+                                    taxAmount += lineGst.taxAmount;
+                                    cgstAmount += lineGst.cgstAmount;
+                                    sgstAmount += lineGst.sgstAmount;
+                                    igstAmount += lineGst.igstAmount;
+                                  }
+                                }
+
+                                if (taxAmount > 0.009) {
+                                  return Column(
+                                    children: [
+                                      const SizedBox(height: 10),
+                                      _SaleSummaryRow(
+                                        label: 'Taxable value',
+                                        value: formatCurrency(taxableAmount),
+                                      ),
+                                      _SaleSummaryRow(
+                                        label: 'GST total',
+                                        value: formatCurrency(taxAmount),
+                                      ),
+                                      _SaleSummaryRow(
+                                        label: 'CGST / SGST',
+                                        value: '${formatCurrency(cgstAmount)} / ${formatCurrency(sgstAmount)}',
+                                      ),
+                                      if (igstAmount > 0.009)
+                                        _SaleSummaryRow(
+                                          label: 'IGST',
+                                          value: formatCurrency(igstAmount),
+                                        ),
+                                      const SizedBox(height: 10),
+                                    ],
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              },
+                            ),
                             _SaleSummaryRow(
                               label: 'Collected',
                               value: formatCurrency(detail.amountReceived),
@@ -1028,12 +1099,24 @@ class _SaleItemRow extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '${item.quantity} x ${formatCurrency(item.unitPrice)}${item.size?.isNotEmpty == true ? ' | ${item.size}' : ''}',
+                '${item.quantity} x ${formatCurrency(item.unitPrice)}'
+                '${item.size?.isNotEmpty == true ? ' | ${item.size}' : ''}'
+                '${item.gstRate > 0 ? ' | GST ${item.gstRate.toStringAsFixed(item.gstRate.truncateToDouble() == item.gstRate ? 0 : 2)}%' : ''}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Colors.white.withValues(alpha: 0.58),
                   fontWeight: FontWeight.w600,
                 ),
               ),
+              if (item.taxAmount > 0.009) ...<Widget>[
+                const SizedBox(height: 3),
+                Text(
+                  'Taxable ${formatCurrency(item.taxableAmount)} | Tax ${formatCurrency(item.taxAmount)}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppPalette.info.withValues(alpha: 0.86),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ],
           ),
         ),

@@ -94,6 +94,46 @@ class SalesApiTests(TestCase):
             1,
         )
 
+    def test_sale_computes_intra_state_gst_breakdown(self):
+        self.shop.state_code = "27"
+        self.shop.save(update_fields=["state_code"])
+        taxed_item = InventoryItem.objects.create(
+            shop=self.shop,
+            name="GST Mug",
+            sku="SKU-GST",
+            sell_price=Decimal("118.00"),
+            gst_rate=Decimal("18.00"),
+            hsn_code="6912",
+            price_includes_tax=True,
+        )
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/",
+            {
+                "items": [
+                    {
+                        "inventory_item_id": str(taxed_item.id),
+                        "quantity": 1,
+                        "unit_price": "118.00",
+                    }
+                ],
+                "payments": [{"payment_method": "CASH", "amount": "118.00"}],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.content)
+        sale = Sale.objects.get(items__inventory_item=taxed_item)
+        self.assertEqual(sale.taxable_amount, Decimal("100.00"))
+        self.assertEqual(sale.tax_amount, Decimal("18.00"))
+        self.assertEqual(sale.cgst_amount, Decimal("9.00"))
+        self.assertEqual(sale.sgst_amount, Decimal("9.00"))
+        self.assertEqual(sale.igst_amount, Decimal("0.00"))
+        self.assertEqual(sale.place_of_supply_state, "27")
+        line = sale.items.get(inventory_item=taxed_item)
+        self.assertEqual(line.gst_rate, Decimal("18.00"))
+        self.assertEqual(line.hsn_snapshot, "6912")
+        self.assertEqual(line.tax_amount, Decimal("18.00"))
+
     def test_list_sales_for_shop(self):
         sale = Sale.objects.create(
             shop=self.shop,
@@ -344,3 +384,112 @@ class SalesApiTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 409)
+
+    def test_sale_void_reverses_inventory_and_customer_balances(self):
+        sale = Sale.objects.create(
+            shop=self.shop,
+            actor_user=self.user,
+            customer=self.customer,
+            receipt_number="S-VOID001",
+            subtotal_amount=Decimal("500.00"),
+            total_amount=Decimal("500.00"),
+            amount_received=Decimal("0.00"),
+            amount_due=Decimal("500.00"),
+            payment_mode=Sale.PaymentMode.CREDIT,
+            customer_name_snapshot="Ayaan Retail",
+            sale_date=timezone.localdate(),
+            occurred_at=timezone.now(),
+        )
+        SaleItem.objects.create(
+            sale=sale,
+            inventory_item=self.item,
+            quantity=1,
+            unit_price=Decimal("500.00"),
+            line_total=Decimal("500.00"),
+        )
+        self.customer.balance = Decimal("500.00")
+        self.customer.total_spent = Decimal("500.00")
+        self.customer.save()
+
+        response = self.client.patch(f"/api/v1/shops/{self.shop.id}/sales/{sale.id}/void/")
+        
+        self.assertEqual(response.status_code, 200)
+        sale.refresh_from_db()
+        self.assertEqual(sale.status, Sale.Status.VOID)
+        
+        # Verify customer ledger reversed
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.balance, Decimal("0.00"))
+        self.assertEqual(self.customer.total_spent, Decimal("0.00"))
+        
+        # Verify inventory reversed
+        ledger = InventoryStockLedger.objects.filter(item=self.item, event_type=InventoryStockLedger.EventType.RETURN).first()
+        self.assertIsNotNone(ledger)
+        self.assertEqual(ledger.quantity_delta, 1)
+
+    def test_sale_gst_summary_endpoint(self):
+        self.shop.state_code = "27"
+        self.shop.save()
+        
+        taxed_item = InventoryItem.objects.create(
+            shop=self.shop,
+            name="GST Mug",
+            sell_price=Decimal("118.00"),
+            gst_rate=Decimal("18.00"),
+            hsn_code="6912",
+            price_includes_tax=True,
+        )
+        
+        # Create an intra-state sale
+        self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/",
+            {
+                "items": [{"inventory_item_id": str(taxed_item.id), "quantity": 1, "unit_price": "118.00"}],
+                "payments": [{"payment_method": "CASH", "amount": "118.00"}],
+            },
+            format="json",
+        )
+        
+        response = self.client.get(f"/api/v1/shops/{self.shop.id}/sales/summary/gst/")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        self.assertEqual(data["taxable_amount"], "100.00")
+        self.assertEqual(data["cgst_amount"], "9.00")
+        self.assertEqual(data["sgst_amount"], "9.00")
+        
+        # Verify B2C small and HSN summary lists
+        self.assertEqual(len(data["b2c_small"]), 1)
+        self.assertEqual(float(data["b2c_small"][0]["items__gst_rate"]), 18.0)
+        self.assertEqual(float(data["b2c_small"][0]["taxable_amount"]), 100.0)
+        
+        self.assertEqual(len(data["hsn_summary"]), 1)
+        self.assertEqual(data["hsn_summary"][0]["items__hsn_snapshot"], "6912")
+        self.assertEqual(float(data["hsn_summary"][0]["tax_amount"]), 18.0)
+
+    def test_sale_inter_state_place_of_supply(self):
+        self.shop.state_code = "27"
+        self.shop.save()
+        
+        taxed_item = InventoryItem.objects.create(
+            shop=self.shop,
+            name="GST Mug",
+            sell_price=Decimal("118.00"),
+            gst_rate=Decimal("18.00"),
+            price_includes_tax=True,
+        )
+        
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/",
+            {
+                "place_of_supply_state": "29",  # Karnataka (Inter-state from 27)
+                "items": [{"inventory_item_id": str(taxed_item.id), "quantity": 1, "unit_price": "118.00"}],
+                "payments": [{"payment_method": "CASH", "amount": "118.00"}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        sale = Sale.objects.get(receipt_number=response.json()["receipt_number"])
+        self.assertEqual(sale.place_of_supply_state, "29")
+        self.assertEqual(sale.igst_amount, Decimal("18.00"))
+        self.assertEqual(sale.cgst_amount, Decimal("0.00"))

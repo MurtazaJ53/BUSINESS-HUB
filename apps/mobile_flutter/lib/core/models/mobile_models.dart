@@ -803,6 +803,9 @@ class InventoryCatalogItem {
     this.costPrice,
     this.supplierId,
     this.lastPurchaseDate,
+    this.hsnCode,
+    this.gstRate = 0,
+    this.priceIncludesTax = true,
   });
 
   final String id;
@@ -819,6 +822,9 @@ class InventoryCatalogItem {
   final double? costPrice;
   final String? supplierId;
   final String? lastPurchaseDate;
+  final String? hsnCode;
+  final double gstRate;
+  final bool priceIncludesTax;
 
   double get marginPerUnit => price - (costPrice ?? 0);
 }
@@ -1041,6 +1047,9 @@ class PosCartItem {
     this.size,
     this.sku,
     this.costPrice,
+    this.hsnCode,
+    this.gstRate = 0,
+    this.priceIncludesTax = true,
   });
 
   final String id;
@@ -1052,6 +1061,9 @@ class PosCartItem {
   final String? size;
   final String? sku;
   final double? costPrice;
+  final String? hsnCode;
+  final double gstRate;
+  final bool priceIncludesTax;
 
   double get lineTotal => price * quantity;
 
@@ -1065,6 +1077,9 @@ class PosCartItem {
     String? size,
     String? sku,
     double? costPrice,
+    String? hsnCode,
+    double? gstRate,
+    bool? priceIncludesTax,
   }) {
     return PosCartItem(
       id: id ?? this.id,
@@ -1076,6 +1091,9 @@ class PosCartItem {
       size: size ?? this.size,
       sku: sku ?? this.sku,
       costPrice: costPrice ?? this.costPrice,
+      hsnCode: hsnCode ?? this.hsnCode,
+      gstRate: gstRate ?? this.gstRate,
+      priceIncludesTax: priceIncludesTax ?? this.priceIncludesTax,
     );
   }
 
@@ -1086,6 +1104,9 @@ class PosCartItem {
     'price': price,
     'size': size,
     'costPrice': costPrice,
+    'hsnCode': hsnCode,
+    'gstRate': gstRate,
+    'priceIncludesTax': priceIncludesTax,
   };
 }
 
@@ -1129,6 +1150,14 @@ class SaleDetailItem {
     this.size,
     this.sku,
     this.unitCost,
+    this.hsnCode,
+    this.gstRate = 0,
+    this.taxableAmount = 0,
+    this.taxAmount = 0,
+    this.cgstAmount = 0,
+    this.sgstAmount = 0,
+    this.igstAmount = 0,
+    this.priceIncludesTax = true,
   });
 
   final String name;
@@ -1137,6 +1166,14 @@ class SaleDetailItem {
   final String? size;
   final String? sku;
   final double? unitCost;
+  final String? hsnCode;
+  final double gstRate;
+  final double taxableAmount;
+  final double taxAmount;
+  final double cgstAmount;
+  final double sgstAmount;
+  final double igstAmount;
+  final bool priceIncludesTax;
 
   double get lineTotal => unitPrice * quantity;
 }

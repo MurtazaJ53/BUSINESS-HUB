@@ -22,6 +22,12 @@ class Shop(SourceTrackedModel):
     settings_json = models.JSONField(default=dict, blank=True)
     timezone = models.CharField(max_length=64, default="Asia/Kolkata")
     currency_code = models.CharField(max_length=8, default="INR")
+    # GST registration (India). gstin is the 15-char GST number; state_code is the
+    # 2-digit GST state code used to decide intra-state (CGST+SGST) vs inter-state
+    # (IGST) on each sale. region_code selects the localisation profile (IN/UK).
+    region_code = models.CharField(max_length=8, default="IN")
+    gstin = models.CharField(max_length=15, blank=True)
+    state_code = models.CharField(max_length=2, blank=True)
     is_active = models.BooleanField(default=True)
 
     @property
