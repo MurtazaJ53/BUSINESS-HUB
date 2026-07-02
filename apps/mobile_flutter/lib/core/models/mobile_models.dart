@@ -1349,6 +1349,7 @@ class LocalSaleCommit {
     required this.customerName,
     required this.customerPhone,
     required this.footerNote,
+    this.buyerGstin,
     required this.inventoryDeltas,
   });
 
@@ -1368,6 +1369,7 @@ class LocalSaleCommit {
   final String? customerName;
   final String? customerPhone;
   final String? footerNote;
+  final String? buyerGstin;
   final Map<String, int> inventoryDeltas;
 
   Map<String, dynamic> toBackendCommandPayload() => {
@@ -1378,6 +1380,7 @@ class LocalSaleCommit {
       'customer_id': customerId,
       'customer_name': customerName ?? '',
       'customer_phone': customerPhone ?? '',
+      'buyer_gstin': buyerGstin ?? '',
       'discount_amount': discount.toStringAsFixed(2),
       'payment_mode': paymentMode,
       'footer_note': footerNote ?? '',

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from decimal import Decimal
+import csv
+from django.http import HttpResponse
 
 from django.db import transaction
 from django.db.models import Q
@@ -489,3 +491,87 @@ class SaleCommandIngestionView(ShopScopedMixin, generics.GenericAPIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class GSTR1ExportView(ShopScopedMixin, APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    minimum_role = ShopMembership.Role.STAFF
+
+    def get(self, request, shop_id):
+        membership = self.get_membership()
+        shop = membership.shop
+        
+        month = request.query_params.get('month')
+        year = request.query_params.get('year')
+        
+        if not month or not year:
+            return Response({"error": "month and year are required parameters"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            month = int(month)
+            year = int(year)
+        except ValueError:
+            return Response({"error": "month and year must be integers"}, status=status.HTTP_400_BAD_REQUEST)
+
+        sales = Sale.objects.filter(
+            shop=shop, 
+            tombstone=False,
+            status=Sale.Status.COMPLETED,
+            sale_date__year=year,
+            sale_date__month=month
+        ).prefetch_related("items")
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="GSTR1_{shop.name}_{year}_{month}.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            'GSTIN/UIN of Recipient', 
+            'Receiver Name', 
+            'Invoice Number', 
+            'Invoice Date', 
+            'Invoice Value', 
+            'Place Of Supply', 
+            'Reverse Charge', 
+            'Applicable % of Tax Rate', 
+            'Invoice Type', 
+            'E-Commerce GSTIN', 
+            'Rate', 
+            'Taxable Value',
+            'Cess Amount'
+        ])
+
+        for sale in sales:
+            # Group items by GST rate for the sale
+            rate_groups = {}
+            for item in sale.items.all():
+                if item.gst_rate not in rate_groups:
+                    rate_groups[item.gst_rate] = {
+                        "taxable": Decimal("0.00"),
+                        "tax": Decimal("0.00"),
+                    }
+                rate_groups[item.gst_rate]["taxable"] += item.taxable_amount
+                rate_groups[item.gst_rate]["tax"] += item.tax_amount
+                
+            buyer_gstin = sale.buyer_gstin or ''
+            invoice_type = "Regular B2B" if buyer_gstin else "B2C Others"
+            
+            for rate, amounts in rate_groups.items():
+                if amounts["taxable"] > 0:
+                    writer.writerow([
+                        buyer_gstin,
+                        sale.customer_name_snapshot,
+                        sale.receipt_number,
+                        sale.sale_date.strftime("%d-%b-%y"),
+                        sale.total_amount, # Total invoice value is usually printed on all rows for same invoice in GSTR1
+                        sale.place_of_supply_state or shop.state_code,
+                        'N',
+                        '',
+                        invoice_type,
+                        '',
+                        rate,
+                        amounts["taxable"],
+                        ''
+                    ])
+                    
+        return response

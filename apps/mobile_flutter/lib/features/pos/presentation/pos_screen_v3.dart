@@ -436,20 +436,23 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
     final syncCoordinator = ref.read(mobileSyncCoordinatorProvider);
     final activeShopId = session?.shopId;
     final gstSummary = _gstSummary;
+    final buyerGstinController = TextEditingController();
 
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: AppColors.of(context).background,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.of(context).background,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             Container(
               width: 40,
               height: 4,
@@ -490,6 +493,19 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
                 ),
               ],
             ],
+            const SizedBox(height: 16),
+            TextField(
+              controller: buyerGstinController,
+              decoration: InputDecoration(
+                labelText: 'Buyer GSTIN (Optional)',
+                hintText: 'Enter GSTIN for B2B Tax Invoice',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+              textCapitalization: TextCapitalization.characters,
+            ),
             const SizedBox(height: 24),
             PrimaryActionButton(
               label: _saving
@@ -517,6 +533,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
                           ],
                           paymentMode: 'CASH',
                           footerNote: shop.footer,
+                          buyerGstin: buyerGstinController.text.trim().isNotEmpty ? buyerGstinController.text.trim() : null,
                         );
                         final result = await syncCoordinator.submitSale(commit);
                         if (!mounted || !context.mounted) {

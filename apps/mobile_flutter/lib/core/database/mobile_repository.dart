@@ -1289,6 +1289,10 @@ class SalesRepository {
           )
         : jsonEncode(const []);
 
+    final combinedFooter = (data['buyer_gstin'] != null && data['buyer_gstin'].toString().trim().isNotEmpty)
+        ? '${data['footer_note'] ?? ''}\n\nBuyer GSTIN: ${data['buyer_gstin']}'.trim()
+        : _asStringOrNull(data['footer_note']);
+
     await _db
         .into(_db.salesEntries)
         .insertOnConflictUpdate(
@@ -1310,7 +1314,7 @@ class SalesRepository {
             customerName: Value(_asStringOrNull(data['customer_name'])),
             customerPhone: Value(_asStringOrNull(data['customer_phone'])),
             customerId: Value(_asStringOrNull(data['customer_id'])),
-            footerNote: Value(_asStringOrNull(data['footer_note'])),
+            footerNote: Value(combinedFooter),
             itemsJson: items,
             paymentsJson: payments,
             commandId: Value(commandId),
@@ -1332,6 +1336,7 @@ class SalesRepository {
     String? customerId,
     String? customerName,
     String? customerPhone,
+    String? buyerGstin,
     double discount = 0,
   }) async {
     if (shopId.trim().isEmpty) {
@@ -1378,7 +1383,11 @@ class SalesRepository {
               customerName: Value(customerName),
               customerPhone: Value(customerPhone),
               customerId: Value(customerId),
-              footerNote: Value(footerNote),
+              footerNote: Value(
+                (buyerGstin != null && buyerGstin.trim().isNotEmpty)
+                    ? '$footerNote\n\nBuyer GSTIN: $buyerGstin'.trim()
+                    : footerNote
+              ),
               itemsJson: jsonEncode(encodedItems),
               paymentsJson: jsonEncode(encodedPayments),
               commandId: Value(commandId),
@@ -1403,7 +1412,7 @@ class SalesRepository {
                   shopId: shopId,
                   baseDomainEpoch: baseDomainEpoch,
                   date: date,
-                  createdAt: createdAt,
+                  createdAt: now.toIso8601String(),
                   total: total,
                   discount: discount,
                   discountType: 'fixed',
@@ -1414,6 +1423,7 @@ class SalesRepository {
                   customerName: customerName,
                   customerPhone: customerPhone,
                   footerNote: footerNote,
+                  buyerGstin: buyerGstin,
                   inventoryDeltas: inventoryDeltas,
                 ).toBackendCommandPayload(),
               ),

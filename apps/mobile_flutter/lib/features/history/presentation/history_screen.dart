@@ -7,6 +7,7 @@ import '../../../core/database/mobile_repository.dart';
 import '../../../core/insights/mobile_operational_insights.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
+import '../../../core/providers/printer_provider.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/tax/gst.dart';
@@ -567,6 +568,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                             icon: Icons.shopping_bag_rounded,
                             accent: AppPalette.info,
                           ),
+                          if (detail.footerNote != null && detail.footerNote!.contains('Buyer GSTIN:'))
+                            const MobileTag(
+                              label: 'Tax Invoice',
+                              icon: Icons.account_balance_rounded,
+                              accent: AppPalette.success,
+                            ),
                           if (detail.hasOutstandingDue)
                             MobileTag(
                               label: 'Due ${formatCurrency(detail.amountDue)}',
@@ -723,6 +730,61 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                               ),
                           ],
                         ),
+                      ),
+                      const SizedBox(height: 18),
+                      Consumer(
+                        builder: (context, ref, child) {
+                          return ElevatedButton.icon(
+                            onPressed: () async {
+                              final printerService = ref.read(receiptPrinterProvider);
+                              final shop = ref.read(shopInfoProvider).asData?.value;
+                              if (shop == null) return;
+                              
+                              try {
+                                final devices = await printerService.getDevices();
+                                if (devices.isEmpty) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('No Bluetooth printers found.')),
+                                    );
+                                  }
+                                  return;
+                                }
+                                
+                                // Connect to first device for now
+                                await printerService.connect(devices.first);
+                                await printerService.printTaxInvoice(detail, shop);
+                                await printerService.disconnect();
+                                
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Receipt printed successfully.')),
+                                  );
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Failed to print: $e')),
+                                  );
+                                }
+                              }
+                            },
+                            icon: const Icon(Icons.print_rounded),
+                            label: Text(
+                              detail.footerNote != null && detail.footerNote!.contains('Buyer GSTIN:') 
+                                ? 'PRINT TAX INVOICE' 
+                                : 'PRINT RECEIPT'
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppPalette.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          );
+                        }
                       ),
                     ],
                   ),

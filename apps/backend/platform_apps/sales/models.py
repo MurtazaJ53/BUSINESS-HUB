@@ -59,6 +59,7 @@ class Sale(SourceTrackedModel):
     customer_name_snapshot = models.CharField(max_length=255, blank=True)
     customer_phone_snapshot = models.CharField(max_length=32, blank=True)
     footer_note = models.TextField(blank=True)
+    buyer_gstin = models.CharField(max_length=15, blank=True, null=True, help_text="GSTIN of the buyer for B2B sales")
     note = models.TextField(blank=True)
     sale_date = models.DateField()
     occurred_at = models.DateTimeField()

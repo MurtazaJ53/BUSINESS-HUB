@@ -140,6 +140,7 @@ class SaleSerializer(serializers.ModelSerializer):
             "amount_due",
             "payment_mode",
             "footer_note",
+            "buyer_gstin",
             "note",
             "sale_date",
             "occurred_at",
