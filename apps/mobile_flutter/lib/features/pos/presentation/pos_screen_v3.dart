@@ -12,6 +12,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/premium_components.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// Redesigned POS Screen v3.0
 /// Simple, Clean, Premium, Professional
@@ -96,16 +97,26 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
       // Checkout FAB
       floatingActionButton: _cart.isEmpty
           ? null
-          : FloatingActionButton.extended(
-              onPressed: () => _openCheckout(context),
-              backgroundColor: AppPalette.primary,
-              icon: const Icon(Icons.shopping_bag_rounded, size: 24),
-              label: Text(
-                'Checkout ${formatCurrency(_cartTotal)}',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.2,
+          : Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              width: double.infinity,
+              height: 64,
+              child: FloatingActionButton.extended(
+                onPressed: () => _openCheckout(context),
+                backgroundColor: AppPalette.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(32),
+                ),
+                elevation: 12,
+                icon: const Icon(Icons.shopping_bag_rounded, size: 24, color: Colors.white),
+                label: Text(
+                  'Checkout ${formatCurrency(_cartTotal)}',
+                  style: GoogleFonts.outfit(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -282,17 +293,17 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
   }) {
     return Material(
       color: isSelected ? AppPalette.primary : AppColors.of(context).surfaceStrong,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(24),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(24),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           child: Text(
             label,
-            style: TextStyle(
+            style: GoogleFonts.outfit(
               fontSize: 14,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
               color: isSelected ? Colors.white : AppColors.of(context).textSecondary,
             ),
           ),
@@ -320,21 +331,29 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
 
   Widget _buildProductCard(InventoryCatalogItem item) {
     final inCart = _cart.any((cartItem) => cartItem.id == item.id);
+    final theme = Theme.of(context);
 
     return Container(
       decoration: BoxDecoration(
         color: AppColors.of(context).surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: inCart ? AppPalette.primary : AppColors.of(context).borderSoft,
           width: inCart ? 2 : 1,
         ),
+        boxShadow: inCart ? [
+          BoxShadow(
+            color: AppPalette.primary.withValues(alpha: 0.15),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          )
+        ] : [],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: () => _addToCart(item),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(24),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -342,16 +361,16 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
               children: [
                 // Product image placeholder
                 Container(
-                  height: 100,
+                  height: 90,
                   decoration: BoxDecoration(
-                    color: AppPalette.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    color: inCart ? AppPalette.primary.withValues(alpha: 0.12) : AppColors.of(context).surfaceStrong,
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Center(
                     child: Icon(
                       Icons.inventory_2_rounded,
-                      size: 40,
-                      color: AppPalette.primary,
+                      size: 36,
+                      color: inCart ? AppPalette.primary : AppColors.of(context).textTertiary,
                     ),
                   ),
                 ),
@@ -361,9 +380,9 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
                   item.name,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: GoogleFonts.outfit(
                     fontSize: 15,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.of(context).textPrimary,
                   ),
                 ),
@@ -374,9 +393,9 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
                   children: [
                     Text(
                       formatCurrency(item.price),
-                      style: TextStyle(
+                      style: GoogleFonts.outfit(
                         fontSize: 17,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
                         color: AppPalette.primary,
                       ),
                     ),

@@ -1,7 +1,9 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/models/mobile_models.dart';
 import '../../../core/models/mobile_session.dart';
@@ -152,42 +154,53 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
                     ),
                     Padding(
                       padding: EdgeInsets.fromLTRB(
-                        horizontalInset,
-                        compactChrome ? 10 : 12,
-                        horizontalInset,
-                        compactChrome ? 12 : 16,
+                        horizontalInset * 1.5,
+                        12,
+                        horizontalInset * 1.5,
+                        24, // Float higher
                       ),
-                      child: DecoratedBox(
+                      child: Container(
                         decoration: BoxDecoration(
-                          color: AppPalette.surface.withValues(alpha: 0.82),
-                          borderRadius: BorderRadius.circular(
-                            compactChrome ? 22 : 26,
-                          ),
+                          color: AppPalette.surface.withValues(alpha: 0.85),
+                          borderRadius: BorderRadius.circular(32),
                           border: Border.all(
-                            color: AppPalette.borderSoft.withValues(alpha: 0.7),
+                            color: AppPalette.borderSoft.withValues(alpha: 0.5),
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
                         ),
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: compactChrome ? 3 : 6,
-                            vertical: compactChrome ? 5 : 6,
-                          ),
-                          child: Row(
-                            children: navProfile.items
-                                .map(
-                                  (entry) => Expanded(
-                                    child: _NavButton(
-                                      item: entry.item,
-                                      active:
-                                          widget.navigationShell.currentIndex ==
-                                          entry.branchIndex,
-                                      compact: compactChrome,
-                                      onTap: () =>
-                                          _goToBranch(entry.branchIndex),
-                                    ),
-                                  ),
-                                )
-                                .toList(growable: false),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(32),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 8,
+                              ),
+                              child: Row(
+                                children: navProfile.items
+                                    .map(
+                                      (entry) => Expanded(
+                                        child: _NavButton(
+                                          item: entry.item,
+                                          active:
+                                              widget.navigationShell.currentIndex ==
+                                              entry.branchIndex,
+                                          compact: compactChrome,
+                                          onTap: () =>
+                                              _goToBranch(entry.branchIndex),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(growable: false),
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -448,10 +461,10 @@ class _NavButton extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   softWrap: false,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: GoogleFonts.outfit(
                     color: color,
-                    fontSize: compact ? 10 : 11,
-                    fontWeight: FontWeight.w800,
+                    fontSize: compact ? 11 : 12,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: 0.3,
                   ),
                 ),

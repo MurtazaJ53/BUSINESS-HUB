@@ -85,27 +85,16 @@ class DashboardScreenV3 extends ConsumerWidget {
   }) {
     return CustomScrollView(
       slivers: [
-        // Header
-        SliverToBoxAdapter(
-          child: _buildHeader(
-            context,
-            shopName: shop.name,
-            role: session?.displayRoleLabel ?? 'GUEST',
-            syncStatus: syncStatus,
-          ),
-        ),
-
+        // Header is handled by the Shell
         // Hero Metric
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
             child: HeroMetricCard(
               label: 'Today\'s Sales',
               value: formatCurrency(overview.todayRevenue),
               caption: '${overview.todaySalesCount} '
                   '${overview.todaySalesCount == 1 ? 'transaction' : 'transactions'}',
-              // No fabricated trend: only show a delta once a real
-              // period-over-period comparison is wired in.
               accentColor: AppPalette.success,
             ),
           ),
@@ -239,78 +228,4 @@ class DashboardScreenV3 extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(
-    BuildContext context, {
-    required String shopName,
-    required String role,
-    required MobileSyncStatus syncStatus,
-  }) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-      decoration: BoxDecoration(
-        color: AppColors.of(context).surface,
-        border: Border(
-          bottom: BorderSide(color: AppColors.of(context).borderSoft, width: 1),
-        ),
-      ),
-      child: Row(
-        children: [
-          // Shop info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  shopName,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  role,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
-                    color: AppColors.of(context).textTertiary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Sync status
-          StatusBadge(
-            label: syncStatus == MobileSyncStatus.syncing ? 'Syncing' : 'Live',
-            color: syncStatus == MobileSyncStatus.error
-                ? AppPalette.error
-                : AppPalette.success,
-          ),
-          const SizedBox(width: 12),
-          // Profile button
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppPalette.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              icon: Icon(
-                Icons.person_rounded,
-                size: 20,
-                color: AppPalette.primary,
-              ),
-              onPressed: () => context.push('/settings'),
-              padding: EdgeInsets.zero,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
