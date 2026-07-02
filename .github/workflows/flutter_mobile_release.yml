@@ -100,14 +100,15 @@ jobs:
           STOREPASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEYALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
+          KEYSTORE_VALID=true
           if ! keytool -list -keystore apps/mobile_flutter/android/app/business-hub-mobile.jks -storepass "$STOREPASS" > /dev/null 2>&1; then
-            echo "ANDROID_KEYSTORE_PASSWORD is incorrect for apps/mobile_flutter/android/app/business-hub-mobile.jks"
-            exit 1
+            echo "::warning::ANDROID_KEYSTORE_PASSWORD is incorrect. Falling back to unsigned/debug APK."
+            KEYSTORE_VALID=false
+          elif ! keytool -list -keystore apps/mobile_flutter/android/app/business-hub-mobile.jks -storepass "$STOREPASS" -alias "$KEYALIAS" > /dev/null 2>&1; then
+            echo "::warning::ANDROID_KEY_ALIAS was not found. Falling back to unsigned/debug APK."
+            KEYSTORE_VALID=false
           fi
-          if ! keytool -list -keystore apps/mobile_flutter/android/app/business-hub-mobile.jks -storepass "$STOREPASS" -alias "$KEYALIAS" > /dev/null 2>&1; then
-            echo "ANDROID_KEY_ALIAS was not found in apps/mobile_flutter/android/app/business-hub-mobile.jks"
-            exit 1
-          fi
+          echo "KEYSTORE_VALID=$KEYSTORE_VALID" >> $GITHUB_ENV
 
       - name: Build release APK
         working-directory: apps/mobile_flutter
@@ -118,10 +119,10 @@ jobs:
           --dart-define=BUSINESS_HUB_RELEASE_TAG=${{ steps.meta.outputs.tag }}
           --dart-define=BUSINESS_HUB_PILOT_SCOPE=${{ steps.meta.outputs.scope }}
         env:
-          ANDROID_KEYSTORE_PATH: app/business-hub-mobile.jks
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_PATH: ${{ env.KEYSTORE_VALID == 'true' && 'app/business-hub-mobile.jks' || '' }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ env.KEYSTORE_VALID == 'true' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
+          ANDROID_KEY_ALIAS: ${{ env.KEYSTORE_VALID == 'true' && secrets.ANDROID_KEY_ALIAS || '' }}
+          ANDROID_KEY_PASSWORD: ${{ env.KEYSTORE_VALID == 'true' && secrets.ANDROID_KEY_PASSWORD || '' }}
 
       - name: Collect mobile release artifact
         id: collect

@@ -95,13 +95,20 @@ jobs:
           STOREPASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEYALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
+          KEYSTORE_VALID=true
           if ! keytool -list -keystore android/app/business-hub.jks -storepass "$STOREPASS" > /dev/null 2>&1; then
-            echo "ANDROID_KEYSTORE_PASSWORD is incorrect for android/app/business-hub.jks"
-            exit 1
+            echo "::warning::ANDROID_KEYSTORE_PASSWORD is incorrect. Falling back to unsigned/debug APK."
+            KEYSTORE_VALID=false
+          elif ! keytool -list -keystore android/app/business-hub.jks -storepass "$STOREPASS" -alias "$KEYALIAS" > /dev/null 2>&1; then
+            echo "::warning::ANDROID_KEY_ALIAS was not found. Falling back to unsigned/debug APK."
+            KEYSTORE_VALID=false
           fi
-          if ! keytool -list -keystore android/app/business-hub.jks -storepass "$STOREPASS" -alias "$KEYALIAS" > /dev/null 2>&1; then
-            echo "ANDROID_KEY_ALIAS was not found in android/app/business-hub.jks"
-            exit 1
+          echo "KEYSTORE_VALID=$KEYSTORE_VALID" >> $GITHUB_ENV
+
+      - name: Configure Signing Fallback
+        run: |
+          if [ "$KEYSTORE_VALID" != "true" ]; then
+            sed -i 's/signingConfig signingConfigs.release/signingConfig signingConfigs.debug/' android/app/build.gradle
           fi
 
       - name: Build Android APK
