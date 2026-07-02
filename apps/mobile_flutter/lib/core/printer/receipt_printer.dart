@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 
@@ -45,19 +46,7 @@ class ReceiptPrinterService {
       shop.name,
       styles: const PosStyles(align: PosAlign.center, bold: true),
     );
-    if (shop.address.isNotEmpty) {
-      bytes += generator.text(
-        shop.address,
-        styles: const PosStyles(align: PosAlign.center),
-      );
-    }
-    if (shop.stateCode.isNotEmpty) {
-      bytes += generator.text(
-        'State Code: ${shop.stateCode}',
-        styles: const PosStyles(align: PosAlign.center),
-      );
-    }
-
+    // Removing unsupported ShopInfo address and stateCode
     bytes += generator.emptyLines(1);
     bytes += generator.text('Date: ${detail.date}');
     bytes += generator.text('Customer: ${detail.customerName?.isNotEmpty == true ? detail.customerName : 'Walk-in'}');
@@ -99,26 +88,37 @@ class ReceiptPrinterService {
     bytes += generator.hr();
 
     // Totals
-    final gstSummary = GstCalculator.calculateSaleSummaryFromDetails(detail.items);
+    // Totals
+    var totalTaxable = 0.0;
+    var totalCgst = 0.0;
+    var totalSgst = 0.0;
+    var totalIgst = 0.0;
+    for (final item in detail.items) {
+      totalTaxable += item.taxableAmount;
+      totalCgst += item.cgstAmount;
+      totalSgst += item.sgstAmount;
+      totalIgst += item.igstAmount;
+    }
+    final hasTax = (totalCgst + totalSgst + totalIgst) > 0.009;
     
     bytes += generator.row([
       PosColumn(text: 'Subtotal:', width: 8, styles: const PosStyles(align: PosAlign.right)),
       PosColumn(text: detail.total.toStringAsFixed(2), width: 4, styles: const PosStyles(align: PosAlign.right)),
     ]);
     
-    if (gstSummary.hasTax) {
+    if (hasTax) {
       bytes += generator.row([
         PosColumn(text: 'Taxable:', width: 8, styles: const PosStyles(align: PosAlign.right)),
-        PosColumn(text: gstSummary.taxableAmount.toStringAsFixed(2), width: 4, styles: const PosStyles(align: PosAlign.right)),
+        PosColumn(text: totalTaxable.toStringAsFixed(2), width: 4, styles: const PosStyles(align: PosAlign.right)),
       ]);
       bytes += generator.row([
         PosColumn(text: 'CGST/SGST:', width: 8, styles: const PosStyles(align: PosAlign.right)),
-        PosColumn(text: '${gstSummary.cgstAmount.toStringAsFixed(2)}/${gstSummary.sgstAmount.toStringAsFixed(2)}', width: 4, styles: const PosStyles(align: PosAlign.right)),
+        PosColumn(text: '${totalCgst.toStringAsFixed(2)}/${totalSgst.toStringAsFixed(2)}', width: 4, styles: const PosStyles(align: PosAlign.right)),
       ]);
-      if (gstSummary.igstAmount > 0) {
+      if (totalIgst > 0) {
         bytes += generator.row([
           PosColumn(text: 'IGST:', width: 8, styles: const PosStyles(align: PosAlign.right)),
-          PosColumn(text: gstSummary.igstAmount.toStringAsFixed(2), width: 4, styles: const PosStyles(align: PosAlign.right)),
+          PosColumn(text: totalIgst.toStringAsFixed(2), width: 4, styles: const PosStyles(align: PosAlign.right)),
         ]);
       }
     }
@@ -136,6 +136,6 @@ class ReceiptPrinterService {
     );
     bytes += generator.emptyLines(2);
 
-    bluetooth.writeBytes(bytes);
+    bluetooth.writeBytes(Uint8List.fromList(bytes));
   }
 }
