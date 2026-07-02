@@ -72,6 +72,18 @@ jobs:
 
       - name: Decode Keystore
         run: |
+
+      - name: Verify Android Build Secrets
+        run: |
+          missing=0
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then echo "ANDROID_KEYSTORE_BASE64 is missing"; missing=1; fi
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ]; then echo "ANDROID_KEYSTORE_PASSWORD is missing"; missing=1; fi
+          if [ -z "${{ secrets.ANDROID_KEY_ALIAS }}" ]; then echo "ANDROID_KEY_ALIAS is missing"; missing=1; fi
+          if [ -z "${{ secrets.ANDROID_KEY_PASSWORD }}" ]; then echo "ANDROID_KEY_PASSWORD is missing"; missing=1; fi
+          if [ "$missing" -eq 1 ]; then exit 1; fi
+
+      - name: Decode Keystore
+        run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | tr -d '\r\n ' | base64 --decode > android/app/business-hub.jks
           if [ ! -s android/app/business-hub.jks ]; then
             echo "Keystore decoding failed"
@@ -79,12 +91,15 @@ jobs:
           fi
 
       - name: Keystore Doctor
+        env:
+          STOREPASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEYALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          if ! keytool -list -keystore android/app/business-hub.jks -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > /dev/null 2>&1; then
+          if ! keytool -list -keystore android/app/business-hub.jks -storepass "$STOREPASS" > /dev/null 2>&1; then
             echo "ANDROID_KEYSTORE_PASSWORD is incorrect for android/app/business-hub.jks"
             exit 1
           fi
-          if ! keytool -list -keystore android/app/business-hub.jks -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" -alias "${{ secrets.ANDROID_KEY_ALIAS }}" > /dev/null 2>&1; then
+          if ! keytool -list -keystore android/app/business-hub.jks -storepass "$STOREPASS" -alias "$KEYALIAS" > /dev/null 2>&1; then
             echo "ANDROID_KEY_ALIAS was not found in android/app/business-hub.jks"
             exit 1
           fi

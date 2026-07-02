@@ -96,12 +96,15 @@ jobs:
           fi
 
       - name: Keystore doctor
+        env:
+          STOREPASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEYALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          if ! keytool -list -keystore apps/mobile_flutter/android/app/business-hub-mobile.jks -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > /dev/null 2>&1; then
+          if ! keytool -list -keystore apps/mobile_flutter/android/app/business-hub-mobile.jks -storepass "$STOREPASS" > /dev/null 2>&1; then
             echo "ANDROID_KEYSTORE_PASSWORD is incorrect for apps/mobile_flutter/android/app/business-hub-mobile.jks"
             exit 1
           fi
-          if ! keytool -list -keystore apps/mobile_flutter/android/app/business-hub-mobile.jks -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" -alias "${{ secrets.ANDROID_KEY_ALIAS }}" > /dev/null 2>&1; then
+          if ! keytool -list -keystore apps/mobile_flutter/android/app/business-hub-mobile.jks -storepass "$STOREPASS" -alias "$KEYALIAS" > /dev/null 2>&1; then
             echo "ANDROID_KEY_ALIAS was not found in apps/mobile_flutter/android/app/business-hub-mobile.jks"
             exit 1
           fi
