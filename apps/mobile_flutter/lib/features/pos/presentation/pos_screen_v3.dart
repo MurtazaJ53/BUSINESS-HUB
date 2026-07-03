@@ -586,6 +586,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
           ],
         ),
       ),
+      ),
     ).whenComplete(() {
       if (mounted && _saving) {
         setState(() => _saving = false);

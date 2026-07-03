@@ -593,7 +593,7 @@ class $InventoryEntriesTable extends InventoryEntries
   }
 
   @override
-  Set<GeneratedColumn> get $primaryKey => const {};
+  Set<GeneratedColumn> get $primaryKey => {id};
   @override
   InventoryEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
@@ -1304,7 +1304,7 @@ class $InventoryPrivateEntriesTable extends InventoryPrivateEntries
   }
 
   @override
-  Set<GeneratedColumn> get $primaryKey => const {};
+  Set<GeneratedColumn> get $primaryKey => {id};
   @override
   InventoryPrivateEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
@@ -2035,7 +2035,7 @@ class $SalesEntriesTable extends SalesEntries
   }
 
   @override
-  Set<GeneratedColumn> get $primaryKey => const {};
+  Set<GeneratedColumn> get $primaryKey => {id};
   @override
   SalesEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
@@ -3027,7 +3027,7 @@ class $CustomerEntriesTable extends CustomerEntries
   }
 
   @override
-  Set<GeneratedColumn> get $primaryKey => const {};
+  Set<GeneratedColumn> get $primaryKey => {id};
   @override
   CustomerEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
@@ -4282,6 +4282,46 @@ abstract class _$BusinessHubDatabase extends GeneratedDatabase {
   );
   late final $CommerceOutboxEntriesTable commerceOutboxEntries =
       $CommerceOutboxEntriesTable(this);
+  late final Index inventoryNameIdx = Index(
+    'inventory_name_idx',
+    'CREATE INDEX inventory_name_idx ON inventory (name)',
+  );
+  late final Index inventorySkuIdx = Index(
+    'inventory_sku_idx',
+    'CREATE INDEX inventory_sku_idx ON inventory (sku)',
+  );
+  late final Index inventoryCategoryIdx = Index(
+    'inventory_category_idx',
+    'CREATE INDEX inventory_category_idx ON inventory (category)',
+  );
+  late final Index inventoryTombstoneIdx = Index(
+    'inventory_tombstone_idx',
+    'CREATE INDEX inventory_tombstone_idx ON inventory (tombstone)',
+  );
+  late final Index salesCreatedAtIdx = Index(
+    'sales_created_at_idx',
+    'CREATE INDEX sales_created_at_idx ON sales (created_at)',
+  );
+  late final Index salesTombstoneIdx = Index(
+    'sales_tombstone_idx',
+    'CREATE INDEX sales_tombstone_idx ON sales (tombstone)',
+  );
+  late final Index salesSyncStatusIdx = Index(
+    'sales_sync_status_idx',
+    'CREATE INDEX sales_sync_status_idx ON sales (sync_status)',
+  );
+  late final Index customersNameIdx = Index(
+    'customers_name_idx',
+    'CREATE INDEX customers_name_idx ON customers (name)',
+  );
+  late final Index customersPhoneIdx = Index(
+    'customers_phone_idx',
+    'CREATE INDEX customers_phone_idx ON customers (phone)',
+  );
+  late final Index customersTombstoneIdx = Index(
+    'customers_tombstone_idx',
+    'CREATE INDEX customers_tombstone_idx ON customers (tombstone)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4293,6 +4333,16 @@ abstract class _$BusinessHubDatabase extends GeneratedDatabase {
     salesEntries,
     customerEntries,
     commerceOutboxEntries,
+    inventoryNameIdx,
+    inventorySkuIdx,
+    inventoryCategoryIdx,
+    inventoryTombstoneIdx,
+    salesCreatedAtIdx,
+    salesTombstoneIdx,
+    salesSyncStatusIdx,
+    customersNameIdx,
+    customersPhoneIdx,
+    customersTombstoneIdx,
   ];
 }
 
