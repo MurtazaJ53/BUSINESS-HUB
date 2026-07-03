@@ -331,86 +331,64 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
 
   Widget _buildProductCard(InventoryCatalogItem item) {
     final inCart = _cart.any((cartItem) => cartItem.id == item.id);
-    final theme = Theme.of(context);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.of(context).surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: inCart ? AppPalette.primary : AppColors.of(context).borderSoft,
-          width: inCart ? 2 : 1,
+    return InkWell(
+      onTap: () => _addToCart(item),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: inCart ? AppPalette.primary.withValues(alpha: 0.1) : AppColors.of(context).surface,
+          border: Border.all(
+            color: inCart ? AppPalette.primary : AppColors.of(context).border,
+            width: inCart ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(4),
         ),
-        boxShadow: inCart ? [
-          BoxShadow(
-            color: AppPalette.primary.withValues(alpha: 0.15),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          )
-        ] : [],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _addToCart(item),
-          borderRadius: BorderRadius.circular(24),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              item.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (item.sku.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                item.sku,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.of(context).textSecondary,
+                ),
+              ),
+            ],
+            const Spacer(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Product image placeholder
-                Container(
-                  height: 90,
-                  decoration: BoxDecoration(
-                    color: inCart ? AppPalette.primary.withValues(alpha: 0.12) : AppColors.of(context).surfaceStrong,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      Icons.inventory_2_rounded,
-                      size: 36,
-                      color: inCart ? AppPalette.primary : AppColors.of(context).textTertiary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Product name
                 Text(
-                  item.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.outfit(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.of(context).textPrimary,
+                  formatCurrency(item.price),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: inCart ? AppPalette.primary : AppColors.of(context).textPrimary,
                   ),
                 ),
-                const Spacer(),
-                // Price and stock
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      formatCurrency(item.price),
-                      style: GoogleFonts.outfit(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: AppPalette.primary,
-                      ),
-                    ),
-                    StatusBadge(
-                      label: '${item.stock}',
-                      color: item.stock > 5
-                          ? AppPalette.success
-                          : AppPalette.warning,
-                      showDot: false,
-                    ),
-                  ],
+                Text(
+                  'Qty: ${item.stock}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: item.stock > 5 ? AppColors.of(context).textSecondary : AppPalette.warning,
+                  ),
                 ),
               ],
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -448,150 +426,77 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
     });
   }
 
-  void _openCheckout(BuildContext context) {
+import 'checkout_payment_sheet.dart';
+
+  void _openCheckout(BuildContext context) async {
     final session = ref.read(mobileSessionProvider).asData?.value;
     final shop = ref.read(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
     final salesRepository = ref.read(salesRepositoryProvider);
     final syncCoordinator = ref.read(mobileSyncCoordinatorProvider);
     final activeShopId = session?.shopId;
-    final gstSummary = _gstSummary;
-    final buyerGstinController = TextEditingController();
 
-    showModalBottomSheet<void>(
+    if (activeShopId == null || activeShopId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Shop session is still loading.')));
+      return;
+    }
+
+    // 1. Show the robust Payment Sheet
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.of(context).background,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      builder: (context) => CheckoutPaymentSheet(
+        cartTotal: _cartTotal,
+        gstSummary: _gstSummary,
+      ),
+    );
+
+    if (result == null || !mounted || !context.mounted) return;
+
+    // 2. Extract checkout data
+    final payments = result['payments'] as List<PosPayment>;
+    final paymentMode = result['paymentMode'] as String;
+    final buyerGstin = result['buyerGstin'] as String?;
+
+    setState(() => _saving = true);
+
+    try {
+      final commit = await salesRepository.recordLocalSale(
+        shopId: activeShopId,
+        items: List<PosCartItem>.from(_cart),
+        payments: payments,
+        paymentMode: paymentMode,
+        footerNote: shop.footer,
+        buyerGstin: buyerGstin,
+      );
+      
+      final syncResult = await syncCoordinator.submitSale(commit);
+      
+      if (!mounted || !context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            syncResult.acceptedByBackend
+                ? 'Sale synced: ${formatCurrency(commit.total)}'
+                : 'Sale queued: ${formatCurrency(commit.total)}',
           ),
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.of(context).border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Checkout',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 24),
-            _CheckoutRow(label: 'Subtotal', value: formatCurrency(_cartTotal)),
-            if (gstSummary.hasTax) ...[
-              const SizedBox(height: 10),
-              _CheckoutRow(
-                label: 'Taxable value',
-                value: formatCurrency(gstSummary.taxableAmount),
-              ),
-              const SizedBox(height: 10),
-              _CheckoutRow(
-                label: 'GST total',
-                value: formatCurrency(gstSummary.taxAmount),
-              ),
-              const SizedBox(height: 10),
-              _CheckoutRow(
-                label: 'CGST / SGST',
-                value:
-                    '${formatCurrency(gstSummary.cgstAmount)} / ${formatCurrency(gstSummary.sgstAmount)}',
-              ),
-              if (gstSummary.igstAmount > 0.009) ...[
-                const SizedBox(height: 10),
-                _CheckoutRow(
-                  label: 'IGST',
-                  value: formatCurrency(gstSummary.igstAmount),
-                ),
-              ],
-            ],
-            const SizedBox(height: 16),
-            TextField(
-              controller: buyerGstinController,
-              decoration: InputDecoration(
-                labelText: 'Buyer GSTIN (Optional)',
-                hintText: 'Enter GSTIN for B2B Tax Invoice',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-              textCapitalization: TextCapitalization.characters,
-            ),
-            const SizedBox(height: 24),
-            PrimaryActionButton(
-              label: _saving
-                  ? 'Saving...'
-                  : 'Complete Sale ${formatCurrency(_cartTotal)}',
-              icon: Icons.check_rounded,
-              onPressed: _saving
-                  ? null
-                  : () async {
-                      if (activeShopId == null || activeShopId.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Shop session is still loading.'),
-                          ),
-                        );
-                        return;
-                      }
-                      setState(() => _saving = true);
-                      try {
-                        final commit = await salesRepository.recordLocalSale(
-                          shopId: activeShopId,
-                          items: List<PosCartItem>.from(_cart),
-                          payments: <PosPayment>[
-                            PosPayment(mode: 'CASH', amount: _cartTotal),
-                          ],
-                          paymentMode: 'CASH',
-                          footerNote: shop.footer,
-                          buyerGstin: buyerGstinController.text.trim().isNotEmpty ? buyerGstinController.text.trim() : null,
-                        );
-                        final result = await syncCoordinator.submitSale(commit);
-                        if (!mounted || !context.mounted) {
-                          return;
-                        }
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              result.acceptedByBackend
-                                  ? 'Sale synced: ${formatCurrency(commit.total)}'
-                                  : 'Sale queued: ${formatCurrency(commit.total)}',
-                            ),
-                          ),
-                        );
-                        setState(() {
-                          _cart.clear();
-                          _saving = false;
-                        });
-                      } catch (error) {
-                        if (!mounted || !context.mounted) {
-                          return;
-                        }
-                        setState(() => _saving = false);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Sale failed: $error')),
-                        );
-                      }
-                    },
-            ),
-          ],
+          backgroundColor: AppPalette.success,
         ),
-      ),
-      ),
-    ).whenComplete(() {
-      if (mounted && _saving) {
-        setState(() => _saving = false);
-      }
-    });
+      );
+      
+      setState(() {
+        _cart.clear();
+        _saving = false;
+      });
+      
+    } catch (error) {
+      if (!mounted || !context.mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sale failed: $error'), backgroundColor: AppPalette.error),
+      );
+    }
   }
 }
 

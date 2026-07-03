@@ -6,11 +6,31 @@ import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../shell/presentation/mobile_surface.dart';
 
-class AuthGateScreen extends ConsumerWidget {
+class AuthGateScreen extends ConsumerStatefulWidget {
   const AuthGateScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AuthGateScreen> createState() => _AuthGateScreenState();
+}
+
+class _AuthGateScreenState extends ConsumerState<AuthGateScreen> {
+  final _pinController = TextEditingController();
+  bool _isLoggingIn = false;
+
+  void _handleLogin() async {
+    if (_pinController.text.isEmpty) return;
+    
+    setState(() => _isLoggingIn = true);
+    
+    await ref.read(mobileSessionProvider.notifier).login(_pinController.text);
+    
+    if (mounted) {
+      setState(() => _isLoggingIn = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final sessionAsync = ref.watch(mobileSessionProvider);
 
     return sessionAsync.when(
@@ -37,15 +57,73 @@ class AuthGateScreen extends ConsumerWidget {
               context.go(session.defaultRoute);
             }
           });
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
 
-        return const _AuthScaffold(
-          child: _BrandedStatus(
-            icon: Icons.verified_rounded,
-            eyebrow: 'Ready',
-            title: 'Command center is ready',
-            subtitle:
-                'Business Hub is local-first now. Live sync can be switched on when the backend is available.',
+        // SHOW LOGIN SCREEN IF NO SESSION
+        return _AuthScaffold(
+          child: MobilePanel(
+            title: 'Staff Login',
+            action: const MobileTag(label: 'SECURE', icon: Icons.lock_outline),
+            child: Column(
+              children: [
+                const SizedBox(height: 16),
+                const Icon(Icons.storefront_rounded, size: 48, color: AppPalette.primary),
+                const SizedBox(height: 24),
+                Text(
+                  'Enter your assigned PIN to unlock the POS terminal.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppPalette.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                TextField(
+                  controller: _pinController,
+                  obscureText: true,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  maxLength: 4,
+                  style: const TextStyle(fontSize: 24, letterSpacing: 8, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    hintText: '----',
+                    counterText: '',
+                    filled: true,
+                    fillColor: AppPalette.backgroundSoft,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  onSubmitted: (_) => _handleLogin(),
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _isLoggingIn ? null : _handleLogin,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppPalette.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 0,
+                    ),
+                    child: _isLoggingIn
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Text(
+                            'UNLOCK TERMINAL',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                          ),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
