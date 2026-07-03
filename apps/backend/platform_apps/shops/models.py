@@ -1,6 +1,7 @@
 from __future__ import annotations
-
+import uuid
 from django.conf import settings
+from django.core.cache import cache
 from django.db import models
 
 from platform_apps.common.models import SourceTrackedModel
@@ -36,9 +37,23 @@ class Shop(SourceTrackedModel):
 
     @property
     def enabled_features(self) -> dict[str, bool]:
+        cache_key = f"shop:{self.id}:enabled_features"
+        cached_features = cache.get(cache_key)
+        if cached_features is not None:
+            return cached_features
+
         explicit = self.settings_json.get("enabled_features")
         overrides = explicit if isinstance(explicit, dict) else None
-        return build_enabled_features(self.plan_tier, overrides=overrides)
+        features = build_enabled_features(self.plan_tier, overrides=overrides)
+        
+        # Cache for 1 hour
+        cache.set(cache_key, features, 3600)
+        return features
+
+    def save(self, *args, **kwargs):
+        # Invalidate cache when shop is saved
+        cache.delete(f"shop:{self.id}:enabled_features")
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return self.name

@@ -14,6 +14,8 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .tasks import process_sale_command_task
+
 from platform_apps.audit.services import create_workspace_audit_event, snapshot_sale
 from platform_apps.common.migration import MigrationDomain
 from platform_apps.common.migration_guards import (
@@ -366,7 +368,7 @@ class SaleCommandIngestionView(ShopScopedMixin, generics.GenericAPIView):
             shop_id=str(membership.shop_id),
             domains=guarded_domains,
         )
-        sales_control = assert_domain_epoch_current(
+        assert_domain_epoch_current(
             shop_id=str(membership.shop_id),
             domain=MigrationDomain.SALES,
             base_domain_epoch=base_domain_epoch,
@@ -406,90 +408,25 @@ class SaleCommandIngestionView(ShopScopedMixin, generics.GenericAPIView):
                     status=status.HTTP_409_CONFLICT,
                 )
 
-            sale_serializer = SaleSerializer(
-                data=sale_payload,
-                context={
-                    "shop": membership.shop,
-                    "actor": request.user,
-                },
-            )
-            sale_serializer.is_valid(raise_exception=True)
-
-            source_meta_json = dict(sale_payload.get("source_meta_json") or {})
-            source_meta_json.update(
-                {
-                    "command_id": command_id,
-                    "source_surface": source_surface,
-                }
-            )
-
-            sale = sale_serializer.save(
-                source_system="postgres_command",
-                source_id=command_id,
-                source_shop_id=membership.shop.source_id,
-                source_path=f"shops/{membership.shop.source_id or membership.shop_id}/sales/commands/{command_id}",
-                domain_epoch=sales_control.current_epoch if sales_control is not None else base_domain_epoch,
-                source_meta_json=source_meta_json,
-            )
-
-            receipt.actor_user = request.user
-            receipt.sale = sale
-            receipt.source_surface = source_surface
-            receipt.base_domain_epoch = base_domain_epoch
-            receipt.result_status = SaleCommandReceipt.ResultStatus.ACCEPTED
-            receipt.payload_json = {
-                "sale": raw_sale_payload,
-                "source_surface": source_surface,
-                "guarded_domains": guarded_domains,
-                "resolved_epochs": {
-                    domain: control.current_epoch if control is not None else None
-                    for domain, control in controls.items()
-                },
+            # Store resolved epochs for the background task
+            receipt.payload_json["resolved_epochs"] = {
+                domain: control.current_epoch if control is not None else None
+                for domain, control in controls.items()
             }
-            receipt.applied_at = timezone.now()
-            receipt.save(
-                update_fields=[
-                    "actor_user",
-                    "sale",
-                    "source_surface",
-                    "base_domain_epoch",
-                    "result_status",
-                    "payload_json",
-                    "applied_at",
-                    "updated_at",
-                ]
-            )
+            receipt.save(update_fields=["payload_json"])
 
-        refresh_shop_dashboard_projection(membership.shop)
-        sale = _get_sale_queryset_for_shop(shop_id=str(membership.shop_id)).get(pk=sale.id)
-        create_workspace_audit_event(
-            shop=membership.shop,
-            actor_user=request.user,
-            actor_role=membership.role,
-            category="sale",
-            event_type="sale.command.accepted",
-            entity_type="sale_command",
-            entity_id=command_id,
-            entity_label=sale.receipt_number,
-            summary=f"Accepted sale command for {sale.receipt_number}.",
-            source_surface=source_surface,
-            after=snapshot_sale(sale),
-            metadata={
-                "command_id": command_id,
-                "receipt_id": receipt.id,
-                "base_domain_epoch": base_domain_epoch,
-                "duplicate": False,
-            },
-        )
+        # Enqueue the background task
+        process_sale_command_task.delay(str(receipt.id))
+
         return Response(
             {
                 "command_id": command_id,
                 "receipt_id": str(receipt.id),
                 "duplicate": False,
                 "result_status": receipt.result_status,
-                "sale": SaleSerializer(sale).data,
+                "message": "Sale command accepted and is processing in the background.",
             },
-            status=status.HTTP_201_CREATED,
+            status=status.HTTP_202_ACCEPTED,
         )
 
 

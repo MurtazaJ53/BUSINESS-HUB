@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from cryptography.fields import encrypt
 from decimal import Decimal
 
 from django.conf import settings
@@ -16,8 +17,8 @@ class Customer(SourceTrackedModel):
 
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="customers")
     name = models.CharField(max_length=255)
-    phone = models.CharField(max_length=32, blank=True, default="-")
-    email = models.EmailField(blank=True)
+    phone = encrypt(models.CharField(max_length=32, blank=True, default="-"))
+    email = encrypt(models.EmailField(blank=True))
     total_spent = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     balance = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     notes = models.TextField(blank=True)

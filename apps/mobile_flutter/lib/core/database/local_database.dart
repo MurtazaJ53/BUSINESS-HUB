@@ -20,6 +20,10 @@ class ShopSettingsEntries extends Table {
   Set<Column<Object>>? get primaryKey => {key};
 }
 
+@TableIndex(name: 'inventory_name_idx', columns: {#name})
+@TableIndex(name: 'inventory_sku_idx', columns: {#sku})
+@TableIndex(name: 'inventory_category_idx', columns: {#category})
+@TableIndex(name: 'inventory_tombstone_idx', columns: {#tombstone})
 class InventoryEntries extends Table {
   @override
   String get tableName => 'inventory';
@@ -43,6 +47,9 @@ class InventoryEntries extends Table {
   IntColumn get updatedAt =>
       integer().named('updated_at').withDefault(const Constant(0))();
   BoolColumn get tombstone => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
 }
 
 class InventoryPrivateEntries extends Table {
@@ -58,8 +65,14 @@ class InventoryPrivateEntries extends Table {
   IntColumn get updatedAt =>
       integer().named('updated_at').withDefault(const Constant(0))();
   BoolColumn get tombstone => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
 }
 
+@TableIndex(name: 'sales_created_at_idx', columns: {#createdAt})
+@TableIndex(name: 'sales_tombstone_idx', columns: {#tombstone})
+@TableIndex(name: 'sales_sync_status_idx', columns: {#syncStatus})
 class SalesEntries extends Table {
   @override
   String get tableName => 'sales';
@@ -90,8 +103,14 @@ class SalesEntries extends Table {
   TextColumn get lastSyncError => text().named('last_sync_error').nullable()();
   IntColumn get lastSyncedAt => integer().named('last_synced_at').nullable()();
   BoolColumn get tombstone => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
 }
 
+@TableIndex(name: 'customers_name_idx', columns: {#name})
+@TableIndex(name: 'customers_phone_idx', columns: {#phone})
+@TableIndex(name: 'customers_tombstone_idx', columns: {#tombstone})
 class CustomerEntries extends Table {
   @override
   String get tableName => 'customers';
@@ -110,6 +129,9 @@ class CustomerEntries extends Table {
       integer().named('updated_at').withDefault(const Constant(0))();
   IntColumn get lastSeenAt => integer().named('last_seen_at').nullable()();
   BoolColumn get tombstone => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
 }
 
 class CommerceOutboxEntries extends Table {
@@ -159,7 +181,7 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       );
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -188,6 +210,10 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
           inventoryEntries,
           inventoryEntries.priceIncludesTax,
         );
+      }
+      if (from < 6) {
+        // Indexes are automatically handled by Drift on upgrade if we don't drop the table.
+        // We just need to bump the schema version.
       }
     },
   );
