@@ -3,7 +3,7 @@ final class MobileRuntimeConfig {
 
   static const bool backendSyncEnabled = bool.fromEnvironment(
     'BUSINESS_HUB_BACKEND_SYNC_ENABLED',
-    defaultValue: false,
+    defaultValue: true,
   );
 
   static const String backendAuthMode = String.fromEnvironment(
