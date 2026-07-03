@@ -13,6 +13,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/premium_components.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'checkout_payment_sheet.dart';
 
 /// Redesigned POS Screen v3.0
 /// Simple, Clean, Premium, Professional
@@ -356,10 +357,10 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            if (item.sku.isNotEmpty) ...[
+            if (item.sku != null && item.sku!.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(
-                item.sku,
+                item.sku!,
                 style: TextStyle(
                   fontSize: 11,
                   color: AppColors.of(context).textSecondary,
@@ -425,8 +426,6 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
       }
     });
   }
-
-import 'checkout_payment_sheet.dart';
 
   void _openCheckout(BuildContext context) async {
     final session = ref.read(mobileSessionProvider).asData?.value;
