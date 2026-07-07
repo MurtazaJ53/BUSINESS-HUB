@@ -14,8 +14,6 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .tasks import process_sale_command_task
-
 from platform_apps.audit.services import create_workspace_audit_event, snapshot_sale
 from platform_apps.common.migration import MigrationDomain
 from platform_apps.common.migration_guards import (
@@ -408,25 +406,60 @@ class SaleCommandIngestionView(ShopScopedMixin, generics.GenericAPIView):
                     status=status.HTTP_409_CONFLICT,
                 )
 
-            # Store resolved epochs for the background task
+            # Record resolved epochs alongside the command payload for audit parity.
             receipt.payload_json["resolved_epochs"] = {
                 domain: control.current_epoch if control is not None else None
                 for domain, control in controls.items()
             }
-            receipt.save(update_fields=["payload_json"])
 
-        # Enqueue the background task
-        process_sale_command_task.delay(str(receipt.id))
+            # Process the command synchronously so the POS client receives the
+            # created sale in the response body. This mirrors the payments
+            # command flow and keeps the POS working without a running worker.
+            sale_serializer = SaleSerializer(
+                data=sale_payload,
+                context={"shop": membership.shop, "actor": request.user},
+            )
+            sale_serializer.is_valid(raise_exception=True)
 
+            source_meta_json = dict(sale_payload.get("source_meta_json") or {})
+            source_meta_json.update(
+                {"command_id": command_id, "source_surface": source_surface}
+            )
+            sales_control = controls.get(MigrationDomain.SALES)
+            domain_epoch = (
+                sales_control.current_epoch if sales_control is not None else base_domain_epoch
+            )
+
+            sale = sale_serializer.save(
+                source_system="postgres_command",
+                source_id=command_id,
+                source_shop_id=membership.shop.source_id,
+                source_path=(
+                    f"shops/{membership.shop.source_id or membership.shop_id}"
+                    f"/sales/commands/{command_id}"
+                ),
+                domain_epoch=domain_epoch,
+                source_meta_json=source_meta_json,
+            )
+
+            receipt.sale = sale
+            receipt.result_status = SaleCommandReceipt.ResultStatus.ACCEPTED
+            receipt.applied_at = timezone.now()
+            receipt.save(
+                update_fields=["sale", "result_status", "applied_at", "payload_json"]
+            )
+
+        refresh_shop_dashboard_projection(membership.shop)
+        sale = _get_sale_queryset_for_shop(shop_id=str(membership.shop_id)).get(pk=sale.id)
         return Response(
             {
                 "command_id": command_id,
                 "receipt_id": str(receipt.id),
                 "duplicate": False,
                 "result_status": receipt.result_status,
-                "message": "Sale command accepted and is processing in the background.",
+                "sale": SaleSerializer(sale).data,
             },
-            status=status.HTTP_202_ACCEPTED,
+            status=status.HTTP_201_CREATED,
         )
 
 

@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,17 +16,45 @@ class AuthGateScreen extends ConsumerStatefulWidget {
   ConsumerState<AuthGateScreen> createState() => _AuthGateScreenState();
 }
 
-class _AuthGateScreenState extends ConsumerState<AuthGateScreen> {
+class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
+    with SingleTickerProviderStateMixin {
   final _pinController = TextEditingController();
   bool _isLoggingIn = false;
+  late final AnimationController _shakeController;
+
+  @override
+  void initState() {
+    super.initState();
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 450),
+    );
+  }
+
+  @override
+  void dispose() {
+    _shakeController.dispose();
+    _pinController.dispose();
+    super.dispose();
+  }
+
+  void _triggerShake() {
+    HapticFeedback.mediumImpact();
+    _shakeController.forward(from: 0);
+  }
 
   void _handleLogin() async {
-    if (_pinController.text.isEmpty) return;
-    
+    // Old-app behaviour: an incomplete PIN shakes the field instead of
+    // silently doing nothing.
+    if (_pinController.text.length < 4) {
+      _triggerShake();
+      return;
+    }
+
     setState(() => _isLoggingIn = true);
-    
+
     await ref.read(mobileSessionProvider.notifier).login(_pinController.text);
-    
+
     if (mounted) {
       setState(() => _isLoggingIn = false);
     }
@@ -62,71 +93,184 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen> {
 
         // SHOW LOGIN SCREEN IF NO SESSION
         return _AuthScaffold(
-          child: MobilePanel(
-            title: 'Staff Login',
-            action: const MobileTag(label: 'SECURE', icon: Icons.lock_outline),
-            child: Column(
-              children: [
-                const SizedBox(height: 16),
-                const Icon(Icons.storefront_rounded, size: 48, color: AppPalette.primary),
-                const SizedBox(height: 24),
-                Text(
-                  'Enter your assigned PIN to unlock the POS terminal.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppPalette.textSecondary,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 32),
-                TextField(
-                  controller: _pinController,
-                  obscureText: true,
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  maxLength: 4,
-                  style: const TextStyle(fontSize: 24, letterSpacing: 8, fontWeight: FontWeight.bold),
-                  decoration: InputDecoration(
-                    hintText: '----',
-                    counterText: '',
-                    filled: true,
-                    fillColor: AppPalette.backgroundSoft,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const _BrandHero(),
+              const SizedBox(height: 28),
+              MobilePanel(
+                title: 'Staff Login',
+                action: const MobileTag(label: 'SECURE', icon: Icons.lock_outline),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 8),
+                    Text(
+                      'Enter your assigned PIN to unlock the POS terminal.',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppPalette.textSecondary,
+                        height: 1.5,
+                      ),
                     ),
-                  ),
-                  onSubmitted: (_) => _handleLogin(),
-                ),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _isLoggingIn ? null : _handleLogin,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppPalette.primary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      elevation: 0,
-                    ),
-                    child: _isLoggingIn
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                          )
-                        : const Text(
-                            'UNLOCK TERMINAL',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                    const SizedBox(height: 28),
+                    _ShakeBuilder(
+                      controller: _shakeController,
+                      child: TextField(
+                        controller: _pinController,
+                        obscureText: true,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        maxLength: 4,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          letterSpacing: 8,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: '----',
+                          counterText: '',
+                          filled: true,
+                          fillColor: AppPalette.backgroundSoft,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
                           ),
-                  ),
+                        ),
+                        onSubmitted: (_) => _handleLogin(),
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          gradient: const LinearGradient(
+                            colors: [AppPalette.primaryLight, AppPalette.primary],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppPalette.primary.withValues(alpha: 0.35),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: ElevatedButton(
+                          onPressed: _isLoggingIn ? null : _handleLogin,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: _isLoggingIn
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  'UNLOCK TERMINAL',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
+    );
+  }
+}
+
+/// Gradient brand hero echoing the legacy web login: sky-blue logo badge,
+/// wordmark and tagline.
+class _BrandHero extends StatelessWidget {
+  const _BrandHero();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      children: [
+        Container(
+          width: 84,
+          height: 84,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(26),
+            gradient: const LinearGradient(
+              colors: [AppPalette.primaryLight, AppPalette.primaryDark],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppPalette.primary.withValues(alpha: 0.45),
+                blurRadius: 28,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: const Icon(Icons.storefront_rounded, color: Colors.white, size: 40),
+        ),
+        const SizedBox(height: 18),
+        Text(
+          'Business Hub',
+          style: theme.textTheme.displaySmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Point of sale & business command center',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: AppPalette.textTertiary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Horizontal shake driven by an [AnimationController]; used for invalid input.
+class _ShakeBuilder extends StatelessWidget {
+  const _ShakeBuilder({required this.controller, required this.child});
+
+  final AnimationController controller;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
+        // 3 quick oscillations that decay to zero as the controller completes.
+        final dx = math.sin(controller.value * math.pi * 6) *
+            10 *
+            (1 - controller.value);
+        return Transform.translate(offset: Offset(dx, 0), child: child);
+      },
+      child: child,
     );
   }
 }
@@ -153,15 +297,16 @@ class _AuthScaffold extends StatelessWidget {
         ),
         child: Stack(
           children: <Widget>[
+            // Sky-blue brand aura (matches the legacy app palette).
             const Positioned(
               top: -80,
               left: -40,
-              child: _AuraBlob(size: 220, color: Color(0x26E58A47)),
+              child: _AuraBlob(size: 240, color: Color(0x330EA5E9)),
             ),
             const Positioned(
               bottom: -80,
               right: -42,
-              child: _AuraBlob(size: 220, color: Color(0x227CA4F8)),
+              child: _AuraBlob(size: 240, color: Color(0x2638BDF8)),
             ),
             SafeArea(
               child: Center(

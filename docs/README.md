@@ -1,5 +1,10 @@
 # Business Hub Documentation Pack
 
+> **Note (2026-07-07):** 36 older pilot / release-runner / phase-runbook docs were
+> moved to [archive/](./archive/) to reduce sprawl. Some links below may point to
+> archived files. The verified source-of-truth is the repo-root
+> [README.md](../README.md).
+
 ## Purpose
 
 This folder contains the current working documentation set for Business Hub.

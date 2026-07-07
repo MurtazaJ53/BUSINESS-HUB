@@ -21,11 +21,11 @@ final class AppPalette {
   static const Color textTertiary = Color(0xFFA1A1AA);
   static const Color textDisabled = Color(0xFF71717A);
 
-  // Brand Colors (Electric Ocean Theme)
-  static const Color primary = Color(0xFF6366F1); // Electric Indigo
-  static const Color primaryHover = Color(0xFF4F46E5);
-  static const Color primaryLight = Color(0xFF818CF8);
-  static const Color primaryDark = Color(0xFF4338CA);
+  // Brand Colors (Business Hub sky-blue — carried over from the legacy app)
+  static const Color primary = Color(0xFF0EA5E9); // Sky 500 (hsl 199 89% 48%)
+  static const Color primaryHover = Color(0xFF0284C7); // Sky 600
+  static const Color primaryLight = Color(0xFF38BDF8); // Sky 400
+  static const Color primaryDark = Color(0xFF0369A1); // Sky 700
 
   static const Color accent = Color(0xFF06B6D4); // Cyan
   static const Color accentHover = Color(0xFF0891B2);
@@ -51,7 +51,7 @@ final class AppPalette {
   // Domain Colors
   static const Color revenue = Color(0xFF10B981);
   static const Color expense = Color(0xFFEF4444);
-  static const Color inventory = Color(0xFF6366F1);
+  static const Color inventory = Color(0xFF0EA5E9);
   static const Color customer = Color(0xFF06B6D4);
   static const Color alert = Color(0xFFF59E0B);
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from cryptography.fields import encrypt
+from django_cryptography.fields import encrypt
 from decimal import Decimal
 
 from django.conf import settings
