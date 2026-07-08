@@ -1338,6 +1338,7 @@ class SalesRepository {
     String? customerPhone,
     String? buyerGstin,
     double discount = 0,
+    DateTime? saleDate,
   }) async {
     if (shopId.trim().isEmpty) {
       throw ArgumentError('A valid shopId is required to queue a mobile sale.');
@@ -1346,7 +1347,10 @@ class SalesRepository {
     final saleId = 'sale-${DateTime.now().millisecondsSinceEpoch}';
     final commandId = 'sale-cmd-${DateTime.now().microsecondsSinceEpoch}';
     final now = DateTime.now();
-    final createdAt = now.toIso8601String();
+    // Business timestamp for the sale (allows backdating); record ids and
+    // updatedAt stay at the real current time.
+    final effectiveAt = saleDate ?? now;
+    final createdAt = effectiveAt.toIso8601String();
     final date = createdAt.split('T').first;
     final baseDomainEpoch = await _readDomainEpoch('sales');
     final inventoryDeltas = <String, int>{};
@@ -1378,7 +1382,7 @@ class SalesRepository {
               discountType: const Value('fixed'),
               paymentMode: Value(paymentMode),
               date: date,
-              createdAt: now.millisecondsSinceEpoch,
+              createdAt: effectiveAt.millisecondsSinceEpoch,
               updatedAt: Value(now.millisecondsSinceEpoch),
               customerName: Value(customerName),
               customerPhone: Value(customerPhone),
@@ -1412,7 +1416,7 @@ class SalesRepository {
                   shopId: shopId,
                   baseDomainEpoch: baseDomainEpoch,
                   date: date,
-                  createdAt: now.toIso8601String(),
+                  createdAt: createdAt,
                   total: total,
                   discount: discount,
                   discountType: 'fixed',

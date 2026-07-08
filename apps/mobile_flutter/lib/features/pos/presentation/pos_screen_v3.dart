@@ -36,6 +36,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
   String? _selectedCategory;
   bool _saving = false;
   bool _discountIsPercent = false;
+  DateTime? _saleDate; // null = today
 
   static const int _pageSize = 50;
 
@@ -207,6 +208,18 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
             setState(() => _discountIsPercent = !_discountIsPercent),
         customerNameController: _customerNameController,
         customerPhoneController: _customerPhoneController,
+        saleDate: () => _saleDate,
+        onPickDate: () async {
+          final picked = await showDatePicker(
+            context: context,
+            initialDate: _saleDate ?? DateTime.now(),
+            firstDate: DateTime(2020),
+            lastDate: DateTime.now(),
+          );
+          if (picked != null && mounted) {
+            setState(() => _saleDate = picked);
+          }
+        },
       ),
     );
     setState(() {}); // reflect any edits made inside the sheet
@@ -257,6 +270,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
         discount: _discountAmount,
         customerName: customerName.isEmpty ? null : customerName,
         customerPhone: customerPhone.isEmpty ? null : customerPhone,
+        saleDate: _saleDate,
       );
       if (!mounted) return;
       // Local-first: the sale is committed to the device now, so confirm and
@@ -275,6 +289,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
       setState(() {
         _cart.clear();
         _discountIsPercent = false;
+        _saleDate = null;
         _saving = false;
       });
       unawaited(syncCoordinator.submitSale(commit));
@@ -823,6 +838,8 @@ class _CartSheet extends StatefulWidget {
     required this.onToggleType,
     required this.customerNameController,
     required this.customerPhoneController,
+    required this.saleDate,
+    required this.onPickDate,
   });
 
   final List<PosCartItem> cart;
@@ -836,6 +853,8 @@ class _CartSheet extends StatefulWidget {
   final VoidCallback onToggleType;
   final TextEditingController customerNameController;
   final TextEditingController customerPhoneController;
+  final DateTime? Function() saleDate;
+  final Future<void> Function() onPickDate;
 
   @override
   State<_CartSheet> createState() => _CartSheetState();
@@ -931,6 +950,14 @@ class _CartSheetState extends State<_CartSheet> {
                           _CustomerCard(
                             nameController: widget.customerNameController,
                             phoneController: widget.customerPhoneController,
+                          ),
+                          const SizedBox(height: 10),
+                          _DateCard(
+                            date: widget.saleDate(),
+                            onTap: () async {
+                              await widget.onPickDate();
+                              if (context.mounted) setState(() {});
+                            },
                           ),
                         ],
                       ),
@@ -1058,6 +1085,58 @@ class _MiniToggleChip extends StatelessWidget {
         style: TextStyle(
           fontWeight: FontWeight.w800,
           color: selected ? Colors.white : AppPalette.primary,
+        ),
+      ),
+    );
+  }
+}
+
+class _DateCard extends StatelessWidget {
+  const _DateCard({required this.date, required this.onTap});
+
+  final DateTime? date;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    return Material(
+      color: colors.surface,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: colors.borderSoft),
+          ),
+          child: Row(
+            children: <Widget>[
+              Icon(
+                Icons.event_rounded,
+                size: 20,
+                color: colors.textTertiary,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Sale date',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: colors.textSecondary,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                date == null ? 'Today' : formatCompactDate(date!),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(Icons.edit_calendar_rounded, size: 18, color: AppPalette.primary),
+            ],
+          ),
         ),
       ),
     );
