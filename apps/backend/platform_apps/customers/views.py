@@ -16,6 +16,7 @@ from platform_apps.audit.services import (
 )
 from platform_apps.common.migration import MigrationDomain
 from platform_apps.common.migration_guards import assert_postgres_primary_write_enabled
+from platform_apps.common.query import bounded_list_limit
 from platform_apps.customers.models import Customer, CustomerLedgerEntry
 from platform_apps.customers.serializers import (
     CustomerLedgerEntrySerializer,
@@ -57,7 +58,7 @@ class CustomerListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
             )
         if status_value:
             queryset = queryset.filter(status=status_value)
-        return queryset
+        return queryset[: bounded_list_limit(self.request.query_params.get("limit"))]
 
     def get_serializer_context(self):
         context = super().get_serializer_context()

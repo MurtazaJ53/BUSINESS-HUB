@@ -16,6 +16,7 @@ from rest_framework.views import APIView
 
 from platform_apps.audit.services import create_workspace_audit_event, snapshot_sale
 from platform_apps.common.migration import MigrationDomain
+from platform_apps.common.query import bounded_list_limit
 from platform_apps.common.migration_guards import (
     assert_domain_epoch_current,
     assert_postgres_primary_write_enabled_multi,
@@ -88,7 +89,9 @@ class SaleListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
             queryset = queryset.filter(status=status_value)
         if customer_id:
             queryset = queryset.filter(customer_id=customer_id)
-        return queryset
+        # Bound the unpaginated list so a huge shop never serializes every
+        # sale in one response. Clients read the most-recent slice.
+        return queryset[: bounded_list_limit(self.request.query_params.get("limit"))]
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
