@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
+import '../../../core/providers/printer_provider.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/tax/gst.dart';
@@ -293,6 +294,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
         _saving = false;
       });
       unawaited(syncCoordinator.submitSale(commit));
+      if (mounted) await _showReceiptSheet(commit);
     } catch (error) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -303,6 +305,138 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
         ),
       );
     }
+  }
+
+  Future<void> _showReceiptSheet(LocalSaleCommit commit) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final colors = AppColors.of(sheetContext);
+        var printing = false;
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            Future<void> printReceipt() async {
+              if (printing) return;
+              setSheetState(() => printing = true);
+              try {
+                final detail = await ref
+                    .read(salesRepositoryProvider)
+                    .getSaleDetail(commit.saleId);
+                final shop = ref.read(shopInfoProvider).asData?.value;
+                if (detail == null || shop == null) {
+                  throw Exception('Receipt detail is not available yet.');
+                }
+                final printer = ref.read(receiptPrinterProvider);
+                final devices = await printer.getDevices();
+                if (devices.isEmpty) {
+                  if (sheetContext.mounted) {
+                    setSheetState(() => printing = false);
+                    ScaffoldMessenger.of(sheetContext).showSnackBar(
+                      const SnackBar(
+                        content: Text('No paired Bluetooth printer found.'),
+                      ),
+                    );
+                  }
+                  return;
+                }
+                await printer.connect(devices.first);
+                await printer.printTaxInvoice(detail, shop);
+                await printer.disconnect();
+                if (sheetContext.mounted) {
+                  Navigator.pop(sheetContext);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Receipt printed.')),
+                  );
+                }
+              } catch (error) {
+                if (sheetContext.mounted) {
+                  setSheetState(() => printing = false);
+                  ScaffoldMessenger.of(sheetContext).showSnackBar(
+                    SnackBar(content: Text('Print failed: $error')),
+                  );
+                }
+              }
+            }
+
+            return Container(
+              decoration: BoxDecoration(
+                color: colors.background,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: const EdgeInsets.all(24),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: AppPalette.success.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Icon(
+                        Icons.check_circle_rounded,
+                        color: AppPalette.success,
+                        size: 36,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Sale complete',
+                      style: Theme.of(sheetContext).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      formatCurrency(commit.total),
+                      style: Theme.of(sheetContext).textTheme.titleLarge
+                          ?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: AppPalette.primary,
+                          ),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: FilledButton.icon(
+                        onPressed: printing ? null : printReceipt,
+                        icon: printing
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.print_rounded),
+                        label: Text(printing ? 'Printing...' : 'Print receipt'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        icon: const Icon(Icons.check_rounded),
+                        label: const Text('Done'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   // ---- build ----------------------------------------------------------------
