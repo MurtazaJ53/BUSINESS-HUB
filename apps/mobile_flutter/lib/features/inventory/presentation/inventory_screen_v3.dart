@@ -134,6 +134,15 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                   letterSpacing: -0.3,
                 ),
               ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () => _showBulkAddSheet(context),
+                icon: const Icon(Icons.playlist_add_rounded, size: 18),
+                label: const Text('Bulk'),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -377,6 +386,18 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _showAddItemSheet(context, duplicateOf: item);
+                },
+                icon: const Icon(Icons.copy_rounded),
+                label: const Text('Duplicate'),
+              ),
+            ),
           ],
         ),
       ),
@@ -417,25 +438,36 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
     );
   }
 
-  void _showAddItemSheet(BuildContext context, {InventoryCatalogItem? existing}) {
+  void _showAddItemSheet(
+    BuildContext context, {
+    InventoryCatalogItem? existing,
+    InventoryCatalogItem? duplicateOf,
+  }) {
     final isEdit = existing != null;
+    final source = existing ?? duplicateOf;
     final formKey = GlobalKey<FormState>();
-    final nameController = TextEditingController(text: existing?.name ?? '');
+    final nameController = TextEditingController(
+      text: source == null
+          ? ''
+          : (duplicateOf != null ? '${source.name} (copy)' : source.name),
+    );
     final priceController = TextEditingController(
-      text: existing != null ? existing.price.toStringAsFixed(2) : '',
+      text: source != null ? source.price.toStringAsFixed(2) : '',
     );
     final stockController = TextEditingController(
-      text: '${existing?.stock ?? 0}',
+      text: '${duplicateOf != null ? 0 : (source?.stock ?? 0)}',
     );
     final categoryController = TextEditingController(
-      text: existing?.category ?? 'General',
+      text: source?.category ?? 'General',
     );
-    final skuController = TextEditingController(text: existing?.sku ?? '');
-    final hsnController = TextEditingController(text: existing?.hsnCode ?? '');
+    final skuController = TextEditingController(
+      text: duplicateOf != null ? '' : (source?.sku ?? ''),
+    );
+    final hsnController = TextEditingController(text: source?.hsnCode ?? '');
     final gstController = TextEditingController(
-      text: existing != null ? existing.gstRate.toString() : '0',
+      text: source != null ? source.gstRate.toString() : '0',
     );
-    var priceIncludesTax = existing?.priceIncludesTax ?? true;
+    var priceIncludesTax = source?.priceIncludesTax ?? true;
     var isSaving = false;
 
     showModalBottomSheet<void>(
@@ -804,5 +836,205 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
       qtyController.dispose();
       priceController.dispose();
     });
+  }
+
+  void _showBulkAddSheet(BuildContext context) {
+    final rows = <_BulkRow>[_BulkRow(), _BulkRow(), _BulkRow()];
+    var isSaving = false;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            Future<void> save() async {
+              final valid = rows
+                  .where(
+                    (r) =>
+                        r.name.text.trim().isNotEmpty &&
+                        (double.tryParse(r.price.text.trim()) ?? 0) > 0,
+                  )
+                  .toList();
+              if (valid.isEmpty || isSaving) {
+                ScaffoldMessenger.of(sheetContext).showSnackBar(
+                  const SnackBar(
+                    content: Text('Enter at least one item name and price.'),
+                  ),
+                );
+                return;
+              }
+              setSheetState(() => isSaving = true);
+              try {
+                final coordinator = ref.read(mobileSyncCoordinatorProvider);
+                for (final r in valid) {
+                  await coordinator.createInventoryItem(
+                    name: r.name.text.trim(),
+                    sellPrice: double.parse(r.price.text.trim()),
+                    openingStock: int.tryParse(r.qty.text.trim()) ?? 0,
+                  );
+                }
+                if (!sheetContext.mounted) return;
+                Navigator.pop(sheetContext);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '${valid.length} item${valid.length == 1 ? '' : 's'} added.',
+                    ),
+                  ),
+                );
+              } catch (error) {
+                if (!sheetContext.mounted) return;
+                setSheetState(() => isSaving = false);
+                ScaffoldMessenger.of(sheetContext).showSnackBar(
+                  SnackBar(content: Text('Bulk add failed: $error')),
+                );
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.of(sheetContext).background,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
+                ),
+                padding: const EdgeInsets.all(20),
+                child: SafeArea(
+                  top: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppColors.of(sheetContext).border,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Bulk add items',
+                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Name and price required. Quantity optional.',
+                        style: TextStyle(
+                          color: AppColors.of(sheetContext).textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Flexible(
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: rows.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            final r = rows[index];
+                            return Row(
+                              children: [
+                                Expanded(
+                                  flex: 4,
+                                  child: TextField(
+                                    controller: r.name,
+                                    decoration: const InputDecoration(
+                                      isDense: true,
+                                      hintText: 'Item name',
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  flex: 2,
+                                  child: TextField(
+                                    controller: r.price,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                          decimal: true,
+                                        ),
+                                    decoration: const InputDecoration(
+                                      isDense: true,
+                                      hintText: 'Price',
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  flex: 2,
+                                  child: TextField(
+                                    controller: r.qty,
+                                    keyboardType: TextInputType.number,
+                                    decoration: const InputDecoration(
+                                      isDense: true,
+                                      hintText: 'Qty',
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: rows.length <= 1
+                                      ? null
+                                      : () => setSheetState(
+                                          () => rows.removeAt(index).dispose(),
+                                        ),
+                                  icon: const Icon(
+                                    Icons.remove_circle_outline_rounded,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () =>
+                              setSheetState(() => rows.add(_BulkRow())),
+                          icon: const Icon(Icons.add_rounded),
+                          label: const Text('Add row'),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      PrimaryActionButton(
+                        label: isSaving ? 'Importing...' : 'Import items',
+                        icon: Icons.playlist_add_check_rounded,
+                        onPressed: isSaving ? null : save,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      for (final r in rows) {
+        r.dispose();
+      }
+    });
+  }
+}
+
+class _BulkRow {
+  final TextEditingController name = TextEditingController();
+  final TextEditingController price = TextEditingController();
+  final TextEditingController qty = TextEditingController();
+
+  void dispose() {
+    name.dispose();
+    price.dispose();
+    qty.dispose();
   }
 }
