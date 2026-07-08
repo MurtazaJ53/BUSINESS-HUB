@@ -52,12 +52,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     final sales =
         ref.watch(historySalesProvider(_filter)).asData?.value ??
         const <RecentSaleSummary>[];
-    final states =
-        ref.watch(historyDomainStatesProvider).asData?.value ??
-        <DomainControlState>[
-          DomainControlState.legacy('sales'),
-          DomainControlState.legacy('payments'),
-        ];
     final report = HistoryReportSnapshot.fromSales(sales);
     final showOperationalSummary = shop.normalizedPlanTier != 'starter';
     final showAdvancedReport = shop.supportsAdvancedReports;
@@ -336,31 +330,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 label: const Text('Retry receipt sync'),
               ),
             ],
-          ),
-        ),
-        const SizedBox(height: 18),
-        MobilePanel(
-          title: 'Sync lanes',
-          action: MobileTag(
-            label: syncStatus == MobileSyncStatus.syncing
-                ? 'Refreshing'
-                : 'Live posture',
-            icon: syncStatus == MobileSyncStatus.syncing
-                ? Icons.sync_rounded
-                : Icons.wifi_tethering_rounded,
-            accent: syncStatus == MobileSyncStatus.error
-                ? AppPalette.error
-                : AppPalette.primary,
-          ),
-          child: Column(
-            children: states
-                .map(
-                  (state) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _DomainPostureRow(state: state),
-                  ),
-                )
-                .toList(growable: false),
           ),
         ),
         const SizedBox(height: 18),
