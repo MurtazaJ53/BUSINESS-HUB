@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/theme/app_colors.dart';
@@ -433,14 +434,27 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
             // Actions
             Row(
               children: [
+                if (customer.balance > 0) ...[
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _recordPayment(context, customer);
+                      },
+                      icon: const Icon(Icons.payments_rounded),
+                      label: const Text('Record payment'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                ],
                 Expanded(
-                  child: PrimaryActionButton(
-                    label: 'View History',
-                    icon: Icons.history_rounded,
+                  child: OutlinedButton.icon(
                     onPressed: () {
                       Navigator.pop(context);
-                      // TODO: Navigate to customer history
+                      _showAddCustomerSheet(context, existing: customer);
                     },
+                    icon: const Icon(Icons.edit_rounded),
+                    label: const Text('Edit'),
                   ),
                 ),
               ],
@@ -451,45 +465,288 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
     );
   }
 
-  void _showAddCustomerSheet(BuildContext context) {
-    showModalBottomSheet(
+  void _showAddCustomerSheet(
+    BuildContext context, {
+    BackendCustomerSummary? existing,
+  }) {
+    final isEdit = existing != null;
+    final nameController = TextEditingController(text: existing?.name ?? '');
+    final phoneController = TextEditingController(text: existing?.phone ?? '');
+    final emailController = TextEditingController(text: existing?.email ?? '');
+    final notesController = TextEditingController(text: existing?.notes ?? '');
+    final balanceController = TextEditingController();
+    var isSaving = false;
+
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: AppColors.of(context).background,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          Future<void> save() async {
+            final name = nameController.text.trim();
+            if (name.isEmpty || isSaving) return;
+            setSheetState(() => isSaving = true);
+            try {
+              final now = DateTime.now();
+              final id =
+                  existing?.id ?? 'local-cust-${now.microsecondsSinceEpoch}';
+              final opening =
+                  double.tryParse(balanceController.text.trim()) ?? 0;
+              await ref
+                  .read(customerRepositoryProvider)
+                  .mergeRemoteCustomerDocument(
+                    id,
+                    <String, dynamic>{
+                      'name': name,
+                      'phone': phoneController.text.trim(),
+                      'email': emailController.text.trim(),
+                      'notes': notesController.text.trim(),
+                      'status': 'active',
+                      'balance': isEdit ? existing.balance : opening,
+                      'total_spent': isEdit ? existing.totalSpent : 0,
+                      'tombstone': false,
+                      'updatedAt': now.toIso8601String(),
+                    },
+                    updatedAt: now.millisecondsSinceEpoch,
+                  );
+              if (!sheetContext.mounted) return;
+              Navigator.pop(sheetContext);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('$name ${isEdit ? 'updated' : 'added'}.'),
+                ),
+              );
+            } catch (error) {
+              if (!sheetContext.mounted) return;
+              setSheetState(() => isSaving = false);
+              ScaffoldMessenger.of(sheetContext).showSnackBar(
+                SnackBar(content: Text('Save failed: $error')),
+              );
+            }
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+            ),
+            child: Container(
               decoration: BoxDecoration(
-                color: AppColors.of(context).border,
-                borderRadius: BorderRadius.circular(2),
+                color: AppColors.of(sheetContext).background,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
+              ),
+              padding: const EdgeInsets.all(24),
+              child: SafeArea(
+                top: false,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppColors.of(sheetContext).border,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        isEdit ? 'Edit Customer' : 'Add New Customer',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      TextField(
+                        controller: nameController,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(labelText: 'Name'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(labelText: 'Phone'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'Email (optional)',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: notesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Notes (optional)',
+                        ),
+                      ),
+                      if (!isEdit) ...[
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: balanceController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: const InputDecoration(
+                            labelText: 'Opening due (optional)',
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+                      PrimaryActionButton(
+                        label: isSaving
+                            ? 'Saving...'
+                            : (isEdit ? 'Save Changes' : 'Create Customer'),
+                        icon: isEdit
+                            ? Icons.check_rounded
+                            : Icons.person_add_rounded,
+                        onPressed: isSaving ? null : save,
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 24),
-            Text(
-              'Add New Customer',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 24),
-            PrimaryActionButton(
-              label: 'Create Customer',
-              icon: Icons.person_add_rounded,
-              onPressed: () {
-                Navigator.pop(context);
-                // TODO: Navigate to create screen
-              },
-            ),
-          ],
-        ),
+          );
+        },
       ),
-    );
+    ).whenComplete(() {
+      nameController.dispose();
+      phoneController.dispose();
+      emailController.dispose();
+      notesController.dispose();
+      balanceController.dispose();
+    });
+  }
+
+  void _recordPayment(BuildContext context, BackendCustomerSummary customer) {
+    final amountController = TextEditingController();
+    var isSaving = false;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          Future<void> save() async {
+            final amount = double.tryParse(amountController.text.trim()) ?? 0;
+            if (amount <= 0 || isSaving) return;
+            setSheetState(() => isSaving = true);
+            try {
+              final now = DateTime.now();
+              final newBalance = (customer.balance - amount)
+                  .clamp(0, double.infinity)
+                  .toDouble();
+              await ref
+                  .read(customerRepositoryProvider)
+                  .mergeRemoteCustomerDocument(
+                    customer.id,
+                    <String, dynamic>{
+                      'name': customer.name,
+                      'phone': customer.phone ?? '',
+                      'email': customer.email ?? '',
+                      'notes': customer.notes ?? '',
+                      'status': 'active',
+                      'balance': newBalance,
+                      'total_spent': customer.totalSpent,
+                      'tombstone': false,
+                      'updatedAt': now.toIso8601String(),
+                    },
+                    updatedAt: now.millisecondsSinceEpoch,
+                  );
+              if (!sheetContext.mounted) return;
+              Navigator.pop(sheetContext);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Payment recorded. New due ${formatCurrency(newBalance)}.',
+                  ),
+                ),
+              );
+            } catch (error) {
+              if (!sheetContext.mounted) return;
+              setSheetState(() => isSaving = false);
+              ScaffoldMessenger.of(sheetContext).showSnackBar(
+                SnackBar(content: Text('Failed: $error')),
+              );
+            }
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.of(sheetContext).background,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
+              ),
+              padding: const EdgeInsets.all(24),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.of(sheetContext).border,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Record payment',
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${customer.name} · due ${formatCurrency(customer.balance)}',
+                      style: TextStyle(
+                        color: AppColors.of(sheetContext).textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    TextField(
+                      controller: amountController,
+                      autofocus: true,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Amount received',
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    PrimaryActionButton(
+                      label: isSaving ? 'Saving...' : 'Record payment',
+                      icon: Icons.payments_rounded,
+                      onPressed: isSaving ? null : save,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    ).whenComplete(() => amountController.dispose());
   }
 }
