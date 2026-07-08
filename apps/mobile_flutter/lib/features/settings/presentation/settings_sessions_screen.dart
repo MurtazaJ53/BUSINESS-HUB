@@ -181,7 +181,7 @@ class _SettingsSessionsScreenState
                   Text(
                     'Verify MFA from Security before revoking, restoring, or remotely wiping mobile device access.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.72),
+                      color: Colors.black.withValues(alpha: 0.72),
                       height: 1.45,
                     ),
                   ),
@@ -205,7 +205,7 @@ class _SettingsSessionsScreenState
                 child: Text(
                   _message!,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.76),
+                    color: Colors.black.withValues(alpha: 0.76),
                     height: 1.4,
                   ),
                 ),
@@ -347,9 +347,9 @@ class _WorkspaceSessionCard extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF232A36),
+        color: AppPalette.surfaceStrong,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -366,7 +366,7 @@ class _WorkspaceSessionCard extends StatelessWidget {
             Text(
               '${record.memberName} | $subtitle',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.66),
+                color: Colors.black.withValues(alpha: 0.66),
                 fontWeight: FontWeight.w600,
                 height: 1.4,
               ),
@@ -407,7 +407,7 @@ class _WorkspaceSessionCard extends StatelessWidget {
             Text(
               record.trustSummary,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.white.withValues(alpha: 0.76),
+                color: Colors.black.withValues(alpha: 0.76),
                 height: 1.4,
               ),
             ),
@@ -415,7 +415,7 @@ class _WorkspaceSessionCard extends StatelessWidget {
             Text(
               lastSeen,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.56),
+                color: Colors.black.withValues(alpha: 0.56),
                 fontWeight: FontWeight.w600,
                 height: 1.35,
               ),
@@ -427,7 +427,7 @@ class _WorkspaceSessionCard extends StatelessWidget {
               Text(
                 _deviceMetaLine(record),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.56),
+                  color: Colors.black.withValues(alpha: 0.56),
                   fontWeight: FontWeight.w600,
                   height: 1.35,
                 ),
@@ -438,7 +438,7 @@ class _WorkspaceSessionCard extends StatelessWidget {
               Text(
                 'Reason: ${record.revokeReason}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.64),
+                  color: Colors.black.withValues(alpha: 0.64),
                   fontWeight: FontWeight.w600,
                   height: 1.35,
                 ),
@@ -454,7 +454,7 @@ class _WorkspaceSessionCard extends StatelessWidget {
                       child: Text(
                         '- $reason',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.62),
+                          color: Colors.black.withValues(alpha: 0.62),
                           fontWeight: FontWeight.w600,
                           height: 1.35,
                         ),
@@ -491,7 +491,7 @@ class _WorkspaceSessionCard extends StatelessWidget {
                   return Text(
                     'This device is outside your current session-control scope.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.56),
+                      color: Colors.black.withValues(alpha: 0.56),
                       fontWeight: FontWeight.w600,
                       height: 1.35,
                     ),

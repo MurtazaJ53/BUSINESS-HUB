@@ -129,7 +129,7 @@ class _SettingsAttendanceScreenState
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF070B13),
+      backgroundColor: AppPalette.background,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
@@ -393,7 +393,7 @@ class _SettingsAttendanceScreenState
               child: Text(
                 _message!,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.76),
+                  color: Colors.black.withValues(alpha: 0.76),
                   height: 1.4,
                 ),
               ),
@@ -419,7 +419,7 @@ class _SettingsAttendanceScreenState
                       ? 'Add the staff member with the exact email they will use on the phone. After that, they can sign in with the same email and mark attendance from Business Hub.'
                       : 'Your owner or store admin must attach this exact email to the workspace first. After that, sign in with the same email and mark your shift here.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.72),
+                    color: Colors.black.withValues(alpha: 0.72),
                     height: 1.45,
                   ),
                 ),
@@ -525,7 +525,7 @@ class _SettingsAttendanceScreenState
                                   : 'Choose your shift status for today. Business Hub will save it to this workspace immediately.'
                             : 'Today is already marked as ${_statusLabel(todayRecord.status).toLowerCase()}. Open recent sessions below if you need to review the saved note.',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.72),
+                          color: Colors.black.withValues(alpha: 0.72),
                           height: 1.45,
                         ),
                       ),
@@ -632,9 +632,9 @@ class _AttendanceSessionCard extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF232A36),
+        color: AppPalette.surfaceStrong,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -662,7 +662,7 @@ class _AttendanceSessionCard extends StatelessWidget {
             Text(
               '${formatCompactDate(record.sessionDate)}  ·  ${_roleLabel(record.memberRole)}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.68),
+                color: Colors.black.withValues(alpha: 0.68),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -698,7 +698,7 @@ class _AttendanceSessionCard extends StatelessWidget {
               Text(
                 record.note,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.70),
+                  color: Colors.black.withValues(alpha: 0.70),
                   height: 1.45,
                 ),
               ),

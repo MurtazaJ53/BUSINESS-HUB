@@ -70,7 +70,7 @@ class MobileStandaloneScaffold extends StatelessWidget {
                               Icons.arrow_back_rounded,
                               size: compact ? 20 : 24,
                             ),
-                            color: Colors.white,
+                            color: AppPalette.textPrimary,
                             padding: EdgeInsets.zero,
                           ),
                         ),
@@ -160,7 +160,7 @@ class MobileHeroBanner extends StatelessWidget {
               height: compact ? 118 : 150,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                color: Color(0x1AF0C879),
+                color: Color(0x1A0EA5E9),
               ),
             ),
           ),
@@ -529,12 +529,12 @@ class MobileActionCard extends StatelessWidget {
                   width: compact ? 48 : 56,
                   height: compact ? 48 : 56,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.12),
+                    color: accent.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(compact ? 14 : 18),
                   ),
                   child: Icon(
                     icon,
-                    color: Colors.white,
+                    color: accent,
                     size: compact ? 24 : 28,
                   ),
                 ),

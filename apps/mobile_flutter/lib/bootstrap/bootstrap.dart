@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app/app.dart';
+import '../core/theme/app_theme.dart';
 
 Future<void> bootstrapApplication() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,7 +33,7 @@ class _FatalSurfaceFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: const Color(0xFF070B13),
+      color: AppPalette.background,
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -40,9 +41,9 @@ class _FatalSurfaceFallback extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 420),
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: const Color(0xFF1A2029),
+                color: AppPalette.surfaceStrong,
                 borderRadius: BorderRadius.circular(26),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(22),
@@ -75,7 +76,7 @@ class _FatalSurfaceFallback extends StatelessWidget {
                       'Business Hub stopped this view from turning into a blank page. Please reopen the screen or refresh the workspace.',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.72),
+                        color: Colors.black.withValues(alpha: 0.72),
                         fontWeight: FontWeight.w600,
                         height: 1.45,
                       ),

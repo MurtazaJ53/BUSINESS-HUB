@@ -338,7 +338,7 @@ class _SettingsSecurityScreenState
               child: Text(
                 _message!,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.76),
+                  color: Colors.black.withValues(alpha: 0.76),
                 ),
               ),
             ),
@@ -405,7 +405,7 @@ class _SettingsSecurityScreenState
                   Text(
                     'Start authenticator setup, then verify the first code to enable MFA on this account.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.74),
+                      color: Colors.black.withValues(alpha: 0.74),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -474,7 +474,7 @@ class _SettingsSecurityScreenState
                   Text(
                     'Enter one current authenticator code to unlock protected mobile controls for this secure window.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.74),
+                      color: Colors.black.withValues(alpha: 0.74),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -507,7 +507,7 @@ class _SettingsSecurityScreenState
                   Text(
                     'Disable MFA only if you are replacing the authenticator app. This immediately re-locks protected business-control surfaces.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.74),
+                      color: Colors.black.withValues(alpha: 0.74),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -568,7 +568,7 @@ class _SecurityRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Icon(icon, size: 18, color: Colors.white.withValues(alpha: 0.68)),
+          Icon(icon, size: 18, color: Colors.black.withValues(alpha: 0.68)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -577,14 +577,14 @@ class _SecurityRow extends StatelessWidget {
                 Text(
                   label,
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.62),
+                    color: Colors.black.withValues(alpha: 0.62),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   value,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.88),
+                    color: Colors.black.withValues(alpha: 0.88),
                   ),
                 ),
               ],
@@ -606,9 +606,9 @@ class _SecurityValueBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+        color: Colors.black.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -618,14 +618,14 @@ class _SecurityValueBlock extends StatelessWidget {
             Text(
               label,
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: Colors.white.withValues(alpha: 0.62),
+                color: Colors.black.withValues(alpha: 0.62),
               ),
             ),
             const SizedBox(height: 8),
             Text(
               value,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.white.withValues(alpha: 0.9),
+                color: Colors.black.withValues(alpha: 0.9),
                 fontFamily: 'monospace',
               ),
             ),

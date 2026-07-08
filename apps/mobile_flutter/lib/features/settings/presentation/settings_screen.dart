@@ -149,7 +149,7 @@ class SettingsScreen extends ConsumerWidget {
                       ? 'Attach staff with the exact email they will use on the phone, control who is admin or viewer, and keep attendance and expenses inside the same product.'
                       : 'Your owner or store admin must attach this exact email to the workspace first. After that, sign in with the same email and use attendance and store operations from here during the shift.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.72),
+                    color: Colors.black.withValues(alpha: 0.72),
                     height: 1.45,
                   ),
                 ),
@@ -277,7 +277,7 @@ class SettingsScreen extends ConsumerWidget {
                 Text(
                   _planBody(shop),
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.70),
+                    color: Colors.black.withValues(alpha: 0.70),
                     height: 1.45,
                   ),
                 ),
@@ -417,7 +417,7 @@ class SettingsScreen extends ConsumerWidget {
                     pulse?.headline.body ??
                         'Open the pulse desk to acknowledge, resolve, or reopen the latest workspace tasks and anomaly signals.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.72),
+                      color: Colors.black.withValues(alpha: 0.72),
                       height: 1.45,
                     ),
                   ),
@@ -455,7 +455,7 @@ class SettingsScreen extends ConsumerWidget {
                         ? 'Review mobile device access, risky trust posture, and remote wipe actions from one owner/admin desk.'
                         : '${sessions.where((item) => item.isTrusted && !item.wipeRequested).length} trusted, ${sessions.where((item) => item.needsReview).length} review, and ${sessions.where((item) => item.isRisky || item.wipeRequested).length} risky or wipe-pending device sessions are visible right now.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.72),
+                      color: Colors.black.withValues(alpha: 0.72),
                       height: 1.45,
                     ),
                   ),
@@ -484,7 +484,7 @@ class SettingsScreen extends ConsumerWidget {
                   Text(
                     'Protect Workspace plan, Advanced ops, and other sensitive control surfaces with an authenticator app.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.72),
+                      color: Colors.black.withValues(alpha: 0.72),
                       height: 1.45,
                     ),
                   ),
@@ -1002,9 +1002,9 @@ class _PlanSection extends StatelessWidget {
     final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF232A36),
+        color: AppPalette.surfaceStrong,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -1014,7 +1014,7 @@ class _PlanSection extends StatelessWidget {
             Text(
               title,
               style: theme.textTheme.labelLarge?.copyWith(
-                color: Colors.white.withValues(alpha: 0.60),
+                color: Colors.black.withValues(alpha: 0.60),
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.35,
               ),
@@ -1026,7 +1026,7 @@ class _PlanSection extends StatelessWidget {
                 child: Text(
                   '- $line',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.76),
+                    color: Colors.black.withValues(alpha: 0.76),
                     height: 1.4,
                   ),
                 ),
@@ -1057,9 +1057,9 @@ class _SettingsRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: const Color(0xFF232A36),
+          color: AppPalette.surfaceStrong,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
         ),
         child: Padding(
           padding: const EdgeInsets.all(14),
@@ -1070,10 +1070,10 @@ class _SettingsRow extends StatelessWidget {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF232A36),
+                  color: AppPalette.surfaceStrong,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: Colors.white70, size: 18),
+                child: Icon(icon, color: AppPalette.textTertiary, size: 18),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1083,7 +1083,7 @@ class _SettingsRow extends StatelessWidget {
                     Text(
                       label,
                       style: theme.textTheme.labelMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.52),
+                        color: Colors.black.withValues(alpha: 0.52),
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.5,
                       ),

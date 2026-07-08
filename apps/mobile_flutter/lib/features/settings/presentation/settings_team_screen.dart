@@ -165,7 +165,7 @@ class SettingsTeamScreen extends ConsumerWidget {
                 Text(
                   'Invite a daily operator, store admin, or read-only reviewer into this workspace.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.72),
+                    color: Colors.black.withValues(alpha: 0.72),
                     height: 1.45,
                   ),
                 ),
@@ -217,7 +217,7 @@ class SettingsTeamScreen extends ConsumerWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF070B13),
+      backgroundColor: AppPalette.background,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
@@ -431,7 +431,7 @@ class SettingsTeamScreen extends ConsumerWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF070B13),
+      backgroundColor: AppPalette.background,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
@@ -634,9 +634,9 @@ class _TeamMemberRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: const Color(0xFF232A36),
+          color: AppPalette.surfaceStrong,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
         ),
         child: Padding(
           padding: const EdgeInsets.all(14),
@@ -664,7 +664,7 @@ class _TeamMemberRow extends StatelessWidget {
               Text(
                 member.memberEmail,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.68),
+                  color: Colors.black.withValues(alpha: 0.68),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -695,7 +695,7 @@ class _TeamMemberRow extends StatelessWidget {
               Text(
                 member.roleSummary,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.68),
+                  color: Colors.black.withValues(alpha: 0.68),
                   height: 1.4,
                 ),
               ),
@@ -733,7 +733,7 @@ class _TeamBullet extends StatelessWidget {
             child: Text(
               text,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.white.withValues(alpha: 0.72),
+                color: Colors.black.withValues(alpha: 0.72),
                 height: 1.45,
               ),
             ),

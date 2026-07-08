@@ -25,7 +25,7 @@ class BusinessHubMobileApp extends ConsumerWidget {
         debugShowCheckedModeBanner: false,
         themeMode: themeMode,
         theme: AppTheme.light,
-        darkTheme: AppTheme.dark,
+        darkTheme: AppTheme.light,
         home: const _StartupBootScreen(),
       ),
       error: (error, _) => MaterialApp(
@@ -33,7 +33,7 @@ class BusinessHubMobileApp extends ConsumerWidget {
         debugShowCheckedModeBanner: false,
         themeMode: themeMode,
         theme: AppTheme.light,
-        darkTheme: AppTheme.dark,
+        darkTheme: AppTheme.light,
         home: _StartupFailedScreen(
           message: error.toString(),
           onRetry: () => ref.invalidate(startupBootstrapProvider),
@@ -48,7 +48,7 @@ class BusinessHubMobileApp extends ConsumerWidget {
           debugShowCheckedModeBanner: false,
           themeMode: themeMode,
           theme: AppTheme.light,
-          darkTheme: AppTheme.dark,
+          darkTheme: AppTheme.light,
           routerConfig: router,
         );
       },
@@ -215,7 +215,7 @@ class _StartupFailedScreen extends StatelessWidget {
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.72),
+                                color: AppPalette.textSecondary,
                                 fontWeight: FontWeight.w600,
                                 height: 1.45,
                               ),

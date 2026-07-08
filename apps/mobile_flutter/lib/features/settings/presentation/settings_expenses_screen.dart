@@ -111,7 +111,7 @@ class _SettingsExpensesScreenState
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF070B13),
+      backgroundColor: AppPalette.background,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
@@ -390,7 +390,7 @@ class _SettingsExpensesScreenState
               child: Text(
                 _message!,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.76),
+                  color: Colors.black.withValues(alpha: 0.76),
                   height: 1.4,
                 ),
               ),
@@ -466,7 +466,7 @@ class _SettingsExpensesScreenState
                       ? 'This account can review store spending, but only daily operators and above can create or update expense records.'
                       : 'Capture small daily store costs like travel, packaging, internet, rent support, or urgent purchases directly from the phone.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.72),
+                    color: Colors.black.withValues(alpha: 0.72),
                     height: 1.45,
                   ),
                 ),
@@ -532,9 +532,9 @@ class _ExpenseCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF232A36),
+        color: AppPalette.surfaceStrong,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -562,7 +562,7 @@ class _ExpenseCard extends StatelessWidget {
             Text(
               '${formatCompactDate(expense.expenseDate)}  ·  ${_paymentMethodLabel(expense.paymentMethod)}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.68),
+                color: Colors.black.withValues(alpha: 0.68),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -571,7 +571,7 @@ class _ExpenseCard extends StatelessWidget {
               Text(
                 expense.description,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.70),
+                  color: Colors.black.withValues(alpha: 0.70),
                   height: 1.45,
                 ),
               ),

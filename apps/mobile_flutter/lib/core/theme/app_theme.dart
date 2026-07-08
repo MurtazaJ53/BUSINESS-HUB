@@ -5,21 +5,21 @@ import 'app_colors.dart';
 
 /// Brand + semantic colours shared across light and dark themes.
 final class AppPalette {
-  // Neutrals (Foundation) — dark
-  static const Color backgroundDeep = Color(0xFF000000);
-  static const Color background = Color(0xFF0A0A0A);
-  static const Color backgroundSoft = Color(0xFF141414);
-  static const Color surface = Color(0xFF1C1C1E);
-  static const Color surfaceStrong = Color(0xFF2C2C2E);
-  static const Color borderSoft = Color(0xFF38383A);
-  static const Color border = Color(0xFF48484A);
-  static const Color borderStrong = Color(0xFF636366);
+  // Neutrals (Foundation) — white/light (blue-and-white theme)
+  static const Color backgroundDeep = Color(0xFFEEF2F6);
+  static const Color background = Color(0xFFF8FAFC);
+  static const Color backgroundSoft = Color(0xFFF1F5F9);
+  static const Color surface = Color(0xFFFFFFFF);
+  static const Color surfaceStrong = Color(0xFFF4F4F5);
+  static const Color borderSoft = Color(0xFFE4E4E7);
+  static const Color border = Color(0xFFD4D4D8);
+  static const Color borderStrong = Color(0xFFA1A1AA);
 
-  // Text Hierarchy — dark
-  static const Color textPrimary = Color(0xFFF8FAFC);
-  static const Color textSecondary = Color(0xFFD4D4D8);
-  static const Color textTertiary = Color(0xFFA1A1AA);
-  static const Color textDisabled = Color(0xFF71717A);
+  // Text Hierarchy — dark ink on white
+  static const Color textPrimary = Color(0xFF0F172A);
+  static const Color textSecondary = Color(0xFF3F3F46);
+  static const Color textTertiary = Color(0xFF71717A);
+  static const Color textDisabled = Color(0xFFA1A1AA);
 
   // Brand Colors (Business Hub sky-blue — carried over from the legacy app)
   static const Color primary = Color(0xFF0EA5E9); // Sky 500 (hsl 199 89% 48%)
@@ -27,9 +27,10 @@ final class AppPalette {
   static const Color primaryLight = Color(0xFF38BDF8); // Sky 400
   static const Color primaryDark = Color(0xFF0369A1); // Sky 700
 
-  static const Color accent = Color(0xFF06B6D4); // Cyan
-  static const Color accentHover = Color(0xFF0891B2);
-  static const Color accentLight = Color(0xFF22D3EE);
+  // Secondary accent kept within the blue family (was cyan).
+  static const Color accent = Color(0xFF0284C7); // Sky 600
+  static const Color accentHover = Color(0xFF0369A1); // Sky 700
+  static const Color accentLight = Color(0xFF38BDF8); // Sky 400
 
   // Semantic Colors
   static const Color success = Color(0xFF10B981);
@@ -52,7 +53,7 @@ final class AppPalette {
   static const Color revenue = Color(0xFF10B981);
   static const Color expense = Color(0xFFEF4444);
   static const Color inventory = Color(0xFF0EA5E9);
-  static const Color customer = Color(0xFF06B6D4);
+  static const Color customer = Color(0xFF0284C7);
   static const Color alert = Color(0xFFF59E0B);
 
   // Backward-compatible aliases used across existing screens.

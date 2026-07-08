@@ -427,7 +427,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     Text(
                       '${report.syncedCount} synced | ${report.queuedCount} queued | ${report.failedCount} failed',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.62),
+                        color: Colors.black.withValues(alpha: 0.62),
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -441,7 +441,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                           ? '${shop.planLabel} keeps reporting lighter here. Upgrade to Pro for payment-mix and buyer-pattern insights.'
                           : '${shop.planLabel} focuses on simple receipt review. Upgrade to unlock deeper report rollups.',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.54),
+                        color: Colors.black.withValues(alpha: 0.54),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -514,7 +514,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF070B13),
+      backgroundColor: AppPalette.background,
       builder: (context) {
         return SafeArea(
           child: Padding(
@@ -931,7 +931,7 @@ class _SyncFilterChip extends StatelessWidget {
       child: Material(
         color: active
             ? activeColor.withValues(alpha: 0.14)
-            : const Color(0xFF232A36),
+            : AppPalette.surfaceStrong,
         borderRadius: BorderRadius.circular(18),
         child: InkWell(
           onTap: onTap,
@@ -941,7 +941,7 @@ class _SyncFilterChip extends StatelessWidget {
             child: Text(
               label,
               style: TextStyle(
-                color: active ? activeColor : Colors.white70,
+                color: active ? activeColor : AppPalette.textTertiary,
                 fontWeight: FontWeight.w700,
                 fontSize: 12,
               ),
@@ -974,7 +974,7 @@ class _DomainPostureRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppPalette.surfaceStrong.withValues(alpha: 0.66),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1001,7 +1001,7 @@ class _DomainPostureRow extends StatelessWidget {
                     state.pilotSignoffSummary ??
                         '${state.postureLabel} | epoch ${state.currentEpoch}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.58),
+                      color: Colors.black.withValues(alpha: 0.58),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1044,7 +1044,7 @@ class _HistorySaleRow extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppPalette.surfaceStrong.withValues(alpha: 0.66),
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+            border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
           ),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -1074,7 +1074,7 @@ class _HistorySaleRow extends StatelessWidget {
                       Text(
                         '${sale.customerName?.isNotEmpty == true ? sale.customerName : 'Walk-in customer'} | ${sale.date}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.58),
+                          color: Colors.black.withValues(alpha: 0.58),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -1098,7 +1098,7 @@ class _HistorySaleRow extends StatelessWidget {
                             'Tap for detail',
                             style: Theme.of(context).textTheme.labelSmall
                                 ?.copyWith(
-                                  color: Colors.white.withValues(alpha: 0.56),
+                                  color: Colors.black.withValues(alpha: 0.56),
                                   fontWeight: FontWeight.w700,
                                 ),
                           ),
@@ -1165,7 +1165,7 @@ class _SaleItemRow extends StatelessWidget {
                 '${item.size?.isNotEmpty == true ? ' | ${item.size}' : ''}'
                 '${item.gstRate > 0 ? ' | GST ${item.gstRate.toStringAsFixed(item.gstRate.truncateToDouble() == item.gstRate ? 0 : 2)}%' : ''}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.58),
+                  color: Colors.black.withValues(alpha: 0.58),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -1219,7 +1219,7 @@ class _SalePaymentRow extends StatelessWidget {
                 Text(
                   payment.referenceCode ?? payment.note!,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.58),
+                    color: Colors.black.withValues(alpha: 0.58),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1266,7 +1266,7 @@ class _HistoryMetricTile extends StatelessWidget {
             Text(
               label,
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: Colors.white.withValues(alpha: 0.58),
+                color: Colors.black.withValues(alpha: 0.58),
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -1296,7 +1296,7 @@ class _HistoryPaymentMixRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppPalette.surfaceStrong.withValues(alpha: 0.66),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -1316,7 +1316,7 @@ class _HistoryPaymentMixRow extends StatelessWidget {
                   Text(
                     '${mix.count} receipt(s) Â· ${mix.shareLabel}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.58),
+                      color: Colors.black.withValues(alpha: 0.58),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1352,7 +1352,7 @@ class _SaleSummaryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = Theme.of(context).textTheme.bodyMedium?.copyWith(
-      color: emphasize ? Colors.white : Colors.white.withValues(alpha: 0.72),
+      color: emphasize ? AppPalette.textPrimary : Colors.black.withValues(alpha: 0.72),
       fontWeight: emphasize ? FontWeight.w900 : FontWeight.w600,
     );
     return Padding(
@@ -1398,7 +1398,7 @@ Color _syncTone(CommerceSyncState state) {
     CommerceSyncState.queued => AppPalette.warning,
     CommerceSyncState.syncing => AppPalette.primary,
     CommerceSyncState.failed => AppPalette.error,
-    CommerceSyncState.localOnly => Colors.white70,
+    CommerceSyncState.localOnly => AppPalette.textTertiary,
   };
 }
 

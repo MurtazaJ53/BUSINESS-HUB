@@ -111,7 +111,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                   Text(
                     'Recovery, rollout, and deep support tooling can affect the whole workspace. Business Hub now requires a fresh MFA window before this surface opens.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.72),
+                      color: Colors.black.withValues(alpha: 0.72),
                       height: 1.45,
                     ),
                   ),
@@ -618,7 +618,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                 Text(
                   'These rollout, evidence, recovery, and migration tools are still here for admin work, but they stay hidden during normal shop use so the screen stays cleaner.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.68),
+                    color: Colors.black.withValues(alpha: 0.68),
                     fontWeight: FontWeight.w600,
                     height: 1.45,
                   ),
@@ -665,7 +665,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                   Text(
                     'Use this before a pilot handoff or floor smoke run. It captures the installed build identity, workspace, queue health, and domain posture in one copyable block for release notes, QA, or operator chat.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.68),
+                      color: Colors.black.withValues(alpha: 0.68),
                       fontWeight: FontWeight.w600,
                       height: 1.45,
                     ),
@@ -757,7 +757,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                               actionPlan.summary,
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.68),
+                                    color: Colors.black.withValues(alpha: 0.68),
                                     fontWeight: FontWeight.w600,
                                     height: 1.45,
                                   ),
@@ -977,7 +977,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                       Text(
                         'This tracker records which operator evidence exports have already been captured on this device for the current workspace, and it survives app restarts so the team can see what is still missing before handoff.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.68),
+                          color: Colors.black.withValues(alpha: 0.68),
                           fontWeight: FontWeight.w600,
                           height: 1.45,
                         ),
@@ -1308,7 +1308,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                               readinessReport.summary,
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.68),
+                                    color: Colors.black.withValues(alpha: 0.68),
                                     fontWeight: FontWeight.w600,
                                     height: 1.45,
                                   ),
@@ -1434,7 +1434,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                               'Run the floor smoke checklist from the device itself and copy the resulting evidence block into the rollout log. This keeps the final operator decision tied to the exact installed release and workspace binding.',
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.68),
+                                    color: Colors.black.withValues(alpha: 0.68),
                                     fontWeight: FontWeight.w600,
                                     height: 1.45,
                                   ),
@@ -1502,7 +1502,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                       Text(
                         'Use this when a pilot device has replay trouble. It shows the highest-risk queued or failed commerce commands, lets you retry one receipt at a time, and creates a recovery report you can hand to support or QA.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.68),
+                          color: Colors.black.withValues(alpha: 0.68),
                           fontWeight: FontWeight.w600,
                           height: 1.45,
                         ),
@@ -1664,7 +1664,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                               'Use this at the end of a real pilot shift. It captures whether checkout, replay, and customer-ledger behavior stayed healthy, and creates the final operator-side handoff note for the next shift or rollout lead.',
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.68),
+                                    color: Colors.black.withValues(alpha: 0.68),
                                     fontWeight: FontWeight.w600,
                                     height: 1.45,
                                   ),
@@ -1756,7 +1756,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                               rolloutDecisionSummary.summary,
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.68),
+                                    color: Colors.black.withValues(alpha: 0.68),
                                     fontWeight: FontWeight.w600,
                                     height: 1.45,
                                   ),
@@ -1864,7 +1864,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                               waveCloseoutReadiness.summary,
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.68),
+                                    color: Colors.black.withValues(alpha: 0.68),
                                     fontWeight: FontWeight.w600,
                                     height: 1.45,
                                   ),
@@ -1992,7 +1992,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                               waveSignoffPack.summary,
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.68),
+                                    color: Colors.black.withValues(alpha: 0.68),
                                     fontWeight: FontWeight.w600,
                                     height: 1.45,
                                   ),
@@ -2093,7 +2093,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                               waveArchivePack.summary,
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.68),
+                                    color: Colors.black.withValues(alpha: 0.68),
                                     fontWeight: FontWeight.w600,
                                     height: 1.45,
                                   ),
@@ -2195,7 +2195,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                               'Use this when a rollout lead wants one final copied pack for the wave record. It consolidates the current readiness, snapshot, and recovery posture, then lets the operator summarize smoke and closeout outcomes in one export.',
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.68),
+                                    color: Colors.black.withValues(alpha: 0.68),
                                     fontWeight: FontWeight.w600,
                                     height: 1.45,
                                   ),
@@ -2283,7 +2283,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                               'Use this when the rollout lead, support, or engineering needs one structured incident record directly from the affected device. It turns the current readiness, snapshot, and recovery state into a support-ready escalation pack.',
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.68),
+                                    color: Colors.black.withValues(alpha: 0.68),
                                     fontWeight: FontWeight.w600,
                                     height: 1.45,
                                   ),
@@ -2389,7 +2389,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                           'Mark each floor check from the device you are holding. The copied report becomes the operator-side evidence for the release tag and pilot scope currently installed.',
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.68),
+                                color: Colors.black.withValues(alpha: 0.68),
                                 fontWeight: FontWeight.w600,
                                 height: 1.45,
                               ),
@@ -2421,7 +2421,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                                   preview.summary,
                                   style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(
-                                        color: Colors.white.withValues(
+                                        color: Colors.black.withValues(
                                           alpha: 0.76,
                                         ),
                                         fontWeight: FontWeight.w600,
@@ -2433,7 +2433,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                                   'Pass ${preview.passedCount} | Fail ${preview.failedCount} | Pending ${preview.pendingCount}',
                                   style: Theme.of(context).textTheme.labelLarge
                                       ?.copyWith(
-                                        color: Colors.white,
+                                        color: AppPalette.textSecondary,
                                         fontWeight: FontWeight.w800,
                                       ),
                                 ),
@@ -2560,7 +2560,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                           'Record how the pilot device actually finished the shift. This report is meant for the next operator, the rollout lead, or a support escalation thread.',
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.68),
+                                color: Colors.black.withValues(alpha: 0.68),
                                 fontWeight: FontWeight.w600,
                                 height: 1.45,
                               ),
@@ -2592,7 +2592,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                                   preview.summary,
                                   style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(
-                                        color: Colors.white.withValues(
+                                        color: Colors.black.withValues(
                                           alpha: 0.76,
                                         ),
                                         fontWeight: FontWeight.w600,
@@ -2765,7 +2765,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                           'This pack is meant for the rollout lead or wave record. Summarize the smoke result, the end-of-shift outcome, and the recommendation for the current rollout wave.',
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.68),
+                                color: Colors.black.withValues(alpha: 0.68),
                                 fontWeight: FontWeight.w600,
                                 height: 1.45,
                               ),
@@ -2797,7 +2797,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                                   preview.summary,
                                   style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(
-                                        color: Colors.white.withValues(
+                                        color: Colors.black.withValues(
                                           alpha: 0.76,
                                         ),
                                         fontWeight: FontWeight.w600,
@@ -3041,7 +3041,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                           'Use this when the device has crossed from normal pilot monitoring into a support or engineering incident. The copied pack is meant to be pasted directly into the escalation thread.',
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.68),
+                                color: Colors.black.withValues(alpha: 0.68),
                                 fontWeight: FontWeight.w600,
                                 height: 1.45,
                               ),
@@ -3073,7 +3073,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                                   preview.summary,
                                   style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(
-                                        color: Colors.white.withValues(
+                                        color: Colors.black.withValues(
                                           alpha: 0.76,
                                         ),
                                         fontWeight: FontWeight.w600,
@@ -3270,7 +3270,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                   Text(
                     'Use a clear session label for this rollout wave or shift. Starting a fresh session clears the captured evidence list and begins a new tracker window.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.68),
+                      color: Colors.black.withValues(alpha: 0.68),
                       fontWeight: FontWeight.w600,
                       height: 1.45,
                     ),
@@ -3343,7 +3343,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                       Text(
                         'These values update the local workspace immediately and then sync back to the live shop document for ${session.shopId}.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.66),
+                          color: Colors.black.withValues(alpha: 0.66),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -3484,12 +3484,12 @@ class _PilotSmokeCheckCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: selected
                   ? tone.withValues(alpha: 0.14)
-                  : Colors.white.withValues(alpha: 0.02),
+                  : Colors.black.withValues(alpha: 0.02),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: selected
                     ? tone.withValues(alpha: 0.42)
-                    : Colors.white.withValues(alpha: 0.08),
+                    : Colors.black.withValues(alpha: 0.08),
               ),
             ),
             child: Row(
@@ -3498,7 +3498,7 @@ class _PilotSmokeCheckCard extends StatelessWidget {
                 Icon(
                   icon,
                   size: 16,
-                  color: selected ? tone : Colors.white.withValues(alpha: 0.62),
+                  color: selected ? tone : Colors.black.withValues(alpha: 0.62),
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -3506,7 +3506,7 @@ class _PilotSmokeCheckCard extends StatelessWidget {
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     color: selected
                         ? tone
-                        : Colors.white.withValues(alpha: 0.8),
+                        : Colors.black.withValues(alpha: 0.8),
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -3519,9 +3519,9 @@ class _PilotSmokeCheckCard extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF232A36),
+        color: AppPalette.surfaceStrong,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -3605,9 +3605,9 @@ class _CloseoutToggleCard extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF232A36),
+        color: AppPalette.surfaceStrong,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -3665,7 +3665,7 @@ class _ReadinessNoteRow extends StatelessWidget {
             child: Text(
               message,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.72),
+                color: Colors.black.withValues(alpha: 0.72),
                 fontWeight: FontWeight.w600,
                 height: 1.45,
               ),
@@ -3699,7 +3699,7 @@ class _OutboxAttentionRow extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF232A36),
+        color: AppPalette.surfaceStrong,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: tone.withValues(alpha: 0.18)),
       ),
@@ -3740,7 +3740,7 @@ class _OutboxAttentionRow extends StatelessWidget {
             Text(
               'Command ${entry.commandId} | attempts ${entry.attemptCount}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.62),
+                color: Colors.black.withValues(alpha: 0.62),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -3785,9 +3785,9 @@ class _SettingsRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: const Color(0xFF232A36),
+          color: AppPalette.surfaceStrong,
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -3810,7 +3810,7 @@ class _SettingsRow extends StatelessWidget {
                     Text(
                       label.toUpperCase(),
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.5),
+                        color: Colors.black.withValues(alpha: 0.5),
                         fontWeight: FontWeight.w900,
                         letterSpacing: 1.2,
                       ),
@@ -3849,9 +3849,9 @@ class _DomainSettingsRow extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF232A36),
+        color: AppPalette.surfaceStrong,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -3882,7 +3882,7 @@ class _DomainSettingsRow extends StatelessWidget {
               state.pilotSignoffSummary ??
                   'Write master: ${state.writeMaster} | epoch ${state.currentEpoch}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.62),
+                color: Colors.black.withValues(alpha: 0.62),
                 fontWeight: FontWeight.w600,
                 height: 1.45,
               ),

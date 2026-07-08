@@ -12,8 +12,9 @@ final themeModeProvider =
     NotifierProvider<ThemeModeController, ThemeMode>(ThemeModeController.new);
 
 class ThemeModeController extends Notifier<ThemeMode> {
+  // Business Hub is a blue-and-white (light only) app, so we pin light mode.
   @override
-  ThemeMode build() => ThemeMode.system;
+  ThemeMode build() => ThemeMode.light;
 
   void set(ThemeMode mode) => state = mode;
 

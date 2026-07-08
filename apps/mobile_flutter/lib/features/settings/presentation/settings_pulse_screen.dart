@@ -197,7 +197,7 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
                   Text(
                     'Verify MFA from Security before opening pulse controls on mobile. This keeps owner/admin signal control behind a real second factor.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.72),
+                      color: Colors.black.withValues(alpha: 0.72),
                       height: 1.45,
                     ),
                   ),
@@ -221,7 +221,7 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
                 child: Text(
                   _message!,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.76),
+                    color: Colors.black.withValues(alpha: 0.76),
                     height: 1.4,
                   ),
                 ),
@@ -260,7 +260,7 @@ class _SettingsPulseScreenState extends ConsumerState<SettingsPulseScreen> {
                           pulse.headline.body,
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.72),
+                                color: Colors.black.withValues(alpha: 0.72),
                                 height: 1.45,
                               ),
                         ),
@@ -454,9 +454,9 @@ class _PulseSignalCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF232A36),
+        color: AppPalette.surfaceStrong,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -479,7 +479,7 @@ class _PulseSignalCard extends StatelessWidget {
                       Text(
                         signal.body,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.66),
+                          color: Colors.black.withValues(alpha: 0.66),
                           fontWeight: FontWeight.w600,
                           height: 1.4,
                         ),
@@ -552,7 +552,7 @@ class _PulseSignalCard extends StatelessWidget {
             Text(
               _signalMetaLine(signal),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.56),
+                color: Colors.black.withValues(alpha: 0.56),
                 fontWeight: FontWeight.w600,
                 height: 1.4,
               ),
@@ -562,7 +562,7 @@ class _PulseSignalCard extends StatelessWidget {
               Text(
                 'Note: ${signal.resolutionNote}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.64),
+                  color: Colors.black.withValues(alpha: 0.64),
                   fontWeight: FontWeight.w600,
                   height: 1.4,
                 ),
@@ -573,7 +573,7 @@ class _PulseSignalCard extends StatelessWidget {
               Text(
                 'Follow-up: ${signal.followUpNote}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.64),
+                  color: Colors.black.withValues(alpha: 0.64),
                   fontWeight: FontWeight.w600,
                   height: 1.4,
                 ),
@@ -584,7 +584,7 @@ class _PulseSignalCard extends StatelessWidget {
               Text(
                 'Escalation: ${signal.escalationNote}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.64),
+                  color: Colors.black.withValues(alpha: 0.64),
                   fontWeight: FontWeight.w600,
                   height: 1.4,
                 ),

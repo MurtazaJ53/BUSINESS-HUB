@@ -68,7 +68,7 @@ class SettingsPlanScreen extends ConsumerWidget {
                   Text(
                     'Verify MFA from Security before opening Workspace plan on mobile. This keeps owner/admin business controls behind a real second factor.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.72),
+                      color: Colors.black.withValues(alpha: 0.72),
                       height: 1.45,
                     ),
                   ),
@@ -104,7 +104,7 @@ class SettingsPlanScreen extends ConsumerWidget {
                   Text(
                     _planBody(shop),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.72),
+                      color: Colors.black.withValues(alpha: 0.72),
                       height: 1.45,
                     ),
                   ),
@@ -169,7 +169,7 @@ class SettingsPlanScreen extends ConsumerWidget {
                       child: Text(
                         '- $line',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.74),
+                          color: Colors.black.withValues(alpha: 0.74),
                           height: 1.45,
                         ),
                       ),
@@ -273,9 +273,9 @@ class _PlanSectionCard extends StatelessWidget {
     final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF232A36),
+        color: AppPalette.surfaceStrong,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -285,7 +285,7 @@ class _PlanSectionCard extends StatelessWidget {
             Text(
               title,
               style: theme.textTheme.labelLarge?.copyWith(
-                color: Colors.white.withValues(alpha: 0.60),
+                color: Colors.black.withValues(alpha: 0.60),
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.35,
               ),
@@ -297,7 +297,7 @@ class _PlanSectionCard extends StatelessWidget {
                 child: Text(
                   '- $line',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.76),
+                    color: Colors.black.withValues(alpha: 0.76),
                     height: 1.4,
                   ),
                 ),
@@ -355,9 +355,9 @@ class _PlanTierCard extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF232A36),
+        color: AppPalette.surfaceStrong,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -367,7 +367,7 @@ class _PlanTierCard extends StatelessWidget {
             Text(
               '$label plan',
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: Colors.white.withValues(alpha: 0.60),
+                color: Colors.black.withValues(alpha: 0.60),
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.35,
               ),
@@ -383,7 +383,7 @@ class _PlanTierCard extends StatelessWidget {
             Text(
               body,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.white.withValues(alpha: 0.72),
+                color: Colors.black.withValues(alpha: 0.72),
                 height: 1.45,
               ),
             ),
@@ -394,7 +394,7 @@ class _PlanTierCard extends StatelessWidget {
                 child: Text(
                   '- $line',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.76),
+                    color: Colors.black.withValues(alpha: 0.76),
                     height: 1.4,
                   ),
                 ),
