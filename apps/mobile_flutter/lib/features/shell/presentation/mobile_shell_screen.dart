@@ -116,7 +116,7 @@ class _MobileShellScreenState extends ConsumerState<MobileShellScreen> {
                 ),
                 _AmbientGlow(
                   alignment: Alignment.bottomRight,
-                  color: AppPalette.warning,
+                  color: AppPalette.accent,
                 ),
               ],
               SafeArea(
@@ -364,7 +364,7 @@ class _HeaderIconButton extends StatelessWidget {
       child: IconButton(
         onPressed: onPressed,
         icon: Icon(icon, size: compact ? 20 : 24),
-        color: Colors.white,
+        color: AppPalette.textPrimary,
         padding: EdgeInsets.zero,
       ),
     );

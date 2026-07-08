@@ -1,724 +1,183 @@
 import 'package:flutter/material.dart';
-
-import '../../../core/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/models/mobile_models.dart';
-import '../../../core/models/mobile_session.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/runtime/app_runtime_info.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
-import '../../../core/utils/formatters.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../shell/presentation/mobile_surface.dart';
 
+/// Clean, shop-owner-first settings.
+///
+/// Day-to-day controls only. Internal/ops tooling (pulse, device sessions,
+/// advanced ops) lives behind the single "Admin tools" entry.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(mobileSessionProvider).asData?.value;
-    final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
-    final syncStatus = ref.watch(syncStatusProvider);
-    final runtimeInfoAsync = ref.watch(appRuntimeInfoProvider);
-    final pulseAsync = ref.watch(workspacePulseProvider);
-    final pulse = pulseAsync.asData?.value;
-    final sessionsAsync = ref.watch(workspaceAccessSessionsProvider);
-    final sessions =
-        sessionsAsync.asData?.value ?? const <WorkspaceAccessSessionRecord>[];
     final shop =
         ref.watch(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
-    final teamMembersAsync = ref.watch(workspaceTeamMembersProvider);
-    final teamMembers =
-        teamMembersAsync.asData?.value ?? const <WorkspaceTeamMemberRecord>[];
-    final attendanceSummaryAsync = ref.watch(attendanceSummaryProvider);
-    final attendanceSummary = attendanceSummaryAsync.asData?.value;
-    final expenseSummaryAsync = ref.watch(expenseSummaryProvider);
-    final expenseSummary = expenseSummaryAsync.asData?.value;
-    final history =
-        ref.watch(historyOverviewProvider).asData?.value ??
-        HistoryOverview.empty();
     final pending = ref.watch(pendingOutboxCountProvider).asData?.value ?? 0;
-    final profile = _SettingsRoleProfile.fromSession(session, shop);
+    final version = ref.watch(appRuntimeInfoProvider).asData?.value.versionLabel;
+    final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
+
+    final owner = session?.isOwnerLike ?? false;
 
     return MobileStandaloneScaffold(
-      title: profile.screenTitle,
+      title: 'Settings',
       child: ListView(
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
         children: <Widget>[
-          MobileScreenLead(
-            title: profile.leadTitle,
-            subtitle: profile.leadSubtitle,
-            icon: profile.leadIcon,
-            accent: profile.leadAccent,
-            primaryTag: MobileTag(
-              label: session?.displayRoleLabel ?? 'GUEST',
-              icon: Icons.badge_rounded,
-              accent: profile.leadAccent,
-            ),
-            secondaryTag: MobileTag(
-              label: switch (syncStatus) {
-                MobileSyncStatus.syncing => 'Working',
-                MobileSyncStatus.error => 'Needs attention',
-                MobileSyncStatus.offline => 'Offline',
-                MobileSyncStatus.idle => 'Stable',
-              },
-              icon: switch (syncStatus) {
-                MobileSyncStatus.syncing => Icons.sync_rounded,
-                MobileSyncStatus.error => Icons.error_outline_rounded,
-                MobileSyncStatus.offline => Icons.cloud_off_rounded,
-                MobileSyncStatus.idle => Icons.verified_rounded,
-              },
-              accent: switch (syncStatus) {
-                MobileSyncStatus.syncing => AppPalette.primary,
-                MobileSyncStatus.error => AppPalette.error,
-                MobileSyncStatus.offline => AppPalette.warning,
-                MobileSyncStatus.idle => AppPalette.success,
-              },
-            ),
-          ),
-          const SizedBox(height: 18),
+          // Shop identity
           MobilePanel(
-            title: 'Workspace',
-            action: MobileTag(
-              label: profile.workspaceTag,
-              icon: Icons.storefront_rounded,
-              accent: AppPalette.success,
-            ),
-            child: Column(
-              children: <Widget>[
-                _SettingsRow(
-                  label: 'Workspace',
-                  value: shop.name,
-                  icon: Icons.storefront_rounded,
-                ),
-                _SettingsRow(
-                  label: 'Operator',
-                  value: session != null && session.email.isNotEmpty
-                      ? session.email
-                      : 'Not signed in',
-                  icon: Icons.person_rounded,
-                ),
-                _SettingsRow(
-                  label: 'Role',
-                  value: session?.displayRoleLabel ?? 'UNKNOWN',
-                  icon: Icons.admin_panel_settings_rounded,
-                ),
-                _SettingsRow(
-                  label: 'Access focus',
-                  value: session?.roleSummary ?? 'Role scope is still loading',
-                  icon: Icons.rule_folder_rounded,
-                ),
-                _SettingsRow(
-                  label: 'Plan',
-                  value: '${shop.planLabel} plan',
-                  icon: Icons.workspace_premium_rounded,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          MobilePanel(
-            title: session?.isOwnerLike ?? false
-                ? 'Team and operations'
-                : 'My shop access',
-            action: MobileTag(
-              label: session?.isOwnerLike ?? false
-                  ? teamMembers.isEmpty
-                        ? (teamMembersAsync.isLoading
-                              ? 'Refreshing'
-                              : 'No team')
-                        : '${teamMembers.length} attached'
-                  : shop.supportsAttendance
-                  ? (attendanceSummaryAsync.isLoading
-                        ? 'Refreshing'
-                        : '${attendanceSummary?.totalSessions ?? 0} records')
-                  : 'Shop access',
-              icon: session?.isOwnerLike ?? false
-                  ? Icons.groups_rounded
-                  : Icons.badge_rounded,
-              accent: AppPalette.primary,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  session?.isOwnerLike ?? false
-                      ? 'Attach staff with the exact email they will use on the phone, control who is admin or viewer, and keep attendance and expenses inside the same product.'
-                      : 'Your owner or store admin must attach this exact email to the workspace first. After that, sign in with the same email and use attendance and store operations from here during the shift.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.black.withValues(alpha: 0.72),
-                    height: 1.45,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                if (shop.supportsAttendance)
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: <Widget>[
-                      if (session?.isOwnerLike ?? false)
-                        MobileTag(
-                          label:
-                              '${attendanceSummary?.activeWorkersToday ?? 0} on floor today',
-                          icon: Icons.groups_rounded,
-                          accent: AppPalette.success,
-                        ),
-                      MobileTag(
-                        label:
-                            '${attendanceSummary?.presentCount ?? 0} present records',
-                        icon: Icons.check_circle_rounded,
-                        accent: AppPalette.primary,
-                      ),
-                      if (shop.supportsExpenses)
-                        MobileTag(
-                          label: expenseSummaryAsync.isLoading
-                              ? 'Refreshing spend'
-                              : formatCurrency(
-                                  expenseSummary?.totalAmount ?? 0,
-                                ),
-                          icon: Icons.payments_rounded,
-                          accent: AppPalette.warning,
-                        ),
-                    ],
-                  ),
-                if (shop.supportsAttendance || shop.supportsExpenses)
-                  const SizedBox(height: 14),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final stacked = constraints.maxWidth < 430;
-                    final actions = <Widget>[
-                      if (session?.isOwnerLike ?? false)
-                        Expanded(
-                          child: FilledButton.tonalIcon(
-                            onPressed: () {
-                              context.push('/settings/team');
-                            },
-                            icon: const Icon(Icons.groups_rounded),
-                            label: const Text('Workspace team'),
-                          ),
-                        ),
-                      if (shop.supportsAttendance)
-                        Expanded(
-                          child: FilledButton.tonalIcon(
-                            onPressed: () {
-                              context.push('/settings/attendance');
-                            },
-                            icon: const Icon(Icons.fact_check_rounded),
-                            label: const Text('Attendance'),
-                          ),
-                        ),
-                      if (shop.supportsExpenses)
-                        Expanded(
-                          child: FilledButton.tonalIcon(
-                            onPressed: () {
-                              context.push('/settings/expenses');
-                            },
-                            icon: const Icon(Icons.payments_rounded),
-                            label: const Text('Expenses'),
-                          ),
-                        ),
-                    ];
-
-                    if (actions.isEmpty) {
-                      return const SizedBox.shrink();
-                    }
-
-                    if (stacked) {
-                      return Column(
-                        children: actions
-                            .expand(
-                              (widget) => <Widget>[
-                                widget,
-                                if (widget != actions.last)
-                                  const SizedBox(height: 10),
-                              ],
-                            )
-                            .toList(growable: false),
-                      );
-                    }
-
-                    return Row(
-                      children: actions
-                          .expand(
-                            (widget) => <Widget>[
-                              widget,
-                              if (widget != actions.last)
-                                const SizedBox(width: 10),
-                            ],
-                          )
-                          .toList(growable: false),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          MobilePanel(
-            title: 'Workspace plan',
+            title: 'Shop',
             action: MobileTag(
               label: '${shop.planLabel} plan',
               icon: Icons.workspace_premium_rounded,
-              accent: AppPalette.warning,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  _planTitle(shop),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _planBody(shop),
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.black.withValues(alpha: 0.70),
-                    height: 1.45,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                _PlanSection(
-                  title: _currentPlanSectionTitle(shop),
-                  lines: _currentPlanSectionLines(shop),
-                ),
-                const SizedBox(height: 12),
-                _PlanSection(
-                  title: _nextPlanSectionTitle(shop),
-                  lines: _nextPlanSectionLines(shop),
-                ),
-                if (session?.isOwnerLike ?? false) ...<Widget>[
-                  const SizedBox(height: 12),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final stacked = constraints.maxWidth < 430;
-                      final actions = <Widget>[
-                        Expanded(
-                          child: FilledButton.tonalIcon(
-                            onPressed: () {
-                              context.push('/settings/plan');
-                            },
-                            icon: const Icon(Icons.open_in_new_rounded),
-                            label: const Text('Open compare'),
-                          ),
-                        ),
-                        Expanded(
-                          child: FilledButton.tonalIcon(
-                            onPressed: () async {
-                              await Clipboard.setData(
-                                ClipboardData(
-                                  text: _buildPlanSummaryText(shop, session),
-                                ),
-                              );
-                              if (!context.mounted) {
-                                return;
-                              }
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Plan summary copied.'),
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.copy_rounded),
-                            label: const Text('Copy summary'),
-                          ),
-                        ),
-                        if (shop.normalizedPlanTier != 'pro')
-                          Expanded(
-                            child: FilledButton.tonalIcon(
-                              onPressed: () async {
-                                await Clipboard.setData(
-                                  ClipboardData(
-                                    text: _buildUpgradeBriefText(shop, session),
-                                  ),
-                                );
-                                if (!context.mounted) {
-                                  return;
-                                }
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Upgrade brief copied.'),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.trending_up_rounded),
-                              label: Text(_upgradeButtonLabel(shop)),
-                            ),
-                          ),
-                      ];
-
-                      if (stacked) {
-                        return Column(
-                          children: actions
-                              .expand(
-                                (widget) => <Widget>[
-                                  widget,
-                                  if (widget != actions.last)
-                                    const SizedBox(height: 10),
-                                ],
-                              )
-                              .toList(growable: false),
-                        );
-                      }
-
-                      return Row(
-                        children: actions
-                            .expand(
-                              (widget) => <Widget>[
-                                widget,
-                                if (widget != actions.last)
-                                  const SizedBox(width: 10),
-                              ],
-                            )
-                            .toList(growable: false),
-                      );
-                    },
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          if (session?.isOwnerLike ?? false) ...<Widget>[
-            MobilePanel(
-              title: 'Workspace pulse',
-              action: MobileTag(
-                label: pulse == null
-                    ? (pulseAsync.isLoading ? 'Refreshing' : 'Unavailable')
-                    : pulse.stats.criticalAnomalyCount > 0
-                    ? '${pulse.stats.criticalAnomalyCount} critical'
-                    : '${pulse.stats.openTaskCount} tasks',
-                icon: pulse == null
-                    ? Icons.sync_rounded
-                    : pulse.stats.criticalAnomalyCount > 0
-                    ? Icons.crisis_alert_rounded
-                    : Icons.auto_awesome_rounded,
-                accent: pulse == null
-                    ? AppPalette.primary
-                    : pulse.stats.criticalAnomalyCount > 0
-                    ? AppPalette.error
-                    : AppPalette.primary,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    pulse?.headline.title ?? 'Owner/admin attention desk',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    pulse?.headline.body ??
-                        'Open the pulse desk to acknowledge, resolve, or reopen the latest workspace tasks and anomaly signals.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.black.withValues(alpha: 0.72),
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  FilledButton.tonalIcon(
-                    onPressed: () {
-                      context.push('/settings/pulse');
-                    },
-                    icon: const Icon(Icons.monitor_heart_rounded),
-                    label: const Text('Open pulse desk'),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            MobilePanel(
-              title: 'Workspace sessions',
-              action: MobileTag(
-                label: sessions.isEmpty
-                    ? (sessionsAsync.isLoading ? 'Refreshing' : 'No devices')
-                    : '${sessions.length} devices',
-                icon: sessions.isEmpty
-                    ? Icons.smartphone_rounded
-                    : Icons.devices_rounded,
-                accent:
-                    sessions.any((item) => item.isRisky || item.wipeRequested)
-                    ? AppPalette.error
-                    : AppPalette.primary,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    sessions.isEmpty
-                        ? 'Review mobile device access, risky trust posture, and remote wipe actions from one owner/admin desk.'
-                        : '${sessions.where((item) => item.isTrusted && !item.wipeRequested).length} trusted, ${sessions.where((item) => item.needsReview).length} review, and ${sessions.where((item) => item.isRisky || item.wipeRequested).length} risky or wipe-pending device sessions are visible right now.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.black.withValues(alpha: 0.72),
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  FilledButton.tonalIcon(
-                    onPressed: () {
-                      context.push('/settings/sessions');
-                    },
-                    icon: const Icon(Icons.devices_rounded),
-                    label: const Text('Open sessions'),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            MobilePanel(
-              title: 'Security',
-              action: MobileTag(
-                label: 'Owner/admin gate',
-                icon: Icons.verified_user_rounded,
-                accent: AppPalette.primary,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    'Protect Workspace plan, Advanced ops, and other sensitive control surfaces with an authenticator app.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.black.withValues(alpha: 0.72),
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  FilledButton.tonalIcon(
-                    onPressed: () {
-                      context.push('/settings/security');
-                    },
-                    icon: const Icon(Icons.security_rounded),
-                    label: const Text('Open security'),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-          ],
-          MobilePanel(
-            title: profile.syncPanelTitle,
-            action: MobileTag(
-              label: pending > 0 ? '$pending queued' : 'Queue clear',
-              icon: pending > 0
-                  ? Icons.cloud_upload_rounded
-                  : Icons.check_circle_rounded,
-              accent: pending > 0 ? AppPalette.warning : AppPalette.success,
-            ),
-            child: Column(
-              children: <Widget>[
-                _SettingsRow(
-                  label: 'Sync posture',
-                  value: profile.syncLabelFor(syncStatus),
-                  icon: Icons.sync_alt_rounded,
-                ),
-                _SettingsRow(
-                  label: 'Queued receipts',
-                  value: '$pending',
-                  icon: Icons.outbox_rounded,
-                ),
-                _SettingsRow(
-                  label: 'Last receipt sync',
-                  value: history.lastSyncedAt == null
-                      ? 'Unknown'
-                      : formatCompactDate(history.lastSyncedAt!),
-                  icon: Icons.schedule_rounded,
-                ),
-                if (profile.showOwnerSyncDetails) ...<Widget>[
-                  _SettingsRow(
-                    label: 'Queued value',
-                    value: formatCurrency(history.queuedRevenue),
-                    icon: Icons.currency_rupee_rounded,
-                  ),
-                  _SettingsRow(
-                    label: 'Failed receipts',
-                    value: '${history.failedSales}',
-                    icon: Icons.error_outline_rounded,
-                  ),
-                ],
-                const SizedBox(height: 8),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final stacked = constraints.maxWidth < 430;
-                    final actions = <Widget>[
-                      Expanded(
-                        child: FilledButton.tonalIcon(
-                          onPressed: () async {
-                            await syncCoordinator.refresh();
-                            if (!context.mounted) {
-                              return;
-                            }
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Workspace refresh requested.'),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.refresh_rounded),
-                          label: Text(profile.refreshButtonLabel),
-                        ),
-                      ),
-                      Expanded(
-                        child: FilledButton.tonalIcon(
-                          onPressed: pending > 0
-                              ? () async {
-                                  final result = await syncCoordinator
-                                      .flushCommerceOutbox();
-                                  if (!context.mounted) {
-                                    return;
-                                  }
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        result.message ??
-                                            'Queued receipts retry requested.',
-                                      ),
-                                    ),
-                                  );
-                                }
-                              : null,
-                          icon: const Icon(Icons.cloud_upload_rounded),
-                          label: const Text('Retry queue'),
-                        ),
-                      ),
-                    ];
-
-                    if (stacked) {
-                      return Column(
-                        children: <Widget>[
-                          actions[0],
-                          const SizedBox(height: 10),
-                          actions[1],
-                        ],
-                      );
-                    }
-
-                    return Row(
-                      children: <Widget>[
-                        actions[0],
-                        const SizedBox(width: 10),
-                        actions[1],
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          MobilePanel(
-            title: 'App',
-            action: MobileTag(
-              label: runtimeInfoAsync.asData?.value.versionLabel ?? 'Loading',
-              icon: Icons.new_releases_rounded,
               accent: AppPalette.primary,
             ),
-            child: runtimeInfoAsync.when(
-              data: (runtime) => Column(
-                children: <Widget>[
-                  _SettingsRow(
-                    label: 'Version',
-                    value: runtime.versionLabel,
-                    icon: Icons.sell_rounded,
-                  ),
-                  _SettingsRow(
-                    label: 'Release channel',
-                    value: runtime.releaseFingerprint,
-                    icon: Icons.flag_rounded,
-                  ),
-                  if (profile.showOwnerSyncDetails) ...<Widget>[
-                    _SettingsRow(
-                      label: 'App',
-                      value: runtime.appName,
-                      icon: Icons.android_rounded,
-                    ),
-                    _SettingsRow(
-                      label: 'Package',
-                      value: runtime.packageName,
-                      icon: Icons.inventory_2_rounded,
-                    ),
-                  ],
-                ],
-              ),
-              loading: () => const MobileEmptyState(
-                icon: Icons.sync_rounded,
-                title: 'Loading app info',
-                body: 'The app is resolving runtime metadata.',
-              ),
-              error: (error, _) => MobileEmptyState(
-                icon: Icons.error_outline_rounded,
-                title: 'App info unavailable',
-                body: error.toString(),
-              ),
+            child: Column(
+              children: <Widget>[
+                _InfoRow(
+                  icon: Icons.storefront_rounded,
+                  label: 'Shop',
+                  value: shop.name,
+                ),
+                _InfoRow(
+                  icon: Icons.person_rounded,
+                  label: 'Signed in',
+                  value: session != null && session.email.isNotEmpty
+                      ? session.email
+                      : 'Local operator',
+                ),
+                _InfoRow(
+                  icon: Icons.badge_rounded,
+                  label: 'Role',
+                  value: session?.displayRoleLabel ?? 'GUEST',
+                  last: true,
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 18),
-          MobilePanel(
-            title: profile.accountPanelTitle,
-            action: MobileTag(
-              label: profile.accountTag,
-              icon: profile.accountIcon,
-              accent: profile.accountAccent,
+          const SizedBox(height: 22),
+
+          // Manage
+          const _SectionLabel('Manage'),
+          if (owner)
+            MobileListTile(
+              title: 'Team',
+              subtitle: 'Staff members and roles',
+              leadingIcon: Icons.groups_rounded,
+              onTap: () => context.push('/settings/team'),
             ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final stacked = constraints.maxWidth < 430;
-                final actions = <Widget>[
-                  if (profile.showAdvancedOpsButton)
-                    Expanded(
-                      child: FilledButton.tonalIcon(
-                        onPressed: () {
-                          context.push('/settings/advanced');
-                        },
-                        icon: const Icon(Icons.tune_rounded),
-                        label: const Text('Advanced ops'),
-                      ),
-                    ),
-                  Expanded(
-                    child: FilledButton.tonalIcon(
-                      onPressed: () async {
-                        await syncCoordinator.refresh();
-                        if (!context.mounted) {
-                          return;
-                        }
-                        context.go('/dashboard');
-                      },
-                      icon: const Icon(Icons.offline_bolt_rounded),
-                      label: const Text('Reload local workspace'),
-                    ),
+          if (shop.supportsAttendance)
+            MobileListTile(
+              title: 'Attendance',
+              subtitle: 'Clock-in and shift records',
+              leadingIcon: Icons.fact_check_rounded,
+              onTap: () => context.push('/settings/attendance'),
+            ),
+          if (shop.supportsExpenses)
+            MobileListTile(
+              title: 'Expenses',
+              subtitle: 'Track shop spending',
+              leadingIcon: Icons.payments_rounded,
+              onTap: () => context.push('/settings/expenses'),
+            ),
+          MobileListTile(
+            title: 'Plan',
+            subtitle: '${shop.planLabel} plan',
+            leadingIcon: Icons.workspace_premium_rounded,
+            onTap: () => context.push('/settings/plan'),
+          ),
+          if (owner)
+            MobileListTile(
+              title: 'Security',
+              subtitle: 'App lock and MFA',
+              leadingIcon: Icons.security_rounded,
+              onTap: () => context.push('/settings/security'),
+            ),
+
+          // Sync (only surfaces when there is something to do)
+          if (pending > 0) ...<Widget>[
+            const SizedBox(height: 22),
+            MobilePanel(
+              title: 'Sync',
+              action: MobileTag(
+                label: '$pending queued',
+                icon: Icons.cloud_upload_rounded,
+                accent: AppPalette.warning,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Text(
+                    '$pending receipt${pending == 1 ? '' : 's'} waiting to sync.',
+                    style: Theme.of(context).textTheme.bodyMedium,
                   ),
-                ];
+                  const SizedBox(height: 12),
+                  FilledButton.tonalIcon(
+                    onPressed: () async {
+                      final result =
+                          await syncCoordinator.flushCommerceOutbox();
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            result.message ?? 'Retrying queued receipts.',
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.cloud_upload_rounded),
+                    label: const Text('Retry sync'),
+                  ),
+                ],
+              ),
+            ),
+          ],
 
-                if (stacked) {
-                  return Column(
-                    children: actions
-                        .expand(
-                          (widget) => <Widget>[
-                            widget,
-                            if (widget != actions.last)
-                              const SizedBox(height: 10),
-                          ],
-                        )
-                        .toList(growable: false),
-                  );
-                }
+          // Admin tools (owners only)
+          if (owner && shop.supportsAdvancedOps) ...<Widget>[
+            const SizedBox(height: 22),
+            const _SectionLabel('Advanced'),
+            MobileListTile(
+              title: 'Admin tools',
+              subtitle: 'Pulse, devices and operations',
+              leadingIcon: Icons.tune_rounded,
+              accent: AppPalette.textTertiary,
+              onTap: () => context.push('/settings/admin'),
+            ),
+          ],
 
-                return Row(
-                  children: actions
-                      .expand(
-                        (widget) => <Widget>[
-                          widget,
-                          if (widget != actions.last) const SizedBox(width: 10),
-                        ],
-                      )
-                      .toList(growable: false),
-                );
+          const SizedBox(height: 28),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                ref.read(mobileSessionProvider.notifier).logout();
+                context.go('/');
               },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppPalette.error,
+                side: const BorderSide(color: AppPalette.error, width: 1),
+              ),
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Sign out'),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Center(
+            child: Text(
+              'Business Hub${version == null ? '' : ' · $version'}',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: AppPalette.textTertiary,
+              ),
             ),
           ),
         ],
@@ -727,380 +186,68 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-class _SettingsRoleProfile {
-  const _SettingsRoleProfile({
-    required this.screenTitle,
-    required this.leadTitle,
-    required this.leadSubtitle,
-    required this.leadIcon,
-    required this.leadAccent,
-    required this.workspaceTag,
-    required this.syncPanelTitle,
-    required this.refreshButtonLabel,
-    required this.accountPanelTitle,
-    required this.accountTag,
-    required this.accountIcon,
-    required this.accountAccent,
-    required this.showAdvancedOpsButton,
-    required this.showOwnerSyncDetails,
-  });
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.label);
 
-  final String screenTitle;
-  final String leadTitle;
-  final String leadSubtitle;
-  final IconData leadIcon;
-  final Color leadAccent;
-  final String workspaceTag;
-  final String syncPanelTitle;
-  final String refreshButtonLabel;
-  final String accountPanelTitle;
-  final String accountTag;
-  final IconData accountIcon;
-  final Color accountAccent;
-  final bool showAdvancedOpsButton;
-  final bool showOwnerSyncDetails;
-
-  factory _SettingsRoleProfile.fromSession(dynamic session, ShopInfo shop) {
-    if (session?.isCashierLike ?? false) {
-      return const _SettingsRoleProfile(
-        screenTitle: 'Shift settings',
-        leadTitle: 'Shift settings',
-        leadSubtitle:
-            'Keep the day simple here. Check app health, refresh the workspace, and sign out when the shift ends.',
-        leadIcon: Icons.settings_rounded,
-        leadAccent: AppPalette.primary,
-        workspaceTag: 'SHIFT READY',
-        syncPanelTitle: 'App health',
-        refreshButtonLabel: 'Refresh app',
-        accountPanelTitle: 'Account',
-        accountTag: 'FAST EXIT',
-        accountIcon: Icons.flash_on_rounded,
-        accountAccent: AppPalette.success,
-        showAdvancedOpsButton: false,
-        showOwnerSyncDetails: false,
-      );
-    }
-
-    if (session?.isManager ?? false) {
-      return const _SettingsRoleProfile(
-        screenTitle: 'Operations settings',
-        leadTitle: 'Operations settings',
-        leadSubtitle:
-            'Use this space for daily store settings and app health. Heavy platform tooling stays out of the way.',
-        leadIcon: Icons.settings_applications_rounded,
-        leadAccent: AppPalette.success,
-        workspaceTag: 'STORE READY',
-        syncPanelTitle: 'Workspace health',
-        refreshButtonLabel: 'Refresh workspace',
-        accountPanelTitle: 'Account',
-        accountTag: 'DAILY USE',
-        accountIcon: Icons.badge_rounded,
-        accountAccent: AppPalette.success,
-        showAdvancedOpsButton: false,
-        showOwnerSyncDetails: false,
-      );
-    }
-
-    return _SettingsRoleProfile(
-      screenTitle: 'Store settings',
-      leadTitle: 'Store settings',
-      leadSubtitle:
-          'Daily controls stay simple here. Advanced recovery, rollout, and technical tooling remain behind the admin-only ops area.',
-      leadIcon: Icons.settings_rounded,
-      leadAccent: AppPalette.info,
-      workspaceTag: 'OWNER VIEW',
-      syncPanelTitle: 'Workspace health',
-      refreshButtonLabel: 'Refresh workspace',
-      accountPanelTitle: 'Owner and support',
-      accountTag: 'ADMIN PATH',
-      accountIcon: Icons.shield_rounded,
-      accountAccent: AppPalette.info,
-      showAdvancedOpsButton: shop.supportsAdvancedOps,
-      showOwnerSyncDetails: shop.supportsAdvancedOps,
-    );
-  }
-
-  String syncLabelFor(MobileSyncStatus syncStatus) {
-    return switch (syncStatus) {
-      MobileSyncStatus.syncing => 'Refreshing',
-      MobileSyncStatus.error => 'Needs attention',
-      MobileSyncStatus.offline => 'Offline',
-      MobileSyncStatus.idle => 'Stable',
-    };
-  }
-}
-
-String _planTitle(ShopInfo shop) {
-  switch (shop.normalizedPlanTier) {
-    case 'starter':
-      return 'Starter keeps this workspace calm';
-    case 'pro':
-      return 'Pro unlocks the full curated stack';
-    default:
-      return 'Growth adds daily store operations';
-  }
-}
-
-String _planBody(ShopInfo shop) {
-  switch (shop.normalizedPlanTier) {
-    case 'starter':
-      return 'This workspace focuses on selling, stock, customers, and receipts. Heavier operations stay hidden until the shop actually needs them.';
-    case 'pro':
-      return 'This workspace can open deeper insights and stronger admin support tools while still keeping raw ERP complexity out of normal daily use.';
-    default:
-      return 'This workspace includes practical store operations like expenses and attendance without turning the product into a crowded ERP shell.';
-  }
-}
-
-String _currentPlanSectionTitle(ShopInfo shop) {
-  switch (shop.normalizedPlanTier) {
-    case 'starter':
-      return 'Starter now';
-    case 'pro':
-      return 'Pro now';
-    default:
-      return 'Growth now';
-  }
-}
-
-List<String> _currentPlanSectionLines(ShopInfo shop) {
-  switch (shop.normalizedPlanTier) {
-    case 'starter':
-      return const <String>[
-        'POS and barcode selling',
-        'Inventory and low-stock watch',
-        'Customer balances and receipt history',
-      ];
-    case 'pro':
-      return const <String>[
-        'Finance and advanced reporting',
-        'Advanced owner and admin controls',
-        'The full curated Business Hub stack',
-      ];
-    default:
-      return const <String>[
-        'Everything in Starter',
-        'Expenses and attendance',
-        'Supplier-ready store operations',
-      ];
-  }
-}
-
-String _nextPlanSectionTitle(ShopInfo shop) {
-  switch (shop.normalizedPlanTier) {
-    case 'starter':
-      return 'Growth next';
-    case 'pro':
-      return 'Keep it curated';
-    default:
-      return 'Pro next';
-  }
-}
-
-List<String> _nextPlanSectionLines(ShopInfo shop) {
-  switch (shop.normalizedPlanTier) {
-    case 'starter':
-      return const <String>[
-        'Expenses and attendance',
-        'Light supplier workflows',
-        'More operational control without ERP clutter',
-      ];
-    case 'pro':
-      return const <String>[
-        'Limit deep tools to owners and admins',
-        'Keep daily screens simple for staff',
-        'Avoid exposing raw ERP complexity',
-      ];
-    default:
-      return const <String>[
-        'Finance and owner summary rollups',
-        'Advanced customer and sales insight',
-        'Stronger admin and support controls',
-      ];
-  }
-}
-
-String _upgradeButtonLabel(ShopInfo shop) {
-  switch (shop.normalizedPlanTier) {
-    case 'starter':
-      return 'Copy Growth brief';
-    case 'growth':
-      return 'Copy Pro brief';
-    default:
-      return 'Copy upgrade brief';
-  }
-}
-
-String _nextPlanLabel(ShopInfo shop) {
-  switch (shop.normalizedPlanTier) {
-    case 'starter':
-      return 'Growth';
-    case 'growth':
-      return 'Pro';
-    default:
-      return 'Pro';
-  }
-}
-
-String _buildPlanSummaryText(ShopInfo shop, MobileSession? session) {
-  final buffer = StringBuffer()
-    ..writeln('Business Hub workspace plan summary')
-    ..writeln('Workspace: ${shop.name}')
-    ..writeln('Current plan: ${shop.planLabel}')
-    ..writeln('Operator role: ${session?.displayRoleLabel ?? 'UNKNOWN'}')
-    ..writeln()
-    ..writeln('${_currentPlanSectionTitle(shop)}:');
-
-  for (final line in _currentPlanSectionLines(shop)) {
-    buffer.writeln('- $line');
-  }
-
-  buffer
-    ..writeln()
-    ..writeln('${_nextPlanSectionTitle(shop)}:');
-
-  for (final line in _nextPlanSectionLines(shop)) {
-    buffer.writeln('- $line');
-  }
-
-  return buffer.toString().trimRight();
-}
-
-String _buildUpgradeBriefText(ShopInfo shop, MobileSession? session) {
-  final buffer = StringBuffer()
-    ..writeln('Business Hub workspace upgrade brief')
-    ..writeln('Workspace: ${shop.name}')
-    ..writeln('Current plan: ${shop.planLabel}')
-    ..writeln('Requested next plan: ${_nextPlanLabel(shop)}')
-    ..writeln('Operator role: ${session?.displayRoleLabel ?? 'UNKNOWN'}')
-    ..writeln()
-    ..writeln('${_currentPlanSectionTitle(shop)}:');
-
-  for (final line in _currentPlanSectionLines(shop)) {
-    buffer.writeln('- $line');
-  }
-
-  buffer
-    ..writeln()
-    ..writeln('${_nextPlanSectionTitle(shop)}:');
-
-  for (final line in _nextPlanSectionLines(shop)) {
-    buffer.writeln('- $line');
-  }
-
-  return buffer.toString().trimRight();
-}
-
-class _PlanSection extends StatelessWidget {
-  const _PlanSection({required this.title, required this.lines});
-
-  final String title;
-  final List<String> lines;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppPalette.surfaceStrong,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              title,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: Colors.black.withValues(alpha: 0.60),
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.35,
-              ),
-            ),
-            const SizedBox(height: 10),
-            ...lines.map(
-              (line) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  '- $line',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.black.withValues(alpha: 0.76),
-                    height: 1.4,
-                  ),
-                ),
-              ),
-            ),
-          ],
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 12),
+      child: Text(
+        label.toUpperCase(),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: AppPalette.textTertiary,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.2,
         ),
       ),
     );
   }
 }
 
-class _SettingsRow extends StatelessWidget {
-  const _SettingsRow({
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.icon,
     required this.label,
     required this.value,
-    required this.icon,
+    this.last = false,
   });
 
+  final IconData icon;
   final String label;
   final String value;
-  final IconData icon;
+  final bool last;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppPalette.surfaceStrong,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: AppPalette.surfaceStrong,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: AppPalette.textTertiary, size: 18),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      label,
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: Colors.black.withValues(alpha: 0.52),
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      value,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+      padding: EdgeInsets.only(bottom: last ? 0 : 14),
+      child: Row(
+        children: <Widget>[
+          Icon(icon, size: 20, color: AppPalette.textTertiary),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppPalette.textTertiary,
+            ),
           ),
-        ),
+          const Spacer(),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
