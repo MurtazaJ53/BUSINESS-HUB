@@ -25,11 +25,15 @@ class PosScreenV3 extends ConsumerStatefulWidget {
 
 class _PosScreenV3State extends ConsumerState<PosScreenV3> {
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _discountController = TextEditingController();
+  final TextEditingController _customerNameController = TextEditingController();
+  final TextEditingController _customerPhoneController = TextEditingController();
   final List<PosCartItem> _cart = <PosCartItem>[];
 
   String _search = '';
   String? _selectedCategory;
   bool _saving = false;
+  bool _discountIsPercent = false;
 
   static const int _pageSize = 50;
 
@@ -38,10 +42,76 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
   int get _cartCount => _cart.fold<int>(0, (sum, item) => sum + item.quantity);
   GstCartSummary get _gstSummary => computeCartGst(_cart);
 
+  double get _discountAmount {
+    final raw = double.tryParse(_discountController.text.trim()) ?? 0;
+    if (raw <= 0) return 0;
+    final amount = _discountIsPercent ? _cartTotal * (raw / 100) : raw;
+    return amount.clamp(0, _cartTotal).toDouble();
+  }
+
+  double get _netTotal => _cartTotal - _discountAmount;
+
   @override
   void dispose() {
     _searchController.dispose();
+    _discountController.dispose();
+    _customerNameController.dispose();
+    _customerPhoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _addCustomItem() async {
+    final nameController = TextEditingController();
+    final priceController = TextEditingController();
+    final added = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Custom item'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            TextField(
+              controller: nameController,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(labelText: 'Item name'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: priceController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'Price'),
+            ),
+          ],
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    final name = nameController.text.trim();
+    final price = double.tryParse(priceController.text.trim()) ?? 0;
+    nameController.dispose();
+    priceController.dispose();
+    if (added != true || name.isEmpty || price <= 0) return;
+    setState(() {
+      _cart.add(
+        PosCartItem(
+          id: 'custom-${DateTime.now().microsecondsSinceEpoch}',
+          name: name,
+          price: price,
+          quantity: 1,
+          stock: 999999,
+          category: 'Custom',
+        ),
+      );
+    });
   }
 
   // ---- cart mutations -------------------------------------------------------
@@ -126,7 +196,15 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
         cart: _cart,
         onChangeQty: _changeQtyById,
         gstSummary: () => _gstSummary,
-        total: () => _cartTotal,
+        grossTotal: () => _cartTotal,
+        discountAmount: () => _discountAmount,
+        netTotal: () => _netTotal,
+        discountController: _discountController,
+        isPercent: () => _discountIsPercent,
+        onToggleType: () =>
+            setState(() => _discountIsPercent = !_discountIsPercent),
+        customerNameController: _customerNameController,
+        customerPhoneController: _customerPhoneController,
       ),
     );
     setState(() {}); // reflect any edits made inside the sheet
@@ -155,13 +233,15 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) =>
-          CheckoutPaymentSheet(cartTotal: _cartTotal, gstSummary: _gstSummary),
+          CheckoutPaymentSheet(cartTotal: _netTotal, gstSummary: _gstSummary),
     );
     if (result == null || !mounted) return;
 
     final payments = result['payments'] as List<PosPayment>;
     final paymentMode = result['paymentMode'] as String;
     final buyerGstin = result['buyerGstin'] as String?;
+    final customerName = _customerNameController.text.trim();
+    final customerPhone = _customerPhoneController.text.trim();
 
     setState(() => _saving = true);
     try {
@@ -172,6 +252,9 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
         paymentMode: paymentMode,
         footerNote: shop.footer,
         buyerGstin: buyerGstin,
+        discount: _discountAmount,
+        customerName: customerName.isEmpty ? null : customerName,
+        customerPhone: customerPhone.isEmpty ? null : customerPhone,
       );
       final syncResult = await syncCoordinator.submitSale(commit);
       if (!mounted) return;
@@ -185,8 +268,12 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
           backgroundColor: AppPalette.success,
         ),
       );
+      _discountController.clear();
+      _customerNameController.clear();
+      _customerPhoneController.clear();
       setState(() {
         _cart.clear();
+        _discountIsPercent = false;
         _saving = false;
       });
     } catch (error) {
@@ -276,12 +363,25 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            'Point of Sale',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.4,
-            ),
+          Row(
+            children: <Widget>[
+              Text(
+                'Point of Sale',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.4,
+                ),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: _addCustomItem,
+                icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
+                label: const Text('Custom item'),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Row(
@@ -713,13 +813,27 @@ class _CartSheet extends StatefulWidget {
     required this.cart,
     required this.onChangeQty,
     required this.gstSummary,
-    required this.total,
+    required this.grossTotal,
+    required this.discountAmount,
+    required this.netTotal,
+    required this.discountController,
+    required this.isPercent,
+    required this.onToggleType,
+    required this.customerNameController,
+    required this.customerPhoneController,
   });
 
   final List<PosCartItem> cart;
   final void Function(String id, int delta) onChangeQty;
   final GstCartSummary Function() gstSummary;
-  final double Function() total;
+  final double Function() grossTotal;
+  final double Function() discountAmount;
+  final double Function() netTotal;
+  final TextEditingController discountController;
+  final bool Function() isPercent;
+  final VoidCallback onToggleType;
+  final TextEditingController customerNameController;
+  final TextEditingController customerPhoneController;
 
   @override
   State<_CartSheet> createState() => _CartSheetState();
@@ -731,12 +845,11 @@ class _CartSheetState extends State<_CartSheet> {
     final colors = AppColors.of(context);
     final theme = Theme.of(context);
     final gst = widget.gstSummary();
-    final total = widget.total();
 
     return DraggableScrollableSheet(
-      initialChildSize: 0.7,
+      initialChildSize: 0.75,
       minChildSize: 0.4,
-      maxChildSize: 0.92,
+      maxChildSize: 0.95,
       expand: false,
       builder: (context, scrollController) {
         return Container(
@@ -785,34 +898,226 @@ class _CartSheetState extends State<_CartSheet> {
                           ),
                         ),
                       )
-                    : ListView.separated(
+                    : ListView(
                         controller: scrollController,
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                        itemCount: widget.cart.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          final line = widget.cart[index];
-                          return _CartLine(
-                            line: line,
-                            onInc: () {
-                              widget.onChangeQty(line.id, 1);
+                        children: <Widget>[
+                          for (final line in widget.cart) ...<Widget>[
+                            _CartLine(
+                              line: line,
+                              onInc: () {
+                                widget.onChangeQty(line.id, 1);
+                                setState(() {});
+                              },
+                              onDec: () {
+                                widget.onChangeQty(line.id, -1);
+                                setState(() {});
+                              },
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+                          _DiscountCard(
+                            controller: widget.discountController,
+                            isPercent: widget.isPercent(),
+                            onToggle: () {
+                              widget.onToggleType();
                               setState(() {});
                             },
-                            onDec: () {
-                              widget.onChangeQty(line.id, -1);
-                              setState(() {});
-                            },
-                          );
-                        },
+                            onChanged: () => setState(() {}),
+                          ),
+                          const SizedBox(height: 10),
+                          _CustomerCard(
+                            nameController: widget.customerNameController,
+                            phoneController: widget.customerPhoneController,
+                          ),
+                        ],
                       ),
               ),
-              _CartFooter(gst: gst, total: total, onPay: widget.cart.isEmpty
-                  ? null
-                  : () => Navigator.of(context).pop('checkout')),
+              _CartFooter(
+                gst: gst,
+                discount: widget.discountAmount(),
+                total: widget.netTotal(),
+                onPay: widget.cart.isEmpty
+                    ? null
+                    : () => Navigator.of(context).pop('checkout'),
+              ),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+class _DiscountCard extends StatelessWidget {
+  const _DiscountCard({
+    required this.controller,
+    required this.isPercent,
+    required this.onToggle,
+    required this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final bool isPercent;
+  final VoidCallback onToggle;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.borderSoft),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: <Widget>[
+          Icon(Icons.local_offer_rounded, size: 20, color: colors.textTertiary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              onChanged: (_) => onChanged(),
+              decoration: const InputDecoration(
+                isDense: true,
+                labelText: 'Discount',
+                border: InputBorder.none,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          _MiniToggle(
+            leftLabel: '₹',
+            rightLabel: '%',
+            rightSelected: isPercent,
+            onTap: onToggle,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniToggle extends StatelessWidget {
+  const _MiniToggle({
+    required this.leftLabel,
+    required this.rightLabel,
+    required this.rightSelected,
+    required this.onTap,
+  });
+
+  final String leftLabel;
+  final String rightLabel;
+  final bool rightSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppPalette.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        padding: const EdgeInsets.all(3),
+        child: Row(
+          children: <Widget>[
+            _MiniToggleChip(label: leftLabel, selected: !rightSelected),
+            _MiniToggleChip(label: rightLabel, selected: rightSelected),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniToggleChip extends StatelessWidget {
+  const _MiniToggleChip({required this.label, required this.selected});
+
+  final String label;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 34,
+      height: 30,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: selected ? AppPalette.primary : Colors.transparent,
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+          color: selected ? Colors.white : AppPalette.primary,
+        ),
+      ),
+    );
+  }
+}
+
+class _CustomerCard extends StatelessWidget {
+  const _CustomerCard({
+    required this.nameController,
+    required this.phoneController,
+  });
+
+  final TextEditingController nameController;
+  final TextEditingController phoneController;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.borderSoft),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(Icons.person_rounded, size: 20, color: colors.textTertiary),
+              const SizedBox(width: 8),
+              Text(
+                'Customer (optional)',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: colors.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          TextField(
+            controller: nameController,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              isDense: true,
+              hintText: 'Name',
+              border: InputBorder.none,
+            ),
+          ),
+          TextField(
+            controller: phoneController,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              isDense: true,
+              hintText: 'Phone',
+              border: InputBorder.none,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -877,9 +1182,15 @@ class _CartLine extends StatelessWidget {
 }
 
 class _CartFooter extends StatelessWidget {
-  const _CartFooter({required this.gst, required this.total, required this.onPay});
+  const _CartFooter({
+    required this.gst,
+    required this.discount,
+    required this.total,
+    required this.onPay,
+  });
 
   final GstCartSummary gst;
+  final double discount;
   final double total;
   final VoidCallback? onPay;
 
@@ -906,6 +1217,14 @@ class _CartFooter extends StatelessWidget {
           if (gst.hasTax) ...<Widget>[
             const SizedBox(height: 6),
             _SummaryRow(label: 'Tax', value: formatCurrency(gst.taxAmount)),
+          ],
+          if (discount > 0) ...<Widget>[
+            const SizedBox(height: 6),
+            _SummaryRow(
+              label: 'Discount',
+              value: '- ${formatCurrency(discount)}',
+              valueColor: AppPalette.success,
+            ),
           ],
           const SizedBox(height: 10),
           Row(
@@ -946,10 +1265,11 @@ class _CartFooter extends StatelessWidget {
 }
 
 class _SummaryRow extends StatelessWidget {
-  const _SummaryRow({required this.label, required this.value});
+  const _SummaryRow({required this.label, required this.value, this.valueColor});
 
   final String label;
   final String value;
+  final Color? valueColor;
 
   @override
   Widget build(BuildContext context) {
@@ -964,7 +1284,10 @@ class _SummaryRow extends StatelessWidget {
         const Spacer(),
         Text(
           value,
-          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: valueColor,
+          ),
         ),
       ],
     );
