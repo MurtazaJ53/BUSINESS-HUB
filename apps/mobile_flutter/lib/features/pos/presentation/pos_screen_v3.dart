@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -256,15 +258,14 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
         customerName: customerName.isEmpty ? null : customerName,
         customerPhone: customerPhone.isEmpty ? null : customerPhone,
       );
-      final syncResult = await syncCoordinator.submitSale(commit);
       if (!mounted) return;
+      // Local-first: the sale is committed to the device now, so confirm and
+      // reset immediately. Backend sync runs in the background (its result is
+      // reflected by the sync status chip), so checkout never waits on the
+      // network.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            syncResult.acceptedByBackend
-                ? 'Sale synced: ${formatCurrency(commit.total)}'
-                : 'Sale queued: ${formatCurrency(commit.total)}',
-          ),
+          content: Text('Sale saved: ${formatCurrency(commit.total)}'),
           backgroundColor: AppPalette.success,
         ),
       );
@@ -276,6 +277,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
         _discountIsPercent = false;
         _saving = false;
       });
+      unawaited(syncCoordinator.submitSale(commit));
     } catch (error) {
       if (!mounted) return;
       setState(() => _saving = false);
