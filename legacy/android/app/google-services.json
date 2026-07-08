@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "631267912572",
+    "project_id": "business-hub-pro",
+    "storage_bucket": "business-hub-pro.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:631267912572:android:7f9c187945998c544f12f9",
+        "android_client_info": {
+          "package_name": "com.businesshub.pro"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "631267912572-16t3snbu56r3dl1o8n5l3sbne29885rf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDe8LA-KHFoi_nxoqXxVdjAxG_fDSTXkrw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "631267912572-16t3snbu56r3dl1o8n5l3sbne29885rf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
