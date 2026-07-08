@@ -70,6 +70,13 @@ class SettingsScreen extends ConsumerWidget {
           const _SectionLabel('Manage'),
           if (owner)
             MobileListTile(
+              title: 'Business details',
+              subtitle: 'Name, receipt footer, currency',
+              leadingIcon: Icons.storefront_rounded,
+              onTap: () => context.push('/settings/business'),
+            ),
+          if (owner)
+            MobileListTile(
               title: 'Team',
               subtitle: 'Staff members and roles',
               leadingIcon: Icons.groups_rounded,
