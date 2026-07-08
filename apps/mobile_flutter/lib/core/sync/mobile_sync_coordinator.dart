@@ -394,6 +394,34 @@ class MobileSyncCoordinator {
     setStatus(MobileSyncStatus.idle);
   }
 
+  /// Archive (soft-delete) an inventory item locally. Tombstoned items are
+  /// filtered out of every catalog query.
+  Future<void> deleteInventoryItem({
+    required String itemId,
+    required String name,
+  }) async {
+    final session = _session;
+    if (session == null || !session.hasShop) {
+      throw StateError('Sign in to a workspace before removing inventory.');
+    }
+    if (session.isReadOnly) {
+      throw StateError('Viewer access cannot remove inventory items.');
+    }
+    setStatus(MobileSyncStatus.syncing);
+    final now = DateTime.now();
+    await _inventoryRepository.mergeInventoryDocument(
+      itemId,
+      <String, dynamic>{
+        'name': name,
+        'status': 'archived',
+        'tombstone': true,
+        'updatedAt': now.toIso8601String(),
+      },
+      updatedAt: now.millisecondsSinceEpoch,
+    );
+    setStatus(MobileSyncStatus.idle);
+  }
+
   Future<CommerceSyncResult> submitSale(LocalSaleCommit commit) async {
     final session = _session;
     if (session == null || !session.hasShop) {

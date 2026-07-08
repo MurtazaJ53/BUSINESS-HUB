@@ -1446,6 +1446,33 @@ class SalesRepository {
           ),
         );
       }
+
+      // Credit sale: push the unpaid balance onto the customer's khata so the
+      // due shows up in the Clients list. Done inside the sale transaction so
+      // the ledger stays consistent with the recorded sale.
+      if (customerId != null && customerId.isNotEmpty) {
+        final received = payments.fold<double>(
+          0,
+          (sum, payment) => sum + payment.amount,
+        );
+        final saleDue = total - received;
+        if (saleDue > 0.009) {
+          final customerRow =
+              await (_db.select(_db.customerEntries)
+                    ..where((tbl) => tbl.id.equals(customerId)))
+                  .getSingleOrNull();
+          if (customerRow != null) {
+            await (_db.update(
+              _db.customerEntries,
+            )..where((tbl) => tbl.id.equals(customerId))).write(
+              CustomerEntriesCompanion(
+                balance: Value(customerRow.balance + saleDue),
+                updatedAt: Value(now.millisecondsSinceEpoch),
+              ),
+            );
+          }
+        }
+      }
     });
 
     return LocalSaleCommit(

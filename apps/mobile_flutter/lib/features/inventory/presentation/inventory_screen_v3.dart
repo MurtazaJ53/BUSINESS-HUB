@@ -387,16 +387,32 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
               ],
             ),
             const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton.icon(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _showAddItemSheet(context, duplicateOf: item);
-                },
-                icon: const Icon(Icons.copy_rounded),
-                label: const Text('Duplicate'),
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _showAddItemSheet(context, duplicateOf: item);
+                    },
+                    icon: const Icon(Icons.copy_rounded),
+                    label: const Text('Duplicate'),
+                  ),
+                ),
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _confirmDeleteItem(item);
+                    },
+                    icon: const Icon(Icons.delete_outline_rounded),
+                    label: const Text('Delete'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppPalette.error,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -836,6 +852,42 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
       qtyController.dispose();
       priceController.dispose();
     });
+  }
+
+  Future<void> _confirmDeleteItem(InventoryCatalogItem item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete item?'),
+        content: Text('${item.name} will be removed from your inventory.'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(backgroundColor: AppPalette.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref
+          .read(mobileSyncCoordinatorProvider)
+          .deleteInventoryItem(itemId: item.id, name: item.name);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${item.name} deleted.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Delete failed: $error')),
+      );
+    }
   }
 
   void _showBulkAddSheet(BuildContext context) {

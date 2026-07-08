@@ -229,6 +229,50 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
     }
   }
 
+  /// When a sale leaves a balance due, attach it to a real customer (matched
+  /// by phone, or created) so the due lands in the Clients khata. Returns the
+  /// customer id to record on the sale, or null for a fully-paid walk-in.
+  Future<String?> _resolveCustomerForSale({
+    required List<PosPayment> payments,
+    required String customerName,
+    required String customerPhone,
+  }) async {
+    final paid = payments.fold<double>(0, (sum, p) => sum + p.amount);
+    final saleDue = _netTotal - paid;
+    final hasCustomer = customerName.isNotEmpty || customerPhone.isNotEmpty;
+    if (saleDue <= 0.009 || !hasCustomer) {
+      return null;
+    }
+
+    final existing =
+        ref.read(customersProvider).asData?.value ??
+        const <BackendCustomerSummary>[];
+    if (customerPhone.isNotEmpty) {
+      for (final c in existing) {
+        if ((c.phone ?? '').trim() == customerPhone) {
+          return c.id;
+        }
+      }
+    }
+
+    final now = DateTime.now();
+    final id = 'local-cust-${now.microsecondsSinceEpoch}';
+    await ref.read(customerRepositoryProvider).mergeRemoteCustomerDocument(
+      id,
+      <String, dynamic>{
+        'name': customerName.isEmpty ? 'Customer' : customerName,
+        'phone': customerPhone,
+        'status': 'active',
+        'balance': 0,
+        'total_spent': 0,
+        'tombstone': false,
+        'updatedAt': now.toIso8601String(),
+      },
+      updatedAt: now.millisecondsSinceEpoch,
+    );
+    return id;
+  }
+
   Future<void> _openCheckout() async {
     final session = ref.read(mobileSessionProvider).asData?.value;
     final shop = ref.read(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
@@ -261,6 +305,11 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
 
     setState(() => _saving = true);
     try {
+      final customerId = await _resolveCustomerForSale(
+        payments: payments,
+        customerName: customerName,
+        customerPhone: customerPhone,
+      );
       final commit = await salesRepository.recordLocalSale(
         shopId: activeShopId,
         items: List<PosCartItem>.from(_cart),
@@ -269,6 +318,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
         footerNote: shop.footer,
         buyerGstin: buyerGstin,
         discount: _discountAmount,
+        customerId: customerId,
         customerName: customerName.isEmpty ? null : customerName,
         customerPhone: customerPhone.isEmpty ? null : customerPhone,
         saleDate: _saleDate,
