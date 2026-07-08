@@ -352,13 +352,30 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
             const SizedBox(height: 24),
 
             // Actions
-            PrimaryActionButton(
-              label: 'Edit Item',
-              icon: Icons.edit_rounded,
-              onPressed: () {
-                Navigator.pop(context);
-                // TODO: Navigate to edit screen
-              },
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _showRestockSheet(context, item);
+                    },
+                    icon: const Icon(Icons.add_box_rounded),
+                    label: const Text('Restock'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _showAddItemSheet(context, existing: item);
+                    },
+                    icon: const Icon(Icons.edit_rounded),
+                    label: const Text('Edit'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -400,16 +417,25 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
     );
   }
 
-  void _showAddItemSheet(BuildContext context) {
+  void _showAddItemSheet(BuildContext context, {InventoryCatalogItem? existing}) {
+    final isEdit = existing != null;
     final formKey = GlobalKey<FormState>();
-    final nameController = TextEditingController();
-    final priceController = TextEditingController();
-    final stockController = TextEditingController(text: '0');
-    final categoryController = TextEditingController(text: 'General');
-    final skuController = TextEditingController();
-    final hsnController = TextEditingController();
-    final gstController = TextEditingController(text: '0');
-    var priceIncludesTax = true;
+    final nameController = TextEditingController(text: existing?.name ?? '');
+    final priceController = TextEditingController(
+      text: existing != null ? existing.price.toStringAsFixed(2) : '',
+    );
+    final stockController = TextEditingController(
+      text: '${existing?.stock ?? 0}',
+    );
+    final categoryController = TextEditingController(
+      text: existing?.category ?? 'General',
+    );
+    final skuController = TextEditingController(text: existing?.sku ?? '');
+    final hsnController = TextEditingController(text: existing?.hsnCode ?? '');
+    final gstController = TextEditingController(
+      text: existing != null ? existing.gstRate.toString() : '0',
+    );
+    var priceIncludesTax = existing?.priceIncludesTax ?? true;
     var isSaving = false;
 
     showModalBottomSheet<void>(
@@ -431,18 +457,36 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                 final gstRate =
                     double.tryParse(gstController.text.trim()) ?? 0;
 
-                await ref
-                    .read(mobileSyncCoordinatorProvider)
-                    .createInventoryItem(
-                      name: nameController.text.trim(),
-                      sellPrice: price,
-                      openingStock: openingStock,
-                      category: categoryController.text.trim(),
-                      sku: skuController.text.trim(),
-                      hsnCode: hsnController.text.trim(),
-                      gstRate: gstRate,
-                      priceIncludesTax: priceIncludesTax,
-                    );
+                final coordinator = ref.read(mobileSyncCoordinatorProvider);
+                if (isEdit) {
+                  await coordinator.updateInventoryItem(
+                    itemId: existing.id,
+                    name: nameController.text.trim(),
+                    sellPrice: price,
+                    stock: openingStock,
+                    category: categoryController.text.trim(),
+                    sku: skuController.text.trim(),
+                    hsnCode: hsnController.text.trim(),
+                    gstRate: gstRate,
+                    priceIncludesTax: priceIncludesTax,
+                    costPrice: existing.costPrice,
+                    size: existing.size ?? '',
+                    subcategory: existing.subcategory ?? '',
+                    description: existing.description ?? '',
+                    createdAt: existing.createdAt,
+                  );
+                } else {
+                  await coordinator.createInventoryItem(
+                    name: nameController.text.trim(),
+                    sellPrice: price,
+                    openingStock: openingStock,
+                    category: categoryController.text.trim(),
+                    sku: skuController.text.trim(),
+                    hsnCode: hsnController.text.trim(),
+                    gstRate: gstRate,
+                    priceIncludesTax: priceIncludesTax,
+                  );
+                }
 
                 if (!sheetContext.mounted) {
                   return;
@@ -450,7 +494,9 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                 Navigator.pop(sheetContext);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('${nameController.text.trim()} added.'),
+                    content: Text(
+                      '${nameController.text.trim()} ${isEdit ? 'updated' : 'added'}.',
+                    ),
                   ),
                 );
               } catch (error) {
@@ -494,7 +540,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                           ),
                           const SizedBox(height: 24),
                           Text(
-                            'Add New Item',
+                            isEdit ? 'Edit Item' : 'Add New Item',
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.w700,
@@ -591,8 +637,12 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                           ),
                           const SizedBox(height: 20),
                           PrimaryActionButton(
-                            label: isSaving ? 'Saving...' : 'Create Item',
-                            icon: Icons.add_rounded,
+                            label: isSaving
+                                ? 'Saving...'
+                                : (isEdit ? 'Save Changes' : 'Create Item'),
+                            icon: isEdit
+                                ? Icons.check_rounded
+                                : Icons.add_rounded,
                             onPressed: isSaving ? null : saveItem,
                           ),
                         ],
@@ -613,6 +663,146 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
       skuController.dispose();
       hsnController.dispose();
       gstController.dispose();
+    });
+  }
+
+  void _showRestockSheet(BuildContext context, InventoryCatalogItem item) {
+    final qtyController = TextEditingController();
+    final priceController = TextEditingController(
+      text: item.price.toStringAsFixed(2),
+    );
+    var isSaving = false;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            Future<void> save() async {
+              final addQty = int.tryParse(qtyController.text.trim()) ?? 0;
+              if (addQty <= 0 || isSaving) return;
+              setSheetState(() => isSaving = true);
+              try {
+                final newPrice =
+                    double.tryParse(priceController.text.trim()) ?? item.price;
+                await ref
+                    .read(mobileSyncCoordinatorProvider)
+                    .updateInventoryItem(
+                      itemId: item.id,
+                      name: item.name,
+                      sellPrice: newPrice,
+                      stock: item.stock + addQty,
+                      category: item.category,
+                      sku: item.sku ?? '',
+                      hsnCode: item.hsnCode ?? '',
+                      gstRate: item.gstRate,
+                      priceIncludesTax: item.priceIncludesTax,
+                      costPrice: item.costPrice,
+                      size: item.size ?? '',
+                      subcategory: item.subcategory ?? '',
+                      description: item.description ?? '',
+                      createdAt: item.createdAt,
+                    );
+                if (!sheetContext.mounted) return;
+                Navigator.pop(sheetContext);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '${item.name}: +$addQty (now ${item.stock + addQty}).',
+                    ),
+                  ),
+                );
+              } catch (error) {
+                if (!sheetContext.mounted) return;
+                setSheetState(() => isSaving = false);
+                ScaffoldMessenger.of(sheetContext).showSnackBar(
+                  SnackBar(content: Text('Restock failed: $error')),
+                );
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.of(sheetContext).background,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
+                ),
+                padding: const EdgeInsets.all(24),
+                child: SafeArea(
+                  top: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppColors.of(sheetContext).border,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Restock',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.of(sheetContext).textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${item.name} · current stock ${item.stock}',
+                        style: TextStyle(
+                          color: AppColors.of(sheetContext).textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      TextField(
+                        controller: qtyController,
+                        keyboardType: TextInputType.number,
+                        autofocus: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Add quantity',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: priceController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Selling price',
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      PrimaryActionButton(
+                        label: isSaving ? 'Saving...' : 'Add stock',
+                        icon: Icons.add_box_rounded,
+                        onPressed: isSaving ? null : save,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      qtyController.dispose();
+      priceController.dispose();
     });
   }
 }

@@ -321,6 +321,79 @@ class MobileSyncCoordinator {
     }
   }
 
+  /// Update an existing inventory item locally (edit + restock).
+  ///
+  /// The local merge is a full upsert, so callers must pass the complete set
+  /// of fields (using the item's current values for anything unchanged) or the
+  /// missing fields reset to defaults.
+  Future<void> updateInventoryItem({
+    required String itemId,
+    required String name,
+    required double sellPrice,
+    required int stock,
+    String sku = '',
+    String barcode = '',
+    String category = 'General',
+    String subcategory = '',
+    String size = '',
+    String description = '',
+    double? costPrice,
+    String hsnCode = '',
+    double gstRate = 0,
+    bool priceIncludesTax = true,
+    DateTime? createdAt,
+  }) async {
+    final session = _session;
+    if (session == null || !session.hasShop) {
+      throw StateError('Sign in to a workspace before editing inventory.');
+    }
+    if (session.isReadOnly) {
+      throw StateError('Viewer access cannot edit inventory items.');
+    }
+
+    setStatus(MobileSyncStatus.syncing);
+    final now = DateTime.now();
+    final iso = now.toIso8601String();
+    final normalizedCategory =
+        category.trim().isEmpty ? 'General' : category.trim();
+    final payload = <String, dynamic>{
+      'name': name.trim(),
+      'price': sellPrice,
+      'sell_price': sellPrice,
+      'sku': sku.trim(),
+      'barcode': barcode.trim(),
+      'category': normalizedCategory,
+      'subcategory': subcategory.trim(),
+      'size': size.trim(),
+      'description': description.trim(),
+      'hsnCode': hsnCode.trim(),
+      'gstRate': gstRate,
+      'priceIncludesTax': priceIncludesTax,
+      'stock': stock,
+      'status': 'active',
+      'tombstone': false,
+      'createdAt': (createdAt ?? now).toIso8601String(),
+      'updatedAt': iso,
+    };
+    await _inventoryRepository.mergeInventoryDocument(
+      itemId,
+      payload,
+      updatedAt: now.millisecondsSinceEpoch,
+    );
+    if (costPrice != null && session.canViewCost) {
+      await _inventoryRepository.mergeInventoryPrivateDocument(
+        itemId,
+        <String, dynamic>{
+          'costPrice': costPrice,
+          'updatedAt': iso,
+          'tombstone': false,
+        },
+        updatedAt: now.millisecondsSinceEpoch,
+      );
+    }
+    setStatus(MobileSyncStatus.idle);
+  }
+
   Future<CommerceSyncResult> submitSale(LocalSaleCommit commit) async {
     final session = _session;
     if (session == null || !session.hasShop) {
