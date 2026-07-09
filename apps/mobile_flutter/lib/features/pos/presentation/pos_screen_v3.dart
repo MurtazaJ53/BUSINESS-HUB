@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
+import '../../../core/pos/cart_pricing.dart';
+import '../../../core/pos/held_sales.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/providers/printer_provider.dart';
 import '../../../core/session/mobile_session_controller.dart';
@@ -41,19 +43,22 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
 
   static const int _pageSize = 50;
 
-  double get _cartTotal =>
-      _cart.fold<double>(0, (sum, item) => sum + item.lineTotal);
+  double get _cartTotal => CartPricing.subtotal(_cart);
   int get _cartCount => _cart.fold<int>(0, (sum, item) => sum + item.quantity);
-  GstCartSummary get _gstSummary => computeCartGst(_cart);
 
-  double get _discountAmount {
-    final raw = double.tryParse(_discountController.text.trim()) ?? 0;
-    if (raw <= 0) return 0;
-    final amount = _discountIsPercent ? _cartTotal * (raw / 100) : raw;
-    return amount.clamp(0, _cartTotal).toDouble();
-  }
+  // GST is computed on the discounted (net) cart so the tax shown matches the
+  // amount actually charged.
+  GstCartSummary get _gstSummary =>
+      computeCartGst(_cart, discount: _discountAmount);
 
-  double get _netTotal => _cartTotal - _discountAmount;
+  double get _discountAmount => CartPricing.discountAmount(
+    subtotal: _cartTotal,
+    value: double.tryParse(_discountController.text.trim()) ?? 0,
+    isPercent: _discountIsPercent,
+  );
+
+  double get _netTotal =>
+      CartPricing.net(subtotal: _cartTotal, discount: _discountAmount);
 
   @override
   void dispose() {
@@ -168,6 +173,131 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
   }
 
   // ---- actions --------------------------------------------------------------
+
+  void _holdCurrentSale() {
+    if (_cart.isEmpty) return;
+    ref
+        .read(heldSalesProvider.notifier)
+        .hold(
+          HeldSale(
+            id: 'held-${DateTime.now().microsecondsSinceEpoch}',
+            items: List<PosCartItem>.from(_cart),
+            discountText: _discountController.text,
+            discountIsPercent: _discountIsPercent,
+            customerName: _customerNameController.text,
+            customerPhone: _customerPhoneController.text,
+            saleDate: _saleDate,
+            heldAt: DateTime.now(),
+          ),
+        );
+    _discountController.clear();
+    _customerNameController.clear();
+    _customerPhoneController.clear();
+    setState(() {
+      _cart.clear();
+      _discountIsPercent = false;
+      _saleDate = null;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Sale held.')),
+    );
+  }
+
+  void _resumeHeldSale(HeldSale held) {
+    _discountController.text = held.discountText;
+    _customerNameController.text = held.customerName;
+    _customerPhoneController.text = held.customerPhone;
+    setState(() {
+      _cart
+        ..clear()
+        ..addAll(held.items);
+      _discountIsPercent = held.discountIsPercent;
+      _saleDate = held.saleDate;
+    });
+    ref.read(heldSalesProvider.notifier).remove(held.id);
+  }
+
+  Future<void> _showHeldSales() async {
+    final held = ref.read(heldSalesProvider);
+    if (held.isEmpty) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final colors = AppColors.of(sheetContext);
+        return Container(
+          decoration: BoxDecoration(
+            color: colors.background,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: colors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Held sales',
+                  style: Theme.of(sheetContext).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ...held.map(
+                  (h) => Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: colors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: colors.borderSoft),
+                    ),
+                    child: ListTile(
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        _resumeHeldSale(h);
+                      },
+                      leading: const Icon(
+                        Icons.pause_circle_filled_rounded,
+                        color: AppPalette.primary,
+                      ),
+                      title: Text(
+                        h.label,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: Text(
+                        '${h.itemCount} item${h.itemCount == 1 ? '' : 's'} · ${formatCurrency(h.total)}',
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        color: AppPalette.error,
+                        onPressed: () {
+                          ref.read(heldSalesProvider.notifier).remove(h.id);
+                          Navigator.pop(sheetContext);
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   Future<void> _openScanner(List<InventoryCatalogItem> items) async {
     final code = await showModalBottomSheet<String>(
@@ -574,12 +704,27 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
                 ),
               ),
               const Spacer(),
+              if (ref.watch(heldSalesProvider).isNotEmpty)
+                TextButton.icon(
+                  onPressed: _showHeldSales,
+                  icon: const Icon(Icons.inventory_2_outlined, size: 18),
+                  label: Text('Held ${ref.watch(heldSalesProvider).length}'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                ),
+              if (_cart.isNotEmpty)
+                IconButton(
+                  onPressed: _holdCurrentSale,
+                  icon: const Icon(Icons.pause_circle_outline_rounded),
+                  tooltip: 'Hold sale',
+                ),
               TextButton.icon(
                 onPressed: _addCustomItem,
                 icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
-                label: const Text('Custom item'),
+                label: const Text('Custom'),
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                 ),
               ),
             ],
