@@ -755,6 +755,24 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                           );
                         }
                       ),
+                      if (detail.total >= 0 &&
+                          !(detail.footerNote ?? '').contains('RETURN')) ...<Widget>[
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: () =>
+                              _startReturn(context, detail, salesRepository),
+                          icon: const Icon(Icons.assignment_return_rounded),
+                          label: const Text('RETURN / REFUND'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppPalette.error,
+                            side: const BorderSide(color: AppPalette.error),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 );
@@ -764,6 +782,68 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         );
       },
     );
+  }
+
+  Future<void> _startReturn(
+    BuildContext sheetContext,
+    SaleRecordDetail detail,
+    SalesRepository salesRepository,
+  ) async {
+    var restock = true;
+    final confirmed = await showDialog<bool>(
+      context: sheetContext,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Return / refund'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text('Refund ${formatCurrency(detail.total)} for this receipt.'),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                value: restock,
+                onChanged: (v) => setDialogState(() => restock = v),
+                title: const Text('Put items back in stock'),
+              ),
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: FilledButton.styleFrom(backgroundColor: AppPalette.error),
+              child: const Text('Refund'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+
+    final shopId = ref.read(mobileSessionProvider).asData?.value?.shopId;
+    if (shopId == null || shopId.isEmpty) return;
+    try {
+      await salesRepository.recordReturn(
+        shopId: shopId,
+        original: detail,
+        restock: restock,
+      );
+      if (sheetContext.mounted) Navigator.pop(sheetContext);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Refunded ${formatCurrency(detail.total)}.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Refund failed: $error')),
+        );
+      }
+    }
   }
 }
 

@@ -1515,6 +1515,86 @@ class SalesRepository {
     );
   }
 
+  /// Record a full return/refund of a past sale: a reversing (negative) sale
+  /// for history + reporting, and — if [restock] — put the items back on the
+  /// shelf (matched by SKU, else name). All in one transaction.
+  Future<void> recordReturn({
+    required String shopId,
+    required SaleRecordDetail original,
+    required bool restock,
+  }) async {
+    final now = DateTime.now();
+    final saleId = 'return-${now.millisecondsSinceEpoch}';
+    final commandId = 'return-cmd-${now.microsecondsSinceEpoch}';
+
+    final encodedItems = original.items
+        .map(
+          (it) => <String, dynamic>{
+            'name': it.name,
+            'quantity': -it.quantity,
+            'unitPrice': it.unitPrice,
+            'lineTotal': -(it.unitPrice * it.quantity),
+            'sku': it.sku,
+            'gstRate': it.gstRate,
+            'priceIncludesTax': it.priceIncludesTax,
+          },
+        )
+        .toList(growable: false);
+    final encodedPayments = <Map<String, dynamic>>[
+      <String, dynamic>{'mode': 'REFUND', 'amount': -original.amountReceived},
+    ];
+
+    await _db.transaction(() async {
+      await _db
+          .into(_db.salesEntries)
+          .insert(
+            SalesEntriesCompanion.insert(
+              id: saleId,
+              total: -original.total,
+              discount: const Value(0),
+              discountType: const Value('fixed'),
+              paymentMode: const Value('REFUND'),
+              date: now.toIso8601String().split('T').first,
+              createdAt: now.millisecondsSinceEpoch,
+              updatedAt: Value(now.millisecondsSinceEpoch),
+              customerName: Value(original.customerName),
+              customerPhone: Value(original.customerPhone),
+              footerNote: Value('RETURN of receipt ${original.id}'),
+              itemsJson: jsonEncode(encodedItems),
+              paymentsJson: jsonEncode(encodedPayments),
+              commandId: Value(commandId),
+              syncStatus: const Value('queued'),
+              backendSaleId: const Value(null),
+            ),
+          );
+
+      if (restock) {
+        for (final it in original.items) {
+          final hasSku = it.sku != null && it.sku!.trim().isNotEmpty;
+          final row =
+              await (_db.select(_db.inventoryEntries)
+                    ..where(
+                      (t) => hasSku
+                          ? t.sku.equals(it.sku!)
+                          : t.name.equals(it.name),
+                    )
+                    ..limit(1))
+                  .getSingleOrNull();
+          if (row != null) {
+            await (_db.update(
+              _db.inventoryEntries,
+            )..where((t) => t.id.equals(row.id))).write(
+              InventoryEntriesCompanion(
+                stock: Value(row.stock + it.quantity),
+                updatedAt: Value(now.millisecondsSinceEpoch),
+              ),
+            );
+          }
+        }
+      }
+    });
+  }
+
   Future<List<CommerceOutboxEntryModel>> getPendingOutboxEntries() async {
     final rows =
         await (_db.select(_db.commerceOutboxEntries)
