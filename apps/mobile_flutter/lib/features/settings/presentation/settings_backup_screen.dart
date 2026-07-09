@@ -1,0 +1,252 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/backup/backup_service.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../shell/presentation/mobile_surface.dart';
+
+class SettingsBackupScreen extends ConsumerStatefulWidget {
+  const SettingsBackupScreen({super.key});
+
+  @override
+  ConsumerState<SettingsBackupScreen> createState() =>
+      _SettingsBackupScreenState();
+}
+
+class _SettingsBackupScreenState extends ConsumerState<SettingsBackupScreen> {
+  List<File> _backups = const <File>[];
+  bool _loading = true;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  Future<void> _refresh() async {
+    final backups = await ref.read(backupServiceProvider).listBackups();
+    if (!mounted) return;
+    setState(() {
+      _backups = backups;
+      _loading = false;
+    });
+  }
+
+  Future<void> _createBackup() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final file = await ref.read(backupServiceProvider).createBackup();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Backup saved: ${_name(file)}')),
+      );
+      await _refresh();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Backup failed: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _restore(File backup) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Restore this backup?'),
+        content: const Text(
+          'This replaces ALL current data with the backup. The app will close '
+          'afterwards — reopen it to finish. This cannot be undone.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(backgroundColor: AppPalette.error),
+            child: const Text('Restore'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(backupServiceProvider).restoreBackup(backup);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Backup restored'),
+          content: const Text(
+            'Your data has been restored. The app will now close — please '
+            'reopen it.',
+          ),
+          actions: <Widget>[
+            FilledButton(
+              onPressed: () => SystemNavigator.pop(),
+              child: const Text('Close app'),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Restore failed: $error')),
+      );
+    }
+  }
+
+  Future<void> _delete(File backup) async {
+    await ref.read(backupServiceProvider).deleteBackup(backup);
+    await _refresh();
+  }
+
+  String _name(File f) => f.uri.pathSegments.last;
+
+  String _size(File f) {
+    final bytes = f.lengthSync();
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    return MobileStandaloneScaffold(
+      title: 'Backup & restore',
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
+        children: <Widget>[
+          MobilePanel(
+            title: 'Backup',
+            action: const MobileTag(
+              label: 'ON THIS DEVICE',
+              icon: Icons.save_rounded,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Save a full copy of your sales, inventory, customers and '
+                  'dues. Keep a recent backup so you never lose your books if '
+                  'the phone is lost or reset.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colors.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _busy ? null : _createBackup,
+                    icon: _busy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.backup_rounded),
+                    label: Text(_busy ? 'Backing up...' : 'Create backup now'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          MobilePanel(
+            title: 'Saved backups',
+            action: MobileTag(
+              label: '${_backups.length}',
+              icon: Icons.folder_rounded,
+            ),
+            child: _loading
+                ? const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                : _backups.isEmpty
+                ? const MobileEmptyState(
+                    icon: Icons.inbox_rounded,
+                    title: 'No backups yet',
+                    body: 'Tap "Create backup now" to make your first one.',
+                  )
+                : Column(
+                    children: _backups
+                        .map(
+                          (f) => Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            decoration: BoxDecoration(
+                              color: colors.surface,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: colors.borderSoft),
+                            ),
+                            child: ListTile(
+                              leading: const Icon(
+                                Icons.description_rounded,
+                                color: AppPalette.primary,
+                              ),
+                              title: Text(
+                                _name(f),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              subtitle: Text(_size(f)),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: <Widget>[
+                                  IconButton(
+                                    icon: const Icon(Icons.restore_rounded),
+                                    color: AppPalette.primary,
+                                    tooltip: 'Restore',
+                                    onPressed: () => _restore(f),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete_outline_rounded,
+                                    ),
+                                    color: AppPalette.error,
+                                    tooltip: 'Delete',
+                                    onPressed: () => _delete(f),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Backups are stored on this device. Copy them to Google Drive or '
+            'a computer for off-device safety.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: colors.textTertiary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

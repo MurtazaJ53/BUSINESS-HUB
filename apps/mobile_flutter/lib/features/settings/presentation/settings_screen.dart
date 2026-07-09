@@ -103,6 +103,12 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => context.push('/settings/plan'),
           ),
           MobileListTile(
+            title: 'Backup & restore',
+            subtitle: 'Protect your books from data loss',
+            leadingIcon: Icons.backup_rounded,
+            onTap: () => context.push('/settings/backup'),
+          ),
+          MobileListTile(
             title: 'Change PIN',
             subtitle: 'Update your unlock PIN',
             leadingIcon: Icons.pin_rounded,

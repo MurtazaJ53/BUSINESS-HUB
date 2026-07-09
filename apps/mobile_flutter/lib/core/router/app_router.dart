@@ -9,6 +9,7 @@ import '../../features/history/presentation/history_screen.dart';
 import '../../features/inventory/presentation/inventory_screen_v3.dart';
 import '../../features/pos/presentation/pos_screen_v3.dart';
 import '../../features/settings/presentation/admin_tools_screen.dart';
+import '../../features/settings/presentation/settings_backup_screen.dart';
 import '../../features/settings/presentation/settings_business_screen.dart';
 import '../../features/settings/presentation/settings_ops_screen.dart';
 import '../../features/settings/presentation/settings_attendance_screen.dart';
@@ -93,6 +94,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: 'business',
             pageBuilder: (context, state) =>
                 const NoTransitionPage<void>(child: SettingsBusinessScreen()),
+          ),
+          GoRoute(
+            parentNavigatorKey: appRootNavigatorKey,
+            path: 'backup',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage<void>(child: SettingsBackupScreen()),
           ),
           GoRoute(
             parentNavigatorKey: appRootNavigatorKey,
