@@ -351,6 +351,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
             setState(() => _saleDate = picked);
           }
         },
+        onPickCustomer: _pickCustomer,
       ),
     );
     setState(() {}); // reflect any edits made inside the sheet
@@ -401,6 +402,120 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
       updatedAt: now.millisecondsSinceEpoch,
     );
     return id;
+  }
+
+  Future<void> _pickCustomer() async {
+    final all =
+        ref.read(customersProvider).asData?.value ??
+        const <BackendCustomerSummary>[];
+    final searchController = TextEditingController();
+    final selected = await showModalBottomSheet<BackendCustomerSummary>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final colors = AppColors.of(sheetContext);
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            final q = searchController.text.trim().toLowerCase();
+            final filtered = q.isEmpty
+                ? all
+                : all
+                      .where(
+                        (c) =>
+                            c.name.toLowerCase().contains(q) ||
+                            (c.phone ?? '').contains(q),
+                      )
+                      .toList(growable: false);
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: colors.background,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
+                ),
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+                child: SafeArea(
+                  top: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: colors.border,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Choose customer',
+                        style: Theme.of(sheetContext).textTheme.titleLarge
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: searchController,
+                        onChanged: (_) => setSheetState(() {}),
+                        decoration: const InputDecoration(
+                          hintText: 'Search name or phone',
+                          prefixIcon: Icon(Icons.search_rounded),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Flexible(
+                        child: filtered.isEmpty
+                            ? const Padding(
+                                padding: EdgeInsets.all(24),
+                                child: Text('No customers found.'),
+                              )
+                            : ListView(
+                                shrinkWrap: true,
+                                children: filtered
+                                    .map(
+                                      (c) => ListTile(
+                                        leading: const Icon(
+                                          Icons.person_rounded,
+                                        ),
+                                        title: Text(
+                                          c.name,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        subtitle: Text(
+                                          '${c.phone ?? ''}${c.balance > 0 ? ' · due ${formatCurrency(c.balance)}' : ''}',
+                                        ),
+                                        onTap: () =>
+                                            Navigator.pop(sheetContext, c),
+                                      ),
+                                    )
+                                    .toList(growable: false),
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    searchController.dispose();
+    if (selected != null) {
+      _customerNameController.text = selected.name;
+      _customerPhoneController.text = selected.phone ?? '';
+      if (mounted) setState(() {});
+    }
   }
 
   Future<void> _openCheckout() async {
@@ -1169,6 +1284,7 @@ class _CartSheet extends StatefulWidget {
     required this.customerPhoneController,
     required this.saleDate,
     required this.onPickDate,
+    required this.onPickCustomer,
   });
 
   final List<PosCartItem> cart;
@@ -1184,6 +1300,7 @@ class _CartSheet extends StatefulWidget {
   final TextEditingController customerPhoneController;
   final DateTime? Function() saleDate;
   final Future<void> Function() onPickDate;
+  final Future<void> Function() onPickCustomer;
 
   @override
   State<_CartSheet> createState() => _CartSheetState();
@@ -1279,6 +1396,10 @@ class _CartSheetState extends State<_CartSheet> {
                           _CustomerCard(
                             nameController: widget.customerNameController,
                             phoneController: widget.customerPhoneController,
+                            onPick: () async {
+                              await widget.onPickCustomer();
+                              setState(() {});
+                            },
                           ),
                           const SizedBox(height: 10),
                           _DateCard(
@@ -1476,10 +1597,12 @@ class _CustomerCard extends StatelessWidget {
   const _CustomerCard({
     required this.nameController,
     required this.phoneController,
+    required this.onPick,
   });
 
   final TextEditingController nameController;
   final TextEditingController phoneController;
+  final Future<void> Function() onPick;
 
   @override
   Widget build(BuildContext context) {
@@ -1503,6 +1626,16 @@ class _CustomerCard extends StatelessWidget {
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   color: colors.textSecondary,
                   fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: onPick,
+                icon: const Icon(Icons.people_alt_rounded, size: 16),
+                label: const Text('Choose'),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  visualDensity: VisualDensity.compact,
                 ),
               ),
             ],
