@@ -20,6 +20,7 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
     with SingleTickerProviderStateMixin {
   final _pinController = TextEditingController();
   bool _isLoggingIn = false;
+  bool _hasPin = true; // assume returning user until checked
   late final AnimationController _shakeController;
 
   @override
@@ -29,6 +30,12 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
       vsync: this,
       duration: const Duration(milliseconds: 450),
     );
+    _loadHasPin();
+  }
+
+  Future<void> _loadHasPin() async {
+    final has = await ref.read(mobileSessionProvider.notifier).hasPin();
+    if (mounted) setState(() => _hasPin = has);
   }
 
   @override
@@ -53,10 +60,18 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
 
     setState(() => _isLoggingIn = true);
 
-    await ref.read(mobileSessionProvider.notifier).login(_pinController.text);
+    final ok = await ref
+        .read(mobileSessionProvider.notifier)
+        .login(_pinController.text);
 
-    if (mounted) {
-      setState(() => _isLoggingIn = false);
+    if (!mounted) return;
+    setState(() => _isLoggingIn = false);
+    if (!ok) {
+      _pinController.clear();
+      _triggerShake();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Incorrect PIN. Try again.')),
+      );
     }
   }
 
@@ -99,13 +114,18 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
               const _BrandHero(),
               const SizedBox(height: 28),
               MobilePanel(
-                title: 'Staff Login',
-                action: const MobileTag(label: 'SECURE', icon: Icons.lock_outline),
+                title: _hasPin ? 'Staff Login' : 'Set up PIN',
+                action: MobileTag(
+                  label: _hasPin ? 'SECURE' : 'FIRST TIME',
+                  icon: Icons.lock_outline,
+                ),
                 child: Column(
                   children: [
                     const SizedBox(height: 8),
                     Text(
-                      'Enter your assigned PIN to unlock the POS terminal.',
+                      _hasPin
+                          ? 'Enter your PIN to unlock the POS terminal.'
+                          : 'Choose a 4-digit PIN to secure this terminal. You will use it every time you sign in.',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppPalette.textSecondary,
@@ -179,9 +199,9 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : const Text(
-                                  'UNLOCK TERMINAL',
-                                  style: TextStyle(
+                              : Text(
+                                  _hasPin ? 'UNLOCK TERMINAL' : 'SET PIN & UNLOCK',
+                                  style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 1.2,

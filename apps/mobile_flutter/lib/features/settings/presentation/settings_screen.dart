@@ -102,6 +102,12 @@ class SettingsScreen extends ConsumerWidget {
             leadingIcon: Icons.workspace_premium_rounded,
             onTap: () => context.push('/settings/plan'),
           ),
+          MobileListTile(
+            title: 'Change PIN',
+            subtitle: 'Update your unlock PIN',
+            leadingIcon: Icons.pin_rounded,
+            onTap: () => _changePinDialog(context, ref),
+          ),
           if (owner)
             MobileListTile(
               title: 'Security',
@@ -191,6 +197,77 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+Future<void> _changePinDialog(BuildContext context, WidgetRef ref) async {
+  final current = TextEditingController();
+  final next = TextEditingController();
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Change PIN'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          TextField(
+            controller: current,
+            obscureText: true,
+            keyboardType: TextInputType.number,
+            maxLength: 4,
+            decoration: const InputDecoration(
+              labelText: 'Current PIN',
+              counterText: '',
+            ),
+          ),
+          TextField(
+            controller: next,
+            obscureText: true,
+            keyboardType: TextInputType.number,
+            maxLength: 4,
+            decoration: const InputDecoration(
+              labelText: 'New PIN',
+              counterText: '',
+            ),
+          ),
+        ],
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: const Text('Save'),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmed == true) {
+    if (next.text.trim().length < 4) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('New PIN must be 4 digits.')),
+        );
+      }
+    } else {
+      final changed = await ref
+          .read(mobileSessionProvider.notifier)
+          .changePin(current.text.trim(), next.text.trim());
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              changed ? 'PIN updated.' : 'Current PIN is incorrect.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+  current.dispose();
+  next.dispose();
 }
 
 class _SectionLabel extends StatelessWidget {

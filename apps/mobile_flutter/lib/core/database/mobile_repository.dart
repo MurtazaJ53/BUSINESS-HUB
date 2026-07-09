@@ -98,6 +98,25 @@ class ShopRepository {
         );
   }
 
+  Future<String?> readSetting(String key) async {
+    final row = await (_db.select(
+      _db.shopSettingsEntries,
+    )..where((tbl) => tbl.key.equals(key))).getSingleOrNull();
+    return row?.value;
+  }
+
+  Future<void> writeSetting(String key, String value) async {
+    await _db
+        .into(_db.shopSettingsEntries)
+        .insertOnConflictUpdate(
+          ShopSettingsEntriesCompanion.insert(
+            key: key,
+            value: value,
+            updatedAt: DateTime.now().millisecondsSinceEpoch,
+          ),
+        );
+  }
+
   Future<void> saveDomainState({required DomainControlState state}) async {
     await _db
         .into(_db.shopSettingsEntries)
