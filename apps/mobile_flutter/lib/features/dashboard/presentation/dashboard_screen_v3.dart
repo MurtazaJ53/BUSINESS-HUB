@@ -131,10 +131,10 @@ class DashboardScreenV3 extends ConsumerWidget {
               child: _StatCard(
                 label: 'Total sales',
                 value: formatCurrencyCompact(history.totalRevenue),
-                caption: '${history.totalSales} receipts',
-                icon: Icons.receipt_long_rounded,
+                caption: 'View reports',
+                icon: Icons.insights_rounded,
                 accent: AppPalette.info,
-                onTap: () => context.go('/history'),
+                onTap: () => context.push('/reports'),
               ),
             ),
             const SizedBox(width: 12),
