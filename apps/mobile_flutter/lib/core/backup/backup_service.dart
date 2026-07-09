@@ -81,6 +81,130 @@ class BackupService {
     }
   }
 
+  // ---- CSV export ----------------------------------------------------------
+
+  Future<Directory> exportsDir() async {
+    final base =
+        (await getExternalStorageDirectory()) ??
+        await getApplicationDocumentsDirectory();
+    final dir = Directory(p.join(base.path, 'business-hub-exports'));
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
+  }
+
+  String _cell(Object? value) {
+    final s = (value ?? '').toString();
+    if (s.contains(',') || s.contains('"') || s.contains('\n')) {
+      return '"${s.replaceAll('"', '""')}"';
+    }
+    return s;
+  }
+
+  String _row(List<Object?> cells) => cells.map(_cell).join(',');
+
+  Future<File> _writeCsv(String name, String content) async {
+    final dir = await exportsDir();
+    final file = File(p.join(dir.path, '$name-${_timestamp()}.csv'));
+    await file.writeAsString(content);
+    return file;
+  }
+
+  Future<File> exportInventoryCsv() async {
+    final rows = await _db.select(_db.inventoryEntries).get();
+    final buf = StringBuffer()
+      ..writeln(
+        _row(<Object?>[
+          'id',
+          'name',
+          'sku',
+          'category',
+          'price',
+          'stock',
+          'gst_rate',
+          'archived',
+        ]),
+      );
+    for (final r in rows) {
+      buf.writeln(
+        _row(<Object?>[
+          r.id,
+          r.name,
+          r.sku,
+          r.category,
+          r.price,
+          r.stock,
+          r.gstRate,
+          r.tombstone,
+        ]),
+      );
+    }
+    return _writeCsv('inventory', buf.toString());
+  }
+
+  Future<File> exportCustomersCsv() async {
+    final rows = await _db.select(_db.customerEntries).get();
+    final buf = StringBuffer()
+      ..writeln(
+        _row(<Object?>[
+          'id',
+          'name',
+          'phone',
+          'email',
+          'balance_due',
+          'total_spent',
+          'status',
+        ]),
+      );
+    for (final r in rows) {
+      buf.writeln(
+        _row(<Object?>[
+          r.id,
+          r.name,
+          r.phone,
+          r.email,
+          r.balance,
+          r.totalSpent,
+          r.status,
+        ]),
+      );
+    }
+    return _writeCsv('customers', buf.toString());
+  }
+
+  Future<File> exportSalesCsv() async {
+    final rows = await _db.select(_db.salesEntries).get();
+    final buf = StringBuffer()
+      ..writeln(
+        _row(<Object?>[
+          'id',
+          'date',
+          'total',
+          'discount',
+          'payment_mode',
+          'customer_name',
+          'customer_phone',
+          'sync_status',
+        ]),
+      );
+    for (final r in rows) {
+      buf.writeln(
+        _row(<Object?>[
+          r.id,
+          r.date,
+          r.total,
+          r.discount,
+          r.paymentMode,
+          r.customerName,
+          r.customerPhone,
+          r.syncStatus,
+        ]),
+      );
+    }
+    return _writeCsv('sales', buf.toString());
+  }
+
   /// Replace the live database with a backup. The app MUST be restarted after
   /// this — the caller should close the app so the restored file is opened
   /// fresh on next launch.

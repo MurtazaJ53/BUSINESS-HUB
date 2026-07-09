@@ -57,6 +57,24 @@ class _SettingsBackupScreenState extends ConsumerState<SettingsBackupScreen> {
     }
   }
 
+  Future<void> _export(
+    String label,
+    Future<File> Function(BackupService service) run,
+  ) async {
+    try {
+      final file = await run(ref.read(backupServiceProvider));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$label exported: ${_name(file)}')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$label export failed: $error')),
+      );
+    }
+  }
+
   Future<void> _restore(File backup) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -237,16 +255,83 @@ class _SettingsBackupScreenState extends ConsumerState<SettingsBackupScreen> {
                         .toList(growable: false),
                   ),
           ),
+          const SizedBox(height: 18),
+          MobilePanel(
+            title: 'Export to CSV',
+            action: const MobileTag(
+              label: 'FOR EXCEL',
+              icon: Icons.table_chart_rounded,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Text(
+                  'Export your data as spreadsheet files you can open in Excel '
+                  'or Google Sheets, or send to your accountant.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colors.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: <Widget>[
+                    _ExportChip(
+                      label: 'Sales',
+                      icon: Icons.receipt_long_rounded,
+                      onTap: () => _export('Sales', (s) => s.exportSalesCsv()),
+                    ),
+                    _ExportChip(
+                      label: 'Inventory',
+                      icon: Icons.inventory_2_rounded,
+                      onTap: () =>
+                          _export('Inventory', (s) => s.exportInventoryCsv()),
+                    ),
+                    _ExportChip(
+                      label: 'Customers',
+                      icon: Icons.groups_rounded,
+                      onTap: () =>
+                          _export('Customers', (s) => s.exportCustomersCsv()),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 12),
           Text(
-            'Backups are stored on this device. Copy them to Google Drive or '
-            'a computer for off-device safety.',
+            'Backups and exports are stored on this device (in business-hub-'
+            'backups / business-hub-exports). Copy them to Google Drive or a '
+            'computer for off-device safety.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: colors.textTertiary,
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ExportChip extends StatelessWidget {
+  const _ExportChip({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ActionChip(
+      avatar: Icon(icon, size: 18, color: AppPalette.primary),
+      label: Text(label),
+      onPressed: onTap,
     );
   }
 }
