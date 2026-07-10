@@ -21,7 +21,7 @@ class BusinessHubMobileApp extends ConsumerWidget {
 
     return startup.when(
       loading: () => MaterialApp(
-        title: 'Business Hub Mobile',
+        title: 'Business Hub',
         debugShowCheckedModeBanner: false,
         themeMode: themeMode,
         theme: AppTheme.light,
@@ -29,7 +29,7 @@ class BusinessHubMobileApp extends ConsumerWidget {
         home: const _StartupBootScreen(),
       ),
       error: (error, _) => MaterialApp(
-        title: 'Business Hub Mobile',
+        title: 'Business Hub',
         debugShowCheckedModeBanner: false,
         themeMode: themeMode,
         theme: AppTheme.light,
@@ -44,7 +44,7 @@ class BusinessHubMobileApp extends ConsumerWidget {
         ref.watch(mobileSyncCoordinatorProvider);
         final router = ref.watch(appRouterProvider);
         return MaterialApp.router(
-          title: 'Business Hub Mobile',
+          title: 'Business Hub',
           debugShowCheckedModeBanner: false,
           themeMode: themeMode,
           theme: AppTheme.light,

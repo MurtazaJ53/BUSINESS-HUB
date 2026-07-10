@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/models/mobile_session.dart';
 import '../../../core/providers/mobile_data_providers.dart';
@@ -86,6 +87,7 @@ class DashboardScreenV3 extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
       children: <Widget>[
+        const _GettingStartedCard(),
         // Today's takings hero
         HeroMetricCard(
           label: "Today's Sales",
@@ -500,6 +502,140 @@ class _EmptyHint extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _GettingStartedCard extends ConsumerStatefulWidget {
+  const _GettingStartedCard();
+
+  @override
+  ConsumerState<_GettingStartedCard> createState() =>
+      _GettingStartedCardState();
+}
+
+class _GettingStartedCardState extends ConsumerState<_GettingStartedCard> {
+  bool _visible = false;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final done =
+        await ref.read(shopRepositoryProvider).readSetting('onboarding_done');
+    if (mounted) {
+      setState(() {
+        _visible = done != 'true';
+        _loaded = true;
+      });
+    }
+  }
+
+  Future<void> _dismiss() async {
+    await ref
+        .read(shopRepositoryProvider)
+        .writeSetting('onboarding_done', 'true');
+    if (mounted) setState(() => _visible = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loaded || !_visible) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: <Color>[AppPalette.primary, AppPalette.primaryDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              const Icon(Icons.rocket_launch_rounded, color: Colors.white),
+              const SizedBox(width: 8),
+              Text(
+                'Getting started',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: _dismiss,
+                child: const Text('Dismiss',
+                    style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          _step('1', 'Set your business details', 'Name, phone, receipt footer',
+              () => context.push('/settings/business')),
+          const SizedBox(height: 8),
+          _step('2', 'Add your first product', 'Build your inventory',
+              () => context.go('/inventory')),
+          const SizedBox(height: 8),
+          _step('3', 'Make your first sale', 'Open the POS',
+              () => context.go('/pos')),
+        ],
+      ),
+    );
+  }
+
+  Widget _step(String n, String title, String subtitle, VoidCallback onTap) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: <Widget>[
+              CircleAvatar(
+                radius: 13,
+                backgroundColor: Colors.white,
+                child: Text(
+                  n,
+                  style: const TextStyle(
+                    color: AppPalette.primary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(title,
+                        style: const TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.w700)),
+                    Text(subtitle,
+                        style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.8),
+                            fontSize: 12)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: Colors.white),
+            ],
+          ),
+        ),
       ),
     );
   }

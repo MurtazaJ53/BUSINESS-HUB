@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
@@ -67,6 +68,15 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   onSelected: (_) => setState(() => _window = w),
                 );
               },
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => context.push('/day-close'),
+              icon: const Icon(Icons.account_balance_wallet_rounded),
+              label: const Text('Day close / cash count'),
             ),
           ),
           const SizedBox(height: 18),

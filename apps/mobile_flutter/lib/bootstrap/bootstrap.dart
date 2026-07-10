@@ -4,23 +4,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app/app.dart';
+import '../core/diagnostics/crash_logger.dart';
 import '../core/theme/app_theme.dart';
 
 Future<void> bootstrapApplication() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await CrashLogger.init();
 
   ErrorWidget.builder = (details) {
     debugPrint('Business Hub widget error: ${details.exception}');
+    CrashLogger.record(details.exception, details.stack, kind: 'widget');
     return const _FatalSurfaceFallback();
   };
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
     debugPrint('Business Hub Flutter error: ${details.exception}');
+    CrashLogger.record(details.exception, details.stack, kind: 'flutter');
   };
 
   PlatformDispatcher.instance.onError = (error, stackTrace) {
     debugPrint('Business Hub platform error: $error');
+    CrashLogger.record(error, stackTrace, kind: 'platform');
     return true;
   };
 

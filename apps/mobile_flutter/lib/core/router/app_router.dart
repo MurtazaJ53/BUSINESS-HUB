@@ -20,6 +20,7 @@ import '../../features/settings/presentation/settings_security_screen.dart';
 import '../../features/settings/presentation/settings_sessions_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/settings/presentation/settings_team_screen.dart';
+import '../../features/reports/presentation/day_close_screen.dart';
 import '../../features/reports/presentation/reports_screen.dart';
 import '../../features/shell/presentation/mobile_shell_screen.dart';
 
@@ -162,6 +163,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/reports',
         pageBuilder: (context, state) =>
             const NoTransitionPage<void>(child: ReportsScreen()),
+      ),
+      GoRoute(
+        parentNavigatorKey: appRootNavigatorKey,
+        path: '/day-close',
+        pageBuilder: (context, state) =>
+            const NoTransitionPage<void>(child: DayCloseScreen()),
       ),
       GoRoute(path: '/home', redirect: (context, state) => '/dashboard'),
     ],

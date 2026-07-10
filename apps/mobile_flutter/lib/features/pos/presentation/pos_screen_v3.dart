@@ -127,7 +127,19 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
 
   // ---- cart mutations -------------------------------------------------------
 
+  void _warnLowStock(String name, int stock) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Only $stock of $name left in stock.'),
+        duration: const Duration(seconds: 2),
+        backgroundColor: AppPalette.warning,
+      ),
+    );
+  }
+
   void _addToCart(InventoryCatalogItem item) {
+    final existingIndex = _cart.indexWhere((c) => c.id == item.id);
+    final nextQty = existingIndex >= 0 ? _cart[existingIndex].quantity + 1 : 1;
     setState(() {
       final index = _cart.indexWhere((c) => c.id == item.id);
       if (index >= 0) {
@@ -154,19 +166,26 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
       }
     });
     HapticFeedback.selectionClick();
+    if (item.stock < 999999 && nextQty > item.stock) {
+      _warnLowStock(item.name, item.stock);
+    }
   }
 
   void _changeQtyById(String id, int delta) {
+    final index = _cart.indexWhere((c) => c.id == id);
+    if (index < 0) return;
+    final line = _cart[index];
+    final next = line.quantity + delta;
     setState(() {
-      final index = _cart.indexWhere((c) => c.id == id);
-      if (index < 0) return;
-      final next = _cart[index].quantity + delta;
       if (next <= 0) {
         _cart.removeAt(index);
       } else {
-        _cart[index] = _cart[index].copyWith(quantity: next);
+        _cart[index] = line.copyWith(quantity: next);
       }
     });
+    if (delta > 0 && line.stock < 999999 && next > line.stock) {
+      _warnLowStock(line.name, line.stock);
+    }
   }
 
   int _qtyInCart(String id) {
@@ -884,6 +903,15 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
                   controller: _searchController,
                   onChanged: (value) => setState(() => _search = value),
                   textInputAction: TextInputAction.search,
+                  // A hardware (keyboard-wedge) barcode scanner types the code
+                  // then sends Enter — if it narrows to one item, add it.
+                  onSubmitted: (value) {
+                    if (items.length == 1) {
+                      _addToCart(items.first);
+                      _searchController.clear();
+                      setState(() => _search = '');
+                    }
+                  },
                   decoration: InputDecoration(
                     hintText: 'Search by name, SKU or barcode',
                     prefixIcon: const Icon(Icons.search_rounded),
