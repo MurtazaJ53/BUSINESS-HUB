@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:printing/printing.dart';
 
 import '../../../core/database/mobile_repository.dart';
 import '../../../core/insights/mobile_operational_insights.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/providers/printer_provider.dart';
+import '../../../core/receipt/receipt_pdf.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/tax/gst.dart';
@@ -755,6 +757,18 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                           );
                         }
                       ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: () => _shareReceiptPdf(detail),
+                        icon: const Icon(Icons.share_rounded),
+                        label: const Text('SHARE PDF / WHATSAPP'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
                       if (detail.total >= 0 &&
                           !(detail.footerNote ?? '').contains('RETURN')) ...<Widget>[
                         const SizedBox(height: 12),
@@ -782,6 +796,21 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         );
       },
     );
+  }
+
+  Future<void> _shareReceiptPdf(SaleRecordDetail detail) async {
+    try {
+      final shop = ref.read(shopInfoProvider).asData?.value;
+      if (shop == null) return;
+      final bytes = await buildReceiptPdf(detail, shop);
+      await Printing.sharePdf(bytes: bytes, filename: 'receipt-${detail.id}.pdf');
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Share failed: $error')),
+        );
+      }
+    }
   }
 
   Future<void> _startReturn(

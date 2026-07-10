@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:printing/printing.dart';
 
 import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/pos/cart_pricing.dart';
 import '../../../core/pos/held_sales.dart';
+import '../../../core/receipt/receipt_pdf.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/providers/printer_provider.dart';
 import '../../../core/session/mobile_session_controller.dart';
@@ -602,6 +604,26 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
     }
   }
 
+  Future<void> _shareReceipt(String saleId) async {
+    try {
+      final detail = await ref
+          .read(salesRepositoryProvider)
+          .getSaleDetail(saleId);
+      final shop = ref.read(shopInfoProvider).asData?.value;
+      if (detail == null || shop == null) {
+        throw Exception('Receipt is not available yet.');
+      }
+      final bytes = await buildReceiptPdf(detail, shop);
+      await Printing.sharePdf(bytes: bytes, filename: 'receipt-$saleId.pdf');
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Share failed: $error')),
+        );
+      }
+    }
+  }
+
   Future<void> _showReceiptSheet(LocalSaleCommit commit) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -719,6 +741,16 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
                       width: double.infinity,
                       height: 54,
                       child: OutlinedButton.icon(
+                        onPressed: () => _shareReceipt(commit.saleId),
+                        icon: const Icon(Icons.share_rounded),
+                        label: const Text('Share / WhatsApp'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: TextButton.icon(
                         onPressed: () => Navigator.pop(sheetContext),
                         icon: const Icon(Icons.check_rounded),
                         label: const Text('Done'),
