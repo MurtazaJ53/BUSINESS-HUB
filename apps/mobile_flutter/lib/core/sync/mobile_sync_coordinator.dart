@@ -422,6 +422,103 @@ class MobileSyncCoordinator {
     setStatus(MobileSyncStatus.idle);
   }
 
+  /// Pull the latest inventory + customers from the backend and merge them
+  /// locally. Merges are upserts, so a pull can never lose local data. Paired
+  /// with the outbox push this gives two-way, multi-device sync.
+  Future<CommerceSyncResult> pullFromCloud() async {
+    if (!MobileRuntimeConfig.backendSyncEnabled) {
+      return const CommerceSyncResult(
+        commandId: 'pull',
+        state: CommerceSyncState.queued,
+        message: 'Live backend sync is disabled for this build.',
+      );
+    }
+    final session = _session;
+    if (session == null || !session.hasShop) {
+      return const CommerceSyncResult(
+        commandId: 'pull',
+        state: CommerceSyncState.queued,
+        message: 'Sign in to a workspace before syncing.',
+      );
+    }
+
+    setStatus(MobileSyncStatus.syncing);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    try {
+      final shopId = session.shopId!;
+      final user = session.user;
+
+      final items = await _backendApiClient.fetchInventoryItems(
+        user: user,
+        shopId: shopId,
+      );
+      for (final row in items) {
+        await _inventoryRepository.mergeBackendInventoryItem(
+          row,
+          updatedAt: now,
+        );
+      }
+
+      final customers = await _backendApiClient.fetchCustomers(
+        user: user,
+        shopId: shopId,
+      );
+      final iso = DateTime.now().toIso8601String();
+      for (final c in customers) {
+        await _customerRepository.mergeRemoteCustomerDocument(
+          c.id,
+          <String, dynamic>{
+            'name': c.name,
+            'phone': c.phone ?? '',
+            'email': c.email ?? '',
+            'notes': c.notes ?? '',
+            'status': c.status,
+            'balance': c.balance,
+            'total_spent': c.totalSpent,
+            'tombstone': false,
+            'updatedAt': iso,
+          },
+          updatedAt: now,
+        );
+      }
+
+      setStatus(MobileSyncStatus.idle);
+      return CommerceSyncResult(
+        commandId: 'pull',
+        state: CommerceSyncState.synced,
+        message:
+            'Pulled ${items.length} products and ${customers.length} customers.',
+      );
+    } on BackendApiException catch (error) {
+      setStatus(MobileSyncStatus.error);
+      return CommerceSyncResult(
+        commandId: 'pull',
+        state: CommerceSyncState.failed,
+        message: 'Cloud pull failed: ${error.message}',
+      );
+    } on IOException catch (error) {
+      setStatus(MobileSyncStatus.offline);
+      return CommerceSyncResult(
+        commandId: 'pull',
+        state: CommerceSyncState.failed,
+        message: 'Cloud unreachable: $error',
+      );
+    }
+  }
+
+  /// Full two-way sync: push queued sales/payments, then pull the latest
+  /// catalog + customers. Safe to trigger manually.
+  Future<CommerceSyncResult> syncNow() async {
+    final push = await flushCommerceOutbox();
+    final pull = await pullFromCloud();
+    if (pull.state == CommerceSyncState.failed) return pull;
+    return CommerceSyncResult(
+      commandId: 'sync-now',
+      state: pull.state,
+      message: 'Synced. ${pull.message} ${push.message ?? ''}'.trim(),
+    );
+  }
+
   Future<CommerceSyncResult> submitSale(LocalSaleCommit commit) async {
     final session = _session;
     if (session == null || !session.hasShop) {

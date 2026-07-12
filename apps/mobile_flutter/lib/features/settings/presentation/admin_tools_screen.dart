@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../shell/presentation/mobile_surface.dart';
 
@@ -66,16 +67,30 @@ class AdminToolsScreen extends ConsumerWidget {
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 12),
-                FilledButton.tonalIcon(
+                FilledButton.icon(
                   onPressed: () async {
-                    await syncCoordinator.refresh();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Syncing with cloud...')),
+                    );
+                    final result = await syncCoordinator.syncNow();
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Workspace refresh requested.')),
+                      SnackBar(
+                        content: Text(result.message ?? 'Sync complete.'),
+                      ),
                     );
                   },
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Refresh workspace'),
+                  icon: const Icon(Icons.cloud_sync_rounded),
+                  label: const Text('Sync with cloud now'),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Pushes queued sales and pulls the latest products & '
+                  'customers from other devices. Needs the backend reachable '
+                  'on your network.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.of(context).textTertiary,
+                  ),
                 ),
               ],
             ),
