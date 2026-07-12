@@ -2,10 +2,15 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../app/app.dart';
 import '../core/diagnostics/crash_logger.dart';
 import '../core/theme/app_theme.dart';
+
+/// Cloud crash reporting is enabled only when a DSN is supplied at build time:
+///   --dart-define SENTRY_DSN=https://...ingest.sentry.io/...
+const String _sentryDsn = String.fromEnvironment('SENTRY_DSN', defaultValue: '');
 
 Future<void> bootstrapApplication() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,6 +22,8 @@ Future<void> bootstrapApplication() async {
     return const _FatalSurfaceFallback();
   };
 
+  // Our on-device crash log runs first; Sentry (when configured) chains onto
+  // these handlers rather than replacing them.
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
     debugPrint('Business Hub Flutter error: ${details.exception}');
@@ -29,7 +36,22 @@ Future<void> bootstrapApplication() async {
     return true;
   };
 
-  runApp(const ProviderScope(child: BusinessHubMobileApp()));
+  void runTheApp() {
+    runApp(const ProviderScope(child: BusinessHubMobileApp()));
+  }
+
+  if (_sentryDsn.isEmpty) {
+    runTheApp();
+    return;
+  }
+
+  await SentryFlutter.init(
+    (options) {
+      options.dsn = _sentryDsn;
+      options.tracesSampleRate = 0.0;
+    },
+    appRunner: runTheApp,
+  );
 }
 
 class _FatalSurfaceFallback extends StatelessWidget {
