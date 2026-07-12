@@ -661,6 +661,20 @@ class InventoryRepository {
     return _mapCatalogRow(rows.first);
   }
 
+  /// Rename a category across every item that carries it. Returns the number
+  /// of items updated.
+  Future<int> renameCategory(String from, String to) async {
+    final normalized = to.trim().isEmpty ? 'General' : to.trim();
+    return (_db.update(
+      _db.inventoryEntries,
+    )..where((tbl) => tbl.category.equals(from))).write(
+      InventoryEntriesCompanion(
+        category: Value(normalized),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
+  }
+
   Future<void> mergeInventoryDocument(
     String id,
     Map<String, dynamic> data, {

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/auth_gate_screen.dart';
 import '../../features/customers/presentation/customers_screen_v3.dart';
+import '../../features/inventory/presentation/category_management_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen_v3.dart';
 import '../../features/history/presentation/history_screen.dart';
 import '../../features/inventory/presentation/inventory_screen_v3.dart';
@@ -169,6 +170,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/day-close',
         pageBuilder: (context, state) =>
             const NoTransitionPage<void>(child: DayCloseScreen()),
+      ),
+      GoRoute(
+        parentNavigatorKey: appRootNavigatorKey,
+        path: '/categories',
+        pageBuilder: (context, state) =>
+            const NoTransitionPage<void>(child: CategoryManagementScreen()),
       ),
       GoRoute(path: '/home', redirect: (context, state) => '/dashboard'),
     ],

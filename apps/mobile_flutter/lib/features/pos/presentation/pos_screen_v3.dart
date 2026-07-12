@@ -42,6 +42,14 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
   bool _saving = false;
   bool _discountIsPercent = false;
   DateTime? _saleDate; // null = today
+  Timer? _searchDebounce;
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) setState(() => _search = value);
+    });
+  }
 
   static const int _pageSize = 50;
 
@@ -64,6 +72,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     _discountController.dispose();
     _customerNameController.dispose();
@@ -901,7 +910,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
               Expanded(
                 child: TextField(
                   controller: _searchController,
-                  onChanged: (value) => setState(() => _search = value),
+                  onChanged: _onSearchChanged,
                   textInputAction: TextInputAction.search,
                   // A hardware (keyboard-wedge) barcode scanner types the code
                   // then sends Enter — if it narrows to one item, add it.

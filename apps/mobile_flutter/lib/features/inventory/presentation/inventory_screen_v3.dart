@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -25,9 +27,18 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
   String _search = '';
   String? _selectedCategory;
   bool _showLowStockOnly = false;
+  Timer? _searchDebounce;
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) setState(() => _search = value);
+    });
+  }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -135,6 +146,14 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                 ),
               ),
               const Spacer(),
+              IconButton(
+                onPressed: () => context.push('/categories'),
+                icon: const Icon(Icons.category_rounded),
+                tooltip: 'Categories',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+              const SizedBox(width: 8),
               TextButton.icon(
                 onPressed: () => _showBulkAddSheet(context),
                 icon: const Icon(Icons.playlist_add_rounded, size: 18),
@@ -149,12 +168,9 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
           PremiumSearchBar(
             controller: _searchController,
             hintText: 'Search inventory...',
-            onChanged: (value) {
-              setState(() {
-                _search = value;
-              });
-            },
+            onChanged: _onSearchChanged,
             onClear: () {
+              _searchDebounce?.cancel();
               setState(() {
                 _search = '';
               });

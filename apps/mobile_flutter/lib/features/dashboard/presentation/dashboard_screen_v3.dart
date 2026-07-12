@@ -6,6 +6,7 @@ import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/models/mobile_session.dart';
 import '../../../core/providers/mobile_data_providers.dart';
+import '../../../core/runtime/update_check.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -87,6 +88,7 @@ class DashboardScreenV3 extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
       children: <Widget>[
+        const _UpdateBanner(),
         const _GettingStartedCard(),
         // Today's takings hero
         HeroMetricCard(
@@ -636,6 +638,50 @@ class _GettingStartedCardState extends ConsumerState<_GettingStartedCard> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _UpdateBanner extends ConsumerWidget {
+  const _UpdateBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(updateStatusProvider);
+    if (!status.updateAvailable) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppPalette.warning.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppPalette.warning.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: <Widget>[
+          const Icon(Icons.system_update_rounded, color: AppPalette.warning),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Update available',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  'Version ${status.latestVersion} is ready. Please update for the latest fixes.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.of(context).textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
