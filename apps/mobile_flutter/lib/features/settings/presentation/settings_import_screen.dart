@@ -111,8 +111,9 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
               color: AppPalette.success,
               title: 'Import complete',
               body:
-                  '${_result!.inventory} product(s) and ${_result!.customers} '
-                  'customer(s) imported.\n\n${_result!.warnings.join('\n\n')}',
+                  '${_result!.inventory} product(s), ${_result!.customers} '
+                  'customer(s), and ${_result!.sales} receipt(s) imported.'
+                  '\n\n${_result!.warnings.join('\n\n')}',
             ),
           ],
         ],

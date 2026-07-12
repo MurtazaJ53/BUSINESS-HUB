@@ -1061,6 +1061,46 @@ class SalesRepository {
     );
   }
 
+  /// Insert a historical sale (e.g. imported from another POS). Idempotent by
+  /// [id]; does NOT touch inventory stock or the sync outbox — it is treated
+  /// as settled past history.
+  Future<void> importHistoricalSale({
+    required String id,
+    required String date,
+    required int createdAtMillis,
+    required double total,
+    required double discount,
+    required String paymentMode,
+    required String? customerName,
+    required String? customerPhone,
+    required String footerNote,
+    required List<Map<String, dynamic>> items,
+    required List<Map<String, dynamic>> payments,
+  }) async {
+    await _db
+        .into(_db.salesEntries)
+        .insertOnConflictUpdate(
+          SalesEntriesCompanion.insert(
+            id: id,
+            total: total,
+            discount: Value(discount),
+            discountType: const Value('fixed'),
+            paymentMode: Value(paymentMode),
+            date: date,
+            createdAt: createdAtMillis,
+            updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+            customerName: Value(customerName),
+            customerPhone: Value(customerPhone),
+            footerNote: Value(footerNote),
+            itemsJson: jsonEncode(items),
+            paymentsJson: jsonEncode(payments),
+            commandId: Value('zobaze-import-$id'),
+            syncStatus: const Value('synced'),
+            backendSaleId: const Value(null),
+          ),
+        );
+  }
+
   Future<SaleRecordDetail?> getSaleDetail(String saleId) async {
     final row = await (_db.select(
       _db.salesEntries,
