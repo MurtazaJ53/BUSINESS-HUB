@@ -180,39 +180,34 @@ final attendanceSessionsProvider =
           );
     });
 
-final expenseSummaryProvider = FutureProvider<ExpenseSummarySnapshot?>((
-  ref,
-) async {
-  final session = await ref.watch(mobileSessionProvider.future);
-  if (session == null || !session.hasShop) {
-    return null;
-  }
-  if (!MobileRuntimeConfig.backendSyncEnabled) {
-    return const ExpenseSummarySnapshot(
-      totalEntries: 0,
-      totalAmount: 0,
-      uniqueCategories: 0,
-      biggestCategory: null,
-    );
-  }
-
-  return ref
-      .read(backendApiClientProvider)
-      .getExpenseSummary(user: session.user, shopId: session.shopId!);
+// Expenses are stored locally (local-first) so they work with or without the
+// backend, like sales / inventory / customers.
+final expensesProvider = StreamProvider<List<ExpenseRecord>>((ref) {
+  return ref.watch(expenseRepositoryProvider).watchExpenses();
 });
 
-final expensesProvider = FutureProvider<List<ExpenseRecord>>((ref) async {
-  final session = await ref.watch(mobileSessionProvider.future);
-  if (session == null || !session.hasShop) {
-    return const <ExpenseRecord>[];
-  }
-  if (!MobileRuntimeConfig.backendSyncEnabled) {
-    return const <ExpenseRecord>[];
-  }
-
-  return ref
-      .read(backendApiClientProvider)
-      .getExpenses(user: session.user, shopId: session.shopId!);
+final expenseSummaryProvider = StreamProvider<ExpenseSummarySnapshot?>((ref) {
+  return ref.watch(expenseRepositoryProvider).watchExpenses().map((list) {
+    final total = list.fold<double>(0, (sum, e) => sum + e.amount);
+    final byCategory = <String, double>{};
+    for (final e in list) {
+      byCategory[e.category] = (byCategory[e.category] ?? 0) + e.amount;
+    }
+    String? biggest;
+    var max = -1.0;
+    byCategory.forEach((k, v) {
+      if (v > max) {
+        max = v;
+        biggest = k;
+      }
+    });
+    return ExpenseSummarySnapshot(
+      totalEntries: list.length,
+      totalAmount: total,
+      uniqueCategories: byCategory.length,
+      biggestCategory: biggest,
+    );
+  });
 });
 
 final dashboardOverviewProvider =

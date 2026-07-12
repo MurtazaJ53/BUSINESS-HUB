@@ -161,6 +161,30 @@ class CommerceOutboxEntries extends Table {
   Set<Column<Object>>? get primaryKey => {commandId};
 }
 
+class ExpenseEntries extends Table {
+  @override
+  String get tableName => 'expenses';
+
+  TextColumn get id => text()();
+  TextColumn get category =>
+      text().withDefault(const Constant('General'))();
+  RealColumn get amount => real().withDefault(const Constant(0))();
+  TextColumn get description => text().withDefault(const Constant(''))();
+  TextColumn get paymentMethod =>
+      text().named('payment_method').withDefault(const Constant('CASH'))();
+  TextColumn get paymentReference =>
+      text().named('payment_reference').withDefault(const Constant(''))();
+  TextColumn get expenseDate => text().named('expense_date')();
+  TextColumn get actorName => text().named('actor_name').nullable()();
+  IntColumn get createdAt => integer().named('created_at')();
+  IntColumn get updatedAt =>
+      integer().named('updated_at').withDefault(const Constant(0))();
+  BoolColumn get tombstone => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
 @DriftDatabase(
   tables: [
     ShopSettingsEntries,
@@ -169,6 +193,7 @@ class CommerceOutboxEntries extends Table {
     SalesEntries,
     CustomerEntries,
     CommerceOutboxEntries,
+    ExpenseEntries,
   ],
 )
 class BusinessHubDatabase extends _$BusinessHubDatabase {
@@ -181,7 +206,7 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       );
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -214,6 +239,9 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       if (from < 6) {
         // Indexes are automatically handled by Drift on upgrade if we don't drop the table.
         // We just need to bump the schema version.
+      }
+      if (from < 7) {
+        await m.createTable(expenseEntries);
       }
     },
   );

@@ -3,10 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/backend/backend_api_client.dart';
 import '../../../core/models/mobile_models.dart';
-import '../../../core/runtime/mobile_runtime_config.dart';
 import '../../../core/session/mobile_session_controller.dart';
+import '../../../core/database/mobile_repository.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/utils/formatters.dart';
 import '../../shell/presentation/mobile_surface.dart';
@@ -42,18 +41,6 @@ class _SettingsExpensesScreenState
     String paymentMethod = 'CASH',
     String paymentReference = '',
   }) async {
-    final session = ref.read(mobileSessionProvider).asData?.value;
-    if (session == null || !session.hasShop) {
-      return false;
-    }
-    if (!MobileRuntimeConfig.backendSyncEnabled) {
-      setState(() {
-        _messageIsError = false;
-        _message =
-            'Expense capture needs backend sync for shared owner/admin reporting. Local mode keeps POS, inventory, customers, and history active.';
-      });
-      return false;
-    }
     setState(() {
       _busy = true;
       _message = null;
@@ -61,24 +48,27 @@ class _SettingsExpensesScreenState
     });
     try {
       await ref
-          .read(backendApiClientProvider)
-          .createExpense(
-            user: session.user,
-            shopId: session.shopId!,
+          .read(expenseRepositoryProvider)
+          .recordExpense(
             category: category,
             amount: amount,
             expenseDate: expenseDate,
             description: description,
             paymentMethod: paymentMethod,
             paymentReference: paymentReference,
+            actorName: ref
+                .read(mobileSessionProvider)
+                .asData
+                ?.value
+                ?.user
+                .displayName,
           );
-      await _refreshExpenses();
       if (!mounted) {
         return true;
       }
       setState(() {
         _messageIsError = false;
-        _message = 'Expense saved successfully.';
+        _message = 'Expense saved.';
       });
       return true;
     } catch (error) {

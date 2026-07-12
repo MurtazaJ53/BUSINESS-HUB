@@ -1977,3 +1977,112 @@ List<SaleDetailPayment> _parseSalePayments(String raw) {
     return const <SaleDetailPayment>[];
   }
 }
+
+final expenseRepositoryProvider = Provider<ExpenseRepository>((ref) {
+  return ExpenseRepository(ref.watch(localDatabaseProvider));
+});
+
+class ExpenseRepository {
+  ExpenseRepository(this._db);
+
+  final BusinessHubDatabase _db;
+
+  Future<void> recordExpense({
+    required String category,
+    required double amount,
+    required DateTime expenseDate,
+    String description = '',
+    String paymentMethod = 'CASH',
+    String paymentReference = '',
+    String? actorName,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await _db.into(_db.expenseEntries).insert(
+          ExpenseEntriesCompanion.insert(
+            id: 'expense-${DateTime.now().microsecondsSinceEpoch}',
+            category: Value(
+              category.trim().isEmpty ? 'General' : category.trim(),
+            ),
+            amount: Value(amount),
+            description: Value(description.trim()),
+            paymentMethod: Value(paymentMethod),
+            paymentReference: Value(paymentReference.trim()),
+            expenseDate: expenseDate.toIso8601String().split('T').first,
+            actorName: Value(actorName),
+            createdAt: now,
+            updatedAt: Value(now),
+          ),
+        );
+  }
+
+  Stream<List<ExpenseRecord>> watchExpenses({
+    String query = '',
+    String category = '',
+  }) {
+    final where = <String>['tombstone = 0'];
+    final vars = <Variable<Object>>[];
+    final q = query.trim().toLowerCase();
+    if (q.isNotEmpty) {
+      where.add('(LOWER(category) LIKE ? OR LOWER(description) LIKE ?)');
+      vars
+        ..add(Variable<String>('%$q%'))
+        ..add(Variable<String>('%$q%'));
+    }
+    if (category.trim().isNotEmpty) {
+      where.add('LOWER(category) = ?');
+      vars.add(Variable<String>(category.trim().toLowerCase()));
+    }
+    final sql =
+        'SELECT * FROM expenses WHERE ${where.join(' AND ')} '
+        'ORDER BY expense_date DESC, created_at DESC;';
+    return _db
+        .customSelect(sql, variables: vars, readsFrom: {_db.expenseEntries})
+        .watch()
+        .map(
+          (rows) => rows
+              .map(
+                (row) => ExpenseRecord(
+                  id: row.read<String>('id'),
+                  category: row.read<String>('category'),
+                  amount: row.read<double>('amount'),
+                  description: row.read<String>('description'),
+                  paymentMethod: row.read<String>('payment_method'),
+                  paymentReference: row.read<String>('payment_reference'),
+                  expenseDate:
+                      DateTime.tryParse(row.read<String>('expense_date')) ??
+                      DateTime.now(),
+                  actorName: _asStringOrNull(
+                    row.readNullable<String>('actor_name'),
+                  ),
+                  tombstone: row.read<int>('tombstone') == 1,
+                ),
+              )
+              .toList(growable: false),
+        );
+  }
+
+  Future<ExpenseSummarySnapshot> summary() async {
+    final rows = await (_db.select(
+      _db.expenseEntries,
+    )..where((t) => t.tombstone.equals(false))).get();
+    final total = rows.fold<double>(0, (sum, r) => sum + r.amount);
+    final byCategory = <String, double>{};
+    for (final r in rows) {
+      byCategory[r.category] = (byCategory[r.category] ?? 0) + r.amount;
+    }
+    String? biggest;
+    var max = -1.0;
+    byCategory.forEach((k, v) {
+      if (v > max) {
+        max = v;
+        biggest = k;
+      }
+    });
+    return ExpenseSummarySnapshot(
+      totalEntries: rows.length,
+      totalAmount: total,
+      uniqueCategories: byCategory.length,
+      biggestCategory: biggest,
+    );
+  }
+}
