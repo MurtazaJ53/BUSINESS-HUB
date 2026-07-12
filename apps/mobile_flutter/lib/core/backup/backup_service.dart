@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../database/local_database.dart';
+import '../tax/gst.dart';
 
 final backupServiceProvider = Provider<BackupService>((ref) {
   return BackupService(ref.watch(localDatabaseProvider));
@@ -203,6 +205,73 @@ class BackupService {
       );
     }
     return _writeCsv('sales', buf.toString());
+  }
+
+  /// GSTR-1 B2B section: one row per invoice that carries a buyer GSTIN, with
+  /// the tax broken out (recomputed from each line's rate). Filing-ready CSV.
+  Future<File> exportGstr1Csv() async {
+    final rows = await _db.select(_db.salesEntries).get();
+    final buf = StringBuffer()
+      ..writeln(
+        _row(<Object?>[
+          'invoice_no',
+          'date',
+          'buyer_gstin',
+          'invoice_value',
+          'taxable_value',
+          'cgst',
+          'sgst',
+          'total_tax',
+        ]),
+      );
+    final gstinPattern = RegExp(r'Buyer GSTIN:\s*([0-9A-Za-z]+)');
+    for (final r in rows) {
+      final match = gstinPattern.firstMatch(r.footerNote ?? '');
+      if (match == null) continue; // B2B only
+      final gstin = match.group(1)!;
+      var taxable = 0.0;
+      var cgst = 0.0;
+      var sgst = 0.0;
+      var tax = 0.0;
+      try {
+        final items = (jsonDecode(r.itemsJson) as List).whereType<Map>();
+        for (final it in items) {
+          final qty = (it['quantity'] as num?)?.toInt() ?? 0;
+          final price =
+              ((it['price'] ?? it['unit_price'] ?? 0) as num).toDouble();
+          final rate =
+              ((it['gstRate'] ?? it['gst_rate'] ?? 0) as num).toDouble();
+          final incl =
+              (it['priceIncludesTax'] ?? it['price_includes_tax'] ?? true) ==
+              true;
+          final line = computeLineGst(
+            lineTotal: price * qty,
+            gstRate: rate,
+            priceIncludesTax: incl,
+            intraState: true,
+          );
+          taxable += line.taxableAmount;
+          cgst += line.cgstAmount;
+          sgst += line.sgstAmount;
+          tax += line.taxAmount;
+        }
+      } catch (_) {
+        // Skip malformed rows rather than fail the whole export.
+      }
+      buf.writeln(
+        _row(<Object?>[
+          r.id,
+          r.date,
+          gstin,
+          r.total,
+          taxable.toStringAsFixed(2),
+          cgst.toStringAsFixed(2),
+          sgst.toStringAsFixed(2),
+          tax.toStringAsFixed(2),
+        ]),
+      );
+    }
+    return _writeCsv('gstr1-b2b', buf.toString());
   }
 
   /// Replace the live database with a backup. The app MUST be restarted after

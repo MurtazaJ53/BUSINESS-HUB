@@ -5,6 +5,7 @@ class ShopInfo {
     required this.footer,
     required this.currency,
     required this.phone,
+    this.gstin = '',
     this.planTier = 'growth',
     this.enabledFeatures = const <String, bool>{},
   });
@@ -14,8 +15,11 @@ class ShopInfo {
   final String footer;
   final String currency;
   final String phone;
+  final String gstin;
   final String planTier;
   final Map<String, bool> enabledFeatures;
+
+  bool get hasGstin => gstin.trim().isNotEmpty;
 
   String get normalizedPlanTier => _normalizePlanTier(planTier);
   String get planLabel {

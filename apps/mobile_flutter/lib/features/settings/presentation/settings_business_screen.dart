@@ -25,6 +25,7 @@ class _SettingsBusinessScreenState
   final _name = TextEditingController();
   final _tagline = TextEditingController();
   final _phone = TextEditingController();
+  final _gstin = TextEditingController();
   final _footer = TextEditingController();
   String _currency = 'INR';
   bool _loaded = false;
@@ -35,6 +36,7 @@ class _SettingsBusinessScreenState
     _name.text = shop.name;
     _tagline.text = shop.tagline;
     _phone.text = shop.phone;
+    _gstin.text = shop.gstin;
     _footer.text = shop.footer;
     _currency = _currencies.contains(shop.currency) ? shop.currency : 'INR';
     _loaded = true;
@@ -45,6 +47,7 @@ class _SettingsBusinessScreenState
     _name.dispose();
     _tagline.dispose();
     _phone.dispose();
+    _gstin.dispose();
     _footer.dispose();
     super.dispose();
   }
@@ -65,6 +68,7 @@ class _SettingsBusinessScreenState
         'footer': _footer.text.trim(),
         'currency': _currency,
         'phone': _phone.text.trim(),
+        'gstin': _gstin.text.trim(),
         // Preserve plan + features (saveShopDocument does a full overwrite).
         'plan_tier': shop.planTier,
         'enabled_features': shop.enabledFeatures,
@@ -121,6 +125,15 @@ class _SettingsBusinessScreenState
                   controller: _phone,
                   keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(labelText: 'Phone'),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _gstin,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: const InputDecoration(
+                    labelText: 'GSTIN (optional)',
+                    hintText: 'Shown on GST tax invoices',
+                  ),
                 ),
               ],
             ),

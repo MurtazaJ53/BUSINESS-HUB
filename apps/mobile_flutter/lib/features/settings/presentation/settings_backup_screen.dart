@@ -295,6 +295,12 @@ class _SettingsBackupScreenState extends ConsumerState<SettingsBackupScreen> {
                       onTap: () =>
                           _export('Customers', (s) => s.exportCustomersCsv()),
                     ),
+                    _ExportChip(
+                      label: 'GST (B2B)',
+                      icon: Icons.request_quote_rounded,
+                      onTap: () =>
+                          _export('GSTR-1 B2B', (s) => s.exportGstr1Csv()),
+                    ),
                   ],
                 ),
               ],

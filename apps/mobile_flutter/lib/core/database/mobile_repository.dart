@@ -51,6 +51,7 @@ class ShopRepository {
               .toString(),
           currency: (decoded['currency'] ?? 'INR').toString(),
           phone: (decoded['phone'] ?? '').toString(),
+          gstin: (decoded['gstin'] ?? '').toString(),
           planTier: (decoded['plan_tier'] ?? 'growth').toString(),
           enabledFeatures: _coerceEnabledFeatures(
             decoded['enabled_features'],
@@ -80,6 +81,7 @@ class ShopRepository {
         'Thank you for your business!';
     settings['currency'] = settings['currency'] ?? rawData['currency'] ?? 'INR';
     settings['phone'] = settings['phone'] ?? rawData['phone'] ?? '';
+    settings['gstin'] = rawData['gstin'] ?? settings['gstin'] ?? '';
     settings['plan_tier'] =
         rawData['plan_tier'] ?? settings['plan_tier'] ?? 'growth';
     settings['enabled_features'] = _coerceEnabledFeatures(
