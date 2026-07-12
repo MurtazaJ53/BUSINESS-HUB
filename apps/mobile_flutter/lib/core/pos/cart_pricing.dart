@@ -1,17 +1,23 @@
+import '../money/money.dart';
 import '../models/mobile_models.dart';
 
 /// Pure, side-effect-free money math for the POS cart.
 ///
-/// Keeping this in one tested place is deliberate: a POS ships money, so a
-/// wrong sign or clamp must be caught by unit tests, not in production. Both
-/// the POS screen and the checkout sheet read their figures from here so the
-/// UI can never drift from the values recorded on the sale.
+/// All arithmetic runs through [Money] (integer paise) so repeated
+/// add/discount/split operations are exact — no binary-double drift. The
+/// public API stays in rupee doubles for the UI and storage layers, which snap
+/// to whole paise on the way in.
 class CartPricing {
   const CartPricing._();
 
   /// Sum of line totals (price * qty) before any discount.
-  static double subtotal(Iterable<PosCartItem> items) =>
-      items.fold<double>(0, (sum, item) => sum + item.lineTotal);
+  static double subtotal(Iterable<PosCartItem> items) {
+    var total = Money.zero;
+    for (final item in items) {
+      total = total + (Money.rupees(item.price) * item.quantity);
+    }
+    return total.rupees;
+  }
 
   /// Resolve a discount input (fixed rupees or a percent) to an amount,
   /// never negative and never more than the subtotal.
@@ -21,30 +27,35 @@ class CartPricing {
     required bool isPercent,
   }) {
     if (value <= 0 || subtotal <= 0) return 0;
-    final amount = isPercent ? subtotal * (value / 100) : value;
-    if (amount <= 0) return 0;
-    return amount > subtotal ? subtotal : amount;
+    final sub = Money.rupees(subtotal);
+    final amount = isPercent ? sub.percent(value) : Money.rupees(value);
+    if (!amount.isPositive) return 0;
+    return amount.min(sub).rupees;
   }
 
   /// Net payable after discount.
   static double net({required double subtotal, required double discount}) {
-    final n = subtotal - discount;
-    return n > 0 ? n : 0;
+    return (Money.rupees(subtotal) - Money.rupees(discount)).clampedToZero.rupees;
   }
 
   /// Total tendered across all payment lines.
-  static double paid(Iterable<PosPayment> payments) =>
-      payments.fold<double>(0, (sum, p) => sum + p.amount);
+  static double paid(Iterable<PosPayment> payments) {
+    var total = Money.zero;
+    for (final p in payments) {
+      total = total + Money.rupees(p.amount);
+    }
+    return total.rupees;
+  }
 
   /// Balance still owed (credit / khata) — 0 if fully paid.
   static double due({required double net, required double paid}) {
-    final d = net - paid;
-    return d > 0.009 ? d : 0;
+    final d = Money.rupees(net) - Money.rupees(paid);
+    return d.isPositive ? d.rupees : 0;
   }
 
   /// Change to return (cash overpayment) — 0 if not overpaid.
   static double change({required double net, required double paid}) {
-    final c = paid - net;
-    return c > 0.009 ? c : 0;
+    final c = Money.rupees(paid) - Money.rupees(net);
+    return c.isPositive ? c.rupees : 0;
   }
 }
