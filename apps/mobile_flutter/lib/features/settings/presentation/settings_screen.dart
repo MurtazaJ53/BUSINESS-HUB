@@ -115,6 +115,13 @@ class SettingsScreen extends ConsumerWidget {
             leadingIcon: Icons.backup_rounded,
             onTap: () => context.push('/settings/backup'),
           ),
+          if (owner)
+            MobileListTile(
+              title: 'Import data',
+              subtitle: 'Migrate from Zobaze (.xlsx)',
+              leadingIcon: Icons.swap_horiz_rounded,
+              onTap: () => context.push('/settings/import'),
+            ),
           MobileListTile(
             title: 'Change PIN',
             subtitle: 'Update your unlock PIN',
