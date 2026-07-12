@@ -20,6 +20,7 @@ import '../../features/settings/presentation/settings_pulse_screen.dart';
 import '../../features/settings/presentation/settings_security_screen.dart';
 import '../../features/settings/presentation/settings_sessions_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
+import '../../features/settings/presentation/settings_staff_screen.dart';
 import '../../features/settings/presentation/settings_team_screen.dart';
 import '../../features/reports/presentation/day_close_screen.dart';
 import '../../features/reports/presentation/reports_screen.dart';
@@ -114,6 +115,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: 'security',
             pageBuilder: (context, state) =>
                 const NoTransitionPage<void>(child: SettingsSecurityScreen()),
+          ),
+          GoRoute(
+            parentNavigatorKey: appRootNavigatorKey,
+            path: 'staff',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage<void>(child: SettingsStaffScreen()),
           ),
           GoRoute(
             parentNavigatorKey: appRootNavigatorKey,

@@ -77,8 +77,15 @@ class SettingsScreen extends ConsumerWidget {
             ),
           if (owner)
             MobileListTile(
+              title: 'Staff & PINs',
+              subtitle: 'Accounts, roles and personal PINs',
+              leadingIcon: Icons.badge_rounded,
+              onTap: () => context.push('/settings/staff'),
+            ),
+          if (owner)
+            MobileListTile(
               title: 'Team',
-              subtitle: 'Staff members and roles',
+              subtitle: 'Workspace members (cloud)',
               leadingIcon: Icons.groups_rounded,
               onTap: () => context.push('/settings/team'),
             ),

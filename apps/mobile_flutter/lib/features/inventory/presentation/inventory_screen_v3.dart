@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
+import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -309,6 +310,9 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
   }
 
   void _showItemDetails(BuildContext context, InventoryCatalogItem item) {
+    final session = ref.read(mobileSessionProvider).asData?.value;
+    final canManage =
+        session != null && (session.isOwnerLike || session.isManager);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -415,19 +419,20 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                     label: const Text('Duplicate'),
                   ),
                 ),
-                Expanded(
-                  child: TextButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _confirmDeleteItem(item);
-                    },
-                    icon: const Icon(Icons.delete_outline_rounded),
-                    label: const Text('Delete'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppPalette.error,
+                if (canManage)
+                  Expanded(
+                    child: TextButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _confirmDeleteItem(item);
+                      },
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      label: const Text('Delete'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppPalette.error,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ],

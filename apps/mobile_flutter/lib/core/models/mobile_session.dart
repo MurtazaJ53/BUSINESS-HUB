@@ -53,6 +53,29 @@ class MobileSession {
     );
   }
 
+  /// Local session for a resolved staff member (multi-user). Owner is elevated;
+  /// everyone else is gated by [role] via the getters below.
+  factory MobileSession.localUser({
+    required String staffId,
+    required String name,
+    required String role,
+  }) {
+    final normalized = role.trim().toLowerCase();
+    if (normalized == 'owner') {
+      return MobileSession.localOwner();
+    }
+    return MobileSession(
+      user: MobileAuthUser.local(id: staffId, name: name),
+      email: MobileRuntimeConfig.localOwnerEmail,
+      uid: staffId,
+      role: normalized.isEmpty ? 'staff' : normalized,
+      membershipId: staffId,
+      permissions: const <String, dynamic>{},
+      shopId: MobileRuntimeConfig.localShopId,
+      isElevatedAdmin: false,
+    );
+  }
+
   final MobileAuthUser user;
   final String email;
   final String uid;

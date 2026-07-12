@@ -770,7 +770,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                         ),
                       ),
                       if (detail.total >= 0 &&
-                          !(detail.footerNote ?? '').contains('RETURN')) ...<Widget>[
+                          !(detail.footerNote ?? '').contains('RETURN') &&
+                          _canRefund()) ...<Widget>[
                         const SizedBox(height: 12),
                         OutlinedButton.icon(
                           onPressed: () =>
@@ -796,6 +797,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         );
       },
     );
+  }
+
+  bool _canRefund() {
+    final s = ref.read(mobileSessionProvider).asData?.value;
+    return s != null && (s.isOwnerLike || s.isManager);
   }
 
   Future<void> _shareReceiptPdf(SaleRecordDetail detail) async {

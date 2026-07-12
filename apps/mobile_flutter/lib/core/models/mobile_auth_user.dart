@@ -16,6 +16,14 @@ class MobileAuthUser {
     );
   }
 
+  factory MobileAuthUser.local({required String id, required String name}) {
+    return MobileAuthUser(
+      uid: id,
+      email: MobileRuntimeConfig.localOwnerEmail,
+      displayName: name.trim().isEmpty ? 'Staff' : name.trim(),
+    );
+  }
+
   final String uid;
   final String email;
   final String displayName;
