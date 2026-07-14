@@ -29,4 +29,19 @@ void main() {
       expect(b!.embeddedValue, closeTo(1250, 0.001));
     });
   });
+
+  group('weighedLinePrice', () {
+    test('1.5 kg at Rs.60/kg = Rs.90', () {
+      expect(weighedLinePrice(rate: 60, weight: 1.5), 90);
+    });
+
+    test('rounds to paise', () {
+      expect(weighedLinePrice(rate: 33.33, weight: 0.25), closeTo(8.33, 0.001));
+    });
+
+    test('non-positive inputs yield zero', () {
+      expect(weighedLinePrice(rate: 0, weight: 2), 0);
+      expect(weighedLinePrice(rate: 60, weight: 0), 0);
+    });
+  });
 }

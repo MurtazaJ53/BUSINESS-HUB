@@ -31,6 +31,13 @@ class WeightBarcodeConfig {
   static const WeightBarcodeConfig standard = WeightBarcodeConfig();
 }
 
+/// Price for a weighed/loose line: rate per unit × weight, rounded to paise.
+/// Returns 0 for non-positive inputs.
+double weighedLinePrice({required double rate, required double weight}) {
+  if (rate <= 0 || weight <= 0) return 0;
+  return double.parse((rate * weight).toStringAsFixed(2));
+}
+
 class WeightBarcode {
   const WeightBarcode({required this.itemCode, required this.embeddedValue});
 

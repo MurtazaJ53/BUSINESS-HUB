@@ -138,6 +138,87 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
     });
   }
 
+  /// Sell loose goods by weight: rate (per kg/unit) x weight -> a priced line.
+  /// Uses a non-inventory line, so it needs no fractional-stock plumbing.
+  Future<void> _addWeighedItem() async {
+    final nameController = TextEditingController();
+    final rateController = TextEditingController();
+    final weightController = TextEditingController();
+    final added = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final rate = double.tryParse(rateController.text.trim()) ?? 0;
+          final weight = double.tryParse(weightController.text.trim()) ?? 0;
+          final linePrice = weighedLinePrice(rate: rate, weight: weight);
+          return AlertDialog(
+            title: const Text('Weighed item'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                TextField(
+                  controller: nameController,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    labelText: 'Item (e.g. Rice)',
+                  ),
+                ),
+                TextField(
+                  controller: rateController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  onChanged: (_) => setDialogState(() {}),
+                  decoration: const InputDecoration(labelText: 'Rate per kg/unit'),
+                ),
+                TextField(
+                  controller: weightController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  onChanged: (_) => setDialogState(() {}),
+                  decoration: const InputDecoration(labelText: 'Weight / qty'),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Line total: ${formatCurrency(linePrice)}',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Add'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    final name = nameController.text.trim();
+    final rate = double.tryParse(rateController.text.trim()) ?? 0;
+    final weight = double.tryParse(weightController.text.trim()) ?? 0;
+    final linePrice = weighedLinePrice(rate: rate, weight: weight);
+    nameController.dispose();
+    rateController.dispose();
+    weightController.dispose();
+    if (added != true || name.isEmpty || linePrice <= 0) return;
+    _addCartLine(
+      id: 'weigh-${DateTime.now().microsecondsSinceEpoch}',
+      name: '$name (${_trimNum(weight)} @ ${formatCurrency(rate)})',
+      price: linePrice,
+    );
+  }
+
+  String _trimNum(double v) =>
+      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
+
   // ---- cart mutations -------------------------------------------------------
 
   void _warnLowStock(String name, int stock) {
@@ -1063,6 +1144,14 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
                 onPressed: _addCustomItem,
                 icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
                 label: const Text('Custom'),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _addWeighedItem,
+                icon: const Icon(Icons.scale_rounded, size: 18),
+                label: const Text('Weigh'),
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                 ),
