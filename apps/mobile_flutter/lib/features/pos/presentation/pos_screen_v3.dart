@@ -11,6 +11,7 @@ import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/pos/cart_pricing.dart';
 import '../../../core/pos/held_sales.dart';
+import '../../../core/pos/weight_barcode.dart';
 import '../../../core/receipt/receipt_pdf.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/providers/printer_provider.dart';
@@ -426,6 +427,30 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
       builder: (_) => const PosScannerSheet(),
     );
     if (code == null || code.trim().isEmpty || !mounted) return;
+
+    // Price/weight-embedded scale barcode: match the item by its PLU digits and
+    // charge the embedded price for this line.
+    final weigh = parseWeightBarcode(code.trim());
+    if (weigh != null) {
+      final plu = weigh.itemCode.toLowerCase();
+      final byPlu = items.where((item) {
+        final sku = item.sku?.toLowerCase() ?? '';
+        return sku == plu || sku.contains(plu) || item.id.toLowerCase() == plu;
+      }).toList();
+      final name = byPlu.isNotEmpty ? byPlu.first.name : 'Weighed item $plu';
+      _addCartLine(
+        id: 'weigh-${DateTime.now().microsecondsSinceEpoch}',
+        name: name,
+        price: weigh.embeddedValue,
+        category: byPlu.isNotEmpty ? byPlu.first.category : 'General',
+        gstRate: byPlu.isNotEmpty ? byPlu.first.gstRate : 0,
+        priceIncludesTax: byPlu.isNotEmpty
+            ? byPlu.first.priceIncludesTax
+            : true,
+      );
+      return;
+    }
+
     final needle = code.trim().toLowerCase();
     final match = items.where((item) {
       final sku = item.sku?.toLowerCase() ?? '';
@@ -438,6 +463,34 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
       return;
     }
     _addToCart(match.first);
+  }
+
+  /// Add an arbitrary line to the cart (custom/open item, or a weighed item)
+  /// without needing an inventory SKU. Uses a very high stock so no low-stock
+  /// warnings fire; ids are non-inventory so no stock is decremented on sale.
+  void _addCartLine({
+    required String id,
+    required String name,
+    required double price,
+    String category = 'General',
+    double gstRate = 0,
+    bool priceIncludesTax = true,
+  }) {
+    setState(() {
+      _cart.add(
+        PosCartItem(
+          id: id,
+          name: name,
+          price: price,
+          quantity: 1,
+          stock: 999999,
+          category: category,
+          gstRate: gstRate,
+          priceIncludesTax: priceIncludesTax,
+        ),
+      );
+    });
+    HapticFeedback.selectionClick();
   }
 
   Future<void> _openCart() async {
@@ -687,6 +740,10 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
         customerPhone: customerPhone.isEmpty ? null : customerPhone,
         saleDate: _saleDate,
       );
+      // Kick the cash drawer for cash sales (no-op without a connected drawer).
+      if (paymentMode == 'CASH') {
+        unawaited(ref.read(receiptPrinterProvider).openCashDrawer());
+      }
       if (!mounted) return;
       // Local-first: the sale is committed to the device now, so confirm and
       // reset immediately. Backend sync runs in the background (its result is

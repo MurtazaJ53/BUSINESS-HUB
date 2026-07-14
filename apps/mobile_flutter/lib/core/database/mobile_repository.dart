@@ -1767,15 +1767,19 @@ class SalesRepository {
             updatedAt: Value(now.millisecondsSinceEpoch),
           ),
         );
-        await _writeStockMovement(
-          _db,
-          itemId: item.id,
-          itemName: item.name,
-          delta: -item.quantity,
-          reason: 'SALE',
-          balanceAfter: item.stock - item.quantity,
-          refId: saleId,
-        );
+        // Skip custom/weighed lines — they aren't inventory rows, so there is
+        // no real stock to move.
+        if (!item.id.startsWith('custom-') && !item.id.startsWith('weigh-')) {
+          await _writeStockMovement(
+            _db,
+            itemId: item.id,
+            itemName: item.name,
+            delta: -item.quantity,
+            reason: 'SALE',
+            balanceAfter: item.stock - item.quantity,
+            refId: saleId,
+          );
+        }
       }
 
       // Credit sale: push the unpaid balance onto the customer's khata so the

@@ -137,4 +137,16 @@ class ReceiptPrinterService {
 
     bluetooth.writeBytes(Uint8List.fromList(bytes));
   }
+
+  /// Send the ESC/POS cash-drawer kick pulse to a drawer wired to the printer's
+  /// RJ11 port. No-op if no printer is connected. Verify the pulse pin/timing
+  /// against your drawer if it doesn't open.
+  Future<void> openCashDrawer() async {
+    final isConnected = await bluetooth.isConnected ?? false;
+    if (!isConnected) return;
+    // ESC p m t1 t2  -> pin 0 (pin 2), on=25ms, off=250ms.
+    bluetooth.writeBytes(
+      Uint8List.fromList(<int>[0x1B, 0x70, 0x00, 0x19, 0xFA]),
+    );
+  }
 }
