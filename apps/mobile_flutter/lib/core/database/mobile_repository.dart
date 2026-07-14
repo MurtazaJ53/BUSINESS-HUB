@@ -417,7 +417,7 @@ class InventoryRepository {
         COALESCE(SUM(i.stock), 0) AS total_stock,
         COALESCE(SUM(i.price * i.stock), 0) AS inventory_value,
         COALESCE(SUM((i.price - ${includeCost ? 'COALESCE(ip.cost_price, 0)' : '0'}) * i.stock), 0) AS potential_profit,
-        COALESCE(SUM(CASE WHEN i.stock <= 5 THEN 1 ELSE 0 END), 0) AS low_stock,
+        COALESCE(SUM(CASE WHEN i.stock <= COALESCE(i.reorder_level, 5) THEN 1 ELSE 0 END), 0) AS low_stock,
         COALESCE((SELECT COUNT(*) FROM sales s WHERE s.tombstone = 0 AND s.date = ?), 0) AS today_sales,
         COALESCE((SELECT SUM(s.total) FROM sales s WHERE s.tombstone = 0 AND s.date = ?), 0) AS today_revenue
       FROM inventory i
@@ -459,7 +459,7 @@ class InventoryRepository {
           '''
             SELECT id, name, COALESCE(category, 'General') AS category, stock, size
             FROM inventory
-            WHERE tombstone = 0 AND stock <= 5
+            WHERE tombstone = 0 AND stock <= COALESCE(reorder_level, 5)
             ORDER BY stock ASC, LOWER(name) ASC
             LIMIT ?;
           ''',
@@ -521,7 +521,7 @@ class InventoryRepository {
       variables.add(Variable<String>(category));
     }
     if (lowStockOnly) {
-      where.add('stock <= 5');
+      where.add('stock <= COALESCE(reorder_level, 5)');
     }
     if (normalized.isNotEmpty) {
       where.add(
@@ -563,7 +563,7 @@ class InventoryRepository {
       variables.add(Variable<String>(category));
     }
     if (lowStockOnly) {
-      where.add('i.stock <= 5');
+      where.add('i.stock <= COALESCE(i.reorder_level, 5)');
     }
     if (normalized.isNotEmpty) {
       where.add(
@@ -593,6 +593,8 @@ class InventoryRepository {
         i.stock,
         i.source_meta,
         i.image_path,
+        i.unit,
+        i.reorder_level,
         i.created_at,
         ${includeCost ? 'COALESCE(ip.cost_price, 0)' : 'NULL'} AS cost_price,
         ip.supplier_id,
@@ -643,6 +645,8 @@ class InventoryRepository {
           i.stock,
           i.source_meta,
           i.image_path,
+          i.unit,
+          i.reorder_level,
           i.created_at,
           ${includeCost ? 'COALESCE(ip.cost_price, 0)' : 'NULL'} AS cost_price,
           ip.supplier_id,
@@ -719,6 +723,14 @@ class InventoryRepository {
                 (data.containsKey('imagePath') ||
                     data.containsKey('image_path'))
                 ? Value(_asStringOrNull(data['imagePath'] ?? data['image_path']))
+                : const Value.absent(),
+            unit: (data.containsKey('unit'))
+                ? Value(_asStringOrNull(data['unit']))
+                : const Value.absent(),
+            reorderLevel:
+                (data.containsKey('reorderLevel') ||
+                    data.containsKey('reorder_level'))
+                ? Value(_asIntOrNull(data['reorderLevel'] ?? data['reorder_level']))
                 : const Value.absent(),
             createdAt: createdAt,
             updatedAt: Value(updatedAt),
@@ -806,6 +818,8 @@ class InventoryRepository {
       stock: row.read<int>('stock'),
       sourceMeta: row.readNullable<String>('source_meta'),
       imagePath: row.readNullable<String>('image_path'),
+      unit: row.readNullable<String>('unit'),
+      reorderLevel: row.readNullable<int>('reorder_level'),
       createdAt: DateTime.fromMillisecondsSinceEpoch(
         row.read<int>('created_at'),
       ),
@@ -1936,6 +1950,17 @@ int _asInt(Object? value) {
   if (value is num) return value.toInt();
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
+}
+
+int? _asIntOrNull(Object? value) {
+  if (value == null) return null;
+  if (value is num) return value.toInt();
+  if (value is String) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    return int.tryParse(trimmed);
+  }
+  return null;
 }
 
 int? _asEpoch(Object? value) {

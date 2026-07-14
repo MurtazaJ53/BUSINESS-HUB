@@ -210,6 +210,8 @@ class MobileSyncCoordinator {
     double gstRate = 0,
     bool priceIncludesTax = true,
     String? imagePath,
+    String? unit,
+    int? reorderLevel,
   }) async {
     final session = _session;
     if (session == null || !session.hasShop) {
@@ -243,6 +245,8 @@ class MobileSyncCoordinator {
         gstRate: gstRate,
         priceIncludesTax: priceIncludesTax,
         imagePath: imagePath,
+        unit: unit,
+        reorderLevel: reorderLevel,
         timestamp: now,
       );
       setStatus(MobileSyncStatus.idle);
@@ -271,13 +275,17 @@ class MobileSyncCoordinator {
         created,
         updatedAt: updatedAt,
       );
-      // The backend has no image field yet, so keep the photo local-only by
-      // re-merging it onto the freshly synced row.
+      // The backend has no image / unit / reorder fields yet, so keep those
+      // local-only by re-merging them onto the freshly synced row.
       final createdId = created['id']?.toString();
-      if (imagePath != null && createdId != null && createdId.isNotEmpty) {
+      final localOnly = <String, dynamic>{};
+      if (imagePath != null) localOnly['imagePath'] = imagePath;
+      if (unit != null) localOnly['unit'] = unit;
+      if (reorderLevel != null) localOnly['reorderLevel'] = reorderLevel;
+      if (localOnly.isNotEmpty && createdId != null && createdId.isNotEmpty) {
         await _inventoryRepository.mergeInventoryDocument(
           createdId,
-          <String, dynamic>{'imagePath': imagePath},
+          localOnly,
           updatedAt: updatedAt,
         );
       }
@@ -305,6 +313,8 @@ class MobileSyncCoordinator {
         gstRate: gstRate,
         priceIncludesTax: priceIncludesTax,
         imagePath: imagePath,
+        unit: unit,
+        reorderLevel: reorderLevel,
         timestamp: now,
       );
       setStatus(MobileSyncStatus.idle);
@@ -326,6 +336,8 @@ class MobileSyncCoordinator {
         gstRate: gstRate,
         priceIncludesTax: priceIncludesTax,
         imagePath: imagePath,
+        unit: unit,
+        reorderLevel: reorderLevel,
         timestamp: now,
       );
       setStatus(MobileSyncStatus.idle);
@@ -357,6 +369,8 @@ class MobileSyncCoordinator {
     bool priceIncludesTax = true,
     DateTime? createdAt,
     String? imagePath,
+    String? unit,
+    int? reorderLevel,
   }) async {
     final session = _session;
     if (session == null || !session.hasShop) {
@@ -387,9 +401,11 @@ class MobileSyncCoordinator {
       'stock': stock,
       'status': 'active',
       'tombstone': false,
-      // Always present on edit so the form fully owns the photo (set / replace
-      // / remove); null clears it.
+      // Always present on edit so the form fully owns these (set / replace
+      // / clear); null clears them.
       'imagePath': imagePath,
+      'unit': unit,
+      'reorderLevel': reorderLevel,
       'createdAt': (createdAt ?? now).toIso8601String(),
       'updatedAt': iso,
     };
@@ -997,6 +1013,8 @@ class MobileSyncCoordinator {
     required bool priceIncludesTax,
     required DateTime timestamp,
     String? imagePath,
+    String? unit,
+    int? reorderLevel,
   }) async {
     final itemId = 'local-${timestamp.microsecondsSinceEpoch}';
     final isoTimestamp = timestamp.toIso8601String();
@@ -1021,6 +1039,8 @@ class MobileSyncCoordinator {
         'actor_uid': session.uid,
       },
       'imagePath': imagePath,
+      'unit': unit,
+      'reorderLevel': reorderLevel,
       'createdAt': isoTimestamp,
       'updatedAt': isoTimestamp,
     };

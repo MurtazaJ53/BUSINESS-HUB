@@ -998,7 +998,7 @@ class _ProductRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
     final theme = Theme.of(context);
-    final lowStock = item.stock <= 5;
+    final lowStock = item.isLowStock;
 
     return Container(
       decoration: BoxDecoration(

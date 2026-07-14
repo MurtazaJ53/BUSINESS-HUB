@@ -883,7 +883,12 @@ class InventoryCatalogItem {
     this.gstRate = 0,
     this.priceIncludesTax = true,
     this.imagePath,
+    this.unit,
+    this.reorderLevel,
   });
+
+  /// Fallback low-stock threshold when an item has no explicit reorder level.
+  static const int defaultReorderLevel = 5;
 
   final String id;
   final String name;
@@ -904,7 +909,17 @@ class InventoryCatalogItem {
   final bool priceIncludesTax;
   final String? imagePath;
 
+  /// Unit of measurement (pcs, kg, litre, ...). Null when unspecified.
+  final String? unit;
+
+  /// Per-item low-stock threshold. Null falls back to [defaultReorderLevel].
+  final int? reorderLevel;
+
   double get marginPerUnit => price - (costPrice ?? 0);
+
+  int get effectiveReorderLevel => reorderLevel ?? defaultReorderLevel;
+
+  bool get isLowStock => stock <= effectiveReorderLevel;
 }
 
 class PosCatalogFilter {

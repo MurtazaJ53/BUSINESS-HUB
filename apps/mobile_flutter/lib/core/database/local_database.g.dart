@@ -421,6 +421,26 @@ class $InventoryEntriesTable extends InventoryEntries
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _unitMeta = const VerificationMeta('unit');
+  @override
+  late final GeneratedColumn<String> unit = GeneratedColumn<String>(
+    'unit',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _reorderLevelMeta = const VerificationMeta(
+    'reorderLevel',
+  );
+  @override
+  late final GeneratedColumn<int> reorderLevel = GeneratedColumn<int>(
+    'reorder_level',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -475,6 +495,8 @@ class $InventoryEntriesTable extends InventoryEntries
     stock,
     sourceMeta,
     imagePath,
+    unit,
+    reorderLevel,
     createdAt,
     updatedAt,
     tombstone,
@@ -587,6 +609,21 @@ class $InventoryEntriesTable extends InventoryEntries
         imagePath.isAcceptableOrUnknown(data['image_path']!, _imagePathMeta),
       );
     }
+    if (data.containsKey('unit')) {
+      context.handle(
+        _unitMeta,
+        unit.isAcceptableOrUnknown(data['unit']!, _unitMeta),
+      );
+    }
+    if (data.containsKey('reorder_level')) {
+      context.handle(
+        _reorderLevelMeta,
+        reorderLevel.isAcceptableOrUnknown(
+          data['reorder_level']!,
+          _reorderLevelMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -672,6 +709,14 @@ class $InventoryEntriesTable extends InventoryEntries
         DriftSqlType.string,
         data['${effectivePrefix}image_path'],
       ),
+      unit: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}unit'],
+      ),
+      reorderLevel: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}reorder_level'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}created_at'],
@@ -708,6 +753,8 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
   final int stock;
   final String? sourceMeta;
   final String? imagePath;
+  final String? unit;
+  final int? reorderLevel;
   final int createdAt;
   final int updatedAt;
   final bool tombstone;
@@ -726,6 +773,8 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     required this.stock,
     this.sourceMeta,
     this.imagePath,
+    this.unit,
+    this.reorderLevel,
     required this.createdAt,
     required this.updatedAt,
     required this.tombstone,
@@ -761,6 +810,12 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     if (!nullToAbsent || imagePath != null) {
       map['image_path'] = Variable<String>(imagePath);
     }
+    if (!nullToAbsent || unit != null) {
+      map['unit'] = Variable<String>(unit);
+    }
+    if (!nullToAbsent || reorderLevel != null) {
+      map['reorder_level'] = Variable<int>(reorderLevel);
+    }
     map['created_at'] = Variable<int>(createdAt);
     map['updated_at'] = Variable<int>(updatedAt);
     map['tombstone'] = Variable<bool>(tombstone);
@@ -793,6 +848,10 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
       imagePath: imagePath == null && nullToAbsent
           ? const Value.absent()
           : Value(imagePath),
+      unit: unit == null && nullToAbsent ? const Value.absent() : Value(unit),
+      reorderLevel: reorderLevel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reorderLevel),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       tombstone: Value(tombstone),
@@ -819,6 +878,8 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
       stock: serializer.fromJson<int>(json['stock']),
       sourceMeta: serializer.fromJson<String?>(json['sourceMeta']),
       imagePath: serializer.fromJson<String?>(json['imagePath']),
+      unit: serializer.fromJson<String?>(json['unit']),
+      reorderLevel: serializer.fromJson<int?>(json['reorderLevel']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
       tombstone: serializer.fromJson<bool>(json['tombstone']),
@@ -842,6 +903,8 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
       'stock': serializer.toJson<int>(stock),
       'sourceMeta': serializer.toJson<String?>(sourceMeta),
       'imagePath': serializer.toJson<String?>(imagePath),
+      'unit': serializer.toJson<String?>(unit),
+      'reorderLevel': serializer.toJson<int?>(reorderLevel),
       'createdAt': serializer.toJson<int>(createdAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
       'tombstone': serializer.toJson<bool>(tombstone),
@@ -863,6 +926,8 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     int? stock,
     Value<String?> sourceMeta = const Value.absent(),
     Value<String?> imagePath = const Value.absent(),
+    Value<String?> unit = const Value.absent(),
+    Value<int?> reorderLevel = const Value.absent(),
     int? createdAt,
     int? updatedAt,
     bool? tombstone,
@@ -881,6 +946,8 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     stock: stock ?? this.stock,
     sourceMeta: sourceMeta.present ? sourceMeta.value : this.sourceMeta,
     imagePath: imagePath.present ? imagePath.value : this.imagePath,
+    unit: unit.present ? unit.value : this.unit,
+    reorderLevel: reorderLevel.present ? reorderLevel.value : this.reorderLevel,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     tombstone: tombstone ?? this.tombstone,
@@ -909,6 +976,10 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
           ? data.sourceMeta.value
           : this.sourceMeta,
       imagePath: data.imagePath.present ? data.imagePath.value : this.imagePath,
+      unit: data.unit.present ? data.unit.value : this.unit,
+      reorderLevel: data.reorderLevel.present
+          ? data.reorderLevel.value
+          : this.reorderLevel,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       tombstone: data.tombstone.present ? data.tombstone.value : this.tombstone,
@@ -932,6 +1003,8 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
           ..write('stock: $stock, ')
           ..write('sourceMeta: $sourceMeta, ')
           ..write('imagePath: $imagePath, ')
+          ..write('unit: $unit, ')
+          ..write('reorderLevel: $reorderLevel, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('tombstone: $tombstone')
@@ -955,6 +1028,8 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     stock,
     sourceMeta,
     imagePath,
+    unit,
+    reorderLevel,
     createdAt,
     updatedAt,
     tombstone,
@@ -977,6 +1052,8 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
           other.stock == this.stock &&
           other.sourceMeta == this.sourceMeta &&
           other.imagePath == this.imagePath &&
+          other.unit == this.unit &&
+          other.reorderLevel == this.reorderLevel &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.tombstone == this.tombstone);
@@ -997,6 +1074,8 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
   final Value<int> stock;
   final Value<String?> sourceMeta;
   final Value<String?> imagePath;
+  final Value<String?> unit;
+  final Value<int?> reorderLevel;
   final Value<int> createdAt;
   final Value<int> updatedAt;
   final Value<bool> tombstone;
@@ -1016,6 +1095,8 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     this.stock = const Value.absent(),
     this.sourceMeta = const Value.absent(),
     this.imagePath = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.reorderLevel = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.tombstone = const Value.absent(),
@@ -1036,6 +1117,8 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     this.stock = const Value.absent(),
     this.sourceMeta = const Value.absent(),
     this.imagePath = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.reorderLevel = const Value.absent(),
     required int createdAt,
     this.updatedAt = const Value.absent(),
     this.tombstone = const Value.absent(),
@@ -1059,6 +1142,8 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     Expression<int>? stock,
     Expression<String>? sourceMeta,
     Expression<String>? imagePath,
+    Expression<String>? unit,
+    Expression<int>? reorderLevel,
     Expression<int>? createdAt,
     Expression<int>? updatedAt,
     Expression<bool>? tombstone,
@@ -1079,6 +1164,8 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
       if (stock != null) 'stock': stock,
       if (sourceMeta != null) 'source_meta': sourceMeta,
       if (imagePath != null) 'image_path': imagePath,
+      if (unit != null) 'unit': unit,
+      if (reorderLevel != null) 'reorder_level': reorderLevel,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (tombstone != null) 'tombstone': tombstone,
@@ -1101,6 +1188,8 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     Value<int>? stock,
     Value<String?>? sourceMeta,
     Value<String?>? imagePath,
+    Value<String?>? unit,
+    Value<int?>? reorderLevel,
     Value<int>? createdAt,
     Value<int>? updatedAt,
     Value<bool>? tombstone,
@@ -1121,6 +1210,8 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
       stock: stock ?? this.stock,
       sourceMeta: sourceMeta ?? this.sourceMeta,
       imagePath: imagePath ?? this.imagePath,
+      unit: unit ?? this.unit,
+      reorderLevel: reorderLevel ?? this.reorderLevel,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       tombstone: tombstone ?? this.tombstone,
@@ -1173,6 +1264,12 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     if (imagePath.present) {
       map['image_path'] = Variable<String>(imagePath.value);
     }
+    if (unit.present) {
+      map['unit'] = Variable<String>(unit.value);
+    }
+    if (reorderLevel.present) {
+      map['reorder_level'] = Variable<int>(reorderLevel.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<int>(createdAt.value);
     }
@@ -1205,6 +1302,8 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
           ..write('stock: $stock, ')
           ..write('sourceMeta: $sourceMeta, ')
           ..write('imagePath: $imagePath, ')
+          ..write('unit: $unit, ')
+          ..write('reorderLevel: $reorderLevel, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('tombstone: $tombstone, ')
@@ -6017,6 +6116,8 @@ typedef $$InventoryEntriesTableCreateCompanionBuilder =
       Value<int> stock,
       Value<String?> sourceMeta,
       Value<String?> imagePath,
+      Value<String?> unit,
+      Value<int?> reorderLevel,
       required int createdAt,
       Value<int> updatedAt,
       Value<bool> tombstone,
@@ -6038,6 +6139,8 @@ typedef $$InventoryEntriesTableUpdateCompanionBuilder =
       Value<int> stock,
       Value<String?> sourceMeta,
       Value<String?> imagePath,
+      Value<String?> unit,
+      Value<int?> reorderLevel,
       Value<int> createdAt,
       Value<int> updatedAt,
       Value<bool> tombstone,
@@ -6120,6 +6223,16 @@ class $$InventoryEntriesTableFilterComposer
 
   ColumnFilters<String> get imagePath => $composableBuilder(
     column: $table.imagePath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get reorderLevel => $composableBuilder(
+    column: $table.reorderLevel,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6218,6 +6331,16 @@ class $$InventoryEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get reorderLevel => $composableBuilder(
+    column: $table.reorderLevel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -6293,6 +6416,14 @@ class $$InventoryEntriesTableAnnotationComposer
   GeneratedColumn<String> get imagePath =>
       $composableBuilder(column: $table.imagePath, builder: (column) => column);
 
+  GeneratedColumn<String> get unit =>
+      $composableBuilder(column: $table.unit, builder: (column) => column);
+
+  GeneratedColumn<int> get reorderLevel => $composableBuilder(
+    column: $table.reorderLevel,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -6354,6 +6485,8 @@ class $$InventoryEntriesTableTableManager
                 Value<int> stock = const Value.absent(),
                 Value<String?> sourceMeta = const Value.absent(),
                 Value<String?> imagePath = const Value.absent(),
+                Value<String?> unit = const Value.absent(),
+                Value<int?> reorderLevel = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
                 Value<bool> tombstone = const Value.absent(),
@@ -6373,6 +6506,8 @@ class $$InventoryEntriesTableTableManager
                 stock: stock,
                 sourceMeta: sourceMeta,
                 imagePath: imagePath,
+                unit: unit,
+                reorderLevel: reorderLevel,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 tombstone: tombstone,
@@ -6394,6 +6529,8 @@ class $$InventoryEntriesTableTableManager
                 Value<int> stock = const Value.absent(),
                 Value<String?> sourceMeta = const Value.absent(),
                 Value<String?> imagePath = const Value.absent(),
+                Value<String?> unit = const Value.absent(),
+                Value<int?> reorderLevel = const Value.absent(),
                 required int createdAt,
                 Value<int> updatedAt = const Value.absent(),
                 Value<bool> tombstone = const Value.absent(),
@@ -6413,6 +6550,8 @@ class $$InventoryEntriesTableTableManager
                 stock: stock,
                 sourceMeta: sourceMeta,
                 imagePath: imagePath,
+                unit: unit,
+                reorderLevel: reorderLevel,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 tombstone: tombstone,

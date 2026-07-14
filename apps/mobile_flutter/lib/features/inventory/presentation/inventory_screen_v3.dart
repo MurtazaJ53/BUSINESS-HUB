@@ -15,6 +15,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/premium_components.dart';
+import '../../pos/presentation/pos_scanner_sheet.dart';
 
 /// Redesigned Inventory Screen v3.0
 /// Simple, Clean, Premium, Professional
@@ -26,6 +27,20 @@ class InventoryScreenV3 extends ConsumerStatefulWidget {
 }
 
 class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
+  /// Units of measurement offered in the item form.
+  static const List<String> _unitOptions = <String>[
+    'pcs',
+    'kg',
+    'g',
+    'litre',
+    'ml',
+    'box',
+    'pack',
+    'dozen',
+    'metre',
+    'feet',
+  ];
+
   final TextEditingController _searchController = TextEditingController();
 
   String _search = '';
@@ -314,15 +329,17 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
         return EnhancedListItem(
           title: item.name,
           subtitle:
-              '${item.category} • Stock: ${item.stock} • ${formatCurrency(item.price)}',
+              '${item.category} • Stock: ${item.stock}'
+              '${item.unit != null && item.unit!.isNotEmpty ? ' ${item.unit}' : ''}'
+              ' • ${formatCurrency(item.price)}',
           leading: _productThumb(item),
           leadingIcon: Icons.inventory_2_rounded,
-          leadingColor: item.stock <= 5
+          leadingColor: item.isLowStock
               ? AppPalette.error
               : AppPalette.inventory,
           trailing: StatusBadge(
-            label: item.stock <= 5 ? 'Low' : 'OK',
-            color: item.stock <= 5 ? AppPalette.error : AppPalette.success,
+            label: item.isLowStock ? 'Low' : 'OK',
+            color: item.isLowStock ? AppPalette.error : AppPalette.success,
           ),
           onTap: () => _showItemDetails(context, item),
         );
@@ -525,6 +542,21 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
     final gstController = TextEditingController(
       text: source != null ? source.gstRate.toString() : '0',
     );
+    final costController = TextEditingController(
+      text: (source?.costPrice ?? 0) > 0
+          ? source!.costPrice!.toStringAsFixed(2)
+          : '',
+    );
+    final descriptionController = TextEditingController(
+      text: source?.description ?? '',
+    );
+    final reorderController = TextEditingController(
+      text: source?.reorderLevel != null ? '${source!.reorderLevel}' : '',
+    );
+    var selectedUnit = source?.unit ?? _unitOptions.first;
+    if (!_unitOptions.contains(selectedUnit)) {
+      selectedUnit = _unitOptions.first;
+    }
     var priceIncludesTax = source?.priceIncludesTax ?? true;
     // A duplicate starts without a photo so it never shares (and later orphans)
     // the original's image file.
@@ -601,6 +633,15 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                 final openingStock = int.parse(stockController.text.trim());
                 final gstRate =
                     double.tryParse(gstController.text.trim()) ?? 0;
+                final costText = costController.text.trim();
+                final costPrice = costText.isEmpty
+                    ? null
+                    : double.tryParse(costText);
+                final reorderText = reorderController.text.trim();
+                final reorderLevel = reorderText.isEmpty
+                    ? null
+                    : int.tryParse(reorderText);
+                final description = descriptionController.text.trim();
 
                 final coordinator = ref.read(mobileSyncCoordinatorProvider);
                 if (isEdit) {
@@ -614,12 +655,14 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                     hsnCode: hsnController.text.trim(),
                     gstRate: gstRate,
                     priceIncludesTax: priceIncludesTax,
-                    costPrice: existing.costPrice,
+                    costPrice: costPrice ?? existing.costPrice,
                     size: existing.size ?? '',
                     subcategory: existing.subcategory ?? '',
-                    description: existing.description ?? '',
+                    description: description,
                     createdAt: existing.createdAt,
                     imagePath: imagePath,
+                    unit: selectedUnit,
+                    reorderLevel: reorderLevel,
                   );
                 } else {
                   await coordinator.createInventoryItem(
@@ -631,7 +674,11 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                     hsnCode: hsnController.text.trim(),
                     gstRate: gstRate,
                     priceIncludesTax: priceIncludesTax,
+                    costPrice: costPrice,
+                    description: description,
                     imagePath: imagePath,
+                    unit: selectedUnit,
+                    reorderLevel: reorderLevel,
                   );
                 }
 
@@ -773,6 +820,26 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                           ),
                           const SizedBox(height: 12),
                           TextFormField(
+                            controller: costController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'Cost / purchase price (optional)',
+                              helperText: 'Drives profit margin & valuation',
+                            ),
+                            validator: (value) {
+                              final text = value?.trim() ?? '';
+                              if (text.isEmpty) return null;
+                              final parsed = double.tryParse(text);
+                              if (parsed == null || parsed < 0) {
+                                return 'Enter a valid cost price';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
                             controller: stockController,
                             keyboardType: TextInputType.number,
                             decoration: const InputDecoration(
@@ -789,6 +856,51 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                             },
                           ),
                           const SizedBox(height: 12),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  initialValue: selectedUnit,
+                                  isExpanded: true,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Unit',
+                                  ),
+                                  items: <DropdownMenuItem<String>>[
+                                    for (final u in _unitOptions)
+                                      DropdownMenuItem<String>(
+                                        value: u,
+                                        child: Text(u),
+                                      ),
+                                  ],
+                                  onChanged: (value) => setSheetState(
+                                    () => selectedUnit = value ?? _unitOptions.first,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: reorderController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Reorder level',
+                                    helperText: 'Low-stock alert',
+                                  ),
+                                  validator: (value) {
+                                    final text = value?.trim() ?? '';
+                                    if (text.isEmpty) return null;
+                                    final parsed = int.tryParse(text);
+                                    if (parsed == null || parsed < 0) {
+                                      return 'Enter 0 or more';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
                           TextFormField(
                             controller: categoryController,
                             decoration: const InputDecoration(
@@ -798,8 +910,34 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                           const SizedBox(height: 12),
                           TextFormField(
                             controller: skuController,
+                            decoration: InputDecoration(
+                              labelText: 'SKU / barcode (optional)',
+                              suffixIcon: IconButton(
+                                icon: const Icon(
+                                  Icons.qr_code_scanner_rounded,
+                                ),
+                                tooltip: 'Scan barcode',
+                                onPressed: () async {
+                                  final code = await showModalBottomSheet<String>(
+                                    context: sheetContext,
+                                    isScrollControlled: true,
+                                    backgroundColor: Colors.transparent,
+                                    builder: (_) => const PosScannerSheet(),
+                                  );
+                                  if (code != null && code.trim().isNotEmpty) {
+                                    skuController.text = code.trim();
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: descriptionController,
+                            maxLines: 2,
+                            textCapitalization: TextCapitalization.sentences,
                             decoration: const InputDecoration(
-                              labelText: 'SKU optional',
+                              labelText: 'Description / notes (optional)',
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -857,6 +995,9 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
       skuController.dispose();
       hsnController.dispose();
       gstController.dispose();
+      costController.dispose();
+      descriptionController.dispose();
+      reorderController.dispose();
     });
   }
 

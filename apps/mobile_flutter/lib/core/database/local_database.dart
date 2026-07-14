@@ -44,6 +44,8 @@ class InventoryEntries extends Table {
   IntColumn get stock => integer().withDefault(const Constant(0))();
   TextColumn get sourceMeta => text().named('source_meta').nullable()();
   TextColumn get imagePath => text().named('image_path').nullable()();
+  TextColumn get unit => text().nullable()();
+  IntColumn get reorderLevel => integer().named('reorder_level').nullable()();
   IntColumn get createdAt => integer().named('created_at')();
   IntColumn get updatedAt =>
       integer().named('updated_at').withDefault(const Constant(0))();
@@ -237,7 +239,7 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       );
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -279,6 +281,10 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       }
       if (from < 9) {
         await m.createTable(purchaseEntries);
+      }
+      if (from < 10) {
+        await m.addColumn(inventoryEntries, inventoryEntries.unit);
+        await m.addColumn(inventoryEntries, inventoryEntries.reorderLevel);
       }
     },
   );
