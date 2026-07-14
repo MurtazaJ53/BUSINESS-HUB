@@ -7,6 +7,7 @@ import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/util/whatsapp.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/premium_components.dart';
@@ -461,18 +462,54 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
               ],
             ),
             const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-                _showLedger(context, customer);
-              },
-              icon: const Icon(Icons.receipt_long_rounded),
-              label: const Text('View khata (ledger)'),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _showLedger(context, customer);
+                    },
+                    icon: const Icon(Icons.receipt_long_rounded),
+                    label: const Text('Khata'),
+                  ),
+                ),
+                if ((customer.phone ?? '').trim().isNotEmpty)
+                  Expanded(
+                    child: TextButton.icon(
+                      onPressed: () => _messageOnWhatsApp(context, customer),
+                      icon: const Icon(Icons.chat_rounded),
+                      label: const Text('WhatsApp'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF25D366),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _messageOnWhatsApp(
+    BuildContext context,
+    BackendCustomerSummary customer,
+  ) async {
+    final shopName =
+        ref.read(shopInfoProvider).asData?.value?.name ?? 'our shop';
+    final message = customer.balance > 0
+        ? 'Hello ${customer.name}, this is a friendly reminder from $shopName. '
+              'Your pending balance is ${formatCurrency(customer.balance)}. '
+              'Thank you!'
+        : 'Hello ${customer.name}, thank you for shopping with $shopName!';
+    final ok = await openWhatsApp(phone: customer.phone ?? '', message: message);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open WhatsApp for this number.')),
+      );
+    }
   }
 
   /// Unified credit + payment timeline with a running balance.
