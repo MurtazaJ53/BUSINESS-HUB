@@ -20,7 +20,9 @@ import '../../../core/tax/gst.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
+import '../../shell/presentation/mobile_surface.dart';
 import 'checkout_payment_sheet.dart';
+import 'pos_catalog_grouping.dart';
 import 'pos_scanner_sheet.dart';
 
 /// Point of Sale — clean product list, editable cart, prominent total.
@@ -201,6 +203,92 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
   int _qtyInCart(String id) {
     final index = _cart.indexWhere((c) => c.id == id);
     return index < 0 ? 0 : _cart[index].quantity;
+  }
+
+  Future<void> _openVariantPicker(VariantGroup group) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.of(context).background,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    MobileSheetHeader(
+                      eyebrow: 'Choose variant',
+                      title: group.baseName,
+                      subtitle:
+                          '${group.variants.length} variants · tap to add to '
+                          'the bill.',
+                      icon: Icons.category_rounded,
+                    ),
+                    const SizedBox(height: 12),
+                    ...group.variants.map((v) {
+                      final qty = _qtyInCart(v.id);
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  Text(
+                                    v.variantLabel ?? v.name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${formatCurrency(v.price)} · stock ${v.stock}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: v.isLowStock
+                                          ? AppPalette.error
+                                          : AppColors.of(
+                                              sheetContext,
+                                            ).textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            qty > 0
+                                ? _QtyStepper(
+                                    quantity: qty,
+                                    onInc: () {
+                                      _changeQtyById(v.id, 1);
+                                      setSheetState(() {});
+                                    },
+                                    onDec: () {
+                                      _changeQtyById(v.id, -1);
+                                      setSheetState(() {});
+                                    },
+                                  )
+                                : _AddButton(
+                                    onTap: () {
+                                      _addToCart(v);
+                                      setSheetState(() {});
+                                    },
+                                  ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   // ---- actions --------------------------------------------------------------
@@ -828,23 +916,40 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
             Expanded(
               child: items.isEmpty
                   ? _EmptyCatalog(searching: _search.isNotEmpty)
-                  : ListView.separated(
-                      padding: EdgeInsets.fromLTRB(
-                        16,
-                        8,
-                        16,
-                        _cart.isEmpty ? 24 : 108,
-                      ),
-                      itemCount: items.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        final item = items[index];
-                        return _ProductRow(
-                          item: item,
-                          qtyInCart: _qtyInCart(item.id),
-                          onAdd: () => _addToCart(item),
-                          onInc: () => _changeQtyById(item.id, 1),
-                          onDec: () => _changeQtyById(item.id, -1),
+                  : Builder(
+                      builder: (context) {
+                        final entries = groupCatalog(items);
+                        return ListView.separated(
+                          padding: EdgeInsets.fromLTRB(
+                            16,
+                            8,
+                            16,
+                            _cart.isEmpty ? 24 : 108,
+                          ),
+                          itemCount: entries.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            final entry = entries[index];
+                            if (entry is VariantGroup) {
+                              return _VariantGroupRow(
+                                group: entry,
+                                qtyInCart: entry.variants.fold<int>(
+                                  0,
+                                  (sum, v) => sum + _qtyInCart(v.id),
+                                ),
+                                onTap: () => _openVariantPicker(entry),
+                              );
+                            }
+                            final item = entry as InventoryCatalogItem;
+                            return _ProductRow(
+                              item: item,
+                              qtyInCart: _qtyInCart(item.id),
+                              onAdd: () => _addToCart(item),
+                              onInc: () => _changeQtyById(item.id, 1),
+                              onDec: () => _changeQtyById(item.id, -1),
+                            );
+                          },
                         );
                       },
                     ),
@@ -1071,6 +1176,119 @@ class _ProductRow extends StatelessWidget {
               ? _QtyStepper(quantity: qtyInCart, onInc: onInc, onDec: onDec)
               : _AddButton(onTap: onAdd),
         ],
+      ),
+    );
+  }
+}
+
+class _VariantGroupRow extends StatelessWidget {
+  const _VariantGroupRow({
+    required this.group,
+    required this.qtyInCart,
+    required this.onTap,
+  });
+
+  final VariantGroup group;
+  final int qtyInCart;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final theme = Theme.of(context);
+    final minPrice = group.minPrice;
+    final totalStock = group.totalStock;
+    final firstImage = group.variants
+        .map((v) => v.imagePath)
+        .firstWhere(
+          (p) => p != null && p.isNotEmpty,
+          orElse: () => null,
+        );
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: qtyInCart > 0
+                  ? AppPalette.primary.withValues(alpha: 0.5)
+                  : colors.borderSoft,
+              width: qtyInCart > 0 ? 1.5 : 1,
+            ),
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: <Widget>[
+              _ProductTile(name: group.baseName, imagePath: firstImage),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      group.baseName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${group.variants.length} variants · $totalStock in stock',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.textTertiary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'from ${formatCurrency(minPrice)}',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: AppPalette.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: AppPalette.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: <Widget>[
+                    if (qtyInCart > 0) ...<Widget>[
+                      Text(
+                        '$qtyInCart',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: AppPalette.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    const Icon(
+                      Icons.tune_rounded,
+                      color: AppPalette.primary,
+                      size: 20,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

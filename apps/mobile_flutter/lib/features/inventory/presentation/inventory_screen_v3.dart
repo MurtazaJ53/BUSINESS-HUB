@@ -16,6 +16,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/premium_components.dart';
 import '../../pos/presentation/pos_scanner_sheet.dart';
+import 'variant_product_sheet.dart';
 
 /// Redesigned Inventory Screen v3.0
 /// Simple, Clean, Premium, Professional
@@ -119,7 +120,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
       ),
       // Add item FAB
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddItemSheet(context),
+        onPressed: () => _showAddChooser(context),
         backgroundColor: AppPalette.primary,
         icon: const Icon(Icons.add_rounded, size: 24),
         label: Text(
@@ -132,6 +133,43 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+    );
+  }
+
+  /// Let the user pick a simple single item or a multi-variant product.
+  void _showAddChooser(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ListTile(
+              leading: const Icon(Icons.add_box_rounded),
+              title: const Text('Single item'),
+              subtitle: const Text('One product, one price and stock'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showAddItemSheet(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.category_rounded),
+              title: const Text('Product with variants'),
+              subtitle: const Text('Sizes/colours, each with own price & stock'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: AppColors.of(context).background,
+                  builder: (_) => const VariantProductSheet(),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 

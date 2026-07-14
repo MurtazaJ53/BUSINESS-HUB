@@ -212,6 +212,8 @@ class MobileSyncCoordinator {
     String? imagePath,
     String? unit,
     int? reorderLevel,
+    String? variantGroupId,
+    String? variantLabel,
   }) async {
     final session = _session;
     if (session == null || !session.hasShop) {
@@ -247,6 +249,8 @@ class MobileSyncCoordinator {
         imagePath: imagePath,
         unit: unit,
         reorderLevel: reorderLevel,
+        variantGroupId: variantGroupId,
+        variantLabel: variantLabel,
         timestamp: now,
       );
       setStatus(MobileSyncStatus.idle);
@@ -315,6 +319,8 @@ class MobileSyncCoordinator {
         imagePath: imagePath,
         unit: unit,
         reorderLevel: reorderLevel,
+        variantGroupId: variantGroupId,
+        variantLabel: variantLabel,
         timestamp: now,
       );
       setStatus(MobileSyncStatus.idle);
@@ -338,8 +344,78 @@ class MobileSyncCoordinator {
         imagePath: imagePath,
         unit: unit,
         reorderLevel: reorderLevel,
+        variantGroupId: variantGroupId,
+        variantLabel: variantLabel,
         timestamp: now,
       );
+      setStatus(MobileSyncStatus.idle);
+    } catch (_) {
+      setStatus(MobileSyncStatus.error);
+      rethrow;
+    }
+  }
+
+  /// Create a product with multiple size/colour variants. Each variant becomes
+  /// its own inventory row (own price / stock / SKU / cost) sharing one
+  /// [variantGroupId], so stock, sales and reporting work per variant while the
+  /// POS can group them behind a single tile. Local-first, like single items.
+  Future<void> createVariantGroup({
+    required String baseName,
+    required List<VariantDraft> variants,
+    String category = 'General',
+    String hsnCode = '',
+    double gstRate = 0,
+    bool priceIncludesTax = true,
+    String? unit,
+    String? imagePath,
+  }) async {
+    final session = _session;
+    if (session == null || !session.hasShop) {
+      throw StateError('Sign in to a workspace before adding inventory.');
+    }
+    if (session.isReadOnly) {
+      throw StateError('Viewer access cannot add inventory items.');
+    }
+    final drafts = variants
+        .where((v) => v.label.trim().isNotEmpty)
+        .toList(growable: false);
+    if (drafts.isEmpty) {
+      throw StateError('Add at least one variant with a label.');
+    }
+
+    setStatus(MobileSyncStatus.syncing);
+    final normalizedCategory = category.trim().isEmpty
+        ? 'General'
+        : category.trim();
+    final groupId = 'vg-${DateTime.now().microsecondsSinceEpoch}';
+    // A single base time; per-variant microsecond offsets keep row ids unique.
+    final base = DateTime.now();
+    try {
+      for (var i = 0; i < drafts.length; i++) {
+        final v = drafts[i];
+        await _createInventoryItemLocally(
+          session: session,
+          name: '${baseName.trim()} (${v.label.trim()})',
+          sellPrice: v.sellPrice,
+          openingStock: v.openingStock,
+          sku: v.sku.trim(),
+          barcode: '',
+          category: normalizedCategory,
+          subcategory: '',
+          size: v.label.trim(),
+          description: '',
+          costPrice: session.canViewCost ? v.costPrice : null,
+          hsnCode: hsnCode.trim(),
+          gstRate: gstRate,
+          priceIncludesTax: priceIncludesTax,
+          timestamp: base.add(Duration(microseconds: i)),
+          imagePath: imagePath,
+          unit: unit,
+          reorderLevel: v.reorderLevel,
+          variantGroupId: groupId,
+          variantLabel: v.label.trim(),
+        );
+      }
       setStatus(MobileSyncStatus.idle);
     } catch (_) {
       setStatus(MobileSyncStatus.error);
@@ -1015,6 +1091,8 @@ class MobileSyncCoordinator {
     String? imagePath,
     String? unit,
     int? reorderLevel,
+    String? variantGroupId,
+    String? variantLabel,
   }) async {
     final itemId = 'local-${timestamp.microsecondsSinceEpoch}';
     final isoTimestamp = timestamp.toIso8601String();
@@ -1041,6 +1119,8 @@ class MobileSyncCoordinator {
       'imagePath': imagePath,
       'unit': unit,
       'reorderLevel': reorderLevel,
+      'variantGroupId': variantGroupId,
+      'variantLabel': variantLabel,
       'createdAt': isoTimestamp,
       'updatedAt': isoTimestamp,
     };

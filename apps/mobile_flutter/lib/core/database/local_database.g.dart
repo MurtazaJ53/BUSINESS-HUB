@@ -441,6 +441,28 @@ class $InventoryEntriesTable extends InventoryEntries
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _variantGroupIdMeta = const VerificationMeta(
+    'variantGroupId',
+  );
+  @override
+  late final GeneratedColumn<String> variantGroupId = GeneratedColumn<String>(
+    'variant_group_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _variantLabelMeta = const VerificationMeta(
+    'variantLabel',
+  );
+  @override
+  late final GeneratedColumn<String> variantLabel = GeneratedColumn<String>(
+    'variant_label',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -497,6 +519,8 @@ class $InventoryEntriesTable extends InventoryEntries
     imagePath,
     unit,
     reorderLevel,
+    variantGroupId,
+    variantLabel,
     createdAt,
     updatedAt,
     tombstone,
@@ -624,6 +648,24 @@ class $InventoryEntriesTable extends InventoryEntries
         ),
       );
     }
+    if (data.containsKey('variant_group_id')) {
+      context.handle(
+        _variantGroupIdMeta,
+        variantGroupId.isAcceptableOrUnknown(
+          data['variant_group_id']!,
+          _variantGroupIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('variant_label')) {
+      context.handle(
+        _variantLabelMeta,
+        variantLabel.isAcceptableOrUnknown(
+          data['variant_label']!,
+          _variantLabelMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -717,6 +759,14 @@ class $InventoryEntriesTable extends InventoryEntries
         DriftSqlType.int,
         data['${effectivePrefix}reorder_level'],
       ),
+      variantGroupId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}variant_group_id'],
+      ),
+      variantLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}variant_label'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}created_at'],
@@ -755,6 +805,8 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
   final String? imagePath;
   final String? unit;
   final int? reorderLevel;
+  final String? variantGroupId;
+  final String? variantLabel;
   final int createdAt;
   final int updatedAt;
   final bool tombstone;
@@ -775,6 +827,8 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     this.imagePath,
     this.unit,
     this.reorderLevel,
+    this.variantGroupId,
+    this.variantLabel,
     required this.createdAt,
     required this.updatedAt,
     required this.tombstone,
@@ -816,6 +870,12 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     if (!nullToAbsent || reorderLevel != null) {
       map['reorder_level'] = Variable<int>(reorderLevel);
     }
+    if (!nullToAbsent || variantGroupId != null) {
+      map['variant_group_id'] = Variable<String>(variantGroupId);
+    }
+    if (!nullToAbsent || variantLabel != null) {
+      map['variant_label'] = Variable<String>(variantLabel);
+    }
     map['created_at'] = Variable<int>(createdAt);
     map['updated_at'] = Variable<int>(updatedAt);
     map['tombstone'] = Variable<bool>(tombstone);
@@ -852,6 +912,12 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
       reorderLevel: reorderLevel == null && nullToAbsent
           ? const Value.absent()
           : Value(reorderLevel),
+      variantGroupId: variantGroupId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(variantGroupId),
+      variantLabel: variantLabel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(variantLabel),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       tombstone: Value(tombstone),
@@ -880,6 +946,8 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
       imagePath: serializer.fromJson<String?>(json['imagePath']),
       unit: serializer.fromJson<String?>(json['unit']),
       reorderLevel: serializer.fromJson<int?>(json['reorderLevel']),
+      variantGroupId: serializer.fromJson<String?>(json['variantGroupId']),
+      variantLabel: serializer.fromJson<String?>(json['variantLabel']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
       tombstone: serializer.fromJson<bool>(json['tombstone']),
@@ -905,6 +973,8 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
       'imagePath': serializer.toJson<String?>(imagePath),
       'unit': serializer.toJson<String?>(unit),
       'reorderLevel': serializer.toJson<int?>(reorderLevel),
+      'variantGroupId': serializer.toJson<String?>(variantGroupId),
+      'variantLabel': serializer.toJson<String?>(variantLabel),
       'createdAt': serializer.toJson<int>(createdAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
       'tombstone': serializer.toJson<bool>(tombstone),
@@ -928,6 +998,8 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     Value<String?> imagePath = const Value.absent(),
     Value<String?> unit = const Value.absent(),
     Value<int?> reorderLevel = const Value.absent(),
+    Value<String?> variantGroupId = const Value.absent(),
+    Value<String?> variantLabel = const Value.absent(),
     int? createdAt,
     int? updatedAt,
     bool? tombstone,
@@ -948,6 +1020,10 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     imagePath: imagePath.present ? imagePath.value : this.imagePath,
     unit: unit.present ? unit.value : this.unit,
     reorderLevel: reorderLevel.present ? reorderLevel.value : this.reorderLevel,
+    variantGroupId: variantGroupId.present
+        ? variantGroupId.value
+        : this.variantGroupId,
+    variantLabel: variantLabel.present ? variantLabel.value : this.variantLabel,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     tombstone: tombstone ?? this.tombstone,
@@ -980,6 +1056,12 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
       reorderLevel: data.reorderLevel.present
           ? data.reorderLevel.value
           : this.reorderLevel,
+      variantGroupId: data.variantGroupId.present
+          ? data.variantGroupId.value
+          : this.variantGroupId,
+      variantLabel: data.variantLabel.present
+          ? data.variantLabel.value
+          : this.variantLabel,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       tombstone: data.tombstone.present ? data.tombstone.value : this.tombstone,
@@ -1005,6 +1087,8 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
           ..write('imagePath: $imagePath, ')
           ..write('unit: $unit, ')
           ..write('reorderLevel: $reorderLevel, ')
+          ..write('variantGroupId: $variantGroupId, ')
+          ..write('variantLabel: $variantLabel, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('tombstone: $tombstone')
@@ -1013,7 +1097,7 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     name,
     price,
@@ -1030,10 +1114,12 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     imagePath,
     unit,
     reorderLevel,
+    variantGroupId,
+    variantLabel,
     createdAt,
     updatedAt,
     tombstone,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1054,6 +1140,8 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
           other.imagePath == this.imagePath &&
           other.unit == this.unit &&
           other.reorderLevel == this.reorderLevel &&
+          other.variantGroupId == this.variantGroupId &&
+          other.variantLabel == this.variantLabel &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.tombstone == this.tombstone);
@@ -1076,6 +1164,8 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
   final Value<String?> imagePath;
   final Value<String?> unit;
   final Value<int?> reorderLevel;
+  final Value<String?> variantGroupId;
+  final Value<String?> variantLabel;
   final Value<int> createdAt;
   final Value<int> updatedAt;
   final Value<bool> tombstone;
@@ -1097,6 +1187,8 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     this.imagePath = const Value.absent(),
     this.unit = const Value.absent(),
     this.reorderLevel = const Value.absent(),
+    this.variantGroupId = const Value.absent(),
+    this.variantLabel = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.tombstone = const Value.absent(),
@@ -1119,6 +1211,8 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     this.imagePath = const Value.absent(),
     this.unit = const Value.absent(),
     this.reorderLevel = const Value.absent(),
+    this.variantGroupId = const Value.absent(),
+    this.variantLabel = const Value.absent(),
     required int createdAt,
     this.updatedAt = const Value.absent(),
     this.tombstone = const Value.absent(),
@@ -1144,6 +1238,8 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     Expression<String>? imagePath,
     Expression<String>? unit,
     Expression<int>? reorderLevel,
+    Expression<String>? variantGroupId,
+    Expression<String>? variantLabel,
     Expression<int>? createdAt,
     Expression<int>? updatedAt,
     Expression<bool>? tombstone,
@@ -1166,6 +1262,8 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
       if (imagePath != null) 'image_path': imagePath,
       if (unit != null) 'unit': unit,
       if (reorderLevel != null) 'reorder_level': reorderLevel,
+      if (variantGroupId != null) 'variant_group_id': variantGroupId,
+      if (variantLabel != null) 'variant_label': variantLabel,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (tombstone != null) 'tombstone': tombstone,
@@ -1190,6 +1288,8 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     Value<String?>? imagePath,
     Value<String?>? unit,
     Value<int?>? reorderLevel,
+    Value<String?>? variantGroupId,
+    Value<String?>? variantLabel,
     Value<int>? createdAt,
     Value<int>? updatedAt,
     Value<bool>? tombstone,
@@ -1212,6 +1312,8 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
       imagePath: imagePath ?? this.imagePath,
       unit: unit ?? this.unit,
       reorderLevel: reorderLevel ?? this.reorderLevel,
+      variantGroupId: variantGroupId ?? this.variantGroupId,
+      variantLabel: variantLabel ?? this.variantLabel,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       tombstone: tombstone ?? this.tombstone,
@@ -1270,6 +1372,12 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     if (reorderLevel.present) {
       map['reorder_level'] = Variable<int>(reorderLevel.value);
     }
+    if (variantGroupId.present) {
+      map['variant_group_id'] = Variable<String>(variantGroupId.value);
+    }
+    if (variantLabel.present) {
+      map['variant_label'] = Variable<String>(variantLabel.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<int>(createdAt.value);
     }
@@ -1304,6 +1412,8 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
           ..write('imagePath: $imagePath, ')
           ..write('unit: $unit, ')
           ..write('reorderLevel: $reorderLevel, ')
+          ..write('variantGroupId: $variantGroupId, ')
+          ..write('variantLabel: $variantLabel, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('tombstone: $tombstone, ')
@@ -6118,6 +6228,8 @@ typedef $$InventoryEntriesTableCreateCompanionBuilder =
       Value<String?> imagePath,
       Value<String?> unit,
       Value<int?> reorderLevel,
+      Value<String?> variantGroupId,
+      Value<String?> variantLabel,
       required int createdAt,
       Value<int> updatedAt,
       Value<bool> tombstone,
@@ -6141,6 +6253,8 @@ typedef $$InventoryEntriesTableUpdateCompanionBuilder =
       Value<String?> imagePath,
       Value<String?> unit,
       Value<int?> reorderLevel,
+      Value<String?> variantGroupId,
+      Value<String?> variantLabel,
       Value<int> createdAt,
       Value<int> updatedAt,
       Value<bool> tombstone,
@@ -6233,6 +6347,16 @@ class $$InventoryEntriesTableFilterComposer
 
   ColumnFilters<int> get reorderLevel => $composableBuilder(
     column: $table.reorderLevel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get variantGroupId => $composableBuilder(
+    column: $table.variantGroupId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get variantLabel => $composableBuilder(
+    column: $table.variantLabel,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6341,6 +6465,16 @@ class $$InventoryEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get variantGroupId => $composableBuilder(
+    column: $table.variantGroupId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get variantLabel => $composableBuilder(
+    column: $table.variantLabel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -6424,6 +6558,16 @@ class $$InventoryEntriesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get variantGroupId => $composableBuilder(
+    column: $table.variantGroupId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get variantLabel => $composableBuilder(
+    column: $table.variantLabel,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -6487,6 +6631,8 @@ class $$InventoryEntriesTableTableManager
                 Value<String?> imagePath = const Value.absent(),
                 Value<String?> unit = const Value.absent(),
                 Value<int?> reorderLevel = const Value.absent(),
+                Value<String?> variantGroupId = const Value.absent(),
+                Value<String?> variantLabel = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
                 Value<bool> tombstone = const Value.absent(),
@@ -6508,6 +6654,8 @@ class $$InventoryEntriesTableTableManager
                 imagePath: imagePath,
                 unit: unit,
                 reorderLevel: reorderLevel,
+                variantGroupId: variantGroupId,
+                variantLabel: variantLabel,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 tombstone: tombstone,
@@ -6531,6 +6679,8 @@ class $$InventoryEntriesTableTableManager
                 Value<String?> imagePath = const Value.absent(),
                 Value<String?> unit = const Value.absent(),
                 Value<int?> reorderLevel = const Value.absent(),
+                Value<String?> variantGroupId = const Value.absent(),
+                Value<String?> variantLabel = const Value.absent(),
                 required int createdAt,
                 Value<int> updatedAt = const Value.absent(),
                 Value<bool> tombstone = const Value.absent(),
@@ -6552,6 +6702,8 @@ class $$InventoryEntriesTableTableManager
                 imagePath: imagePath,
                 unit: unit,
                 reorderLevel: reorderLevel,
+                variantGroupId: variantGroupId,
+                variantLabel: variantLabel,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 tombstone: tombstone,

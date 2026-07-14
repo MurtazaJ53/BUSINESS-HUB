@@ -46,6 +46,9 @@ class InventoryEntries extends Table {
   TextColumn get imagePath => text().named('image_path').nullable()();
   TextColumn get unit => text().nullable()();
   IntColumn get reorderLevel => integer().named('reorder_level').nullable()();
+  TextColumn get variantGroupId =>
+      text().named('variant_group_id').nullable()();
+  TextColumn get variantLabel => text().named('variant_label').nullable()();
   IntColumn get createdAt => integer().named('created_at')();
   IntColumn get updatedAt =>
       integer().named('updated_at').withDefault(const Constant(0))();
@@ -239,7 +242,7 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       );
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -285,6 +288,10 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       if (from < 10) {
         await m.addColumn(inventoryEntries, inventoryEntries.unit);
         await m.addColumn(inventoryEntries, inventoryEntries.reorderLevel);
+      }
+      if (from < 11) {
+        await m.addColumn(inventoryEntries, inventoryEntries.variantGroupId);
+        await m.addColumn(inventoryEntries, inventoryEntries.variantLabel);
       }
     },
   );

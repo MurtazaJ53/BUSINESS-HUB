@@ -595,6 +595,8 @@ class InventoryRepository {
         i.image_path,
         i.unit,
         i.reorder_level,
+        i.variant_group_id,
+        i.variant_label,
         i.created_at,
         ${includeCost ? 'COALESCE(ip.cost_price, 0)' : 'NULL'} AS cost_price,
         ip.supplier_id,
@@ -647,6 +649,8 @@ class InventoryRepository {
           i.image_path,
           i.unit,
           i.reorder_level,
+          i.variant_group_id,
+          i.variant_label,
           i.created_at,
           ${includeCost ? 'COALESCE(ip.cost_price, 0)' : 'NULL'} AS cost_price,
           ip.supplier_id,
@@ -731,6 +735,24 @@ class InventoryRepository {
                 (data.containsKey('reorderLevel') ||
                     data.containsKey('reorder_level'))
                 ? Value(_asIntOrNull(data['reorderLevel'] ?? data['reorder_level']))
+                : const Value.absent(),
+            variantGroupId:
+                (data.containsKey('variantGroupId') ||
+                    data.containsKey('variant_group_id'))
+                ? Value(
+                    _asStringOrNull(
+                      data['variantGroupId'] ?? data['variant_group_id'],
+                    ),
+                  )
+                : const Value.absent(),
+            variantLabel:
+                (data.containsKey('variantLabel') ||
+                    data.containsKey('variant_label'))
+                ? Value(
+                    _asStringOrNull(
+                      data['variantLabel'] ?? data['variant_label'],
+                    ),
+                  )
                 : const Value.absent(),
             createdAt: createdAt,
             updatedAt: Value(updatedAt),
@@ -820,6 +842,8 @@ class InventoryRepository {
       imagePath: row.readNullable<String>('image_path'),
       unit: row.readNullable<String>('unit'),
       reorderLevel: row.readNullable<int>('reorder_level'),
+      variantGroupId: row.readNullable<String>('variant_group_id'),
+      variantLabel: row.readNullable<String>('variant_label'),
       createdAt: DateTime.fromMillisecondsSinceEpoch(
         row.read<int>('created_at'),
       ),

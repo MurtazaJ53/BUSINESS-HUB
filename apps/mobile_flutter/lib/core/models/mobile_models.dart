@@ -221,6 +221,26 @@ class ExpenseRecord {
   final bool tombstone;
 }
 
+/// One row of a "create product with variants" form: a single size/colour
+/// with its own price, stock, SKU and (optionally) cost + reorder level.
+class VariantDraft {
+  const VariantDraft({
+    required this.label,
+    required this.sellPrice,
+    required this.openingStock,
+    this.sku = '',
+    this.costPrice,
+    this.reorderLevel,
+  });
+
+  final String label;
+  final double sellPrice;
+  final int openingStock;
+  final String sku;
+  final double? costPrice;
+  final int? reorderLevel;
+}
+
 class PurchaseRecord {
   const PurchaseRecord({
     required this.id,
@@ -885,6 +905,8 @@ class InventoryCatalogItem {
     this.imagePath,
     this.unit,
     this.reorderLevel,
+    this.variantGroupId,
+    this.variantLabel,
   });
 
   /// Fallback low-stock threshold when an item has no explicit reorder level.
@@ -915,11 +937,21 @@ class InventoryCatalogItem {
   /// Per-item low-stock threshold. Null falls back to [defaultReorderLevel].
   final int? reorderLevel;
 
+  /// Shared id linking sibling variants (size/colour) of one product. Null for
+  /// plain single-tier items.
+  final String? variantGroupId;
+
+  /// Human label for this variant within its group, e.g. "S / Red".
+  final String? variantLabel;
+
   double get marginPerUnit => price - (costPrice ?? 0);
 
   int get effectiveReorderLevel => reorderLevel ?? defaultReorderLevel;
 
   bool get isLowStock => stock <= effectiveReorderLevel;
+
+  bool get hasVariantGroup =>
+      variantGroupId != null && variantGroupId!.isNotEmpty;
 }
 
 class PosCatalogFilter {
