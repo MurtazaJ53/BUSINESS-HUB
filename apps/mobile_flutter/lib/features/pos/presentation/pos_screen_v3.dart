@@ -58,7 +58,8 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
   static const int _pageSize = 50;
 
   double get _cartTotal => CartPricing.subtotal(_cart);
-  int get _cartCount => _cart.fold<int>(0, (sum, item) => sum + item.quantity);
+  int get _cartCount =>
+      _cart.fold<double>(0, (sum, item) => sum + item.quantity).round();
 
   // GST is computed on the discounted (net) cart so the tax shown matches the
   // amount actually charged.
@@ -221,10 +222,10 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
 
   // ---- cart mutations -------------------------------------------------------
 
-  void _warnLowStock(String name, int stock) {
+  void _warnLowStock(String name, double stock) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Only $stock of $name left in stock.'),
+        content: Text('Only ${_fmtQty(stock)} of $name left in stock.'),
         duration: const Duration(seconds: 2),
         backgroundColor: AppPalette.warning,
       ),
@@ -282,7 +283,20 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
     }
   }
 
-  int _qtyInCart(String id) {
+  /// Set an exact (possibly fractional, e.g. 1.5 kg) quantity on a cart line.
+  void _setLineQuantity(String id, double qty) {
+    final index = _cart.indexWhere((c) => c.id == id);
+    if (index < 0) return;
+    setState(() {
+      if (qty <= 0) {
+        _cart.removeAt(index);
+      } else {
+        _cart[index] = _cart[index].copyWith(quantity: qty);
+      }
+    });
+  }
+
+  double _qtyInCart(String id) {
     final index = _cart.indexWhere((c) => c.id == id);
     return index < 0 ? 0 : _cart[index].quantity;
   }
@@ -328,7 +342,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
                                     ),
                                   ),
                                   Text(
-                                    '${formatCurrency(v.price)} · stock ${v.stock}',
+                                    '${formatCurrency(v.price)} · stock ${_fmtQty(v.stock)}',
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: v.isLowStock
@@ -582,6 +596,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
       builder: (_) => _CartSheet(
         cart: _cart,
         onChangeQty: _changeQtyById,
+        onSetQty: _setLineQuantity,
         gstSummary: () => _gstSummary,
         grossTotal: () => _cartTotal,
         discountAmount: () => _discountAmount,
@@ -1073,7 +1088,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
                             if (entry is VariantGroup) {
                               return _VariantGroupRow(
                                 group: entry,
-                                qtyInCart: entry.variants.fold<int>(
+                                qtyInCart: entry.variants.fold<double>(
                                   0,
                                   (sum, v) => sum + _qtyInCart(v.id),
                                 ),
@@ -1292,7 +1307,7 @@ class _ProductRow extends StatelessWidget {
   });
 
   final InventoryCatalogItem item;
-  final int qtyInCart;
+  final double qtyInCart;
   final VoidCallback onAdd;
   final VoidCallback onInc;
   final VoidCallback onDec;
@@ -1353,7 +1368,7 @@ class _ProductRow extends StatelessWidget {
                       const SizedBox(width: 8),
                     ],
                     Text(
-                      '${item.stock} in stock',
+                      '${_fmtQty(item.stock)} in stock',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: lowStock ? AppPalette.warning : colors.textTertiary,
                         fontWeight: lowStock ? FontWeight.w700 : FontWeight.w500,
@@ -1391,7 +1406,7 @@ class _VariantGroupRow extends StatelessWidget {
   });
 
   final VariantGroup group;
-  final int qtyInCart;
+  final double qtyInCart;
   final VoidCallback onTap;
 
   @override
@@ -1442,7 +1457,7 @@ class _VariantGroupRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${group.variants.length} variants · $totalStock in stock',
+                      '${group.variants.length} variants · ${_fmtQty(totalStock)} in stock',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colors.textTertiary,
                       ),
@@ -1472,7 +1487,7 @@ class _VariantGroupRow extends StatelessWidget {
                   children: <Widget>[
                     if (qtyInCart > 0) ...<Widget>[
                       Text(
-                        '$qtyInCart',
+                        _fmtQty(qtyInCart),
                         style: const TextStyle(
                           fontWeight: FontWeight.w800,
                           color: AppPalette.primary,
@@ -1565,16 +1580,24 @@ class _AddButton extends StatelessWidget {
   }
 }
 
+/// Show a quantity without a trailing ".0" (e.g. 2, not 2.0; 1.5 stays 1.5).
+String _fmtQty(num v) =>
+    v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
+
 class _QtyStepper extends StatelessWidget {
   const _QtyStepper({
     required this.quantity,
     required this.onInc,
     required this.onDec,
+    this.onTapQty,
   });
 
-  final int quantity;
+  final double quantity;
   final VoidCallback onInc;
   final VoidCallback onDec;
+
+  /// Tap the number to type an exact (fractional) quantity.
+  final VoidCallback? onTapQty;
 
   @override
   Widget build(BuildContext context) {
@@ -1588,15 +1611,22 @@ class _QtyStepper extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           _StepButton(icon: Icons.remove_rounded, onTap: onDec),
-          SizedBox(
-            width: 30,
-            child: Text(
-              '$quantity',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 16,
-                color: AppPalette.primary,
+          GestureDetector(
+            onTap: onTapQty,
+            child: SizedBox(
+              width: 34,
+              child: Text(
+                _fmtQty(quantity),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                  color: AppPalette.primary,
+                  decoration: onTapQty == null
+                      ? null
+                      : TextDecoration.underline,
+                  decorationColor: AppPalette.primary,
+                ),
               ),
             ),
           ),
@@ -1781,6 +1811,7 @@ class _CartSheet extends StatefulWidget {
   const _CartSheet({
     required this.cart,
     required this.onChangeQty,
+    required this.onSetQty,
     required this.gstSummary,
     required this.grossTotal,
     required this.discountAmount,
@@ -1797,6 +1828,7 @@ class _CartSheet extends StatefulWidget {
 
   final List<PosCartItem> cart;
   final void Function(String id, int delta) onChangeQty;
+  final void Function(String id, double qty) onSetQty;
   final GstCartSummary Function() gstSummary;
   final double Function() grossTotal;
   final double Function() discountAmount;
@@ -1815,6 +1847,41 @@ class _CartSheet extends StatefulWidget {
 }
 
 class _CartSheetState extends State<_CartSheet> {
+  /// Ask for an exact quantity (supports decimals, e.g. 1.5 kg).
+  Future<double?> _promptQuantity(BuildContext context, PosCartItem line) async {
+    final controller = TextEditingController(text: _fmtQty(line.quantity));
+    final result = await showDialog<double>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Quantity · ${line.name}'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(
+            labelText: 'Quantity',
+            hintText: 'e.g. 1.5',
+          ),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(
+              dialogContext,
+              double.tryParse(controller.text.trim()),
+            ),
+            child: const Text('Set'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
@@ -1887,6 +1954,16 @@ class _CartSheetState extends State<_CartSheet> {
                               onDec: () {
                                 widget.onChangeQty(line.id, -1);
                                 setState(() {});
+                              },
+                              onEditQty: () async {
+                                final qty = await _promptQuantity(
+                                  context,
+                                  line,
+                                );
+                                if (qty != null) {
+                                  widget.onSetQty(line.id, qty);
+                                  setState(() {});
+                                }
                               },
                             ),
                             const SizedBox(height: 10),
@@ -2174,11 +2251,17 @@ class _CustomerCard extends StatelessWidget {
 }
 
 class _CartLine extends StatelessWidget {
-  const _CartLine({required this.line, required this.onInc, required this.onDec});
+  const _CartLine({
+    required this.line,
+    required this.onInc,
+    required this.onDec,
+    this.onEditQty,
+  });
 
   final PosCartItem line;
   final VoidCallback onInc;
   final VoidCallback onDec;
+  final VoidCallback? onEditQty;
 
   @override
   Widget build(BuildContext context) {
@@ -2225,7 +2308,12 @@ class _CartLine extends StatelessWidget {
               ],
             ),
           ),
-          _QtyStepper(quantity: line.quantity, onInc: onInc, onDec: onDec),
+          _QtyStepper(
+            quantity: line.quantity,
+            onInc: onInc,
+            onDec: onDec,
+            onTapQty: onEditQty,
+          ),
         ],
       ),
     );

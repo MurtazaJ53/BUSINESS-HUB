@@ -336,7 +336,7 @@ class BackendApiClient {
     required String shopId,
     required String name,
     required double sellPrice,
-    required int openingStock,
+    required double openingStock,
     String sku = '',
     String barcode = '',
     String category = 'General',

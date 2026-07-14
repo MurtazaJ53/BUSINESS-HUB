@@ -187,7 +187,7 @@ class SettingsPurchasesScreen extends ConsumerWidget {
                 // Optional bridge: raise inventory stock for any received items.
                 final inventory = ref.read(inventoryRepositoryProvider);
                 for (final line in stockLines) {
-                  final qty = int.tryParse(line.qty.text.trim()) ?? 0;
+                  final qty = double.tryParse(line.qty.text.trim()) ?? 0;
                   if (line.itemId == null || qty <= 0) continue;
                   final unitCost = double.tryParse(line.cost.text.trim());
                   await inventory.applyStockIn(
@@ -541,7 +541,7 @@ class SettingsPurchasesScreen extends ConsumerWidget {
                               return ListTile(
                                 title: Text(item.name),
                                 subtitle: Text(
-                                  'Stock ${item.stock} · ${formatCurrency(item.price)}',
+                                  'Stock ${formatQty(item.stock)} · ${formatCurrency(item.price)}',
                                 ),
                                 onTap: () =>
                                     Navigator.pop(sheetContext, item),

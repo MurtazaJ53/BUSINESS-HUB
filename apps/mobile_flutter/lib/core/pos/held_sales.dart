@@ -24,7 +24,8 @@ class HeldSale {
   final DateTime? saleDate;
   final DateTime heldAt;
 
-  int get itemCount => items.fold<int>(0, (sum, i) => sum + i.quantity);
+  int get itemCount =>
+      items.fold<double>(0, (sum, i) => sum + i.quantity).round();
   double get total => items.fold<double>(0, (sum, i) => sum + i.lineTotal);
 
   String get label => customerName.trim().isNotEmpty

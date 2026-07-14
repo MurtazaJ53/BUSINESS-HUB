@@ -117,7 +117,7 @@ Future<Uint8List> buildReceiptPdf(SaleRecordDetail detail, ShopInfo shop) async 
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: <pw.Widget>[
                       pw.Text(
-                        '${it.quantity} x ${_money(it.unitPrice)}'
+                        '${formatQty(it.quantity)} x ${_money(it.unitPrice)}'
                         '${isTaxInvoice && it.gstRate > 0 ? '  @${it.gstRate.toStringAsFixed(0)}%' : ''}',
                         style: const pw.TextStyle(fontSize: 8),
                       ),

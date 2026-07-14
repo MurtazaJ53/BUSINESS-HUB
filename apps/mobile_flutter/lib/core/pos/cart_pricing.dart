@@ -14,7 +14,8 @@ class CartPricing {
   static double subtotal(Iterable<PosCartItem> items) {
     var total = Money.zero;
     for (final item in items) {
-      total = total + (Money.rupees(item.price) * item.quantity);
+      // price * qty may be fractional (weighed goods); round to paise via Money.
+      total = total + Money.rupees(item.price * item.quantity);
     }
     return total.rupees;
   }

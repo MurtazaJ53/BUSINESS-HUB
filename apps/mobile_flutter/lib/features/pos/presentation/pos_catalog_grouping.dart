@@ -15,7 +15,7 @@ class VariantGroup {
   double get minPrice =>
       variants.map((v) => v.price).reduce((a, b) => a < b ? a : b);
 
-  int get totalStock => variants.fold<int>(0, (s, v) => s + v.stock);
+  double get totalStock => variants.fold<double>(0, (s, v) => s + v.stock);
 }
 
 /// Strip the trailing " (label)" a variant row carries so a group tile can show

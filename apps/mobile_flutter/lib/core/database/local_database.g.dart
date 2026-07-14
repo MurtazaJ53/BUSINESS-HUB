@@ -391,11 +391,11 @@ class $InventoryEntriesTable extends InventoryEntries
   );
   static const VerificationMeta _stockMeta = const VerificationMeta('stock');
   @override
-  late final GeneratedColumn<int> stock = GeneratedColumn<int>(
+  late final GeneratedColumn<double> stock = GeneratedColumn<double>(
     'stock',
     aliasedName,
     false,
-    type: DriftSqlType.int,
+    type: DriftSqlType.double,
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
@@ -740,7 +740,7 @@ class $InventoryEntriesTable extends InventoryEntries
         data['${effectivePrefix}price_includes_tax'],
       )!,
       stock: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.double,
         data['${effectivePrefix}stock'],
       )!,
       sourceMeta: attachedDatabase.typeMapping.read(
@@ -800,7 +800,7 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
   final String? hsnCode;
   final double gstRate;
   final bool priceIncludesTax;
-  final int stock;
+  final double stock;
   final String? sourceMeta;
   final String? imagePath;
   final String? unit;
@@ -857,7 +857,7 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     }
     map['gst_rate'] = Variable<double>(gstRate);
     map['price_includes_tax'] = Variable<bool>(priceIncludesTax);
-    map['stock'] = Variable<int>(stock);
+    map['stock'] = Variable<double>(stock);
     if (!nullToAbsent || sourceMeta != null) {
       map['source_meta'] = Variable<String>(sourceMeta);
     }
@@ -941,7 +941,7 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
       hsnCode: serializer.fromJson<String?>(json['hsnCode']),
       gstRate: serializer.fromJson<double>(json['gstRate']),
       priceIncludesTax: serializer.fromJson<bool>(json['priceIncludesTax']),
-      stock: serializer.fromJson<int>(json['stock']),
+      stock: serializer.fromJson<double>(json['stock']),
       sourceMeta: serializer.fromJson<String?>(json['sourceMeta']),
       imagePath: serializer.fromJson<String?>(json['imagePath']),
       unit: serializer.fromJson<String?>(json['unit']),
@@ -968,7 +968,7 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
       'hsnCode': serializer.toJson<String?>(hsnCode),
       'gstRate': serializer.toJson<double>(gstRate),
       'priceIncludesTax': serializer.toJson<bool>(priceIncludesTax),
-      'stock': serializer.toJson<int>(stock),
+      'stock': serializer.toJson<double>(stock),
       'sourceMeta': serializer.toJson<String?>(sourceMeta),
       'imagePath': serializer.toJson<String?>(imagePath),
       'unit': serializer.toJson<String?>(unit),
@@ -993,7 +993,7 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     Value<String?> hsnCode = const Value.absent(),
     double? gstRate,
     bool? priceIncludesTax,
-    int? stock,
+    double? stock,
     Value<String?> sourceMeta = const Value.absent(),
     Value<String?> imagePath = const Value.absent(),
     Value<String?> unit = const Value.absent(),
@@ -1159,7 +1159,7 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
   final Value<String?> hsnCode;
   final Value<double> gstRate;
   final Value<bool> priceIncludesTax;
-  final Value<int> stock;
+  final Value<double> stock;
   final Value<String?> sourceMeta;
   final Value<String?> imagePath;
   final Value<String?> unit;
@@ -1233,7 +1233,7 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     Expression<String>? hsnCode,
     Expression<double>? gstRate,
     Expression<bool>? priceIncludesTax,
-    Expression<int>? stock,
+    Expression<double>? stock,
     Expression<String>? sourceMeta,
     Expression<String>? imagePath,
     Expression<String>? unit,
@@ -1283,7 +1283,7 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     Value<String?>? hsnCode,
     Value<double>? gstRate,
     Value<bool>? priceIncludesTax,
-    Value<int>? stock,
+    Value<double>? stock,
     Value<String?>? sourceMeta,
     Value<String?>? imagePath,
     Value<String?>? unit,
@@ -1358,7 +1358,7 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
       map['price_includes_tax'] = Variable<bool>(priceIncludesTax.value);
     }
     if (stock.present) {
-      map['stock'] = Variable<int>(stock.value);
+      map['stock'] = Variable<double>(stock.value);
     }
     if (sourceMeta.present) {
       map['source_meta'] = Variable<String>(sourceMeta.value);
@@ -5983,22 +5983,22 @@ class $StockMovementEntriesTable extends StockMovementEntries
   );
   static const VerificationMeta _deltaMeta = const VerificationMeta('delta');
   @override
-  late final GeneratedColumn<int> delta = GeneratedColumn<int>(
+  late final GeneratedColumn<double> delta = GeneratedColumn<double>(
     'delta',
     aliasedName,
     false,
-    type: DriftSqlType.int,
+    type: DriftSqlType.double,
     requiredDuringInsert: true,
   );
   static const VerificationMeta _balanceAfterMeta = const VerificationMeta(
     'balanceAfter',
   );
   @override
-  late final GeneratedColumn<int> balanceAfter = GeneratedColumn<int>(
+  late final GeneratedColumn<double> balanceAfter = GeneratedColumn<double>(
     'balance_after',
     aliasedName,
     true,
-    type: DriftSqlType.int,
+    type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
   static const VerificationMeta _reasonMeta = const VerificationMeta('reason');
@@ -6170,11 +6170,11 @@ class $StockMovementEntriesTable extends StockMovementEntries
         data['${effectivePrefix}item_name'],
       )!,
       delta: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.double,
         data['${effectivePrefix}delta'],
       )!,
       balanceAfter: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.double,
         data['${effectivePrefix}balance_after'],
       ),
       reason: attachedDatabase.typeMapping.read(
@@ -6211,8 +6211,8 @@ class StockMovementEntry extends DataClass
   final String id;
   final String itemId;
   final String itemName;
-  final int delta;
-  final int? balanceAfter;
+  final double delta;
+  final double? balanceAfter;
 
   /// SALE | PURCHASE | RETURN | ADJUST | OPENING
   final String reason;
@@ -6238,9 +6238,9 @@ class StockMovementEntry extends DataClass
     map['id'] = Variable<String>(id);
     map['item_id'] = Variable<String>(itemId);
     map['item_name'] = Variable<String>(itemName);
-    map['delta'] = Variable<int>(delta);
+    map['delta'] = Variable<double>(delta);
     if (!nullToAbsent || balanceAfter != null) {
-      map['balance_after'] = Variable<int>(balanceAfter);
+      map['balance_after'] = Variable<double>(balanceAfter);
     }
     map['reason'] = Variable<String>(reason);
     if (!nullToAbsent || refId != null) {
@@ -6284,8 +6284,8 @@ class StockMovementEntry extends DataClass
       id: serializer.fromJson<String>(json['id']),
       itemId: serializer.fromJson<String>(json['itemId']),
       itemName: serializer.fromJson<String>(json['itemName']),
-      delta: serializer.fromJson<int>(json['delta']),
-      balanceAfter: serializer.fromJson<int?>(json['balanceAfter']),
+      delta: serializer.fromJson<double>(json['delta']),
+      balanceAfter: serializer.fromJson<double?>(json['balanceAfter']),
       reason: serializer.fromJson<String>(json['reason']),
       refId: serializer.fromJson<String?>(json['refId']),
       note: serializer.fromJson<String>(json['note']),
@@ -6300,8 +6300,8 @@ class StockMovementEntry extends DataClass
       'id': serializer.toJson<String>(id),
       'itemId': serializer.toJson<String>(itemId),
       'itemName': serializer.toJson<String>(itemName),
-      'delta': serializer.toJson<int>(delta),
-      'balanceAfter': serializer.toJson<int?>(balanceAfter),
+      'delta': serializer.toJson<double>(delta),
+      'balanceAfter': serializer.toJson<double?>(balanceAfter),
       'reason': serializer.toJson<String>(reason),
       'refId': serializer.toJson<String?>(refId),
       'note': serializer.toJson<String>(note),
@@ -6314,8 +6314,8 @@ class StockMovementEntry extends DataClass
     String? id,
     String? itemId,
     String? itemName,
-    int? delta,
-    Value<int?> balanceAfter = const Value.absent(),
+    double? delta,
+    Value<double?> balanceAfter = const Value.absent(),
     String? reason,
     Value<String?> refId = const Value.absent(),
     String? note,
@@ -6401,8 +6401,8 @@ class StockMovementEntriesCompanion
   final Value<String> id;
   final Value<String> itemId;
   final Value<String> itemName;
-  final Value<int> delta;
-  final Value<int?> balanceAfter;
+  final Value<double> delta;
+  final Value<double?> balanceAfter;
   final Value<String> reason;
   final Value<String?> refId;
   final Value<String> note;
@@ -6426,7 +6426,7 @@ class StockMovementEntriesCompanion
     required String id,
     required String itemId,
     required String itemName,
-    required int delta,
+    required double delta,
     this.balanceAfter = const Value.absent(),
     required String reason,
     this.refId = const Value.absent(),
@@ -6444,8 +6444,8 @@ class StockMovementEntriesCompanion
     Expression<String>? id,
     Expression<String>? itemId,
     Expression<String>? itemName,
-    Expression<int>? delta,
-    Expression<int>? balanceAfter,
+    Expression<double>? delta,
+    Expression<double>? balanceAfter,
     Expression<String>? reason,
     Expression<String>? refId,
     Expression<String>? note,
@@ -6472,8 +6472,8 @@ class StockMovementEntriesCompanion
     Value<String>? id,
     Value<String>? itemId,
     Value<String>? itemName,
-    Value<int>? delta,
-    Value<int?>? balanceAfter,
+    Value<double>? delta,
+    Value<double?>? balanceAfter,
     Value<String>? reason,
     Value<String?>? refId,
     Value<String>? note,
@@ -6509,10 +6509,10 @@ class StockMovementEntriesCompanion
       map['item_name'] = Variable<String>(itemName.value);
     }
     if (delta.present) {
-      map['delta'] = Variable<int>(delta.value);
+      map['delta'] = Variable<double>(delta.value);
     }
     if (balanceAfter.present) {
-      map['balance_after'] = Variable<int>(balanceAfter.value);
+      map['balance_after'] = Variable<double>(balanceAfter.value);
     }
     if (reason.present) {
       map['reason'] = Variable<String>(reason.value);
@@ -7398,7 +7398,7 @@ typedef $$InventoryEntriesTableCreateCompanionBuilder =
       Value<String?> hsnCode,
       Value<double> gstRate,
       Value<bool> priceIncludesTax,
-      Value<int> stock,
+      Value<double> stock,
       Value<String?> sourceMeta,
       Value<String?> imagePath,
       Value<String?> unit,
@@ -7423,7 +7423,7 @@ typedef $$InventoryEntriesTableUpdateCompanionBuilder =
       Value<String?> hsnCode,
       Value<double> gstRate,
       Value<bool> priceIncludesTax,
-      Value<int> stock,
+      Value<double> stock,
       Value<String?> sourceMeta,
       Value<String?> imagePath,
       Value<String?> unit,
@@ -7500,7 +7500,7 @@ class $$InventoryEntriesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get stock => $composableBuilder(
+  ColumnFilters<double> get stock => $composableBuilder(
     column: $table.stock,
     builder: (column) => ColumnFilters(column),
   );
@@ -7615,7 +7615,7 @@ class $$InventoryEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get stock => $composableBuilder(
+  ColumnOrderings<double> get stock => $composableBuilder(
     column: $table.stock,
     builder: (column) => ColumnOrderings(column),
   );
@@ -7714,7 +7714,7 @@ class $$InventoryEntriesTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<int> get stock =>
+  GeneratedColumn<double> get stock =>
       $composableBuilder(column: $table.stock, builder: (column) => column);
 
   GeneratedColumn<String> get sourceMeta => $composableBuilder(
@@ -7801,7 +7801,7 @@ class $$InventoryEntriesTableTableManager
                 Value<String?> hsnCode = const Value.absent(),
                 Value<double> gstRate = const Value.absent(),
                 Value<bool> priceIncludesTax = const Value.absent(),
-                Value<int> stock = const Value.absent(),
+                Value<double> stock = const Value.absent(),
                 Value<String?> sourceMeta = const Value.absent(),
                 Value<String?> imagePath = const Value.absent(),
                 Value<String?> unit = const Value.absent(),
@@ -7849,7 +7849,7 @@ class $$InventoryEntriesTableTableManager
                 Value<String?> hsnCode = const Value.absent(),
                 Value<double> gstRate = const Value.absent(),
                 Value<bool> priceIncludesTax = const Value.absent(),
-                Value<int> stock = const Value.absent(),
+                Value<double> stock = const Value.absent(),
                 Value<String?> sourceMeta = const Value.absent(),
                 Value<String?> imagePath = const Value.absent(),
                 Value<String?> unit = const Value.absent(),
@@ -10130,8 +10130,8 @@ typedef $$StockMovementEntriesTableCreateCompanionBuilder =
       required String id,
       required String itemId,
       required String itemName,
-      required int delta,
-      Value<int?> balanceAfter,
+      required double delta,
+      Value<double?> balanceAfter,
       required String reason,
       Value<String?> refId,
       Value<String> note,
@@ -10144,8 +10144,8 @@ typedef $$StockMovementEntriesTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> itemId,
       Value<String> itemName,
-      Value<int> delta,
-      Value<int?> balanceAfter,
+      Value<double> delta,
+      Value<double?> balanceAfter,
       Value<String> reason,
       Value<String?> refId,
       Value<String> note,
@@ -10178,12 +10178,12 @@ class $$StockMovementEntriesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get delta => $composableBuilder(
+  ColumnFilters<double> get delta => $composableBuilder(
     column: $table.delta,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get balanceAfter => $composableBuilder(
+  ColumnFilters<double> get balanceAfter => $composableBuilder(
     column: $table.balanceAfter,
     builder: (column) => ColumnFilters(column),
   );
@@ -10238,12 +10238,12 @@ class $$StockMovementEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get delta => $composableBuilder(
+  ColumnOrderings<double> get delta => $composableBuilder(
     column: $table.delta,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get balanceAfter => $composableBuilder(
+  ColumnOrderings<double> get balanceAfter => $composableBuilder(
     column: $table.balanceAfter,
     builder: (column) => ColumnOrderings(column),
   );
@@ -10292,10 +10292,10 @@ class $$StockMovementEntriesTableAnnotationComposer
   GeneratedColumn<String> get itemName =>
       $composableBuilder(column: $table.itemName, builder: (column) => column);
 
-  GeneratedColumn<int> get delta =>
+  GeneratedColumn<double> get delta =>
       $composableBuilder(column: $table.delta, builder: (column) => column);
 
-  GeneratedColumn<int> get balanceAfter => $composableBuilder(
+  GeneratedColumn<double> get balanceAfter => $composableBuilder(
     column: $table.balanceAfter,
     builder: (column) => column,
   );
@@ -10362,8 +10362,8 @@ class $$StockMovementEntriesTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> itemId = const Value.absent(),
                 Value<String> itemName = const Value.absent(),
-                Value<int> delta = const Value.absent(),
-                Value<int?> balanceAfter = const Value.absent(),
+                Value<double> delta = const Value.absent(),
+                Value<double?> balanceAfter = const Value.absent(),
                 Value<String> reason = const Value.absent(),
                 Value<String?> refId = const Value.absent(),
                 Value<String> note = const Value.absent(),
@@ -10388,8 +10388,8 @@ class $$StockMovementEntriesTableTableManager
                 required String id,
                 required String itemId,
                 required String itemName,
-                required int delta,
-                Value<int?> balanceAfter = const Value.absent(),
+                required double delta,
+                Value<double?> balanceAfter = const Value.absent(),
                 required String reason,
                 Value<String?> refId = const Value.absent(),
                 Value<String> note = const Value.absent(),

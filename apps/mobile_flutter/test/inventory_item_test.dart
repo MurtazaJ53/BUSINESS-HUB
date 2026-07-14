@@ -1,7 +1,7 @@
 import 'package:business_hub_mobile/core/models/mobile_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-InventoryCatalogItem _item({required int stock, int? reorderLevel}) {
+InventoryCatalogItem _item({required double stock, int? reorderLevel}) {
   return InventoryCatalogItem(
     id: 'i1',
     name: 'Widget',

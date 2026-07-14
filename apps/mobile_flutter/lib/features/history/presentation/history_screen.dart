@@ -1328,7 +1328,7 @@ class _SaleItemRow extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '${item.quantity} x ${formatCurrency(item.unitPrice)}'
+                '${formatQty(item.quantity)} x ${formatCurrency(item.unitPrice)}'
                 '${item.size?.isNotEmpty == true ? ' | ${item.size}' : ''}'
                 '${item.gstRate > 0 ? ' | GST ${item.gstRate.toStringAsFixed(item.gstRate.truncateToDouble() == item.gstRate ? 0 : 2)}%' : ''}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(

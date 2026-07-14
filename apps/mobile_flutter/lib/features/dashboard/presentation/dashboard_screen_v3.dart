@@ -462,7 +462,7 @@ class _LowStockTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 StatusBadge(
-                  label: '${item.stock} left',
+                  label: '${formatQty(item.stock)} left',
                   color: AppPalette.error,
                   showDot: false,
                 ),

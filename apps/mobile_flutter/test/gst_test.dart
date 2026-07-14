@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 PosCartItem _item({
   double price = 100,
-  int qty = 1,
+  double qty = 1,
   double gst = 0,
   bool incl = true,
 }) => PosCartItem(

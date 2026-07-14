@@ -191,8 +191,8 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                                   : AppPalette.error,
                             ),
                             title: Text(
-                              '${m.reason} · $sign${m.delta}'
-                              '${m.balanceAfter != null ? ' → ${m.balanceAfter}' : ''}',
+                              '${m.reason} · $sign${formatQty(m.delta)}'
+                              '${m.balanceAfter != null ? ' → ${formatQty(m.balanceAfter!)}' : ''}',
                               style: const TextStyle(
                                 fontWeight: FontWeight.w600,
                               ),
@@ -447,7 +447,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
         return EnhancedListItem(
           title: item.name,
           subtitle:
-              '${item.category} • Stock: ${item.stock}'
+              '${item.category} • Stock: ${formatQty(item.stock)}'
               '${item.unit != null && item.unit!.isNotEmpty ? ' ${item.unit}' : ''}'
               ' • ${formatCurrency(item.price)}',
           leading: _productThumb(item),
@@ -529,7 +529,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                 Expanded(
                   child: _buildMetricBox(
                     label: 'Stock',
-                    value: '${item.stock}',
+                    value: '${formatQty(item.stock)}',
                   ),
                 ),
               ],
@@ -757,7 +757,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
               setSheetState(() => isSaving = true);
               try {
                 final price = double.parse(priceController.text.trim());
-                final openingStock = int.parse(stockController.text.trim());
+                final openingStock = double.parse(stockController.text.trim());
                 final gstRate =
                     double.tryParse(gstController.text.trim()) ?? 0;
                 final costText = costController.text.trim();
@@ -973,7 +973,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                               labelText: 'Opening stock',
                             ),
                             validator: (value) {
-                              final parsed = int.tryParse(
+                              final parsed = double.tryParse(
                                 value?.trim() ?? '',
                               );
                               if (parsed == null || parsed < 0) {
@@ -1143,7 +1143,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
             Future<void> save() async {
-              final addQty = int.tryParse(qtyController.text.trim()) ?? 0;
+              final addQty = double.tryParse(qtyController.text.trim()) ?? 0;
               if (addQty <= 0 || isSaving) return;
               setSheetState(() => isSaving = true);
               try {
@@ -1192,7 +1192,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      '${item.name}: +$addQty (now ${item.stock + addQty}).',
+                      '${item.name}: +${formatQty(addQty)} (now ${formatQty(item.stock + addQty)}).',
                     ),
                   ),
                 );
@@ -1244,7 +1244,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${item.name} · current stock ${item.stock}',
+                        '${item.name} · current stock ${formatQty(item.stock)}',
                         style: TextStyle(
                           color: AppColors.of(sheetContext).textSecondary,
                         ),
@@ -1358,7 +1358,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                   await coordinator.createInventoryItem(
                     name: r.name.text.trim(),
                     sellPrice: double.parse(r.price.text.trim()),
-                    openingStock: int.tryParse(r.qty.text.trim()) ?? 0,
+                    openingStock: double.tryParse(r.qty.text.trim()) ?? 0,
                   );
                 }
                 if (!sheetContext.mounted) return;

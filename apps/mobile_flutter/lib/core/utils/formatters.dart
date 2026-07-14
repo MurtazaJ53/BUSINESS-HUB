@@ -125,3 +125,8 @@ String formatCompactDate(DateTime value) {
   final month = local.month.toString().padLeft(2, '0');
   return '$day/$month/${local.year}';
 }
+
+/// Format a quantity/stock value without a trailing ".0" (2 stays "2",
+/// 1.5 stays "1.5"). For fractional (weighed) goods.
+String formatQty(num value) =>
+    value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString();

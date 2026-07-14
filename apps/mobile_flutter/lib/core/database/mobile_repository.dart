@@ -474,7 +474,7 @@ class InventoryRepository {
                   id: row.read<String>('id'),
                   name: row.read<String>('name'),
                   category: row.read<String>('category'),
-                  stock: row.read<int>('stock'),
+                  stock: row.read<double>('stock'),
                   size: row.readNullable<String>('size'),
                 ),
               )
@@ -749,7 +749,7 @@ class InventoryRepository {
                 fallback: true,
               ),
             ),
-            stock: Value(_asInt(data['stock'])),
+            stock: Value(_asDouble(data['stock'])),
             sourceMeta: Value(_encodeNullableJson(data['sourceMeta'])),
             // Only touch the photo when the caller supplies one, so imports and
             // sync merges that don't carry an image never wipe an existing one.
@@ -867,7 +867,7 @@ class InventoryRepository {
       hsnCode: row.readNullable<String>('hsn_code'),
       gstRate: row.read<double>('gst_rate'),
       priceIncludesTax: row.read<bool>('price_includes_tax'),
-      stock: row.read<int>('stock'),
+      stock: row.read<double>('stock'),
       sourceMeta: row.readNullable<String>('source_meta'),
       imagePath: row.readNullable<String>('image_path'),
       unit: row.readNullable<String>('unit'),
@@ -887,7 +887,7 @@ class InventoryRepository {
   /// the last cost when supplied, and logs a movement — all in one transaction.
   Future<void> applyStockIn({
     required String itemId,
-    required int quantity,
+    required double quantity,
     double? unitCost,
     bool updateCost = true,
     String reason = 'PURCHASE',
@@ -945,13 +945,13 @@ class InventoryRepository {
   Future<void> logStockAdjustment({
     required String itemId,
     required String itemName,
-    required int oldStock,
-    required int newStock,
+    required double oldStock,
+    required double newStock,
     String? actorName,
     String note = 'Manual adjustment',
   }) async {
     final delta = newStock - oldStock;
-    if (delta == 0) return;
+    if (delta.abs() < 0.0001) return;
     await _writeStockMovement(
       _db,
       itemId: itemId,
@@ -990,8 +990,8 @@ class InventoryRepository {
                   id: row.read<String>('id'),
                   itemId: row.read<String>('item_id'),
                   itemName: row.read<String>('item_name'),
-                  delta: row.read<int>('delta'),
-                  balanceAfter: row.readNullable<int>('balance_after'),
+                  delta: row.read<double>('delta'),
+                  balanceAfter: row.readNullable<double>('balance_after'),
                   reason: row.read<String>('reason'),
                   refId: row.readNullable<String>('ref_id'),
                   note: row.read<String>('note'),
@@ -1705,7 +1705,7 @@ class SalesRepository {
     final createdAt = effectiveAt.toIso8601String();
     final date = createdAt.split('T').first;
     final baseDomainEpoch = await _readDomainEpoch('sales');
-    final inventoryDeltas = <String, int>{};
+    final inventoryDeltas = <String, double>{};
     final totalBeforeDiscount = items.fold<double>(
       0,
       (sum, item) => sum + item.lineTotal,
@@ -2328,9 +2328,9 @@ Future<void> _writeStockMovement(
   BusinessHubDatabase db, {
   required String itemId,
   required String itemName,
-  required int delta,
+  required double delta,
   required String reason,
-  int? balanceAfter,
+  double? balanceAfter,
   String? refId,
   String note = '',
   String? actorName,
@@ -2391,7 +2391,7 @@ List<SaleDetailItem> _parseSaleItems(String raw) {
         .map(
           (item) => SaleDetailItem(
             name: (item['name'] ?? 'Unknown item').toString(),
-            quantity: _asInt(item['quantity']),
+            quantity: _asDouble(item['quantity']),
             unitPrice: _asDouble(item['price'] ?? item['unit_price']),
             size: _asStringOrNull(item['size']),
             sku: _asStringOrNull(item['sku']),
@@ -2901,7 +2901,7 @@ class ReportsRepository {
       return decoded.whereType<Map<String, dynamic>>().map((item) {
         return ReportSaleLine(
           name: (item['name'] ?? 'Item').toString(),
-          quantity: _asInt(item['quantity']),
+          quantity: _asDouble(item['quantity']),
           price: _asDouble(item['price'] ?? item['unitPrice']),
           costPrice: _asDoubleOrNull(item['costPrice'] ?? item['unit_cost']),
           gstRate: _asDouble(item['gstRate'] ?? item['gst_rate']),

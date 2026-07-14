@@ -2,7 +2,7 @@ import 'package:business_hub_mobile/core/models/mobile_models.dart';
 import 'package:business_hub_mobile/core/pos/cart_pricing.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-PosCartItem _item({double price = 100, int qty = 1}) => PosCartItem(
+PosCartItem _item({double price = 100, double qty = 1}) => PosCartItem(
   id: 'i',
   name: 'x',
   price: price,

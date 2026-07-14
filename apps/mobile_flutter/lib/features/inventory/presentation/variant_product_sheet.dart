@@ -83,7 +83,7 @@ class _VariantProductSheetState extends ConsumerState<VariantProductSheet> {
         VariantDraft(
           label: label,
           sellPrice: price,
-          openingStock: int.tryParse(r.stock.text.trim()) ?? 0,
+          openingStock: double.tryParse(r.stock.text.trim()) ?? 0,
           sku: r.sku.text.trim(),
           costPrice: costText.isEmpty ? null : double.tryParse(costText),
         ),

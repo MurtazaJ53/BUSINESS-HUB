@@ -238,7 +238,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: _StatRow(
-                        label: '${p.name}  ·  ${p.quantity} sold',
+                        label: '${p.name}  ·  ${formatQty(p.quantity)} sold',
                         value: formatCurrency(p.revenue),
                         accent: AppPalette.primary,
                       ),

@@ -41,7 +41,9 @@ class InventoryEntries extends Table {
       real().named('gst_rate').withDefault(const Constant(0))();
   BoolColumn get priceIncludesTax =>
       boolean().named('price_includes_tax').withDefault(const Constant(true))();
-  IntColumn get stock => integer().withDefault(const Constant(0))();
+  // Real-valued so loose goods (e.g. 1.5 kg) can be stocked and sold; whole
+  // units stay exact.
+  RealColumn get stock => real().withDefault(const Constant(0))();
   TextColumn get sourceMeta => text().named('source_meta').nullable()();
   TextColumn get imagePath => text().named('image_path').nullable()();
   TextColumn get unit => text().nullable()();
@@ -229,8 +231,8 @@ class StockMovementEntries extends Table {
   TextColumn get id => text()();
   TextColumn get itemId => text().named('item_id')();
   TextColumn get itemName => text().named('item_name')();
-  IntColumn get delta => integer()();
-  IntColumn get balanceAfter => integer().named('balance_after').nullable()();
+  RealColumn get delta => real()();
+  RealColumn get balanceAfter => real().named('balance_after').nullable()();
 
   /// SALE | PURCHASE | RETURN | ADJUST | OPENING
   TextColumn get reason => text()();
@@ -288,7 +290,7 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       );
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -344,6 +346,12 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       }
       if (from < 13) {
         await m.createTable(customerLedgerEntries);
+      }
+      if (from < 14) {
+        // inventory.stock and stock_movements.delta/balance_after became REAL
+        // (fractional). SQLite numeric affinity already stores fractional
+        // values losslessly and existing whole numbers read back as doubles,
+        // so no data rewrite is required — the type change is transparent.
       }
     },
   );

@@ -6,7 +6,7 @@ InventoryCatalogItem _item(
   String id,
   String name, {
   double price = 100,
-  int stock = 5,
+  double stock = 5,
   String? groupId,
   String? label,
 }) {

@@ -273,7 +273,7 @@ class ReportSaleLine {
   });
 
   final String name;
-  final int quantity;
+  final double quantity;
   final double price;
   final double? costPrice;
   final double gstRate;
@@ -299,7 +299,7 @@ class TopProduct {
     required this.revenue,
   });
   final String name;
-  final int quantity;
+  final double quantity;
   final double revenue;
 }
 
@@ -360,7 +360,7 @@ ProfitLossSnapshot computeProfitAndLoss({
   var grossSales = 0.0;
   var cogs = 0.0;
   var gst = 0.0;
-  final productQty = <String, int>{};
+  final productQty = <String, double>{};
   final productRevenue = <String, double>{};
   final customerSpend = <String, double>{};
   final customerOrders = <String, int>{};
@@ -392,7 +392,7 @@ ProfitLossSnapshot computeProfitAndLoss({
           .map(
             (e) => TopProduct(
               name: e.key,
-              quantity: productQty[e.key] ?? 0,
+              quantity: productQty[e.key] ?? 0.0,
               revenue: e.value,
             ),
           )
@@ -466,10 +466,10 @@ class StockMovement {
   final String id;
   final String itemId;
   final String itemName;
-  final int delta;
+  final double delta;
   final String reason; // SALE | PURCHASE | RETURN | ADJUST | OPENING
   final DateTime createdAt;
-  final int? balanceAfter;
+  final double? balanceAfter;
   final String? refId;
   final String note;
   final String? actorName;
@@ -489,7 +489,7 @@ class PurchaseStockLine {
 
   final String itemId;
   final String itemName;
-  final int quantity;
+  final double quantity;
   final double unitCost;
 }
 
@@ -507,7 +507,7 @@ class VariantDraft {
 
   final String label;
   final double sellPrice;
-  final int openingStock;
+  final double openingStock;
   final String sku;
   final double? costPrice;
   final int? reorderLevel;
@@ -1188,7 +1188,7 @@ class InventoryCatalogItem {
   final String name;
   final double price;
   final String category;
-  final int stock;
+  final double stock;
   final DateTime createdAt;
   final String? sku;
   final String? subcategory;
@@ -1342,7 +1342,7 @@ class LowStockItem {
   final String id;
   final String name;
   final String category;
-  final int stock;
+  final double stock;
   final String? size;
 }
 
@@ -1452,8 +1452,8 @@ class PosCartItem {
   final String id;
   final String name;
   final double price;
-  final int quantity;
-  final int stock;
+  final double quantity;
+  final double stock;
   final String category;
   final String? size;
   final String? sku;
@@ -1468,8 +1468,8 @@ class PosCartItem {
     String? id,
     String? name,
     double? price,
-    int? quantity,
-    int? stock,
+    double? quantity,
+    double? stock,
     String? category,
     String? size,
     String? sku,
@@ -1558,7 +1558,7 @@ class SaleDetailItem {
   });
 
   final String name;
-  final int quantity;
+  final double quantity;
   final double unitPrice;
   final String? size;
   final String? sku;
@@ -1624,7 +1624,8 @@ class SaleRecordDetail {
   final String? backendSaleId;
   final String? lastSyncError;
 
-  int get itemCount => items.fold<int>(0, (sum, item) => sum + item.quantity);
+  int get itemCount =>
+      items.fold<double>(0, (sum, item) => sum + item.quantity).round();
 
   double get subtotal =>
       items.fold<double>(0, (sum, item) => sum + item.lineTotal);
@@ -1767,7 +1768,10 @@ class LocalSaleCommit {
   final String? customerPhone;
   final String? footerNote;
   final String? buyerGstin;
-  final Map<String, int> inventoryDeltas;
+  // Signed stock change per item id (negative = sold). Fractional for weighed
+  // goods. NOTE: the backend sale serializer must accept fractional quantity
+  // before cloud sync is enabled for weighed items.
+  final Map<String, double> inventoryDeltas;
 
   Map<String, dynamic> toBackendCommandPayload() => {
     'command_id': commandId,
