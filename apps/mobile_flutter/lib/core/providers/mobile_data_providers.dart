@@ -210,6 +210,19 @@ final expenseSummaryProvider = StreamProvider<ExpenseSummarySnapshot?>((ref) {
   });
 });
 
+// Stock buying (money-out to suppliers) is local-first, same as expenses.
+final purchasesProvider = StreamProvider<List<PurchaseRecord>>((ref) {
+  return ref.watch(purchaseRepositoryProvider).watchPurchases();
+});
+
+final supplierDuesProvider = StreamProvider<List<SupplierDue>>((ref) {
+  return ref.watch(purchaseRepositoryProvider).watchSuppliers();
+});
+
+final purchaseSummaryProvider = StreamProvider<PurchaseSummarySnapshot>((ref) {
+  return ref.watch(purchaseRepositoryProvider).watchSummary();
+});
+
 final dashboardOverviewProvider =
     StreamProvider.family<DashboardOverview, bool>((ref, includeCost) {
       final inventoryRepository = ref.watch(inventoryRepositoryProvider);

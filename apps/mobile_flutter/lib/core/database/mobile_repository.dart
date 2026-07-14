@@ -2136,3 +2136,185 @@ class ExpenseRepository {
     );
   }
 }
+
+final purchaseRepositoryProvider = Provider<PurchaseRepository>((ref) {
+  return PurchaseRepository(ref.watch(localDatabaseProvider));
+});
+
+/// Stock buying + supplier dues, local-first. Purchases are money-out with a
+/// running payable; suppliers and their outstanding balances are derived by
+/// grouping purchases, so there's no separate supplier entity to keep in sync.
+class PurchaseRepository {
+  PurchaseRepository(this._db);
+
+  final BusinessHubDatabase _db;
+
+  Future<void> recordPurchase({
+    required String supplierName,
+    required double total,
+    required DateTime purchaseDate,
+    double amountPaid = 0,
+    String supplierPhone = '',
+    String reference = '',
+    String paymentMethod = 'CASH',
+    String notes = '',
+    String? actorName,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    // A payment can never exceed the bill, and neither value can be negative.
+    final safeTotal = total < 0 ? 0.0 : total;
+    final safePaid = amountPaid < 0
+        ? 0.0
+        : (amountPaid > safeTotal ? safeTotal : amountPaid);
+    await _db.into(_db.purchaseEntries).insert(
+          PurchaseEntriesCompanion.insert(
+            id: 'purchase-${DateTime.now().microsecondsSinceEpoch}',
+            supplierName: supplierName.trim().isEmpty
+                ? 'Unnamed supplier'
+                : supplierName.trim(),
+            supplierPhone: Value(supplierPhone.trim()),
+            reference: Value(reference.trim()),
+            total: Value(safeTotal),
+            amountPaid: Value(safePaid),
+            paymentMethod: Value(paymentMethod),
+            notes: Value(notes.trim()),
+            purchaseDate: purchaseDate.toIso8601String().split('T').first,
+            actorName: Value(actorName),
+            createdAt: now,
+            updatedAt: Value(now),
+          ),
+        );
+  }
+
+  /// Add a payment against an existing purchase, capped at its outstanding
+  /// balance. Returns the new outstanding balance.
+  Future<double> settlePurchase({
+    required String purchaseId,
+    required double amount,
+  }) async {
+    final row = await (_db.select(_db.purchaseEntries)
+          ..where((t) => t.id.equals(purchaseId)))
+        .getSingleOrNull();
+    if (row == null) return 0;
+    final due = row.total - row.amountPaid;
+    final applied = amount < 0 ? 0.0 : (amount > due ? due : amount);
+    final newPaid = row.amountPaid + applied;
+    await (_db.update(_db.purchaseEntries)
+          ..where((t) => t.id.equals(purchaseId)))
+        .write(
+      PurchaseEntriesCompanion(
+        amountPaid: Value(newPaid),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
+    final remaining = row.total - newPaid;
+    return remaining < 0 ? 0 : remaining;
+  }
+
+  Future<void> deletePurchase(String id) async {
+    await (_db.update(_db.purchaseEntries)..where((t) => t.id.equals(id)))
+        .write(
+      PurchaseEntriesCompanion(
+        tombstone: const Value(true),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
+  }
+
+  Stream<List<PurchaseRecord>> watchPurchases({String query = ''}) {
+    final where = <String>['tombstone = 0'];
+    final vars = <Variable<Object>>[];
+    final q = query.trim().toLowerCase();
+    if (q.isNotEmpty) {
+      where.add(
+        '(LOWER(supplier_name) LIKE ? OR LOWER(reference) LIKE ? '
+        'OR LOWER(notes) LIKE ?)',
+      );
+      vars
+        ..add(Variable<String>('%$q%'))
+        ..add(Variable<String>('%$q%'))
+        ..add(Variable<String>('%$q%'));
+    }
+    final sql =
+        'SELECT * FROM purchases WHERE ${where.join(' AND ')} '
+        'ORDER BY purchase_date DESC, created_at DESC;';
+    return _db
+        .customSelect(sql, variables: vars, readsFrom: {_db.purchaseEntries})
+        .watch()
+        .map((rows) => rows.map(_mapPurchaseRow).toList(growable: false));
+  }
+
+  /// Suppliers rolled up from their purchases, ordered by who you owe most.
+  Stream<List<SupplierDue>> watchSuppliers() {
+    const sql = '''
+      SELECT
+        supplier_name AS name,
+        MAX(supplier_phone) AS phone,
+        COUNT(*) AS purchase_count,
+        COALESCE(SUM(total), 0) AS total_purchased,
+        COALESCE(SUM(total - amount_paid), 0) AS payable
+      FROM purchases
+      WHERE tombstone = 0
+      GROUP BY LOWER(supplier_name)
+      ORDER BY payable DESC, total_purchased DESC;
+    ''';
+    return _db
+        .customSelect(sql, readsFrom: {_db.purchaseEntries})
+        .watch()
+        .map(
+          (rows) => rows
+              .map(
+                (row) => SupplierDue(
+                  name: row.read<String>('name'),
+                  phone:
+                      _asStringOrNull(row.readNullable<String>('phone')) ?? '',
+                  purchaseCount: row.read<int>('purchase_count'),
+                  totalPurchased: row.read<double>('total_purchased'),
+                  payable: row.read<double>('payable'),
+                ),
+              )
+              .toList(growable: false),
+        );
+  }
+
+  Stream<PurchaseSummarySnapshot> watchSummary() {
+    const sql = '''
+      SELECT
+        COUNT(*) AS total_purchases,
+        COALESCE(SUM(total), 0) AS total_spent,
+        COALESCE(SUM(total - amount_paid), 0) AS total_payable,
+        COUNT(DISTINCT LOWER(supplier_name)) AS supplier_count
+      FROM purchases
+      WHERE tombstone = 0;
+    ''';
+    return _db
+        .customSelect(sql, readsFrom: {_db.purchaseEntries})
+        .watchSingle()
+        .map(
+          (row) => PurchaseSummarySnapshot(
+            totalPurchases: row.read<int>('total_purchases'),
+            totalSpent: row.read<double>('total_spent'),
+            totalPayable: row.read<double>('total_payable'),
+            supplierCount: row.read<int>('supplier_count'),
+          ),
+        );
+  }
+
+  PurchaseRecord _mapPurchaseRow(QueryRow row) {
+    return PurchaseRecord(
+      id: row.read<String>('id'),
+      supplierName: row.read<String>('supplier_name'),
+      supplierPhone: row.read<String>('supplier_phone'),
+      reference: row.read<String>('reference'),
+      total: row.read<double>('total'),
+      amountPaid: row.read<double>('amount_paid'),
+      paymentMethod: row.read<String>('payment_method'),
+      notes: row.read<String>('notes'),
+      purchaseDate:
+          DateTime.tryParse(row.read<String>('purchase_date')) ??
+          DateTime.now(),
+      actorName: _asStringOrNull(row.readNullable<String>('actor_name')),
+      tombstone: row.read<int>('tombstone') == 1,
+    );
+  }
+}

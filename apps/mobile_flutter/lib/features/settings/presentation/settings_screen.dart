@@ -104,6 +104,12 @@ class SettingsScreen extends ConsumerWidget {
               onTap: () => context.push('/settings/expenses'),
             ),
           MobileListTile(
+            title: 'Suppliers & purchases',
+            subtitle: 'Stock buying and supplier dues',
+            leadingIcon: Icons.local_shipping_rounded,
+            onTap: () => context.push('/settings/purchases'),
+          ),
+          MobileListTile(
             title: 'Plan',
             subtitle: '${shop.planLabel} plan',
             leadingIcon: Icons.workspace_premium_rounded,

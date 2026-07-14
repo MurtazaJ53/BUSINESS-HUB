@@ -4979,6 +4979,764 @@ class ExpenseEntriesCompanion extends UpdateCompanion<ExpenseEntry> {
   }
 }
 
+class $PurchaseEntriesTable extends PurchaseEntries
+    with TableInfo<$PurchaseEntriesTable, PurchaseEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PurchaseEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _supplierNameMeta = const VerificationMeta(
+    'supplierName',
+  );
+  @override
+  late final GeneratedColumn<String> supplierName = GeneratedColumn<String>(
+    'supplier_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _supplierPhoneMeta = const VerificationMeta(
+    'supplierPhone',
+  );
+  @override
+  late final GeneratedColumn<String> supplierPhone = GeneratedColumn<String>(
+    'supplier_phone',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _referenceMeta = const VerificationMeta(
+    'reference',
+  );
+  @override
+  late final GeneratedColumn<String> reference = GeneratedColumn<String>(
+    'reference',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _totalMeta = const VerificationMeta('total');
+  @override
+  late final GeneratedColumn<double> total = GeneratedColumn<double>(
+    'total',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _amountPaidMeta = const VerificationMeta(
+    'amountPaid',
+  );
+  @override
+  late final GeneratedColumn<double> amountPaid = GeneratedColumn<double>(
+    'amount_paid',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _paymentMethodMeta = const VerificationMeta(
+    'paymentMethod',
+  );
+  @override
+  late final GeneratedColumn<String> paymentMethod = GeneratedColumn<String>(
+    'payment_method',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('CASH'),
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _purchaseDateMeta = const VerificationMeta(
+    'purchaseDate',
+  );
+  @override
+  late final GeneratedColumn<String> purchaseDate = GeneratedColumn<String>(
+    'purchase_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _actorNameMeta = const VerificationMeta(
+    'actorName',
+  );
+  @override
+  late final GeneratedColumn<String> actorName = GeneratedColumn<String>(
+    'actor_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _tombstoneMeta = const VerificationMeta(
+    'tombstone',
+  );
+  @override
+  late final GeneratedColumn<bool> tombstone = GeneratedColumn<bool>(
+    'tombstone',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("tombstone" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    supplierName,
+    supplierPhone,
+    reference,
+    total,
+    amountPaid,
+    paymentMethod,
+    notes,
+    purchaseDate,
+    actorName,
+    createdAt,
+    updatedAt,
+    tombstone,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'purchases';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PurchaseEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('supplier_name')) {
+      context.handle(
+        _supplierNameMeta,
+        supplierName.isAcceptableOrUnknown(
+          data['supplier_name']!,
+          _supplierNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_supplierNameMeta);
+    }
+    if (data.containsKey('supplier_phone')) {
+      context.handle(
+        _supplierPhoneMeta,
+        supplierPhone.isAcceptableOrUnknown(
+          data['supplier_phone']!,
+          _supplierPhoneMeta,
+        ),
+      );
+    }
+    if (data.containsKey('reference')) {
+      context.handle(
+        _referenceMeta,
+        reference.isAcceptableOrUnknown(data['reference']!, _referenceMeta),
+      );
+    }
+    if (data.containsKey('total')) {
+      context.handle(
+        _totalMeta,
+        total.isAcceptableOrUnknown(data['total']!, _totalMeta),
+      );
+    }
+    if (data.containsKey('amount_paid')) {
+      context.handle(
+        _amountPaidMeta,
+        amountPaid.isAcceptableOrUnknown(data['amount_paid']!, _amountPaidMeta),
+      );
+    }
+    if (data.containsKey('payment_method')) {
+      context.handle(
+        _paymentMethodMeta,
+        paymentMethod.isAcceptableOrUnknown(
+          data['payment_method']!,
+          _paymentMethodMeta,
+        ),
+      );
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('purchase_date')) {
+      context.handle(
+        _purchaseDateMeta,
+        purchaseDate.isAcceptableOrUnknown(
+          data['purchase_date']!,
+          _purchaseDateMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_purchaseDateMeta);
+    }
+    if (data.containsKey('actor_name')) {
+      context.handle(
+        _actorNameMeta,
+        actorName.isAcceptableOrUnknown(data['actor_name']!, _actorNameMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('tombstone')) {
+      context.handle(
+        _tombstoneMeta,
+        tombstone.isAcceptableOrUnknown(data['tombstone']!, _tombstoneMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PurchaseEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PurchaseEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      supplierName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}supplier_name'],
+      )!,
+      supplierPhone: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}supplier_phone'],
+      )!,
+      reference: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reference'],
+      )!,
+      total: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}total'],
+      )!,
+      amountPaid: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}amount_paid'],
+      )!,
+      paymentMethod: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payment_method'],
+      )!,
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      )!,
+      purchaseDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}purchase_date'],
+      )!,
+      actorName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}actor_name'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      tombstone: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}tombstone'],
+      )!,
+    );
+  }
+
+  @override
+  $PurchaseEntriesTable createAlias(String alias) {
+    return $PurchaseEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class PurchaseEntry extends DataClass implements Insertable<PurchaseEntry> {
+  final String id;
+  final String supplierName;
+  final String supplierPhone;
+  final String reference;
+  final double total;
+  final double amountPaid;
+  final String paymentMethod;
+  final String notes;
+  final String purchaseDate;
+  final String? actorName;
+  final int createdAt;
+  final int updatedAt;
+  final bool tombstone;
+  const PurchaseEntry({
+    required this.id,
+    required this.supplierName,
+    required this.supplierPhone,
+    required this.reference,
+    required this.total,
+    required this.amountPaid,
+    required this.paymentMethod,
+    required this.notes,
+    required this.purchaseDate,
+    this.actorName,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.tombstone,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['supplier_name'] = Variable<String>(supplierName);
+    map['supplier_phone'] = Variable<String>(supplierPhone);
+    map['reference'] = Variable<String>(reference);
+    map['total'] = Variable<double>(total);
+    map['amount_paid'] = Variable<double>(amountPaid);
+    map['payment_method'] = Variable<String>(paymentMethod);
+    map['notes'] = Variable<String>(notes);
+    map['purchase_date'] = Variable<String>(purchaseDate);
+    if (!nullToAbsent || actorName != null) {
+      map['actor_name'] = Variable<String>(actorName);
+    }
+    map['created_at'] = Variable<int>(createdAt);
+    map['updated_at'] = Variable<int>(updatedAt);
+    map['tombstone'] = Variable<bool>(tombstone);
+    return map;
+  }
+
+  PurchaseEntriesCompanion toCompanion(bool nullToAbsent) {
+    return PurchaseEntriesCompanion(
+      id: Value(id),
+      supplierName: Value(supplierName),
+      supplierPhone: Value(supplierPhone),
+      reference: Value(reference),
+      total: Value(total),
+      amountPaid: Value(amountPaid),
+      paymentMethod: Value(paymentMethod),
+      notes: Value(notes),
+      purchaseDate: Value(purchaseDate),
+      actorName: actorName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(actorName),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      tombstone: Value(tombstone),
+    );
+  }
+
+  factory PurchaseEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PurchaseEntry(
+      id: serializer.fromJson<String>(json['id']),
+      supplierName: serializer.fromJson<String>(json['supplierName']),
+      supplierPhone: serializer.fromJson<String>(json['supplierPhone']),
+      reference: serializer.fromJson<String>(json['reference']),
+      total: serializer.fromJson<double>(json['total']),
+      amountPaid: serializer.fromJson<double>(json['amountPaid']),
+      paymentMethod: serializer.fromJson<String>(json['paymentMethod']),
+      notes: serializer.fromJson<String>(json['notes']),
+      purchaseDate: serializer.fromJson<String>(json['purchaseDate']),
+      actorName: serializer.fromJson<String?>(json['actorName']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+      tombstone: serializer.fromJson<bool>(json['tombstone']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'supplierName': serializer.toJson<String>(supplierName),
+      'supplierPhone': serializer.toJson<String>(supplierPhone),
+      'reference': serializer.toJson<String>(reference),
+      'total': serializer.toJson<double>(total),
+      'amountPaid': serializer.toJson<double>(amountPaid),
+      'paymentMethod': serializer.toJson<String>(paymentMethod),
+      'notes': serializer.toJson<String>(notes),
+      'purchaseDate': serializer.toJson<String>(purchaseDate),
+      'actorName': serializer.toJson<String?>(actorName),
+      'createdAt': serializer.toJson<int>(createdAt),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+      'tombstone': serializer.toJson<bool>(tombstone),
+    };
+  }
+
+  PurchaseEntry copyWith({
+    String? id,
+    String? supplierName,
+    String? supplierPhone,
+    String? reference,
+    double? total,
+    double? amountPaid,
+    String? paymentMethod,
+    String? notes,
+    String? purchaseDate,
+    Value<String?> actorName = const Value.absent(),
+    int? createdAt,
+    int? updatedAt,
+    bool? tombstone,
+  }) => PurchaseEntry(
+    id: id ?? this.id,
+    supplierName: supplierName ?? this.supplierName,
+    supplierPhone: supplierPhone ?? this.supplierPhone,
+    reference: reference ?? this.reference,
+    total: total ?? this.total,
+    amountPaid: amountPaid ?? this.amountPaid,
+    paymentMethod: paymentMethod ?? this.paymentMethod,
+    notes: notes ?? this.notes,
+    purchaseDate: purchaseDate ?? this.purchaseDate,
+    actorName: actorName.present ? actorName.value : this.actorName,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    tombstone: tombstone ?? this.tombstone,
+  );
+  PurchaseEntry copyWithCompanion(PurchaseEntriesCompanion data) {
+    return PurchaseEntry(
+      id: data.id.present ? data.id.value : this.id,
+      supplierName: data.supplierName.present
+          ? data.supplierName.value
+          : this.supplierName,
+      supplierPhone: data.supplierPhone.present
+          ? data.supplierPhone.value
+          : this.supplierPhone,
+      reference: data.reference.present ? data.reference.value : this.reference,
+      total: data.total.present ? data.total.value : this.total,
+      amountPaid: data.amountPaid.present
+          ? data.amountPaid.value
+          : this.amountPaid,
+      paymentMethod: data.paymentMethod.present
+          ? data.paymentMethod.value
+          : this.paymentMethod,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      purchaseDate: data.purchaseDate.present
+          ? data.purchaseDate.value
+          : this.purchaseDate,
+      actorName: data.actorName.present ? data.actorName.value : this.actorName,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      tombstone: data.tombstone.present ? data.tombstone.value : this.tombstone,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PurchaseEntry(')
+          ..write('id: $id, ')
+          ..write('supplierName: $supplierName, ')
+          ..write('supplierPhone: $supplierPhone, ')
+          ..write('reference: $reference, ')
+          ..write('total: $total, ')
+          ..write('amountPaid: $amountPaid, ')
+          ..write('paymentMethod: $paymentMethod, ')
+          ..write('notes: $notes, ')
+          ..write('purchaseDate: $purchaseDate, ')
+          ..write('actorName: $actorName, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('tombstone: $tombstone')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    supplierName,
+    supplierPhone,
+    reference,
+    total,
+    amountPaid,
+    paymentMethod,
+    notes,
+    purchaseDate,
+    actorName,
+    createdAt,
+    updatedAt,
+    tombstone,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PurchaseEntry &&
+          other.id == this.id &&
+          other.supplierName == this.supplierName &&
+          other.supplierPhone == this.supplierPhone &&
+          other.reference == this.reference &&
+          other.total == this.total &&
+          other.amountPaid == this.amountPaid &&
+          other.paymentMethod == this.paymentMethod &&
+          other.notes == this.notes &&
+          other.purchaseDate == this.purchaseDate &&
+          other.actorName == this.actorName &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.tombstone == this.tombstone);
+}
+
+class PurchaseEntriesCompanion extends UpdateCompanion<PurchaseEntry> {
+  final Value<String> id;
+  final Value<String> supplierName;
+  final Value<String> supplierPhone;
+  final Value<String> reference;
+  final Value<double> total;
+  final Value<double> amountPaid;
+  final Value<String> paymentMethod;
+  final Value<String> notes;
+  final Value<String> purchaseDate;
+  final Value<String?> actorName;
+  final Value<int> createdAt;
+  final Value<int> updatedAt;
+  final Value<bool> tombstone;
+  final Value<int> rowid;
+  const PurchaseEntriesCompanion({
+    this.id = const Value.absent(),
+    this.supplierName = const Value.absent(),
+    this.supplierPhone = const Value.absent(),
+    this.reference = const Value.absent(),
+    this.total = const Value.absent(),
+    this.amountPaid = const Value.absent(),
+    this.paymentMethod = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.purchaseDate = const Value.absent(),
+    this.actorName = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.tombstone = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PurchaseEntriesCompanion.insert({
+    required String id,
+    required String supplierName,
+    this.supplierPhone = const Value.absent(),
+    this.reference = const Value.absent(),
+    this.total = const Value.absent(),
+    this.amountPaid = const Value.absent(),
+    this.paymentMethod = const Value.absent(),
+    this.notes = const Value.absent(),
+    required String purchaseDate,
+    this.actorName = const Value.absent(),
+    required int createdAt,
+    this.updatedAt = const Value.absent(),
+    this.tombstone = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       supplierName = Value(supplierName),
+       purchaseDate = Value(purchaseDate),
+       createdAt = Value(createdAt);
+  static Insertable<PurchaseEntry> custom({
+    Expression<String>? id,
+    Expression<String>? supplierName,
+    Expression<String>? supplierPhone,
+    Expression<String>? reference,
+    Expression<double>? total,
+    Expression<double>? amountPaid,
+    Expression<String>? paymentMethod,
+    Expression<String>? notes,
+    Expression<String>? purchaseDate,
+    Expression<String>? actorName,
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<bool>? tombstone,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (supplierName != null) 'supplier_name': supplierName,
+      if (supplierPhone != null) 'supplier_phone': supplierPhone,
+      if (reference != null) 'reference': reference,
+      if (total != null) 'total': total,
+      if (amountPaid != null) 'amount_paid': amountPaid,
+      if (paymentMethod != null) 'payment_method': paymentMethod,
+      if (notes != null) 'notes': notes,
+      if (purchaseDate != null) 'purchase_date': purchaseDate,
+      if (actorName != null) 'actor_name': actorName,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (tombstone != null) 'tombstone': tombstone,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PurchaseEntriesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? supplierName,
+    Value<String>? supplierPhone,
+    Value<String>? reference,
+    Value<double>? total,
+    Value<double>? amountPaid,
+    Value<String>? paymentMethod,
+    Value<String>? notes,
+    Value<String>? purchaseDate,
+    Value<String?>? actorName,
+    Value<int>? createdAt,
+    Value<int>? updatedAt,
+    Value<bool>? tombstone,
+    Value<int>? rowid,
+  }) {
+    return PurchaseEntriesCompanion(
+      id: id ?? this.id,
+      supplierName: supplierName ?? this.supplierName,
+      supplierPhone: supplierPhone ?? this.supplierPhone,
+      reference: reference ?? this.reference,
+      total: total ?? this.total,
+      amountPaid: amountPaid ?? this.amountPaid,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      notes: notes ?? this.notes,
+      purchaseDate: purchaseDate ?? this.purchaseDate,
+      actorName: actorName ?? this.actorName,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      tombstone: tombstone ?? this.tombstone,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (supplierName.present) {
+      map['supplier_name'] = Variable<String>(supplierName.value);
+    }
+    if (supplierPhone.present) {
+      map['supplier_phone'] = Variable<String>(supplierPhone.value);
+    }
+    if (reference.present) {
+      map['reference'] = Variable<String>(reference.value);
+    }
+    if (total.present) {
+      map['total'] = Variable<double>(total.value);
+    }
+    if (amountPaid.present) {
+      map['amount_paid'] = Variable<double>(amountPaid.value);
+    }
+    if (paymentMethod.present) {
+      map['payment_method'] = Variable<String>(paymentMethod.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (purchaseDate.present) {
+      map['purchase_date'] = Variable<String>(purchaseDate.value);
+    }
+    if (actorName.present) {
+      map['actor_name'] = Variable<String>(actorName.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (tombstone.present) {
+      map['tombstone'] = Variable<bool>(tombstone.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PurchaseEntriesCompanion(')
+          ..write('id: $id, ')
+          ..write('supplierName: $supplierName, ')
+          ..write('supplierPhone: $supplierPhone, ')
+          ..write('reference: $reference, ')
+          ..write('total: $total, ')
+          ..write('amountPaid: $amountPaid, ')
+          ..write('paymentMethod: $paymentMethod, ')
+          ..write('notes: $notes, ')
+          ..write('purchaseDate: $purchaseDate, ')
+          ..write('actorName: $actorName, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('tombstone: $tombstone, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$BusinessHubDatabase extends GeneratedDatabase {
   _$BusinessHubDatabase(QueryExecutor e) : super(e);
   $BusinessHubDatabaseManager get managers => $BusinessHubDatabaseManager(this);
@@ -4996,6 +5754,9 @@ abstract class _$BusinessHubDatabase extends GeneratedDatabase {
   late final $CommerceOutboxEntriesTable commerceOutboxEntries =
       $CommerceOutboxEntriesTable(this);
   late final $ExpenseEntriesTable expenseEntries = $ExpenseEntriesTable(this);
+  late final $PurchaseEntriesTable purchaseEntries = $PurchaseEntriesTable(
+    this,
+  );
   late final Index inventoryNameIdx = Index(
     'inventory_name_idx',
     'CREATE INDEX inventory_name_idx ON inventory (name)',
@@ -5048,6 +5809,7 @@ abstract class _$BusinessHubDatabase extends GeneratedDatabase {
     customerEntries,
     commerceOutboxEntries,
     expenseEntries,
+    purchaseEntries,
     inventoryNameIdx,
     inventorySkuIdx,
     inventoryCategoryIdx,
@@ -7525,6 +8287,378 @@ typedef $$ExpenseEntriesTableProcessedTableManager =
       ExpenseEntry,
       PrefetchHooks Function()
     >;
+typedef $$PurchaseEntriesTableCreateCompanionBuilder =
+    PurchaseEntriesCompanion Function({
+      required String id,
+      required String supplierName,
+      Value<String> supplierPhone,
+      Value<String> reference,
+      Value<double> total,
+      Value<double> amountPaid,
+      Value<String> paymentMethod,
+      Value<String> notes,
+      required String purchaseDate,
+      Value<String?> actorName,
+      required int createdAt,
+      Value<int> updatedAt,
+      Value<bool> tombstone,
+      Value<int> rowid,
+    });
+typedef $$PurchaseEntriesTableUpdateCompanionBuilder =
+    PurchaseEntriesCompanion Function({
+      Value<String> id,
+      Value<String> supplierName,
+      Value<String> supplierPhone,
+      Value<String> reference,
+      Value<double> total,
+      Value<double> amountPaid,
+      Value<String> paymentMethod,
+      Value<String> notes,
+      Value<String> purchaseDate,
+      Value<String?> actorName,
+      Value<int> createdAt,
+      Value<int> updatedAt,
+      Value<bool> tombstone,
+      Value<int> rowid,
+    });
+
+class $$PurchaseEntriesTableFilterComposer
+    extends Composer<_$BusinessHubDatabase, $PurchaseEntriesTable> {
+  $$PurchaseEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get supplierName => $composableBuilder(
+    column: $table.supplierName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get supplierPhone => $composableBuilder(
+    column: $table.supplierPhone,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reference => $composableBuilder(
+    column: $table.reference,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get total => $composableBuilder(
+    column: $table.total,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get amountPaid => $composableBuilder(
+    column: $table.amountPaid,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get paymentMethod => $composableBuilder(
+    column: $table.paymentMethod,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get purchaseDate => $composableBuilder(
+    column: $table.purchaseDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get actorName => $composableBuilder(
+    column: $table.actorName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get tombstone => $composableBuilder(
+    column: $table.tombstone,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PurchaseEntriesTableOrderingComposer
+    extends Composer<_$BusinessHubDatabase, $PurchaseEntriesTable> {
+  $$PurchaseEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get supplierName => $composableBuilder(
+    column: $table.supplierName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get supplierPhone => $composableBuilder(
+    column: $table.supplierPhone,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reference => $composableBuilder(
+    column: $table.reference,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get total => $composableBuilder(
+    column: $table.total,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get amountPaid => $composableBuilder(
+    column: $table.amountPaid,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get paymentMethod => $composableBuilder(
+    column: $table.paymentMethod,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get purchaseDate => $composableBuilder(
+    column: $table.purchaseDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get actorName => $composableBuilder(
+    column: $table.actorName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get tombstone => $composableBuilder(
+    column: $table.tombstone,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PurchaseEntriesTableAnnotationComposer
+    extends Composer<_$BusinessHubDatabase, $PurchaseEntriesTable> {
+  $$PurchaseEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get supplierName => $composableBuilder(
+    column: $table.supplierName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get supplierPhone => $composableBuilder(
+    column: $table.supplierPhone,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get reference =>
+      $composableBuilder(column: $table.reference, builder: (column) => column);
+
+  GeneratedColumn<double> get total =>
+      $composableBuilder(column: $table.total, builder: (column) => column);
+
+  GeneratedColumn<double> get amountPaid => $composableBuilder(
+    column: $table.amountPaid,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get paymentMethod => $composableBuilder(
+    column: $table.paymentMethod,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<String> get purchaseDate => $composableBuilder(
+    column: $table.purchaseDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get actorName =>
+      $composableBuilder(column: $table.actorName, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get tombstone =>
+      $composableBuilder(column: $table.tombstone, builder: (column) => column);
+}
+
+class $$PurchaseEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$BusinessHubDatabase,
+          $PurchaseEntriesTable,
+          PurchaseEntry,
+          $$PurchaseEntriesTableFilterComposer,
+          $$PurchaseEntriesTableOrderingComposer,
+          $$PurchaseEntriesTableAnnotationComposer,
+          $$PurchaseEntriesTableCreateCompanionBuilder,
+          $$PurchaseEntriesTableUpdateCompanionBuilder,
+          (
+            PurchaseEntry,
+            BaseReferences<
+              _$BusinessHubDatabase,
+              $PurchaseEntriesTable,
+              PurchaseEntry
+            >,
+          ),
+          PurchaseEntry,
+          PrefetchHooks Function()
+        > {
+  $$PurchaseEntriesTableTableManager(
+    _$BusinessHubDatabase db,
+    $PurchaseEntriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PurchaseEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PurchaseEntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PurchaseEntriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> supplierName = const Value.absent(),
+                Value<String> supplierPhone = const Value.absent(),
+                Value<String> reference = const Value.absent(),
+                Value<double> total = const Value.absent(),
+                Value<double> amountPaid = const Value.absent(),
+                Value<String> paymentMethod = const Value.absent(),
+                Value<String> notes = const Value.absent(),
+                Value<String> purchaseDate = const Value.absent(),
+                Value<String?> actorName = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<bool> tombstone = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PurchaseEntriesCompanion(
+                id: id,
+                supplierName: supplierName,
+                supplierPhone: supplierPhone,
+                reference: reference,
+                total: total,
+                amountPaid: amountPaid,
+                paymentMethod: paymentMethod,
+                notes: notes,
+                purchaseDate: purchaseDate,
+                actorName: actorName,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                tombstone: tombstone,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String supplierName,
+                Value<String> supplierPhone = const Value.absent(),
+                Value<String> reference = const Value.absent(),
+                Value<double> total = const Value.absent(),
+                Value<double> amountPaid = const Value.absent(),
+                Value<String> paymentMethod = const Value.absent(),
+                Value<String> notes = const Value.absent(),
+                required String purchaseDate,
+                Value<String?> actorName = const Value.absent(),
+                required int createdAt,
+                Value<int> updatedAt = const Value.absent(),
+                Value<bool> tombstone = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PurchaseEntriesCompanion.insert(
+                id: id,
+                supplierName: supplierName,
+                supplierPhone: supplierPhone,
+                reference: reference,
+                total: total,
+                amountPaid: amountPaid,
+                paymentMethod: paymentMethod,
+                notes: notes,
+                purchaseDate: purchaseDate,
+                actorName: actorName,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                tombstone: tombstone,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PurchaseEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$BusinessHubDatabase,
+      $PurchaseEntriesTable,
+      PurchaseEntry,
+      $$PurchaseEntriesTableFilterComposer,
+      $$PurchaseEntriesTableOrderingComposer,
+      $$PurchaseEntriesTableAnnotationComposer,
+      $$PurchaseEntriesTableCreateCompanionBuilder,
+      $$PurchaseEntriesTableUpdateCompanionBuilder,
+      (
+        PurchaseEntry,
+        BaseReferences<
+          _$BusinessHubDatabase,
+          $PurchaseEntriesTable,
+          PurchaseEntry
+        >,
+      ),
+      PurchaseEntry,
+      PrefetchHooks Function()
+    >;
 
 class $BusinessHubDatabaseManager {
   final _$BusinessHubDatabase _db;
@@ -7546,4 +8680,6 @@ class $BusinessHubDatabaseManager {
       $$CommerceOutboxEntriesTableTableManager(_db, _db.commerceOutboxEntries);
   $$ExpenseEntriesTableTableManager get expenseEntries =>
       $$ExpenseEntriesTableTableManager(_db, _db.expenseEntries);
+  $$PurchaseEntriesTableTableManager get purchaseEntries =>
+      $$PurchaseEntriesTableTableManager(_db, _db.purchaseEntries);
 }

@@ -221,6 +221,78 @@ class ExpenseRecord {
   final bool tombstone;
 }
 
+class PurchaseRecord {
+  const PurchaseRecord({
+    required this.id,
+    required this.supplierName,
+    required this.supplierPhone,
+    required this.reference,
+    required this.total,
+    required this.amountPaid,
+    required this.paymentMethod,
+    required this.notes,
+    required this.purchaseDate,
+    required this.actorName,
+    required this.tombstone,
+  });
+
+  final String id;
+  final String supplierName;
+  final String supplierPhone;
+  final String reference;
+  final double total;
+  final double amountPaid;
+  final String paymentMethod;
+  final String notes;
+  final DateTime purchaseDate;
+  final String? actorName;
+  final bool tombstone;
+
+  /// Money still owed to the supplier for this purchase (never negative).
+  double get balanceDue {
+    final due = total - amountPaid;
+    return due < 0 ? 0 : due;
+  }
+
+  bool get isSettled => balanceDue <= 0.0001;
+}
+
+/// A supplier rolled up from their purchases: what you've bought and what you
+/// still owe. Derived, not a stored entity.
+class SupplierDue {
+  const SupplierDue({
+    required this.name,
+    required this.phone,
+    required this.purchaseCount,
+    required this.totalPurchased,
+    required this.payable,
+  });
+
+  final String name;
+  final String phone;
+  final int purchaseCount;
+  final double totalPurchased;
+  final double payable;
+}
+
+class PurchaseSummarySnapshot {
+  const PurchaseSummarySnapshot({
+    required this.totalPurchases,
+    required this.totalSpent,
+    required this.totalPayable,
+    required this.supplierCount,
+  });
+
+  final int totalPurchases;
+
+  /// Gross value of stock bought (sum of purchase totals).
+  final double totalSpent;
+
+  /// Outstanding across all suppliers (sum of unpaid balances).
+  final double totalPayable;
+  final int supplierCount;
+}
+
 class WorkspaceAccessSessionHeartbeatResult {
   const WorkspaceAccessSessionHeartbeatResult({
     required this.sessionId,

@@ -186,6 +186,35 @@ class ExpenseEntries extends Table {
   Set<Column<Object>>? get primaryKey => {id};
 }
 
+/// Stock buying (money-out to suppliers). A purchase carries what was bought,
+/// what was paid now, and leaves the rest as a payable. Supplier dues are
+/// derived by grouping non-tombstoned purchases by supplier.
+class PurchaseEntries extends Table {
+  @override
+  String get tableName => 'purchases';
+
+  TextColumn get id => text()();
+  TextColumn get supplierName => text().named('supplier_name')();
+  TextColumn get supplierPhone =>
+      text().named('supplier_phone').withDefault(const Constant(''))();
+  TextColumn get reference => text().withDefault(const Constant(''))();
+  RealColumn get total => real().withDefault(const Constant(0))();
+  RealColumn get amountPaid =>
+      real().named('amount_paid').withDefault(const Constant(0))();
+  TextColumn get paymentMethod =>
+      text().named('payment_method').withDefault(const Constant('CASH'))();
+  TextColumn get notes => text().withDefault(const Constant(''))();
+  TextColumn get purchaseDate => text().named('purchase_date')();
+  TextColumn get actorName => text().named('actor_name').nullable()();
+  IntColumn get createdAt => integer().named('created_at')();
+  IntColumn get updatedAt =>
+      integer().named('updated_at').withDefault(const Constant(0))();
+  BoolColumn get tombstone => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
 @DriftDatabase(
   tables: [
     ShopSettingsEntries,
@@ -195,6 +224,7 @@ class ExpenseEntries extends Table {
     CustomerEntries,
     CommerceOutboxEntries,
     ExpenseEntries,
+    PurchaseEntries,
   ],
 )
 class BusinessHubDatabase extends _$BusinessHubDatabase {
@@ -207,7 +237,7 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       );
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -246,6 +276,9 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       }
       if (from < 8) {
         await m.addColumn(inventoryEntries, inventoryEntries.imagePath);
+      }
+      if (from < 9) {
+        await m.createTable(purchaseEntries);
       }
     },
   );
