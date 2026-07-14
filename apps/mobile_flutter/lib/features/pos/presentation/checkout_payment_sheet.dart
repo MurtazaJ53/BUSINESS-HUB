@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/models/mobile_models.dart';
+import '../../../core/checkout/checkout_policy.dart';
 import '../../../core/tax/gst.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -62,16 +62,19 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
     super.dispose();
   }
 
-  double get _paid => _lines.fold<double>(0, (sum, l) => sum + l.value);
-  double get _due {
-    final d = widget.cartTotal - _paid;
-    return d > 0.009 ? d : 0;
-  }
+  /// Resolve tender lines into what is actually recorded (cash over-tender
+  /// becomes change, never collected money) — the single source of truth for
+  /// the summary and for saving.
+  TenderResolution get _resolution => resolveCashierTender(
+    total: widget.cartTotal,
+    lines: _lines
+        .map((l) => CheckoutPaymentEntry(mode: l.mode, amount: l.value))
+        .toList(growable: false),
+  );
 
-  double get _change {
-    final c = _paid - widget.cartTotal;
-    return c > 0.009 ? c : 0;
-  }
+  double get _paid => _resolution.totalCollected;
+  double get _due => _resolution.dueFor(widget.cartTotal);
+  double get _change => _resolution.change;
 
   void _addLine() {
     setState(() => _lines.add(_PayLine('CASH', _due)));
@@ -87,18 +90,21 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
   }
 
   void _completeSale() {
-    final payments = _lines
-        .where((l) => l.value > 0)
-        .map((l) => PosPayment(mode: l.mode, amount: l.value))
-        .toList(growable: false);
-    final mode = payments.isEmpty
-        ? 'CREDIT'
-        : payments.length == 1
-        ? payments.first.mode
-        : 'SPLIT';
+    final resolution = _resolution;
+    if (resolution.overcharged) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'A card/UPI amount is more than the bill. You can only give change '
+            'on cash — reduce that line.',
+          ),
+        ),
+      );
+      return;
+    }
     Navigator.pop(context, <String, dynamic>{
-      'payments': payments,
-      'paymentMode': mode,
+      'payments': resolution.payments,
+      'paymentMode': paymentModeFor(resolution.payments),
       'buyerGstin': _buyerGstin.text.trim().isEmpty
           ? null
           : _buyerGstin.text.trim(),
