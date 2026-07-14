@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:printing/printing.dart';
 
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
+import '../../../core/receipt/zreport_pdf.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
@@ -19,44 +21,45 @@ class DayCloseScreen extends ConsumerStatefulWidget {
 
 class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
   final TextEditingController _counted = TextEditingController();
+  final TextEditingController _openingFloat = TextEditingController();
 
   @override
   void dispose() {
     _counted.dispose();
+    _openingFloat.dispose();
     super.dispose();
+  }
+
+  Future<void> _printZReport(ZReportSnapshot z) async {
+    final shop = ref.read(shopInfoProvider).asData?.value;
+    if (shop == null) return;
+    final opening = double.tryParse(_openingFloat.text.trim()) ?? 0;
+    final counted = double.tryParse(_counted.text.trim());
+    final today = DateTime.now().toIso8601String().split('T').first;
+    await Printing.layoutPdf(
+      onLayout: (_) => buildZReportPdf(
+        z: z,
+        shop: shop,
+        dateLabel: today,
+        openingFloat: opening,
+        countedCash: counted,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
-    final sales =
-        ref
-            .watch(
-              historySalesProvider(
-                const HistoryFilter(
-                  dateWindow: HistoryDateWindow.today,
-                  limit: 2000,
-                ),
-              ),
-            )
-            .asData
-            ?.value ??
-        const <RecentSaleSummary>[];
+    final z =
+        ref.watch(zReportProvider(HistoryDateWindow.today)).asData?.value ??
+        ZReportSnapshot.empty;
 
-    final gross = sales.fold<double>(0, (s, x) => s + x.total);
-    final collected = sales.fold<double>(0, (s, x) => s + x.amountReceived);
-    final due = sales.fold<double>(0, (s, x) => s + x.amountDue);
-
-    final byMode = <String, double>{};
-    for (final sale in sales) {
-      final mode = sale.paymentMode.isEmpty ? 'OTHER' : sale.paymentMode;
-      byMode[mode] = (byMode[mode] ?? 0) + sale.amountReceived;
-    }
-    final expectedCash = byMode['CASH'] ?? 0;
+    final opening = double.tryParse(_openingFloat.text.trim()) ?? 0;
+    final expectedCash = opening + z.cashCollected;
     final counted = double.tryParse(_counted.text.trim());
     final variance = counted == null ? null : counted - expectedCash;
 
-    final modeEntries = byMode.entries.toList()
+    final modeEntries = z.tenderBreakdown.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
     return MobileStandaloneScaffold(
@@ -67,25 +70,29 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
           MobilePanel(
             title: 'Today',
             action: MobileTag(
-              label: '${sales.length} sales',
+              label: '${z.salesCount} sales',
               icon: Icons.today_rounded,
               accent: AppPalette.primary,
             ),
             child: Column(
               children: <Widget>[
-                _kv('Gross sales', formatCurrency(gross), bold: true),
+                _kv('Gross sales', formatCurrency(z.grossSales), bold: true),
                 const SizedBox(height: 8),
-                _kv('Collected', formatCurrency(collected),
+                _kv('Discounts given', formatCurrency(z.discountTotal)),
+                const SizedBox(height: 8),
+                _kv('Tax collected', formatCurrency(z.taxCollected)),
+                const SizedBox(height: 8),
+                _kv('Collected', formatCurrency(z.collected),
                     color: AppPalette.success),
                 const SizedBox(height: 8),
-                _kv('Outstanding due', formatCurrency(due),
-                    color: due > 0 ? AppPalette.warning : AppPalette.success),
+                _kv('Outstanding due', formatCurrency(z.due),
+                    color: z.due > 0 ? AppPalette.warning : AppPalette.success),
               ],
             ),
           ),
           const SizedBox(height: 18),
           MobilePanel(
-            title: 'Collected by mode',
+            title: 'Collected by tender',
             action: const MobileTag(label: 'TODAY', icon: Icons.payments_rounded),
             child: modeEntries.isEmpty
                 ? const MobileEmptyState(
@@ -112,7 +119,22 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                _kv('Expected cash', formatCurrency(expectedCash), bold: true),
+                TextField(
+                  controller: _openingFloat,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  onChanged: (_) => setState(() {}),
+                  decoration: const InputDecoration(
+                    labelText: 'Opening float (cash you started with)',
+                    prefixText: '₹ ',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _kv('+ Cash sales', formatCurrency(z.cashCollected)),
+                const SizedBox(height: 8),
+                _kv('= Expected in drawer', formatCurrency(expectedCash),
+                    bold: true),
                 const SizedBox(height: 12),
                 TextField(
                   controller: _counted,
@@ -165,6 +187,12 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
                   ),
               ],
             ),
+          ),
+          const SizedBox(height: 18),
+          FilledButton.icon(
+            onPressed: z.salesCount == 0 ? null : () => _printZReport(z),
+            icon: const Icon(Icons.print_rounded),
+            label: const Text('Print / share Z-report'),
           ),
         ],
       ),

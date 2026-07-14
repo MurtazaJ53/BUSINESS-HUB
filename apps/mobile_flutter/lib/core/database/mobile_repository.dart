@@ -673,6 +673,36 @@ class InventoryRepository {
     return _mapCatalogRow(rows.first);
   }
 
+  /// Resolve a set of item ids to full catalog items (for POS quick-keys).
+  Stream<List<InventoryCatalogItem>> watchItemsByIds(List<String> ids) {
+    if (ids.isEmpty) {
+      return Stream<List<InventoryCatalogItem>>.value(
+        const <InventoryCatalogItem>[],
+      );
+    }
+    final placeholders = List<String>.filled(ids.length, '?').join(', ');
+    return _db
+        .customSelect(
+          '''
+        SELECT
+          i.id, i.name, i.price, i.sku,
+          COALESCE(i.category, 'General') AS category,
+          i.subcategory, i.size, i.description, i.hsn_code,
+          COALESCE(i.gst_rate, 0) AS gst_rate,
+          COALESCE(i.price_includes_tax, 1) AS price_includes_tax,
+          i.stock, i.source_meta, i.image_path, i.unit, i.reorder_level,
+          i.variant_group_id, i.variant_label, i.created_at,
+          NULL AS cost_price, NULL AS supplier_id, NULL AS last_purchase_date
+        FROM inventory i
+        WHERE i.tombstone = 0 AND i.id IN ($placeholders);
+      ''',
+          variables: ids.map((id) => Variable<String>(id)).toList(),
+          readsFrom: {_db.inventoryEntries},
+        )
+        .watch()
+        .map((rows) => rows.map(_mapCatalogRow).toList(growable: false));
+  }
+
   /// Rename a category across every item that carries it. Returns the number
   /// of items updated.
   Future<int> renameCategory(String from, String to) async {
@@ -2724,6 +2754,90 @@ class ReportsRepository {
               )
               .toList(growable: false),
         );
+  }
+
+  /// Aggregate a single day's takings into a Z-report: gross, discounts, tax,
+  /// tender split (from actual payment lines), and first/last bill times.
+  Stream<ZReportSnapshot> watchZReport(HistoryDateWindow window) {
+    final exactDate = _historyExactDate(window);
+    final sinceDate = _historySinceDate(window);
+    final where = <String>['tombstone = 0'];
+    final vars = <Variable<Object>>[];
+    if (exactDate != null) {
+      where.add('date = ?');
+      vars.add(Variable<String>(exactDate));
+    } else if (sinceDate != null) {
+      where.add('date >= ?');
+      vars.add(Variable<String>(sinceDate));
+    }
+    return _db
+        .customSelect(
+          'SELECT total, discount, items_json, payments_json, created_at '
+          'FROM sales WHERE ${where.join(' AND ')};',
+          variables: vars,
+          readsFrom: {_db.salesEntries},
+        )
+        .watch()
+        .map((rows) {
+          var gross = 0.0;
+          var discount = 0.0;
+          var tax = 0.0;
+          var collected = 0.0;
+          final tender = <String, double>{};
+          DateTime? firstAt;
+          DateTime? lastAt;
+          for (final row in rows) {
+            gross += row.read<double>('total');
+            discount += row.read<double>('discount');
+            for (final line in _parseReportLines(
+              row.read<String>('items_json'),
+            )) {
+              final lineTotal = line.price * line.quantity;
+              if (line.gstRate > 0) {
+                tax += line.priceIncludesTax
+                    ? lineTotal * line.gstRate / (100 + line.gstRate)
+                    : lineTotal * line.gstRate / 100;
+              }
+            }
+            for (final p in _parseZPayments(row.read<String>('payments_json'))) {
+              final mode = p.key.isEmpty ? 'OTHER' : p.key;
+              tender[mode] = (tender[mode] ?? 0) + p.value;
+              collected += p.value;
+            }
+            final createdAt = DateTime.fromMillisecondsSinceEpoch(
+              row.read<int>('created_at'),
+            );
+            if (firstAt == null || createdAt.isBefore(firstAt)) {
+              firstAt = createdAt;
+            }
+            if (lastAt == null || createdAt.isAfter(lastAt)) lastAt = createdAt;
+          }
+          return ZReportSnapshot(
+            salesCount: rows.length,
+            grossSales: gross,
+            discountTotal: discount,
+            taxCollected: tax,
+            collected: collected,
+            due: (gross - collected) > 0 ? gross - collected : 0,
+            tenderBreakdown: tender,
+            firstBillAt: firstAt,
+            lastBillAt: lastAt,
+          );
+        });
+  }
+
+  List<MapEntry<String, double>> _parseZPayments(String paymentsJson) {
+    if (paymentsJson.trim().isEmpty) return const <MapEntry<String, double>>[];
+    try {
+      final decoded = jsonDecode(paymentsJson);
+      if (decoded is! List) return const <MapEntry<String, double>>[];
+      return decoded.whereType<Map<String, dynamic>>().map((p) {
+        final mode = (p['mode'] ?? p['type'] ?? 'OTHER').toString().toUpperCase();
+        return MapEntry(mode, _asDouble(p['amount']));
+      }).toList(growable: false);
+    } catch (_) {
+      return const <MapEntry<String, double>>[];
+    }
   }
 
   Stream<double> watchPeriodExpenses(HistoryDateWindow window) {

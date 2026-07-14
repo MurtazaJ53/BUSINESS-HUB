@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../database/mobile_repository.dart';
@@ -222,6 +224,58 @@ final reportExpensesProvider =
     StreamProvider.family<double, HistoryDateWindow>((ref, window) {
       return ref.watch(reportsRepositoryProvider).watchPeriodExpenses(window);
     });
+
+// End-of-day Z-report figures (default: today).
+final zReportProvider =
+    StreamProvider.family<ZReportSnapshot, HistoryDateWindow>((ref, window) {
+      return ref.watch(reportsRepositoryProvider).watchZReport(window);
+    });
+
+// POS quick-keys: the shop's favourite items, persisted as a setting.
+final favouriteIdsProvider =
+    AsyncNotifierProvider<FavouriteIdsController, List<String>>(
+      FavouriteIdsController.new,
+    );
+
+class FavouriteIdsController extends AsyncNotifier<List<String>> {
+  static const String _key = 'pos_favourites';
+
+  @override
+  Future<List<String>> build() async {
+    final raw = await ref.read(shopRepositoryProvider).readSetting(_key);
+    if (raw == null || raw.trim().isEmpty) return const <String>[];
+    try {
+      final decoded = jsonDecode(raw);
+      return decoded is List
+          ? decoded.map((e) => e.toString()).toList(growable: false)
+          : const <String>[];
+    } catch (_) {
+      return const <String>[];
+    }
+  }
+
+  bool isFavourite(String id) =>
+      (state.asData?.value ?? const <String>[]).contains(id);
+
+  Future<void> toggle(String id) async {
+    final current = <String>[...(state.asData?.value ?? const <String>[])];
+    if (current.contains(id)) {
+      current.remove(id);
+    } else {
+      current.add(id);
+    }
+    state = AsyncData<List<String>>(current);
+    await ref
+        .read(shopRepositoryProvider)
+        .writeSetting(_key, jsonEncode(current));
+  }
+}
+
+// Resolve the favourite ids to full items for the POS quick-key strip.
+final favouriteItemsProvider = StreamProvider<List<InventoryCatalogItem>>((ref) {
+  final ids = ref.watch(favouriteIdsProvider).asData?.value ?? const <String>[];
+  return ref.watch(inventoryRepositoryProvider).watchItemsByIds(ids);
+});
 
 // Customer khata timeline (credit sales + payments).
 final customerLedgerProvider =

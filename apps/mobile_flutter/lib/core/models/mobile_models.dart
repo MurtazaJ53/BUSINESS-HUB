@@ -221,6 +221,46 @@ class ExpenseRecord {
   final bool tombstone;
 }
 
+/// End-of-day Z-report figures for a single business day.
+class ZReportSnapshot {
+  const ZReportSnapshot({
+    required this.salesCount,
+    required this.grossSales,
+    required this.discountTotal,
+    required this.taxCollected,
+    required this.collected,
+    required this.due,
+    required this.tenderBreakdown,
+    this.firstBillAt,
+    this.lastBillAt,
+  });
+
+  final int salesCount;
+  final double grossSales;
+  final double discountTotal;
+  final double taxCollected;
+  final double collected;
+  final double due;
+
+  /// Amount received per tender type (CASH / UPI / CARD / ...), from the actual
+  /// payment splits — so a split-tender bill is counted correctly.
+  final Map<String, double> tenderBreakdown;
+  final DateTime? firstBillAt;
+  final DateTime? lastBillAt;
+
+  double get cashCollected => tenderBreakdown['CASH'] ?? 0;
+
+  static const ZReportSnapshot empty = ZReportSnapshot(
+    salesCount: 0,
+    grossSales: 0,
+    discountTotal: 0,
+    taxCollected: 0,
+    collected: 0,
+    due: 0,
+    tenderBreakdown: <String, double>{},
+  );
+}
+
 /// A sale reduced to just what a P&L needs. Built from stored sale rows.
 class ReportSaleLine {
   const ReportSaleLine({

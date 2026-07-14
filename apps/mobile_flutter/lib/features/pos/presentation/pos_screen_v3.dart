@@ -969,6 +969,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
           children: <Widget>[
             _buildHeader(context, items),
             if (categories.isNotEmpty) _buildCategoryFilters(categories),
+            _buildFavouritesStrip(),
             const SizedBox(height: 4),
             Expanded(
               child: items.isEmpty
@@ -1005,6 +1006,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
                               onAdd: () => _addToCart(item),
                               onInc: () => _changeQtyById(item.id, 1),
                               onDec: () => _changeQtyById(item.id, -1),
+                              onLongPress: () => _toggleFavourite(item),
                             );
                           },
                         );
@@ -1111,6 +1113,55 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
     );
   }
 
+  Future<void> _toggleFavourite(InventoryCatalogItem item) async {
+    await ref.read(favouriteIdsProvider.notifier).toggle(item.id);
+    if (!mounted) return;
+    final isFav = ref.read(favouriteIdsProvider.notifier).isFavourite(item.id);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          isFav
+              ? '${item.name} pinned to quick-keys.'
+              : '${item.name} removed from quick-keys.',
+        ),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
+  /// Horizontal strip of favourite (quick-key) items above the catalog.
+  /// Long-press any product to pin/unpin it here.
+  Widget _buildFavouritesStrip() {
+    final favourites =
+        ref.watch(favouriteItemsProvider).asData?.value ??
+        const <InventoryCatalogItem>[];
+    if (favourites.isEmpty) return const SizedBox.shrink();
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+        itemCount: favourites.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final item = favourites[index];
+          return ActionChip(
+            avatar: const Icon(
+              Icons.bolt_rounded,
+              size: 16,
+              color: AppPalette.primary,
+            ),
+            label: Text(
+              '${item.name}  ${formatCurrency(item.price)}',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            onPressed: () => _addToCart(item),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildCategoryFilters(List<InventoryCategorySummary> categories) {
     return SizedBox(
       height: 44,
@@ -1148,6 +1199,7 @@ class _ProductRow extends StatelessWidget {
     required this.onAdd,
     required this.onInc,
     required this.onDec,
+    this.onLongPress,
   });
 
   final InventoryCatalogItem item;
@@ -1155,6 +1207,7 @@ class _ProductRow extends StatelessWidget {
   final VoidCallback onAdd;
   final VoidCallback onInc;
   final VoidCallback onDec;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -1162,7 +1215,9 @@ class _ProductRow extends StatelessWidget {
     final theme = Theme.of(context);
     final lowStock = item.isLowStock;
 
-    return Container(
+    return GestureDetector(
+      onLongPress: onLongPress,
+      child: Container(
       decoration: BoxDecoration(
         color: colors.surface,
         borderRadius: BorderRadius.circular(18),
@@ -1233,6 +1288,7 @@ class _ProductRow extends StatelessWidget {
               ? _QtyStepper(quantity: qtyInCart, onInc: onInc, onDec: onDec)
               : _AddButton(onTap: onAdd),
         ],
+      ),
       ),
     );
   }
