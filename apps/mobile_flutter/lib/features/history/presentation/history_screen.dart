@@ -26,6 +26,18 @@ class HistoryScreen extends ConsumerStatefulWidget {
 class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   final TextEditingController _searchController = TextEditingController();
   HistoryFilter _filter = const HistoryFilter();
+  // Filters are collapsed by default so History opens straight to the receipts.
+  bool _showFilters = false;
+
+  int _activeFilterCount() {
+    var n = 0;
+    if (_filter.search.trim().isNotEmpty) n++;
+    if (_filter.syncState != null) n++;
+    if (_filter.paymentMode != null) n++;
+    if (_filter.dateWindow != HistoryDateWindow.all) n++;
+    if (_filter.onlyDueSales) n++;
+    return n;
+  }
 
   @override
   void dispose() {
@@ -136,6 +148,15 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           },
         ),
         const SizedBox(height: 18),
+        _FilterToggleBar(
+          title: roleProfile.filterPanelTitle,
+          activeCount: _activeFilterCount(),
+          expanded: _showFilters,
+          onToggle: () => setState(() => _showFilters = !_showFilters),
+          onClear: hasActiveFilters ? _resetFilters : null,
+        ),
+        if (_showFilters) const SizedBox(height: 12),
+        if (_showFilters)
         MobilePanel(
           title: roleProfile.filterPanelTitle,
           action: MobileTag(
@@ -992,6 +1013,68 @@ class _HistoryRoleProfile {
       filterPanelTitle: 'Find receipts',
       summaryPanelTitle: 'Quick summary',
       feedPanelTitle: 'Receipt list',
+    );
+  }
+}
+
+/// Slim bar that keeps the receipt filters collapsed until tapped, so History
+/// opens straight to the list instead of a tall filter block.
+class _FilterToggleBar extends StatelessWidget {
+  const _FilterToggleBar({
+    required this.title,
+    required this.activeCount,
+    required this.expanded,
+    required this.onToggle,
+    this.onClear,
+  });
+
+  final String title;
+  final int activeCount;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final VoidCallback? onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outline.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: <Widget>[
+          const Icon(Icons.tune_rounded, size: 20, color: AppPalette.primary),
+          const SizedBox(width: 10),
+          Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          if (activeCount > 0) ...<Widget>[
+            const SizedBox(width: 8),
+            MobileTag(label: '$activeCount', accent: AppPalette.info),
+          ],
+          const Spacer(),
+          if (onClear != null)
+            TextButton(
+              onPressed: onClear,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 36),
+              ),
+              child: const Text('Clear'),
+            ),
+          IconButton(
+            onPressed: onToggle,
+            tooltip: expanded ? 'Hide filters' : 'Filter receipts',
+            icon: Icon(
+              expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
