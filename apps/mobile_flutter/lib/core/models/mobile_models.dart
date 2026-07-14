@@ -810,6 +810,7 @@ class InventoryCatalogItem {
     this.hsnCode,
     this.gstRate = 0,
     this.priceIncludesTax = true,
+    this.imagePath,
   });
 
   final String id;
@@ -829,6 +830,7 @@ class InventoryCatalogItem {
   final String? hsnCode;
   final double gstRate;
   final bool priceIncludesTax;
+  final String? imagePath;
 
   double get marginPerUnit => price - (costPrice ?? 0);
 }

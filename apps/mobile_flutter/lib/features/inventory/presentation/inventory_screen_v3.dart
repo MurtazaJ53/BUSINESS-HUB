@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
+import '../../../core/images/product_image_store.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/session/mobile_session_controller.dart';
@@ -285,6 +288,23 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
     );
   }
 
+  /// A 56x56 product photo for list rows, or null so [EnhancedListItem] falls
+  /// back to its coloured icon tile when the item has no image.
+  Widget? _productThumb(InventoryCatalogItem item) {
+    final path = item.imagePath;
+    if (path == null || path.isEmpty || !File(path).existsSync()) return null;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Image.file(
+        File(path),
+        width: 56,
+        height: 56,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const SizedBox(width: 56, height: 56),
+      ),
+    );
+  }
+
   Widget _buildItemsList(List<InventoryCatalogItem> items) {
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 100),
@@ -295,6 +315,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
           title: item.name,
           subtitle:
               '${item.category} • Stock: ${item.stock} • ${formatCurrency(item.price)}',
+          leading: _productThumb(item),
           leadingIcon: Icons.inventory_2_rounded,
           leadingColor: item.stock <= 5
               ? AppPalette.error
@@ -505,7 +526,11 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
       text: source != null ? source.gstRate.toString() : '0',
     );
     var priceIncludesTax = source?.priceIncludesTax ?? true;
+    // A duplicate starts without a photo so it never shares (and later orphans)
+    // the original's image file.
+    String? imagePath = duplicateOf != null ? null : source?.imagePath;
     var isSaving = false;
+    final imageStore = ProductImageStore();
 
     showModalBottomSheet<void>(
       context: context,
@@ -514,6 +539,57 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
+            Future<void> pickImage(ImageSource src) async {
+              try {
+                final stored = await imageStore.pickAndStore(source: src);
+                if (stored == null) return;
+                setSheetState(() => imagePath = stored);
+              } catch (error) {
+                if (!sheetContext.mounted) return;
+                ScaffoldMessenger.of(sheetContext).showSnackBar(
+                  SnackBar(content: Text('Could not add photo: $error')),
+                );
+              }
+            }
+
+            void openPhotoOptions() {
+              showModalBottomSheet<void>(
+                context: sheetContext,
+                builder: (optionsContext) => SafeArea(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.photo_camera_rounded),
+                        title: const Text('Take photo'),
+                        onTap: () {
+                          Navigator.pop(optionsContext);
+                          pickImage(ImageSource.camera);
+                        },
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.photo_library_rounded),
+                        title: const Text('Choose from gallery'),
+                        onTap: () {
+                          Navigator.pop(optionsContext);
+                          pickImage(ImageSource.gallery);
+                        },
+                      ),
+                      if (imagePath != null)
+                        ListTile(
+                          leading: const Icon(Icons.delete_outline_rounded),
+                          title: const Text('Remove photo'),
+                          onTap: () {
+                            Navigator.pop(optionsContext);
+                            setSheetState(() => imagePath = null);
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
             Future<void> saveItem() async {
               if (formKey.currentState?.validate() != true || isSaving) {
                 return;
@@ -543,6 +619,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                     subcategory: existing.subcategory ?? '',
                     description: existing.description ?? '',
                     createdAt: existing.createdAt,
+                    imagePath: imagePath,
                   );
                 } else {
                   await coordinator.createInventoryItem(
@@ -554,6 +631,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                     hsnCode: hsnController.text.trim(),
                     gstRate: gstRate,
                     priceIncludesTax: priceIncludesTax,
+                    imagePath: imagePath,
                   );
                 }
 
@@ -617,6 +695,53 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                             ),
                           ),
                           const SizedBox(height: 24),
+                          Center(
+                            child: GestureDetector(
+                              onTap: openPhotoOptions,
+                              child: Container(
+                                width: 104,
+                                height: 104,
+                                decoration: BoxDecoration(
+                                  color: AppColors.of(sheetContext).surface,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: AppColors.of(sheetContext).border,
+                                  ),
+                                  image: imagePath != null
+                                      ? DecorationImage(
+                                          image: FileImage(File(imagePath!)),
+                                          fit: BoxFit.cover,
+                                        )
+                                      : null,
+                                ),
+                                child: imagePath != null
+                                    ? null
+                                    : Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.add_a_photo_rounded,
+                                            color: AppColors.of(
+                                              sheetContext,
+                                            ).textSecondary,
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            'Add photo',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: AppColors.of(
+                                                sheetContext,
+                                              ).textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
                           TextFormField(
                             controller: nameController,
                             decoration: const InputDecoration(

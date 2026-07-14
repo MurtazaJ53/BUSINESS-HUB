@@ -592,6 +592,7 @@ class InventoryRepository {
         COALESCE(i.price_includes_tax, 1) AS price_includes_tax,
         i.stock,
         i.source_meta,
+        i.image_path,
         i.created_at,
         ${includeCost ? 'COALESCE(ip.cost_price, 0)' : 'NULL'} AS cost_price,
         ip.supplier_id,
@@ -641,6 +642,7 @@ class InventoryRepository {
           COALESCE(i.price_includes_tax, 1) AS price_includes_tax,
           i.stock,
           i.source_meta,
+          i.image_path,
           i.created_at,
           ${includeCost ? 'COALESCE(ip.cost_price, 0)' : 'NULL'} AS cost_price,
           ip.supplier_id,
@@ -711,6 +713,13 @@ class InventoryRepository {
             ),
             stock: Value(_asInt(data['stock'])),
             sourceMeta: Value(_encodeNullableJson(data['sourceMeta'])),
+            // Only touch the photo when the caller supplies one, so imports and
+            // sync merges that don't carry an image never wipe an existing one.
+            imagePath:
+                (data.containsKey('imagePath') ||
+                    data.containsKey('image_path'))
+                ? Value(_asStringOrNull(data['imagePath'] ?? data['image_path']))
+                : const Value.absent(),
             createdAt: createdAt,
             updatedAt: Value(updatedAt),
             tombstone: Value(data['tombstone'] == true),
@@ -796,6 +805,7 @@ class InventoryRepository {
       priceIncludesTax: row.read<bool>('price_includes_tax'),
       stock: row.read<int>('stock'),
       sourceMeta: row.readNullable<String>('source_meta'),
+      imagePath: row.readNullable<String>('image_path'),
       createdAt: DateTime.fromMillisecondsSinceEpoch(
         row.read<int>('created_at'),
       ),

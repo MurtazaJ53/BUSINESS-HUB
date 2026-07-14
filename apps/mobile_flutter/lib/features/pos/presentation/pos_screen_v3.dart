@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1013,7 +1014,7 @@ class _ProductRow extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       child: Row(
         children: <Widget>[
-          _ProductTile(name: item.name),
+          _ProductTile(name: item.name, imagePath: item.imagePath),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -1076,12 +1077,30 @@ class _ProductRow extends StatelessWidget {
 }
 
 class _ProductTile extends StatelessWidget {
-  const _ProductTile({required this.name});
+  const _ProductTile({required this.name, this.imagePath});
 
   final String name;
+  final String? imagePath;
 
   @override
   Widget build(BuildContext context) {
+    final path = imagePath;
+    if (path != null && path.isNotEmpty && File(path).existsSync()) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image.file(
+          File(path),
+          width: 52,
+          height: 52,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => _letterTile(),
+        ),
+      );
+    }
+    return _letterTile();
+  }
+
+  Widget _letterTile() {
     final letter = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
     return Container(
       width: 52,

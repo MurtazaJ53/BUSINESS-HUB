@@ -209,6 +209,7 @@ class MobileSyncCoordinator {
     String hsnCode = '',
     double gstRate = 0,
     bool priceIncludesTax = true,
+    String? imagePath,
   }) async {
     final session = _session;
     if (session == null || !session.hasShop) {
@@ -241,6 +242,7 @@ class MobileSyncCoordinator {
         hsnCode: hsnCode.trim(),
         gstRate: gstRate,
         priceIncludesTax: priceIncludesTax,
+        imagePath: imagePath,
         timestamp: now,
       );
       setStatus(MobileSyncStatus.idle);
@@ -269,6 +271,16 @@ class MobileSyncCoordinator {
         created,
         updatedAt: updatedAt,
       );
+      // The backend has no image field yet, so keep the photo local-only by
+      // re-merging it onto the freshly synced row.
+      final createdId = created['id']?.toString();
+      if (imagePath != null && createdId != null && createdId.isNotEmpty) {
+        await _inventoryRepository.mergeInventoryDocument(
+          createdId,
+          <String, dynamic>{'imagePath': imagePath},
+          updatedAt: updatedAt,
+        );
+      }
       setStatus(MobileSyncStatus.idle);
     } on BackendApiException catch (error) {
       final canUseLocalFallback =
@@ -292,6 +304,7 @@ class MobileSyncCoordinator {
         hsnCode: hsnCode.trim(),
         gstRate: gstRate,
         priceIncludesTax: priceIncludesTax,
+        imagePath: imagePath,
         timestamp: now,
       );
       setStatus(MobileSyncStatus.idle);
@@ -312,6 +325,7 @@ class MobileSyncCoordinator {
         hsnCode: hsnCode.trim(),
         gstRate: gstRate,
         priceIncludesTax: priceIncludesTax,
+        imagePath: imagePath,
         timestamp: now,
       );
       setStatus(MobileSyncStatus.idle);
@@ -342,6 +356,7 @@ class MobileSyncCoordinator {
     double gstRate = 0,
     bool priceIncludesTax = true,
     DateTime? createdAt,
+    String? imagePath,
   }) async {
     final session = _session;
     if (session == null || !session.hasShop) {
@@ -372,6 +387,9 @@ class MobileSyncCoordinator {
       'stock': stock,
       'status': 'active',
       'tombstone': false,
+      // Always present on edit so the form fully owns the photo (set / replace
+      // / remove); null clears it.
+      'imagePath': imagePath,
       'createdAt': (createdAt ?? now).toIso8601String(),
       'updatedAt': iso,
     };
@@ -978,6 +996,7 @@ class MobileSyncCoordinator {
     required double gstRate,
     required bool priceIncludesTax,
     required DateTime timestamp,
+    String? imagePath,
   }) async {
     final itemId = 'local-${timestamp.microsecondsSinceEpoch}';
     final isoTimestamp = timestamp.toIso8601String();
@@ -1001,6 +1020,7 @@ class MobileSyncCoordinator {
         'created_from': 'mobile_inventory',
         'actor_uid': session.uid,
       },
+      'imagePath': imagePath,
       'createdAt': isoTimestamp,
       'updatedAt': isoTimestamp,
     };

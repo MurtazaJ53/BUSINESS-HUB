@@ -410,6 +410,17 @@ class $InventoryEntriesTable extends InventoryEntries
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _imagePathMeta = const VerificationMeta(
+    'imagePath',
+  );
+  @override
+  late final GeneratedColumn<String> imagePath = GeneratedColumn<String>(
+    'image_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -463,6 +474,7 @@ class $InventoryEntriesTable extends InventoryEntries
     priceIncludesTax,
     stock,
     sourceMeta,
+    imagePath,
     createdAt,
     updatedAt,
     tombstone,
@@ -569,6 +581,12 @@ class $InventoryEntriesTable extends InventoryEntries
         sourceMeta.isAcceptableOrUnknown(data['source_meta']!, _sourceMetaMeta),
       );
     }
+    if (data.containsKey('image_path')) {
+      context.handle(
+        _imagePathMeta,
+        imagePath.isAcceptableOrUnknown(data['image_path']!, _imagePathMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -650,6 +668,10 @@ class $InventoryEntriesTable extends InventoryEntries
         DriftSqlType.string,
         data['${effectivePrefix}source_meta'],
       ),
+      imagePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}image_path'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}created_at'],
@@ -685,6 +707,7 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
   final bool priceIncludesTax;
   final int stock;
   final String? sourceMeta;
+  final String? imagePath;
   final int createdAt;
   final int updatedAt;
   final bool tombstone;
@@ -702,6 +725,7 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     required this.priceIncludesTax,
     required this.stock,
     this.sourceMeta,
+    this.imagePath,
     required this.createdAt,
     required this.updatedAt,
     required this.tombstone,
@@ -734,6 +758,9 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     if (!nullToAbsent || sourceMeta != null) {
       map['source_meta'] = Variable<String>(sourceMeta);
     }
+    if (!nullToAbsent || imagePath != null) {
+      map['image_path'] = Variable<String>(imagePath);
+    }
     map['created_at'] = Variable<int>(createdAt);
     map['updated_at'] = Variable<int>(updatedAt);
     map['tombstone'] = Variable<bool>(tombstone);
@@ -763,6 +790,9 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
       sourceMeta: sourceMeta == null && nullToAbsent
           ? const Value.absent()
           : Value(sourceMeta),
+      imagePath: imagePath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(imagePath),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       tombstone: Value(tombstone),
@@ -788,6 +818,7 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
       priceIncludesTax: serializer.fromJson<bool>(json['priceIncludesTax']),
       stock: serializer.fromJson<int>(json['stock']),
       sourceMeta: serializer.fromJson<String?>(json['sourceMeta']),
+      imagePath: serializer.fromJson<String?>(json['imagePath']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
       tombstone: serializer.fromJson<bool>(json['tombstone']),
@@ -810,6 +841,7 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
       'priceIncludesTax': serializer.toJson<bool>(priceIncludesTax),
       'stock': serializer.toJson<int>(stock),
       'sourceMeta': serializer.toJson<String?>(sourceMeta),
+      'imagePath': serializer.toJson<String?>(imagePath),
       'createdAt': serializer.toJson<int>(createdAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
       'tombstone': serializer.toJson<bool>(tombstone),
@@ -830,6 +862,7 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     bool? priceIncludesTax,
     int? stock,
     Value<String?> sourceMeta = const Value.absent(),
+    Value<String?> imagePath = const Value.absent(),
     int? createdAt,
     int? updatedAt,
     bool? tombstone,
@@ -847,6 +880,7 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     priceIncludesTax: priceIncludesTax ?? this.priceIncludesTax,
     stock: stock ?? this.stock,
     sourceMeta: sourceMeta.present ? sourceMeta.value : this.sourceMeta,
+    imagePath: imagePath.present ? imagePath.value : this.imagePath,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     tombstone: tombstone ?? this.tombstone,
@@ -874,6 +908,7 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
       sourceMeta: data.sourceMeta.present
           ? data.sourceMeta.value
           : this.sourceMeta,
+      imagePath: data.imagePath.present ? data.imagePath.value : this.imagePath,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       tombstone: data.tombstone.present ? data.tombstone.value : this.tombstone,
@@ -896,6 +931,7 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
           ..write('priceIncludesTax: $priceIncludesTax, ')
           ..write('stock: $stock, ')
           ..write('sourceMeta: $sourceMeta, ')
+          ..write('imagePath: $imagePath, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('tombstone: $tombstone')
@@ -918,6 +954,7 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
     priceIncludesTax,
     stock,
     sourceMeta,
+    imagePath,
     createdAt,
     updatedAt,
     tombstone,
@@ -939,6 +976,7 @@ class InventoryEntry extends DataClass implements Insertable<InventoryEntry> {
           other.priceIncludesTax == this.priceIncludesTax &&
           other.stock == this.stock &&
           other.sourceMeta == this.sourceMeta &&
+          other.imagePath == this.imagePath &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.tombstone == this.tombstone);
@@ -958,6 +996,7 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
   final Value<bool> priceIncludesTax;
   final Value<int> stock;
   final Value<String?> sourceMeta;
+  final Value<String?> imagePath;
   final Value<int> createdAt;
   final Value<int> updatedAt;
   final Value<bool> tombstone;
@@ -976,6 +1015,7 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     this.priceIncludesTax = const Value.absent(),
     this.stock = const Value.absent(),
     this.sourceMeta = const Value.absent(),
+    this.imagePath = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.tombstone = const Value.absent(),
@@ -995,6 +1035,7 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     this.priceIncludesTax = const Value.absent(),
     this.stock = const Value.absent(),
     this.sourceMeta = const Value.absent(),
+    this.imagePath = const Value.absent(),
     required int createdAt,
     this.updatedAt = const Value.absent(),
     this.tombstone = const Value.absent(),
@@ -1017,6 +1058,7 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     Expression<bool>? priceIncludesTax,
     Expression<int>? stock,
     Expression<String>? sourceMeta,
+    Expression<String>? imagePath,
     Expression<int>? createdAt,
     Expression<int>? updatedAt,
     Expression<bool>? tombstone,
@@ -1036,6 +1078,7 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
       if (priceIncludesTax != null) 'price_includes_tax': priceIncludesTax,
       if (stock != null) 'stock': stock,
       if (sourceMeta != null) 'source_meta': sourceMeta,
+      if (imagePath != null) 'image_path': imagePath,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (tombstone != null) 'tombstone': tombstone,
@@ -1057,6 +1100,7 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     Value<bool>? priceIncludesTax,
     Value<int>? stock,
     Value<String?>? sourceMeta,
+    Value<String?>? imagePath,
     Value<int>? createdAt,
     Value<int>? updatedAt,
     Value<bool>? tombstone,
@@ -1076,6 +1120,7 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
       priceIncludesTax: priceIncludesTax ?? this.priceIncludesTax,
       stock: stock ?? this.stock,
       sourceMeta: sourceMeta ?? this.sourceMeta,
+      imagePath: imagePath ?? this.imagePath,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       tombstone: tombstone ?? this.tombstone,
@@ -1125,6 +1170,9 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
     if (sourceMeta.present) {
       map['source_meta'] = Variable<String>(sourceMeta.value);
     }
+    if (imagePath.present) {
+      map['image_path'] = Variable<String>(imagePath.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<int>(createdAt.value);
     }
@@ -1156,6 +1204,7 @@ class InventoryEntriesCompanion extends UpdateCompanion<InventoryEntry> {
           ..write('priceIncludesTax: $priceIncludesTax, ')
           ..write('stock: $stock, ')
           ..write('sourceMeta: $sourceMeta, ')
+          ..write('imagePath: $imagePath, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('tombstone: $tombstone, ')
@@ -5205,6 +5254,7 @@ typedef $$InventoryEntriesTableCreateCompanionBuilder =
       Value<bool> priceIncludesTax,
       Value<int> stock,
       Value<String?> sourceMeta,
+      Value<String?> imagePath,
       required int createdAt,
       Value<int> updatedAt,
       Value<bool> tombstone,
@@ -5225,6 +5275,7 @@ typedef $$InventoryEntriesTableUpdateCompanionBuilder =
       Value<bool> priceIncludesTax,
       Value<int> stock,
       Value<String?> sourceMeta,
+      Value<String?> imagePath,
       Value<int> createdAt,
       Value<int> updatedAt,
       Value<bool> tombstone,
@@ -5302,6 +5353,11 @@ class $$InventoryEntriesTableFilterComposer
 
   ColumnFilters<String> get sourceMeta => $composableBuilder(
     column: $table.sourceMeta,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get imagePath => $composableBuilder(
+    column: $table.imagePath,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5395,6 +5451,11 @@ class $$InventoryEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get imagePath => $composableBuilder(
+    column: $table.imagePath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -5467,6 +5528,9 @@ class $$InventoryEntriesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get imagePath =>
+      $composableBuilder(column: $table.imagePath, builder: (column) => column);
+
   GeneratedColumn<int> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -5527,6 +5591,7 @@ class $$InventoryEntriesTableTableManager
                 Value<bool> priceIncludesTax = const Value.absent(),
                 Value<int> stock = const Value.absent(),
                 Value<String?> sourceMeta = const Value.absent(),
+                Value<String?> imagePath = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
                 Value<bool> tombstone = const Value.absent(),
@@ -5545,6 +5610,7 @@ class $$InventoryEntriesTableTableManager
                 priceIncludesTax: priceIncludesTax,
                 stock: stock,
                 sourceMeta: sourceMeta,
+                imagePath: imagePath,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 tombstone: tombstone,
@@ -5565,6 +5631,7 @@ class $$InventoryEntriesTableTableManager
                 Value<bool> priceIncludesTax = const Value.absent(),
                 Value<int> stock = const Value.absent(),
                 Value<String?> sourceMeta = const Value.absent(),
+                Value<String?> imagePath = const Value.absent(),
                 required int createdAt,
                 Value<int> updatedAt = const Value.absent(),
                 Value<bool> tombstone = const Value.absent(),
@@ -5583,6 +5650,7 @@ class $$InventoryEntriesTableTableManager
                 priceIncludesTax: priceIncludesTax,
                 stock: stock,
                 sourceMeta: sourceMeta,
+                imagePath: imagePath,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 tombstone: tombstone,

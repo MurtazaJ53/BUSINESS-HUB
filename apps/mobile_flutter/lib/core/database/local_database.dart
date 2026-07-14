@@ -43,6 +43,7 @@ class InventoryEntries extends Table {
       boolean().named('price_includes_tax').withDefault(const Constant(true))();
   IntColumn get stock => integer().withDefault(const Constant(0))();
   TextColumn get sourceMeta => text().named('source_meta').nullable()();
+  TextColumn get imagePath => text().named('image_path').nullable()();
   IntColumn get createdAt => integer().named('created_at')();
   IntColumn get updatedAt =>
       integer().named('updated_at').withDefault(const Constant(0))();
@@ -206,7 +207,7 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       );
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -242,6 +243,9 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       }
       if (from < 7) {
         await m.createTable(expenseEntries);
+      }
+      if (from < 8) {
+        await m.addColumn(inventoryEntries, inventoryEntries.imagePath);
       }
     },
   );

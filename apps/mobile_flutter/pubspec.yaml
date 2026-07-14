@@ -29,6 +29,7 @@ dependencies:
   sentry_flutter: ^9.24.0
   excel: ^4.0.6
   file_picker: ^8.1.0
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:
