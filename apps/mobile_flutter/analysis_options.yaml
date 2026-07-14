@@ -1,10 +1,5 @@
 include: package:flutter_lints/flutter.yaml
 
-analyzer:
-  exclude:
-    - lib/core/widgets/**
-    - lib/features/**/presentation/*_v3.dart
-
 linter:
   rules:
     avoid_print: false

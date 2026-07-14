@@ -2257,12 +2257,6 @@ bool _asBool(Object? value, {bool fallback = false}) {
   return fallback;
 }
 
-int _asInt(Object? value) {
-  if (value is num) return value.toInt();
-  if (value is String) return int.tryParse(value) ?? 0;
-  return 0;
-}
-
 int? _asIntOrNull(Object? value) {
   if (value == null) return null;
   if (value is num) return value.toInt();

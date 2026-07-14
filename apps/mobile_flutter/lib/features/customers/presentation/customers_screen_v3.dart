@@ -272,7 +272,7 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
                 _showWithDuesOnly = value;
               });
             },
-            activeColor: AppPalette.primary,
+            activeThumbColor: AppPalette.primary,
           ),
         ],
       ),
@@ -498,7 +498,7 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
     BackendCustomerSummary customer,
   ) async {
     final shopName =
-        ref.read(shopInfoProvider).asData?.value?.name ?? 'our shop';
+        ref.read(shopInfoProvider).asData?.value.name ?? 'our shop';
     final message = customer.balance > 0
         ? 'Hello ${customer.name}, this is a friendly reminder from $shopName. '
               'Your pending balance is ${formatCurrency(customer.balance)}. '

@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:printing/printing.dart';
 
 import '../../../core/database/mobile_repository.dart';
@@ -933,7 +932,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
                 await printer.disconnect();
                 if (sheetContext.mounted) {
                   Navigator.pop(sheetContext);
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  ScaffoldMessenger.of(sheetContext).showSnackBar(
                     const SnackBar(content: Text('Receipt printed.')),
                   );
                 }
@@ -1081,7 +1080,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
                             _cart.isEmpty ? 24 : 108,
                           ),
                           itemCount: entries.length,
-                          separatorBuilder: (_, __) =>
+                          separatorBuilder: (_, _) =>
                               const SizedBox(height: 10),
                           itemBuilder: (context, index) {
                             final entry = entries[index];
@@ -1273,7 +1272,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: categories.length + 1,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           if (index == 0) {
             return _CategoryChip(

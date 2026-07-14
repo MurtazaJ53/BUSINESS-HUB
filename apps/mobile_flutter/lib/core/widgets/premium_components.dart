@@ -24,8 +24,7 @@ class HeroMetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    
+
     // Electric Ocean Gradient
     final gradient = LinearGradient(
       begin: Alignment.topLeft,
@@ -546,8 +545,6 @@ class SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
@@ -562,7 +559,7 @@ class SectionHeader extends StatelessWidget {
               ),
             ),
           ),
-          if (action != null) action!,
+          ?action,
         ],
       ),
     );

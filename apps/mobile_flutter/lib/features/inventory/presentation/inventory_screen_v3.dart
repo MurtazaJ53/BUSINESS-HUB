@@ -336,7 +336,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: categories.length + 1,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
                 itemBuilder: (context, index) {
                   if (index == 0) {
                     return _buildCategoryChip(
@@ -386,7 +386,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                     _showLowStockOnly = value;
                   });
                 },
-                activeColor: AppPalette.primary,
+                activeThumbColor: AppPalette.primary,
               ),
             ],
           ),
@@ -529,7 +529,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                 Expanded(
                   child: _buildMetricBox(
                     label: 'Stock',
-                    value: '${formatQty(item.stock)}',
+                    value: formatQty(item.stock),
                   ),
                 ),
               ],
@@ -1088,7 +1088,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                           SwitchListTile.adaptive(
                             contentPadding: EdgeInsets.zero,
                             value: priceIncludesTax,
-                            activeColor: AppPalette.primary,
+                            activeThumbColor: AppPalette.primary,
                             title: const Text('Price includes GST'),
                             onChanged: (value) {
                               setSheetState(() => priceIncludesTax = value);
@@ -1424,7 +1424,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                         child: ListView.separated(
                           shrinkWrap: true,
                           itemCount: rows.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          separatorBuilder: (_, _) => const SizedBox(height: 10),
                           itemBuilder: (context, index) {
                             final r = rows[index];
                             return Row(
