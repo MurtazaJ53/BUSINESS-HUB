@@ -1110,8 +1110,82 @@ class CustomerRepository {
         );
   }
 
+  /// Record a payment against a customer's due: reduce the balance (never below
+  /// zero) and append a PAYMENT entry to their khata — atomically.
+  Future<double> recordPayment({
+    required String customerId,
+    required double amount,
+    String? actorName,
+    String note = 'Payment received',
+  }) async {
+    final nowMillis = DateTime.now().millisecondsSinceEpoch;
+    var newBalance = 0.0;
+    await _db.transaction(() async {
+      final row =
+          await (_db.select(_db.customerEntries)
+                ..where((t) => t.id.equals(customerId)))
+              .getSingleOrNull();
+      if (row == null) return;
+      final applied = amount < 0 ? 0.0 : amount;
+      newBalance = (row.balance - applied).clamp(0, double.infinity).toDouble();
+      await (_db.update(
+        _db.customerEntries,
+      )..where((t) => t.id.equals(customerId))).write(
+        CustomerEntriesCompanion(
+          balance: Value(newBalance),
+          updatedAt: Value(nowMillis),
+        ),
+      );
+      await _writeCustomerLedger(
+        _db,
+        customerId: customerId,
+        type: 'PAYMENT',
+        amount: -applied,
+        balanceAfter: newBalance,
+        note: note,
+        actorName: actorName,
+      );
+    });
+    return newBalance;
+  }
+
+  Stream<List<CustomerLedgerRecord>> watchLedger(String customerId) {
+    return _db
+        .customSelect(
+          'SELECT * FROM customer_ledger WHERE customer_id = ? '
+          'ORDER BY created_at DESC;',
+          variables: [Variable<String>(customerId)],
+          readsFrom: {_db.customerLedgerEntries},
+        )
+        .watch()
+        .map(
+          (rows) => rows
+              .map(
+                (row) => CustomerLedgerRecord(
+                  id: row.read<String>('id'),
+                  customerId: row.read<String>('customer_id'),
+                  type: row.read<String>('type'),
+                  amount: row.read<double>('amount'),
+                  balanceAfter: row.read<double>('balance_after'),
+                  refId: _asStringOrNull(row.readNullable<String>('ref_id')),
+                  note: row.read<String>('note'),
+                  actorName: _asStringOrNull(
+                    row.readNullable<String>('actor_name'),
+                  ),
+                  createdAt: DateTime.fromMillisecondsSinceEpoch(
+                    row.read<int>('created_at'),
+                  ),
+                ),
+              )
+              .toList(growable: false),
+        );
+  }
+
   Future<void> clearWorkspace() async {
-    await _db.delete(_db.customerEntries).go();
+    await _db.transaction(() async {
+      await _db.delete(_db.customerEntries).go();
+      await _db.delete(_db.customerLedgerEntries).go();
+    });
   }
 }
 
@@ -1719,13 +1793,23 @@ class SalesRepository {
                     ..where((tbl) => tbl.id.equals(customerId)))
                   .getSingleOrNull();
           if (customerRow != null) {
+            final newBalance = customerRow.balance + saleDue;
             await (_db.update(
               _db.customerEntries,
             )..where((tbl) => tbl.id.equals(customerId))).write(
               CustomerEntriesCompanion(
-                balance: Value(customerRow.balance + saleDue),
+                balance: Value(newBalance),
                 updatedAt: Value(now.millisecondsSinceEpoch),
               ),
+            );
+            await _writeCustomerLedger(
+              _db,
+              customerId: customerId,
+              type: 'SALE_CREDIT',
+              amount: saleDue,
+              balanceAfter: newBalance,
+              refId: saleId,
+              note: 'Credit sale',
             );
           }
         }
@@ -2138,6 +2222,37 @@ int? _asIntOrNull(Object? value) {
     return int.tryParse(trimmed);
   }
   return null;
+}
+
+var _ledgerSeq = 0;
+
+/// Append one entry to a customer's khata. Safe inside a transaction.
+Future<void> _writeCustomerLedger(
+  BusinessHubDatabase db, {
+  required String customerId,
+  required String type,
+  required double amount,
+  required double balanceAfter,
+  String? refId,
+  String note = '',
+  String? actorName,
+}) async {
+  final seq = _ledgerSeq++;
+  await db
+      .into(db.customerLedgerEntries)
+      .insert(
+        CustomerLedgerEntriesCompanion.insert(
+          id: 'led-${DateTime.now().microsecondsSinceEpoch}-$seq',
+          customerId: customerId,
+          type: type,
+          amount: amount,
+          balanceAfter: balanceAfter,
+          refId: Value(refId),
+          note: Value(note),
+          actorName: Value(actorName),
+          createdAt: DateTime.now().millisecondsSinceEpoch,
+        ),
+      );
 }
 
 var _movementSeq = 0;

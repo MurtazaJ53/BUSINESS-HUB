@@ -223,6 +223,12 @@ final reportExpensesProvider =
       return ref.watch(reportsRepositoryProvider).watchPeriodExpenses(window);
     });
 
+// Customer khata timeline (credit sales + payments).
+final customerLedgerProvider =
+    StreamProvider.family<List<CustomerLedgerRecord>, String>((ref, customerId) {
+      return ref.watch(customerRepositoryProvider).watchLedger(customerId);
+    });
+
 // Per-item stock audit trail (sold / received / returned / adjusted).
 final stockMovementsProvider =
     StreamProvider.family<List<StockMovement>, String>((ref, itemId) {

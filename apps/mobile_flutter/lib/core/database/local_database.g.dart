@@ -6554,6 +6554,567 @@ class StockMovementEntriesCompanion
   }
 }
 
+class $CustomerLedgerEntriesTable extends CustomerLedgerEntries
+    with TableInfo<$CustomerLedgerEntriesTable, CustomerLedgerEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CustomerLedgerEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _customerIdMeta = const VerificationMeta(
+    'customerId',
+  );
+  @override
+  late final GeneratedColumn<String> customerId = GeneratedColumn<String>(
+    'customer_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _amountMeta = const VerificationMeta('amount');
+  @override
+  late final GeneratedColumn<double> amount = GeneratedColumn<double>(
+    'amount',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _balanceAfterMeta = const VerificationMeta(
+    'balanceAfter',
+  );
+  @override
+  late final GeneratedColumn<double> balanceAfter = GeneratedColumn<double>(
+    'balance_after',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _refIdMeta = const VerificationMeta('refId');
+  @override
+  late final GeneratedColumn<String> refId = GeneratedColumn<String>(
+    'ref_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+    'note',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _actorNameMeta = const VerificationMeta(
+    'actorName',
+  );
+  @override
+  late final GeneratedColumn<String> actorName = GeneratedColumn<String>(
+    'actor_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    customerId,
+    type,
+    amount,
+    balanceAfter,
+    refId,
+    note,
+    actorName,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'customer_ledger';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CustomerLedgerEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('customer_id')) {
+      context.handle(
+        _customerIdMeta,
+        customerId.isAcceptableOrUnknown(data['customer_id']!, _customerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_customerIdMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('amount')) {
+      context.handle(
+        _amountMeta,
+        amount.isAcceptableOrUnknown(data['amount']!, _amountMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_amountMeta);
+    }
+    if (data.containsKey('balance_after')) {
+      context.handle(
+        _balanceAfterMeta,
+        balanceAfter.isAcceptableOrUnknown(
+          data['balance_after']!,
+          _balanceAfterMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_balanceAfterMeta);
+    }
+    if (data.containsKey('ref_id')) {
+      context.handle(
+        _refIdMeta,
+        refId.isAcceptableOrUnknown(data['ref_id']!, _refIdMeta),
+      );
+    }
+    if (data.containsKey('note')) {
+      context.handle(
+        _noteMeta,
+        note.isAcceptableOrUnknown(data['note']!, _noteMeta),
+      );
+    }
+    if (data.containsKey('actor_name')) {
+      context.handle(
+        _actorNameMeta,
+        actorName.isAcceptableOrUnknown(data['actor_name']!, _actorNameMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CustomerLedgerEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CustomerLedgerEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      customerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}customer_id'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      amount: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}amount'],
+      )!,
+      balanceAfter: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}balance_after'],
+      )!,
+      refId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ref_id'],
+      ),
+      note: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note'],
+      )!,
+      actorName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}actor_name'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CustomerLedgerEntriesTable createAlias(String alias) {
+    return $CustomerLedgerEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class CustomerLedgerEntry extends DataClass
+    implements Insertable<CustomerLedgerEntry> {
+  final String id;
+  final String customerId;
+  final String type;
+  final double amount;
+  final double balanceAfter;
+  final String? refId;
+  final String note;
+  final String? actorName;
+  final int createdAt;
+  const CustomerLedgerEntry({
+    required this.id,
+    required this.customerId,
+    required this.type,
+    required this.amount,
+    required this.balanceAfter,
+    this.refId,
+    required this.note,
+    this.actorName,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['customer_id'] = Variable<String>(customerId);
+    map['type'] = Variable<String>(type);
+    map['amount'] = Variable<double>(amount);
+    map['balance_after'] = Variable<double>(balanceAfter);
+    if (!nullToAbsent || refId != null) {
+      map['ref_id'] = Variable<String>(refId);
+    }
+    map['note'] = Variable<String>(note);
+    if (!nullToAbsent || actorName != null) {
+      map['actor_name'] = Variable<String>(actorName);
+    }
+    map['created_at'] = Variable<int>(createdAt);
+    return map;
+  }
+
+  CustomerLedgerEntriesCompanion toCompanion(bool nullToAbsent) {
+    return CustomerLedgerEntriesCompanion(
+      id: Value(id),
+      customerId: Value(customerId),
+      type: Value(type),
+      amount: Value(amount),
+      balanceAfter: Value(balanceAfter),
+      refId: refId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(refId),
+      note: Value(note),
+      actorName: actorName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(actorName),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory CustomerLedgerEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CustomerLedgerEntry(
+      id: serializer.fromJson<String>(json['id']),
+      customerId: serializer.fromJson<String>(json['customerId']),
+      type: serializer.fromJson<String>(json['type']),
+      amount: serializer.fromJson<double>(json['amount']),
+      balanceAfter: serializer.fromJson<double>(json['balanceAfter']),
+      refId: serializer.fromJson<String?>(json['refId']),
+      note: serializer.fromJson<String>(json['note']),
+      actorName: serializer.fromJson<String?>(json['actorName']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'customerId': serializer.toJson<String>(customerId),
+      'type': serializer.toJson<String>(type),
+      'amount': serializer.toJson<double>(amount),
+      'balanceAfter': serializer.toJson<double>(balanceAfter),
+      'refId': serializer.toJson<String?>(refId),
+      'note': serializer.toJson<String>(note),
+      'actorName': serializer.toJson<String?>(actorName),
+      'createdAt': serializer.toJson<int>(createdAt),
+    };
+  }
+
+  CustomerLedgerEntry copyWith({
+    String? id,
+    String? customerId,
+    String? type,
+    double? amount,
+    double? balanceAfter,
+    Value<String?> refId = const Value.absent(),
+    String? note,
+    Value<String?> actorName = const Value.absent(),
+    int? createdAt,
+  }) => CustomerLedgerEntry(
+    id: id ?? this.id,
+    customerId: customerId ?? this.customerId,
+    type: type ?? this.type,
+    amount: amount ?? this.amount,
+    balanceAfter: balanceAfter ?? this.balanceAfter,
+    refId: refId.present ? refId.value : this.refId,
+    note: note ?? this.note,
+    actorName: actorName.present ? actorName.value : this.actorName,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  CustomerLedgerEntry copyWithCompanion(CustomerLedgerEntriesCompanion data) {
+    return CustomerLedgerEntry(
+      id: data.id.present ? data.id.value : this.id,
+      customerId: data.customerId.present
+          ? data.customerId.value
+          : this.customerId,
+      type: data.type.present ? data.type.value : this.type,
+      amount: data.amount.present ? data.amount.value : this.amount,
+      balanceAfter: data.balanceAfter.present
+          ? data.balanceAfter.value
+          : this.balanceAfter,
+      refId: data.refId.present ? data.refId.value : this.refId,
+      note: data.note.present ? data.note.value : this.note,
+      actorName: data.actorName.present ? data.actorName.value : this.actorName,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CustomerLedgerEntry(')
+          ..write('id: $id, ')
+          ..write('customerId: $customerId, ')
+          ..write('type: $type, ')
+          ..write('amount: $amount, ')
+          ..write('balanceAfter: $balanceAfter, ')
+          ..write('refId: $refId, ')
+          ..write('note: $note, ')
+          ..write('actorName: $actorName, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    customerId,
+    type,
+    amount,
+    balanceAfter,
+    refId,
+    note,
+    actorName,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CustomerLedgerEntry &&
+          other.id == this.id &&
+          other.customerId == this.customerId &&
+          other.type == this.type &&
+          other.amount == this.amount &&
+          other.balanceAfter == this.balanceAfter &&
+          other.refId == this.refId &&
+          other.note == this.note &&
+          other.actorName == this.actorName &&
+          other.createdAt == this.createdAt);
+}
+
+class CustomerLedgerEntriesCompanion
+    extends UpdateCompanion<CustomerLedgerEntry> {
+  final Value<String> id;
+  final Value<String> customerId;
+  final Value<String> type;
+  final Value<double> amount;
+  final Value<double> balanceAfter;
+  final Value<String?> refId;
+  final Value<String> note;
+  final Value<String?> actorName;
+  final Value<int> createdAt;
+  final Value<int> rowid;
+  const CustomerLedgerEntriesCompanion({
+    this.id = const Value.absent(),
+    this.customerId = const Value.absent(),
+    this.type = const Value.absent(),
+    this.amount = const Value.absent(),
+    this.balanceAfter = const Value.absent(),
+    this.refId = const Value.absent(),
+    this.note = const Value.absent(),
+    this.actorName = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CustomerLedgerEntriesCompanion.insert({
+    required String id,
+    required String customerId,
+    required String type,
+    required double amount,
+    required double balanceAfter,
+    this.refId = const Value.absent(),
+    this.note = const Value.absent(),
+    this.actorName = const Value.absent(),
+    required int createdAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       customerId = Value(customerId),
+       type = Value(type),
+       amount = Value(amount),
+       balanceAfter = Value(balanceAfter),
+       createdAt = Value(createdAt);
+  static Insertable<CustomerLedgerEntry> custom({
+    Expression<String>? id,
+    Expression<String>? customerId,
+    Expression<String>? type,
+    Expression<double>? amount,
+    Expression<double>? balanceAfter,
+    Expression<String>? refId,
+    Expression<String>? note,
+    Expression<String>? actorName,
+    Expression<int>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (customerId != null) 'customer_id': customerId,
+      if (type != null) 'type': type,
+      if (amount != null) 'amount': amount,
+      if (balanceAfter != null) 'balance_after': balanceAfter,
+      if (refId != null) 'ref_id': refId,
+      if (note != null) 'note': note,
+      if (actorName != null) 'actor_name': actorName,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CustomerLedgerEntriesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? customerId,
+    Value<String>? type,
+    Value<double>? amount,
+    Value<double>? balanceAfter,
+    Value<String?>? refId,
+    Value<String>? note,
+    Value<String?>? actorName,
+    Value<int>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return CustomerLedgerEntriesCompanion(
+      id: id ?? this.id,
+      customerId: customerId ?? this.customerId,
+      type: type ?? this.type,
+      amount: amount ?? this.amount,
+      balanceAfter: balanceAfter ?? this.balanceAfter,
+      refId: refId ?? this.refId,
+      note: note ?? this.note,
+      actorName: actorName ?? this.actorName,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (customerId.present) {
+      map['customer_id'] = Variable<String>(customerId.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (amount.present) {
+      map['amount'] = Variable<double>(amount.value);
+    }
+    if (balanceAfter.present) {
+      map['balance_after'] = Variable<double>(balanceAfter.value);
+    }
+    if (refId.present) {
+      map['ref_id'] = Variable<String>(refId.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (actorName.present) {
+      map['actor_name'] = Variable<String>(actorName.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CustomerLedgerEntriesCompanion(')
+          ..write('id: $id, ')
+          ..write('customerId: $customerId, ')
+          ..write('type: $type, ')
+          ..write('amount: $amount, ')
+          ..write('balanceAfter: $balanceAfter, ')
+          ..write('refId: $refId, ')
+          ..write('note: $note, ')
+          ..write('actorName: $actorName, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$BusinessHubDatabase extends GeneratedDatabase {
   _$BusinessHubDatabase(QueryExecutor e) : super(e);
   $BusinessHubDatabaseManager get managers => $BusinessHubDatabaseManager(this);
@@ -6576,6 +7137,8 @@ abstract class _$BusinessHubDatabase extends GeneratedDatabase {
   );
   late final $StockMovementEntriesTable stockMovementEntries =
       $StockMovementEntriesTable(this);
+  late final $CustomerLedgerEntriesTable customerLedgerEntries =
+      $CustomerLedgerEntriesTable(this);
   late final Index inventoryNameIdx = Index(
     'inventory_name_idx',
     'CREATE INDEX inventory_name_idx ON inventory (name)',
@@ -6630,6 +7193,7 @@ abstract class _$BusinessHubDatabase extends GeneratedDatabase {
     expenseEntries,
     purchaseEntries,
     stockMovementEntries,
+    customerLedgerEntries,
     inventoryNameIdx,
     inventorySkuIdx,
     inventoryCategoryIdx,
@@ -9874,6 +10438,305 @@ typedef $$StockMovementEntriesTableProcessedTableManager =
       StockMovementEntry,
       PrefetchHooks Function()
     >;
+typedef $$CustomerLedgerEntriesTableCreateCompanionBuilder =
+    CustomerLedgerEntriesCompanion Function({
+      required String id,
+      required String customerId,
+      required String type,
+      required double amount,
+      required double balanceAfter,
+      Value<String?> refId,
+      Value<String> note,
+      Value<String?> actorName,
+      required int createdAt,
+      Value<int> rowid,
+    });
+typedef $$CustomerLedgerEntriesTableUpdateCompanionBuilder =
+    CustomerLedgerEntriesCompanion Function({
+      Value<String> id,
+      Value<String> customerId,
+      Value<String> type,
+      Value<double> amount,
+      Value<double> balanceAfter,
+      Value<String?> refId,
+      Value<String> note,
+      Value<String?> actorName,
+      Value<int> createdAt,
+      Value<int> rowid,
+    });
+
+class $$CustomerLedgerEntriesTableFilterComposer
+    extends Composer<_$BusinessHubDatabase, $CustomerLedgerEntriesTable> {
+  $$CustomerLedgerEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get customerId => $composableBuilder(
+    column: $table.customerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get balanceAfter => $composableBuilder(
+    column: $table.balanceAfter,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get refId => $composableBuilder(
+    column: $table.refId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get actorName => $composableBuilder(
+    column: $table.actorName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CustomerLedgerEntriesTableOrderingComposer
+    extends Composer<_$BusinessHubDatabase, $CustomerLedgerEntriesTable> {
+  $$CustomerLedgerEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get customerId => $composableBuilder(
+    column: $table.customerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get balanceAfter => $composableBuilder(
+    column: $table.balanceAfter,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get refId => $composableBuilder(
+    column: $table.refId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get actorName => $composableBuilder(
+    column: $table.actorName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CustomerLedgerEntriesTableAnnotationComposer
+    extends Composer<_$BusinessHubDatabase, $CustomerLedgerEntriesTable> {
+  $$CustomerLedgerEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get customerId => $composableBuilder(
+    column: $table.customerId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<double> get amount =>
+      $composableBuilder(column: $table.amount, builder: (column) => column);
+
+  GeneratedColumn<double> get balanceAfter => $composableBuilder(
+    column: $table.balanceAfter,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get refId =>
+      $composableBuilder(column: $table.refId, builder: (column) => column);
+
+  GeneratedColumn<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<String> get actorName =>
+      $composableBuilder(column: $table.actorName, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$CustomerLedgerEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$BusinessHubDatabase,
+          $CustomerLedgerEntriesTable,
+          CustomerLedgerEntry,
+          $$CustomerLedgerEntriesTableFilterComposer,
+          $$CustomerLedgerEntriesTableOrderingComposer,
+          $$CustomerLedgerEntriesTableAnnotationComposer,
+          $$CustomerLedgerEntriesTableCreateCompanionBuilder,
+          $$CustomerLedgerEntriesTableUpdateCompanionBuilder,
+          (
+            CustomerLedgerEntry,
+            BaseReferences<
+              _$BusinessHubDatabase,
+              $CustomerLedgerEntriesTable,
+              CustomerLedgerEntry
+            >,
+          ),
+          CustomerLedgerEntry,
+          PrefetchHooks Function()
+        > {
+  $$CustomerLedgerEntriesTableTableManager(
+    _$BusinessHubDatabase db,
+    $CustomerLedgerEntriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CustomerLedgerEntriesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$CustomerLedgerEntriesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CustomerLedgerEntriesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> customerId = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<double> amount = const Value.absent(),
+                Value<double> balanceAfter = const Value.absent(),
+                Value<String?> refId = const Value.absent(),
+                Value<String> note = const Value.absent(),
+                Value<String?> actorName = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CustomerLedgerEntriesCompanion(
+                id: id,
+                customerId: customerId,
+                type: type,
+                amount: amount,
+                balanceAfter: balanceAfter,
+                refId: refId,
+                note: note,
+                actorName: actorName,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String customerId,
+                required String type,
+                required double amount,
+                required double balanceAfter,
+                Value<String?> refId = const Value.absent(),
+                Value<String> note = const Value.absent(),
+                Value<String?> actorName = const Value.absent(),
+                required int createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CustomerLedgerEntriesCompanion.insert(
+                id: id,
+                customerId: customerId,
+                type: type,
+                amount: amount,
+                balanceAfter: balanceAfter,
+                refId: refId,
+                note: note,
+                actorName: actorName,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CustomerLedgerEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$BusinessHubDatabase,
+      $CustomerLedgerEntriesTable,
+      CustomerLedgerEntry,
+      $$CustomerLedgerEntriesTableFilterComposer,
+      $$CustomerLedgerEntriesTableOrderingComposer,
+      $$CustomerLedgerEntriesTableAnnotationComposer,
+      $$CustomerLedgerEntriesTableCreateCompanionBuilder,
+      $$CustomerLedgerEntriesTableUpdateCompanionBuilder,
+      (
+        CustomerLedgerEntry,
+        BaseReferences<
+          _$BusinessHubDatabase,
+          $CustomerLedgerEntriesTable,
+          CustomerLedgerEntry
+        >,
+      ),
+      CustomerLedgerEntry,
+      PrefetchHooks Function()
+    >;
 
 class $BusinessHubDatabaseManager {
   final _$BusinessHubDatabase _db;
@@ -9899,4 +10762,6 @@ class $BusinessHubDatabaseManager {
       $$PurchaseEntriesTableTableManager(_db, _db.purchaseEntries);
   $$StockMovementEntriesTableTableManager get stockMovementEntries =>
       $$StockMovementEntriesTableTableManager(_db, _db.stockMovementEntries);
+  $$CustomerLedgerEntriesTableTableManager get customerLedgerEntries =>
+      $$CustomerLedgerEntriesTableTableManager(_db, _db.customerLedgerEntries);
 }

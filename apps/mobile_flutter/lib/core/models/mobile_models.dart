@@ -381,6 +381,33 @@ ProfitLossSnapshot computeProfitAndLoss({
   );
 }
 
+/// One entry in a customer's khata (credit/payment) timeline.
+class CustomerLedgerRecord {
+  const CustomerLedgerRecord({
+    required this.id,
+    required this.customerId,
+    required this.type,
+    required this.amount,
+    required this.balanceAfter,
+    required this.createdAt,
+    this.refId,
+    this.note = '',
+    this.actorName,
+  });
+
+  final String id;
+  final String customerId;
+  final String type; // SALE_CREDIT | PAYMENT | ADJUST
+  final double amount;
+  final double balanceAfter;
+  final DateTime createdAt;
+  final String? refId;
+  final String note;
+  final String? actorName;
+
+  bool get isPayment => type == 'PAYMENT';
+}
+
 /// One entry in an item's stock audit trail.
 class StockMovement {
   const StockMovement({

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
+import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
@@ -459,9 +460,112 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                _showLedger(context, customer);
+              },
+              icon: const Icon(Icons.receipt_long_rounded),
+              label: const Text('View khata (ledger)'),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  /// Unified credit + payment timeline with a running balance.
+  void _showLedger(BuildContext context, BackendCustomerSummary customer) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.of(context).background,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Khata · ${customer.name}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  'Current due ${formatCurrency(customer.balance)}',
+                  style: TextStyle(
+                    color: customer.balance > 0
+                        ? AppPalette.error
+                        : AppPalette.success,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 360,
+                  child: Consumer(
+                    builder: (context, ref, _) {
+                      final entries =
+                          ref
+                              .watch(customerLedgerProvider(customer.id))
+                              .asData
+                              ?.value ??
+                          const <CustomerLedgerRecord>[];
+                      if (entries.isEmpty) {
+                        return const Center(
+                          child: Text(
+                            'No credit or payments yet.\nCredit sales and '
+                            'payments will appear here.',
+                            textAlign: TextAlign.center,
+                          ),
+                        );
+                      }
+                      return ListView.separated(
+                        itemCount: entries.length,
+                        separatorBuilder: (_, _) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final e = entries[index];
+                          return ListTile(
+                            dense: true,
+                            leading: Icon(
+                              e.isPayment
+                                  ? Icons.south_west_rounded
+                                  : Icons.north_east_rounded,
+                              color: e.isPayment
+                                  ? AppPalette.success
+                                  : AppPalette.error,
+                            ),
+                            title: Text(
+                              '${e.isPayment ? 'Payment' : 'Credit'} '
+                              '${formatCurrency(e.amount.abs())}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${e.createdAt.toIso8601String().split('T').first}'
+                              '${e.note.isNotEmpty ? ' · ${e.note}' : ''}',
+                            ),
+                            trailing: Text(
+                              'Due ${formatCurrency(e.balanceAfter)}',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -644,26 +748,17 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
             if (amount <= 0 || isSaving) return;
             setSheetState(() => isSaving = true);
             try {
-              final now = DateTime.now();
-              final newBalance = (customer.balance - amount)
-                  .clamp(0, double.infinity)
-                  .toDouble();
-              await ref
+              final newBalance = await ref
                   .read(customerRepositoryProvider)
-                  .mergeRemoteCustomerDocument(
-                    customer.id,
-                    <String, dynamic>{
-                      'name': customer.name,
-                      'phone': customer.phone ?? '',
-                      'email': customer.email ?? '',
-                      'notes': customer.notes ?? '',
-                      'status': 'active',
-                      'balance': newBalance,
-                      'total_spent': customer.totalSpent,
-                      'tombstone': false,
-                      'updatedAt': now.toIso8601String(),
-                    },
-                    updatedAt: now.millisecondsSinceEpoch,
+                  .recordPayment(
+                    customerId: customer.id,
+                    amount: amount,
+                    actorName: ref
+                        .read(mobileSessionProvider)
+                        .asData
+                        ?.value
+                        ?.user
+                        .displayName,
                   );
               if (!sheetContext.mounted) return;
               Navigator.pop(sheetContext);

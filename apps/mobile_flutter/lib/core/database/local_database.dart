@@ -243,6 +243,27 @@ class StockMovementEntries extends Table {
   Set<Column<Object>>? get primaryKey => {id};
 }
 
+/// Customer khata: every credit sale and payment as a running timeline.
+/// `amount` is signed — a credit sale adds to the due (+), a payment reduces
+/// it (−). `balanceAfter` is the customer's due immediately after the entry.
+class CustomerLedgerEntries extends Table {
+  @override
+  String get tableName => 'customer_ledger';
+
+  TextColumn get id => text()();
+  TextColumn get customerId => text().named('customer_id')();
+  TextColumn get type => text()(); // SALE_CREDIT | PAYMENT | ADJUST
+  RealColumn get amount => real()();
+  RealColumn get balanceAfter => real().named('balance_after')();
+  TextColumn get refId => text().named('ref_id').nullable()();
+  TextColumn get note => text().withDefault(const Constant(''))();
+  TextColumn get actorName => text().named('actor_name').nullable()();
+  IntColumn get createdAt => integer().named('created_at')();
+
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
 @DriftDatabase(
   tables: [
     ShopSettingsEntries,
@@ -254,6 +275,7 @@ class StockMovementEntries extends Table {
     ExpenseEntries,
     PurchaseEntries,
     StockMovementEntries,
+    CustomerLedgerEntries,
   ],
 )
 class BusinessHubDatabase extends _$BusinessHubDatabase {
@@ -266,7 +288,7 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       );
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -319,6 +341,9 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       }
       if (from < 12) {
         await m.createTable(stockMovementEntries);
+      }
+      if (from < 13) {
+        await m.createTable(customerLedgerEntries);
       }
     },
   );
