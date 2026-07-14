@@ -1960,7 +1960,13 @@ class SalesRepository {
     });
   }
 
-  Future<List<CommerceOutboxEntryModel>> getPendingOutboxEntries() async {
+  /// Pending/failed outbox entries ready to send. The automatic loop honours
+  /// exponential backoff and a max-attempt ceiling so one poison command can't
+  /// hammer the backend forever; a manual retry passes [ignoreBackoff] to force
+  /// every waiting entry (including exhausted ones) through immediately.
+  Future<List<CommerceOutboxEntryModel>> getPendingOutboxEntries({
+    bool ignoreBackoff = false,
+  }) async {
     final rows =
         await (_db.select(_db.commerceOutboxEntries)
               ..where(
@@ -1971,7 +1977,17 @@ class SalesRepository {
               ..orderBy([(tbl) => OrderingTerm.asc(tbl.createdAt)]))
             .get();
 
-    return rows
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final ready = ignoreBackoff
+        ? rows
+        : rows.where((row) {
+            if (row.attemptCount >= kOutboxMaxAttempts) return false;
+            final lastAt = row.lastAttemptAt;
+            if (lastAt == null) return true;
+            return now - lastAt >= outboxBackoffMs(row.attemptCount);
+          }).toList(growable: false);
+
+    return ready
         .map(
           (row) => CommerceOutboxEntryModel(
             commandId: row.commandId,
@@ -2256,6 +2272,20 @@ int? _asIntOrNull(Object? value) {
     return int.tryParse(trimmed);
   }
   return null;
+}
+
+/// After this many automatic attempts a command stops auto-retrying and waits
+/// in the "needs attention" list for a manual retry.
+const int kOutboxMaxAttempts = 8;
+const int _kOutboxBaseBackoffMs = 30000; // 30s
+const int _kOutboxMaxBackoffMs = 3600000; // 1h ceiling
+
+/// Exponential backoff between automatic retries: 30s, 60s, 120s, … capped 1h.
+int outboxBackoffMs(int attemptCount) {
+  if (attemptCount <= 0) return 0;
+  final shift = (attemptCount - 1).clamp(0, 20);
+  final ms = _kOutboxBaseBackoffMs * (1 << shift);
+  return ms > _kOutboxMaxBackoffMs ? _kOutboxMaxBackoffMs : ms;
 }
 
 var _ledgerSeq = 0;

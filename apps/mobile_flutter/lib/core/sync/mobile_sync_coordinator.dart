@@ -619,7 +619,7 @@ class MobileSyncCoordinator {
   /// Full two-way sync: push queued sales/payments, then pull the latest
   /// catalog + customers. Safe to trigger manually.
   Future<CommerceSyncResult> syncNow() async {
-    final push = await flushCommerceOutbox();
+    final push = await flushCommerceOutbox(force: true);
     final pull = await pullFromCloud();
     if (pull.state == CommerceSyncState.failed) return pull;
     return CommerceSyncResult(
@@ -652,6 +652,7 @@ class MobileSyncCoordinator {
   Future<CommerceSyncResult> flushCommerceOutbox({
     String? triggerCommandId,
     bool checkAccess = true,
+    bool force = false,
   }) async {
     if (!MobileRuntimeConfig.backendSyncEnabled) {
       return CommerceSyncResult(
@@ -692,7 +693,11 @@ class MobileSyncCoordinator {
     }
 
     _isFlushingOutbox = true;
-    final entries = await _salesRepository.getPendingOutboxEntries();
+    // A manual retry (or an explicit trigger) forces every waiting entry
+    // through, ignoring backoff and the attempt ceiling.
+    final entries = await _salesRepository.getPendingOutboxEntries(
+      ignoreBackoff: force || triggerCommandId != null,
+    );
     if (entries.isEmpty) {
       _isFlushingOutbox = false;
       return CommerceSyncResult(

@@ -335,7 +335,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 onPressed: overview.queuedSales > 0 || overview.failedSales > 0
                     ? () async {
                         final result = await syncCoordinator
-                            .flushCommerceOutbox();
+                            .flushCommerceOutbox(force: true);
                         if (!context.mounted) {
                           return;
                         }
