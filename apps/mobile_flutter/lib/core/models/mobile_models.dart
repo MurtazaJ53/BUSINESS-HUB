@@ -1007,7 +1007,7 @@ class InventoryMetrics {
   });
 
   final int totalItems;
-  final int totalStock;
+  final double totalStock;
   final double inventoryValue;
   final double potentialProfit;
   final int lowStock;

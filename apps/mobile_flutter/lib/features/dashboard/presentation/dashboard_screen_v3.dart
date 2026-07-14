@@ -107,7 +107,7 @@ class DashboardScreenV3 extends ConsumerWidget {
               child: _StatCard(
                 label: 'Items',
                 value: '${metrics.totalItems}',
-                caption: '${metrics.totalStock} in stock',
+                caption: '${formatQty(metrics.totalStock)} in stock',
                 icon: Icons.inventory_2_rounded,
                 accent: AppPalette.primary,
                 onTap: () => context.go('/inventory'),

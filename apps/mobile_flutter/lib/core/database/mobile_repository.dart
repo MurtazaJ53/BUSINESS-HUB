@@ -439,7 +439,7 @@ class InventoryRepository {
         .map((row) {
           final metrics = InventoryMetrics(
             totalItems: row.read<int>('total_items'),
-            totalStock: row.read<int>('total_stock'),
+            totalStock: row.read<double>('total_stock'),
             inventoryValue: row.read<double>('inventory_value'),
             potentialProfit: row.read<double>('potential_profit'),
             lowStock: row.read<int>('low_stock'),

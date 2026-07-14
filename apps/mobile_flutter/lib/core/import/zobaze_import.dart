@@ -85,8 +85,6 @@ class ZobazeImportService {
   }
 
   static double _num(String s) => double.tryParse(s.replaceAll(',', '')) ?? 0;
-  static int _int(String s) =>
-      int.tryParse(s.split('.').first.replaceAll(',', '')) ?? 0;
 
   Future<ZobazeImportResult> importFile(File file) async {
     final excel = Excel.decodeBytes(await file.readAsBytes());
@@ -198,7 +196,7 @@ class ZobazeImportService {
               'category': category.isEmpty ? 'General' : category,
               'subcategory': cell(row, 'ITEM_TYPE'),
               'size': variant,
-              'stock': _int(cell(row, 'STOCK')),
+              'stock': _num(cell(row, 'STOCK')),
               'status': 'active',
               'tombstone': false,
               'createdAt': iso,
