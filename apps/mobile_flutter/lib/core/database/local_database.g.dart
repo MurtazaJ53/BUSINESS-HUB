@@ -5946,6 +5946,614 @@ class PurchaseEntriesCompanion extends UpdateCompanion<PurchaseEntry> {
   }
 }
 
+class $StockMovementEntriesTable extends StockMovementEntries
+    with TableInfo<$StockMovementEntriesTable, StockMovementEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $StockMovementEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _itemIdMeta = const VerificationMeta('itemId');
+  @override
+  late final GeneratedColumn<String> itemId = GeneratedColumn<String>(
+    'item_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _itemNameMeta = const VerificationMeta(
+    'itemName',
+  );
+  @override
+  late final GeneratedColumn<String> itemName = GeneratedColumn<String>(
+    'item_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deltaMeta = const VerificationMeta('delta');
+  @override
+  late final GeneratedColumn<int> delta = GeneratedColumn<int>(
+    'delta',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _balanceAfterMeta = const VerificationMeta(
+    'balanceAfter',
+  );
+  @override
+  late final GeneratedColumn<int> balanceAfter = GeneratedColumn<int>(
+    'balance_after',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _reasonMeta = const VerificationMeta('reason');
+  @override
+  late final GeneratedColumn<String> reason = GeneratedColumn<String>(
+    'reason',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _refIdMeta = const VerificationMeta('refId');
+  @override
+  late final GeneratedColumn<String> refId = GeneratedColumn<String>(
+    'ref_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+    'note',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _actorNameMeta = const VerificationMeta(
+    'actorName',
+  );
+  @override
+  late final GeneratedColumn<String> actorName = GeneratedColumn<String>(
+    'actor_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    itemId,
+    itemName,
+    delta,
+    balanceAfter,
+    reason,
+    refId,
+    note,
+    actorName,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'stock_movements';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<StockMovementEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('item_id')) {
+      context.handle(
+        _itemIdMeta,
+        itemId.isAcceptableOrUnknown(data['item_id']!, _itemIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_itemIdMeta);
+    }
+    if (data.containsKey('item_name')) {
+      context.handle(
+        _itemNameMeta,
+        itemName.isAcceptableOrUnknown(data['item_name']!, _itemNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_itemNameMeta);
+    }
+    if (data.containsKey('delta')) {
+      context.handle(
+        _deltaMeta,
+        delta.isAcceptableOrUnknown(data['delta']!, _deltaMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deltaMeta);
+    }
+    if (data.containsKey('balance_after')) {
+      context.handle(
+        _balanceAfterMeta,
+        balanceAfter.isAcceptableOrUnknown(
+          data['balance_after']!,
+          _balanceAfterMeta,
+        ),
+      );
+    }
+    if (data.containsKey('reason')) {
+      context.handle(
+        _reasonMeta,
+        reason.isAcceptableOrUnknown(data['reason']!, _reasonMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_reasonMeta);
+    }
+    if (data.containsKey('ref_id')) {
+      context.handle(
+        _refIdMeta,
+        refId.isAcceptableOrUnknown(data['ref_id']!, _refIdMeta),
+      );
+    }
+    if (data.containsKey('note')) {
+      context.handle(
+        _noteMeta,
+        note.isAcceptableOrUnknown(data['note']!, _noteMeta),
+      );
+    }
+    if (data.containsKey('actor_name')) {
+      context.handle(
+        _actorNameMeta,
+        actorName.isAcceptableOrUnknown(data['actor_name']!, _actorNameMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  StockMovementEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return StockMovementEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      itemId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}item_id'],
+      )!,
+      itemName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}item_name'],
+      )!,
+      delta: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}delta'],
+      )!,
+      balanceAfter: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}balance_after'],
+      ),
+      reason: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reason'],
+      )!,
+      refId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ref_id'],
+      ),
+      note: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note'],
+      )!,
+      actorName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}actor_name'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $StockMovementEntriesTable createAlias(String alias) {
+    return $StockMovementEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class StockMovementEntry extends DataClass
+    implements Insertable<StockMovementEntry> {
+  final String id;
+  final String itemId;
+  final String itemName;
+  final int delta;
+  final int? balanceAfter;
+
+  /// SALE | PURCHASE | RETURN | ADJUST | OPENING
+  final String reason;
+  final String? refId;
+  final String note;
+  final String? actorName;
+  final int createdAt;
+  const StockMovementEntry({
+    required this.id,
+    required this.itemId,
+    required this.itemName,
+    required this.delta,
+    this.balanceAfter,
+    required this.reason,
+    this.refId,
+    required this.note,
+    this.actorName,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['item_id'] = Variable<String>(itemId);
+    map['item_name'] = Variable<String>(itemName);
+    map['delta'] = Variable<int>(delta);
+    if (!nullToAbsent || balanceAfter != null) {
+      map['balance_after'] = Variable<int>(balanceAfter);
+    }
+    map['reason'] = Variable<String>(reason);
+    if (!nullToAbsent || refId != null) {
+      map['ref_id'] = Variable<String>(refId);
+    }
+    map['note'] = Variable<String>(note);
+    if (!nullToAbsent || actorName != null) {
+      map['actor_name'] = Variable<String>(actorName);
+    }
+    map['created_at'] = Variable<int>(createdAt);
+    return map;
+  }
+
+  StockMovementEntriesCompanion toCompanion(bool nullToAbsent) {
+    return StockMovementEntriesCompanion(
+      id: Value(id),
+      itemId: Value(itemId),
+      itemName: Value(itemName),
+      delta: Value(delta),
+      balanceAfter: balanceAfter == null && nullToAbsent
+          ? const Value.absent()
+          : Value(balanceAfter),
+      reason: Value(reason),
+      refId: refId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(refId),
+      note: Value(note),
+      actorName: actorName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(actorName),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory StockMovementEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return StockMovementEntry(
+      id: serializer.fromJson<String>(json['id']),
+      itemId: serializer.fromJson<String>(json['itemId']),
+      itemName: serializer.fromJson<String>(json['itemName']),
+      delta: serializer.fromJson<int>(json['delta']),
+      balanceAfter: serializer.fromJson<int?>(json['balanceAfter']),
+      reason: serializer.fromJson<String>(json['reason']),
+      refId: serializer.fromJson<String?>(json['refId']),
+      note: serializer.fromJson<String>(json['note']),
+      actorName: serializer.fromJson<String?>(json['actorName']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'itemId': serializer.toJson<String>(itemId),
+      'itemName': serializer.toJson<String>(itemName),
+      'delta': serializer.toJson<int>(delta),
+      'balanceAfter': serializer.toJson<int?>(balanceAfter),
+      'reason': serializer.toJson<String>(reason),
+      'refId': serializer.toJson<String?>(refId),
+      'note': serializer.toJson<String>(note),
+      'actorName': serializer.toJson<String?>(actorName),
+      'createdAt': serializer.toJson<int>(createdAt),
+    };
+  }
+
+  StockMovementEntry copyWith({
+    String? id,
+    String? itemId,
+    String? itemName,
+    int? delta,
+    Value<int?> balanceAfter = const Value.absent(),
+    String? reason,
+    Value<String?> refId = const Value.absent(),
+    String? note,
+    Value<String?> actorName = const Value.absent(),
+    int? createdAt,
+  }) => StockMovementEntry(
+    id: id ?? this.id,
+    itemId: itemId ?? this.itemId,
+    itemName: itemName ?? this.itemName,
+    delta: delta ?? this.delta,
+    balanceAfter: balanceAfter.present ? balanceAfter.value : this.balanceAfter,
+    reason: reason ?? this.reason,
+    refId: refId.present ? refId.value : this.refId,
+    note: note ?? this.note,
+    actorName: actorName.present ? actorName.value : this.actorName,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  StockMovementEntry copyWithCompanion(StockMovementEntriesCompanion data) {
+    return StockMovementEntry(
+      id: data.id.present ? data.id.value : this.id,
+      itemId: data.itemId.present ? data.itemId.value : this.itemId,
+      itemName: data.itemName.present ? data.itemName.value : this.itemName,
+      delta: data.delta.present ? data.delta.value : this.delta,
+      balanceAfter: data.balanceAfter.present
+          ? data.balanceAfter.value
+          : this.balanceAfter,
+      reason: data.reason.present ? data.reason.value : this.reason,
+      refId: data.refId.present ? data.refId.value : this.refId,
+      note: data.note.present ? data.note.value : this.note,
+      actorName: data.actorName.present ? data.actorName.value : this.actorName,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StockMovementEntry(')
+          ..write('id: $id, ')
+          ..write('itemId: $itemId, ')
+          ..write('itemName: $itemName, ')
+          ..write('delta: $delta, ')
+          ..write('balanceAfter: $balanceAfter, ')
+          ..write('reason: $reason, ')
+          ..write('refId: $refId, ')
+          ..write('note: $note, ')
+          ..write('actorName: $actorName, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    itemId,
+    itemName,
+    delta,
+    balanceAfter,
+    reason,
+    refId,
+    note,
+    actorName,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is StockMovementEntry &&
+          other.id == this.id &&
+          other.itemId == this.itemId &&
+          other.itemName == this.itemName &&
+          other.delta == this.delta &&
+          other.balanceAfter == this.balanceAfter &&
+          other.reason == this.reason &&
+          other.refId == this.refId &&
+          other.note == this.note &&
+          other.actorName == this.actorName &&
+          other.createdAt == this.createdAt);
+}
+
+class StockMovementEntriesCompanion
+    extends UpdateCompanion<StockMovementEntry> {
+  final Value<String> id;
+  final Value<String> itemId;
+  final Value<String> itemName;
+  final Value<int> delta;
+  final Value<int?> balanceAfter;
+  final Value<String> reason;
+  final Value<String?> refId;
+  final Value<String> note;
+  final Value<String?> actorName;
+  final Value<int> createdAt;
+  final Value<int> rowid;
+  const StockMovementEntriesCompanion({
+    this.id = const Value.absent(),
+    this.itemId = const Value.absent(),
+    this.itemName = const Value.absent(),
+    this.delta = const Value.absent(),
+    this.balanceAfter = const Value.absent(),
+    this.reason = const Value.absent(),
+    this.refId = const Value.absent(),
+    this.note = const Value.absent(),
+    this.actorName = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  StockMovementEntriesCompanion.insert({
+    required String id,
+    required String itemId,
+    required String itemName,
+    required int delta,
+    this.balanceAfter = const Value.absent(),
+    required String reason,
+    this.refId = const Value.absent(),
+    this.note = const Value.absent(),
+    this.actorName = const Value.absent(),
+    required int createdAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       itemId = Value(itemId),
+       itemName = Value(itemName),
+       delta = Value(delta),
+       reason = Value(reason),
+       createdAt = Value(createdAt);
+  static Insertable<StockMovementEntry> custom({
+    Expression<String>? id,
+    Expression<String>? itemId,
+    Expression<String>? itemName,
+    Expression<int>? delta,
+    Expression<int>? balanceAfter,
+    Expression<String>? reason,
+    Expression<String>? refId,
+    Expression<String>? note,
+    Expression<String>? actorName,
+    Expression<int>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (itemId != null) 'item_id': itemId,
+      if (itemName != null) 'item_name': itemName,
+      if (delta != null) 'delta': delta,
+      if (balanceAfter != null) 'balance_after': balanceAfter,
+      if (reason != null) 'reason': reason,
+      if (refId != null) 'ref_id': refId,
+      if (note != null) 'note': note,
+      if (actorName != null) 'actor_name': actorName,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  StockMovementEntriesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? itemId,
+    Value<String>? itemName,
+    Value<int>? delta,
+    Value<int?>? balanceAfter,
+    Value<String>? reason,
+    Value<String?>? refId,
+    Value<String>? note,
+    Value<String?>? actorName,
+    Value<int>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return StockMovementEntriesCompanion(
+      id: id ?? this.id,
+      itemId: itemId ?? this.itemId,
+      itemName: itemName ?? this.itemName,
+      delta: delta ?? this.delta,
+      balanceAfter: balanceAfter ?? this.balanceAfter,
+      reason: reason ?? this.reason,
+      refId: refId ?? this.refId,
+      note: note ?? this.note,
+      actorName: actorName ?? this.actorName,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (itemId.present) {
+      map['item_id'] = Variable<String>(itemId.value);
+    }
+    if (itemName.present) {
+      map['item_name'] = Variable<String>(itemName.value);
+    }
+    if (delta.present) {
+      map['delta'] = Variable<int>(delta.value);
+    }
+    if (balanceAfter.present) {
+      map['balance_after'] = Variable<int>(balanceAfter.value);
+    }
+    if (reason.present) {
+      map['reason'] = Variable<String>(reason.value);
+    }
+    if (refId.present) {
+      map['ref_id'] = Variable<String>(refId.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (actorName.present) {
+      map['actor_name'] = Variable<String>(actorName.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StockMovementEntriesCompanion(')
+          ..write('id: $id, ')
+          ..write('itemId: $itemId, ')
+          ..write('itemName: $itemName, ')
+          ..write('delta: $delta, ')
+          ..write('balanceAfter: $balanceAfter, ')
+          ..write('reason: $reason, ')
+          ..write('refId: $refId, ')
+          ..write('note: $note, ')
+          ..write('actorName: $actorName, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$BusinessHubDatabase extends GeneratedDatabase {
   _$BusinessHubDatabase(QueryExecutor e) : super(e);
   $BusinessHubDatabaseManager get managers => $BusinessHubDatabaseManager(this);
@@ -5966,6 +6574,8 @@ abstract class _$BusinessHubDatabase extends GeneratedDatabase {
   late final $PurchaseEntriesTable purchaseEntries = $PurchaseEntriesTable(
     this,
   );
+  late final $StockMovementEntriesTable stockMovementEntries =
+      $StockMovementEntriesTable(this);
   late final Index inventoryNameIdx = Index(
     'inventory_name_idx',
     'CREATE INDEX inventory_name_idx ON inventory (name)',
@@ -6019,6 +6629,7 @@ abstract class _$BusinessHubDatabase extends GeneratedDatabase {
     commerceOutboxEntries,
     expenseEntries,
     purchaseEntries,
+    stockMovementEntries,
     inventoryNameIdx,
     inventorySkuIdx,
     inventoryCategoryIdx,
@@ -8950,6 +9561,319 @@ typedef $$PurchaseEntriesTableProcessedTableManager =
       PurchaseEntry,
       PrefetchHooks Function()
     >;
+typedef $$StockMovementEntriesTableCreateCompanionBuilder =
+    StockMovementEntriesCompanion Function({
+      required String id,
+      required String itemId,
+      required String itemName,
+      required int delta,
+      Value<int?> balanceAfter,
+      required String reason,
+      Value<String?> refId,
+      Value<String> note,
+      Value<String?> actorName,
+      required int createdAt,
+      Value<int> rowid,
+    });
+typedef $$StockMovementEntriesTableUpdateCompanionBuilder =
+    StockMovementEntriesCompanion Function({
+      Value<String> id,
+      Value<String> itemId,
+      Value<String> itemName,
+      Value<int> delta,
+      Value<int?> balanceAfter,
+      Value<String> reason,
+      Value<String?> refId,
+      Value<String> note,
+      Value<String?> actorName,
+      Value<int> createdAt,
+      Value<int> rowid,
+    });
+
+class $$StockMovementEntriesTableFilterComposer
+    extends Composer<_$BusinessHubDatabase, $StockMovementEntriesTable> {
+  $$StockMovementEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get itemId => $composableBuilder(
+    column: $table.itemId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get itemName => $composableBuilder(
+    column: $table.itemName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get delta => $composableBuilder(
+    column: $table.delta,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get balanceAfter => $composableBuilder(
+    column: $table.balanceAfter,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get refId => $composableBuilder(
+    column: $table.refId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get actorName => $composableBuilder(
+    column: $table.actorName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$StockMovementEntriesTableOrderingComposer
+    extends Composer<_$BusinessHubDatabase, $StockMovementEntriesTable> {
+  $$StockMovementEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get itemId => $composableBuilder(
+    column: $table.itemId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get itemName => $composableBuilder(
+    column: $table.itemName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get delta => $composableBuilder(
+    column: $table.delta,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get balanceAfter => $composableBuilder(
+    column: $table.balanceAfter,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get refId => $composableBuilder(
+    column: $table.refId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get actorName => $composableBuilder(
+    column: $table.actorName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$StockMovementEntriesTableAnnotationComposer
+    extends Composer<_$BusinessHubDatabase, $StockMovementEntriesTable> {
+  $$StockMovementEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get itemId =>
+      $composableBuilder(column: $table.itemId, builder: (column) => column);
+
+  GeneratedColumn<String> get itemName =>
+      $composableBuilder(column: $table.itemName, builder: (column) => column);
+
+  GeneratedColumn<int> get delta =>
+      $composableBuilder(column: $table.delta, builder: (column) => column);
+
+  GeneratedColumn<int> get balanceAfter => $composableBuilder(
+    column: $table.balanceAfter,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get reason =>
+      $composableBuilder(column: $table.reason, builder: (column) => column);
+
+  GeneratedColumn<String> get refId =>
+      $composableBuilder(column: $table.refId, builder: (column) => column);
+
+  GeneratedColumn<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<String> get actorName =>
+      $composableBuilder(column: $table.actorName, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$StockMovementEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$BusinessHubDatabase,
+          $StockMovementEntriesTable,
+          StockMovementEntry,
+          $$StockMovementEntriesTableFilterComposer,
+          $$StockMovementEntriesTableOrderingComposer,
+          $$StockMovementEntriesTableAnnotationComposer,
+          $$StockMovementEntriesTableCreateCompanionBuilder,
+          $$StockMovementEntriesTableUpdateCompanionBuilder,
+          (
+            StockMovementEntry,
+            BaseReferences<
+              _$BusinessHubDatabase,
+              $StockMovementEntriesTable,
+              StockMovementEntry
+            >,
+          ),
+          StockMovementEntry,
+          PrefetchHooks Function()
+        > {
+  $$StockMovementEntriesTableTableManager(
+    _$BusinessHubDatabase db,
+    $StockMovementEntriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$StockMovementEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$StockMovementEntriesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$StockMovementEntriesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> itemId = const Value.absent(),
+                Value<String> itemName = const Value.absent(),
+                Value<int> delta = const Value.absent(),
+                Value<int?> balanceAfter = const Value.absent(),
+                Value<String> reason = const Value.absent(),
+                Value<String?> refId = const Value.absent(),
+                Value<String> note = const Value.absent(),
+                Value<String?> actorName = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => StockMovementEntriesCompanion(
+                id: id,
+                itemId: itemId,
+                itemName: itemName,
+                delta: delta,
+                balanceAfter: balanceAfter,
+                reason: reason,
+                refId: refId,
+                note: note,
+                actorName: actorName,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String itemId,
+                required String itemName,
+                required int delta,
+                Value<int?> balanceAfter = const Value.absent(),
+                required String reason,
+                Value<String?> refId = const Value.absent(),
+                Value<String> note = const Value.absent(),
+                Value<String?> actorName = const Value.absent(),
+                required int createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => StockMovementEntriesCompanion.insert(
+                id: id,
+                itemId: itemId,
+                itemName: itemName,
+                delta: delta,
+                balanceAfter: balanceAfter,
+                reason: reason,
+                refId: refId,
+                note: note,
+                actorName: actorName,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$StockMovementEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$BusinessHubDatabase,
+      $StockMovementEntriesTable,
+      StockMovementEntry,
+      $$StockMovementEntriesTableFilterComposer,
+      $$StockMovementEntriesTableOrderingComposer,
+      $$StockMovementEntriesTableAnnotationComposer,
+      $$StockMovementEntriesTableCreateCompanionBuilder,
+      $$StockMovementEntriesTableUpdateCompanionBuilder,
+      (
+        StockMovementEntry,
+        BaseReferences<
+          _$BusinessHubDatabase,
+          $StockMovementEntriesTable,
+          StockMovementEntry
+        >,
+      ),
+      StockMovementEntry,
+      PrefetchHooks Function()
+    >;
 
 class $BusinessHubDatabaseManager {
   final _$BusinessHubDatabase _db;
@@ -8973,4 +9897,6 @@ class $BusinessHubDatabaseManager {
       $$ExpenseEntriesTableTableManager(_db, _db.expenseEntries);
   $$PurchaseEntriesTableTableManager get purchaseEntries =>
       $$PurchaseEntriesTableTableManager(_db, _db.purchaseEntries);
+  $$StockMovementEntriesTableTableManager get stockMovementEntries =>
+      $$StockMovementEntriesTableTableManager(_db, _db.stockMovementEntries);
 }

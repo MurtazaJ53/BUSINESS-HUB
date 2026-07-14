@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/database/mobile_repository.dart';
 import '../../../core/images/product_image_store.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
@@ -133,6 +134,85 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+    );
+  }
+
+  /// Per-item audit trail: how stock changed and why.
+  void _showStockHistory(BuildContext context, InventoryCatalogItem item) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.of(context).background,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Stock history · ${item.name}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 360,
+                  child: Consumer(
+                    builder: (context, ref, _) {
+                      final moves =
+                          ref
+                              .watch(stockMovementsProvider(item.id))
+                              .asData
+                              ?.value ??
+                          const <StockMovement>[];
+                      if (moves.isEmpty) {
+                        return const Center(
+                          child: Text('No stock movements recorded yet.'),
+                        );
+                      }
+                      return ListView.separated(
+                        itemCount: moves.length,
+                        separatorBuilder: (_, _) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final m = moves[index];
+                          final sign = m.isIn ? '+' : '';
+                          return ListTile(
+                            dense: true,
+                            leading: Icon(
+                              m.isIn
+                                  ? Icons.south_west_rounded
+                                  : Icons.north_east_rounded,
+                              color: m.isIn
+                                  ? AppPalette.success
+                                  : AppPalette.error,
+                            ),
+                            title: Text(
+                              '${m.reason} · $sign${m.delta}'
+                              '${m.balanceAfter != null ? ' → ${m.balanceAfter}' : ''}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${m.createdAt.toIso8601String().split('T').first}'
+                              '${m.note.isNotEmpty ? ' · ${m.note}' : ''}'
+                              '${m.actorName != null ? ' · ${m.actorName}' : ''}',
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -510,6 +590,15 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                     ),
                   ),
               ],
+            ),
+            const SizedBox(height: 4),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                _showStockHistory(context, item);
+              },
+              icon: const Icon(Icons.history_rounded),
+              label: const Text('Stock movement history'),
             ),
           ],
         ),
@@ -1077,6 +1166,26 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                       subcategory: item.subcategory ?? '',
                       description: item.description ?? '',
                       createdAt: item.createdAt,
+                      // Preserve local-only fields — updateInventoryItem clears
+                      // any it isn't given.
+                      imagePath: item.imagePath,
+                      unit: item.unit,
+                      reorderLevel: item.reorderLevel,
+                    );
+                await ref
+                    .read(inventoryRepositoryProvider)
+                    .logStockAdjustment(
+                      itemId: item.id,
+                      itemName: item.name,
+                      oldStock: item.stock,
+                      newStock: item.stock + addQty,
+                      actorName: ref
+                          .read(mobileSessionProvider)
+                          .asData
+                          ?.value
+                          ?.user
+                          .displayName,
+                      note: 'Restocked +$addQty',
                     );
                 if (!sheetContext.mounted) return;
                 Navigator.pop(sheetContext);

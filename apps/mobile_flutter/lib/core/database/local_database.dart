@@ -220,6 +220,29 @@ class PurchaseEntries extends Table {
   Set<Column<Object>>? get primaryKey => {id};
 }
 
+/// Append-only audit trail of every stock change: sold in POS, received from a
+/// purchase, returned, or manually adjusted. `delta` is signed (+in / -out).
+class StockMovementEntries extends Table {
+  @override
+  String get tableName => 'stock_movements';
+
+  TextColumn get id => text()();
+  TextColumn get itemId => text().named('item_id')();
+  TextColumn get itemName => text().named('item_name')();
+  IntColumn get delta => integer()();
+  IntColumn get balanceAfter => integer().named('balance_after').nullable()();
+
+  /// SALE | PURCHASE | RETURN | ADJUST | OPENING
+  TextColumn get reason => text()();
+  TextColumn get refId => text().named('ref_id').nullable()();
+  TextColumn get note => text().withDefault(const Constant(''))();
+  TextColumn get actorName => text().named('actor_name').nullable()();
+  IntColumn get createdAt => integer().named('created_at')();
+
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
 @DriftDatabase(
   tables: [
     ShopSettingsEntries,
@@ -230,6 +253,7 @@ class PurchaseEntries extends Table {
     CommerceOutboxEntries,
     ExpenseEntries,
     PurchaseEntries,
+    StockMovementEntries,
   ],
 )
 class BusinessHubDatabase extends _$BusinessHubDatabase {
@@ -242,7 +266,7 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       );
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -292,6 +316,9 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       if (from < 11) {
         await m.addColumn(inventoryEntries, inventoryEntries.variantGroupId);
         await m.addColumn(inventoryEntries, inventoryEntries.variantLabel);
+      }
+      if (from < 12) {
+        await m.createTable(stockMovementEntries);
       }
     },
   );

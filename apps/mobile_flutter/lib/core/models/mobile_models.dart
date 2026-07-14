@@ -221,6 +221,51 @@ class ExpenseRecord {
   final bool tombstone;
 }
 
+/// One entry in an item's stock audit trail.
+class StockMovement {
+  const StockMovement({
+    required this.id,
+    required this.itemId,
+    required this.itemName,
+    required this.delta,
+    required this.reason,
+    required this.createdAt,
+    this.balanceAfter,
+    this.refId,
+    this.note = '',
+    this.actorName,
+  });
+
+  final String id;
+  final String itemId;
+  final String itemName;
+  final int delta;
+  final String reason; // SALE | PURCHASE | RETURN | ADJUST | OPENING
+  final DateTime createdAt;
+  final int? balanceAfter;
+  final String? refId;
+  final String note;
+  final String? actorName;
+
+  bool get isIn => delta > 0;
+}
+
+/// A single stock line on a purchase: an existing item, how many units were
+/// received, and the unit cost paid.
+class PurchaseStockLine {
+  const PurchaseStockLine({
+    required this.itemId,
+    required this.itemName,
+    required this.quantity,
+    required this.unitCost,
+  });
+
+  final String itemId;
+  final String itemName;
+  final int quantity;
+  final double unitCost;
+}
+
 /// One row of a "create product with variants" form: a single size/colour
 /// with its own price, stock, SKU and (optionally) cost + reorder level.
 class VariantDraft {

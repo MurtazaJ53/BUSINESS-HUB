@@ -853,10 +853,135 @@ class InventoryRepository {
     );
   }
 
+  /// Receive stock into an item (used by purchases). Increments stock, updates
+  /// the last cost when supplied, and logs a movement — all in one transaction.
+  Future<void> applyStockIn({
+    required String itemId,
+    required int quantity,
+    double? unitCost,
+    bool updateCost = true,
+    String reason = 'PURCHASE',
+    String? refId,
+    String? actorName,
+    String note = '',
+  }) async {
+    if (quantity == 0) return;
+    final nowMillis = DateTime.now().millisecondsSinceEpoch;
+    await _db.transaction(() async {
+      final row =
+          await (_db.select(_db.inventoryEntries)
+                ..where((t) => t.id.equals(itemId)))
+              .getSingleOrNull();
+      if (row == null) return;
+      final newStock = row.stock + quantity;
+      await (_db.update(
+        _db.inventoryEntries,
+      )..where((t) => t.id.equals(itemId))).write(
+        InventoryEntriesCompanion(
+          stock: Value(newStock),
+          updatedAt: Value(nowMillis),
+        ),
+      );
+      if (updateCost && unitCost != null && unitCost > 0) {
+        await _db
+            .into(_db.inventoryPrivateEntries)
+            .insertOnConflictUpdate(
+              InventoryPrivateEntriesCompanion.insert(
+                id: itemId,
+                costPrice: Value(unitCost),
+                lastPurchaseDate: Value(
+                  DateTime.now().toIso8601String().split('T').first,
+                ),
+                updatedAt: Value(nowMillis),
+              ),
+            );
+      }
+      await _writeStockMovement(
+        _db,
+        itemId: itemId,
+        itemName: row.name,
+        delta: quantity,
+        reason: reason,
+        balanceAfter: newStock,
+        refId: refId,
+        actorName: actorName,
+        note: note,
+      );
+    });
+  }
+
+  /// Log a manual stock correction (the delta between the old and new counts)
+  /// so the audit trail explains every change, not just automated ones.
+  Future<void> logStockAdjustment({
+    required String itemId,
+    required String itemName,
+    required int oldStock,
+    required int newStock,
+    String? actorName,
+    String note = 'Manual adjustment',
+  }) async {
+    final delta = newStock - oldStock;
+    if (delta == 0) return;
+    await _writeStockMovement(
+      _db,
+      itemId: itemId,
+      itemName: itemName,
+      delta: delta,
+      reason: 'ADJUST',
+      balanceAfter: newStock,
+      note: note,
+      actorName: actorName,
+    );
+  }
+
+  Stream<List<StockMovement>> watchStockMovements({
+    String? itemId,
+    int limit = 200,
+  }) {
+    final where = <String>[];
+    final vars = <Variable<Object>>[];
+    if (itemId != null && itemId.isNotEmpty) {
+      where.add('item_id = ?');
+      vars.add(Variable<String>(itemId));
+    }
+    final whereSql = where.isEmpty ? '' : 'WHERE ${where.join(' AND ')} ';
+    return _db
+        .customSelect(
+          'SELECT * FROM stock_movements ${whereSql}ORDER BY created_at DESC '
+          'LIMIT ?;',
+          variables: [...vars, Variable<int>(limit)],
+          readsFrom: {_db.stockMovementEntries},
+        )
+        .watch()
+        .map(
+          (rows) => rows
+              .map(
+                (row) => StockMovement(
+                  id: row.read<String>('id'),
+                  itemId: row.read<String>('item_id'),
+                  itemName: row.read<String>('item_name'),
+                  delta: row.read<int>('delta'),
+                  balanceAfter: row.readNullable<int>('balance_after'),
+                  reason: row.read<String>('reason'),
+                  refId: row.readNullable<String>('ref_id'),
+                  note: row.read<String>('note'),
+                  actorName: _asStringOrNull(
+                    row.readNullable<String>('actor_name'),
+                  ),
+                  createdAt: DateTime.fromMillisecondsSinceEpoch(
+                    row.read<int>('created_at'),
+                  ),
+                ),
+              )
+              .toList(growable: false),
+        );
+  }
+
   Future<void> clearWorkspace() async {
     await _db.transaction(() async {
       await _db.delete(_db.inventoryPrivateEntries).go();
       await _db.delete(_db.inventoryEntries).go();
+      await _db.delete(_db.stockMovementEntries).go();
     });
   }
 }
@@ -1568,6 +1693,15 @@ class SalesRepository {
             updatedAt: Value(now.millisecondsSinceEpoch),
           ),
         );
+        await _writeStockMovement(
+          _db,
+          itemId: item.id,
+          itemName: item.name,
+          delta: -item.quantity,
+          reason: 'SALE',
+          balanceAfter: item.stock - item.quantity,
+          refId: saleId,
+        );
       }
 
       // Credit sale: push the unpaid balance onto the customer's khata so the
@@ -1692,6 +1826,15 @@ class SalesRepository {
                 stock: Value(row.stock + it.quantity),
                 updatedAt: Value(now.millisecondsSinceEpoch),
               ),
+            );
+            await _writeStockMovement(
+              _db,
+              itemId: row.id,
+              itemName: row.name,
+              delta: it.quantity,
+              reason: 'RETURN',
+              balanceAfter: row.stock + it.quantity,
+              refId: saleId,
             );
           }
         }
@@ -1987,6 +2130,41 @@ int? _asIntOrNull(Object? value) {
   return null;
 }
 
+var _movementSeq = 0;
+
+/// Append one row to the stock audit trail. Safe to call inside a transaction;
+/// the id blends time, item and a process-lifetime counter so tight loops never
+/// collide.
+Future<void> _writeStockMovement(
+  BusinessHubDatabase db, {
+  required String itemId,
+  required String itemName,
+  required int delta,
+  required String reason,
+  int? balanceAfter,
+  String? refId,
+  String note = '',
+  String? actorName,
+}) async {
+  final seq = _movementSeq++;
+  await db
+      .into(db.stockMovementEntries)
+      .insert(
+        StockMovementEntriesCompanion.insert(
+          id: 'mv-${DateTime.now().microsecondsSinceEpoch}-$seq',
+          itemId: itemId,
+          itemName: itemName,
+          delta: delta,
+          reason: reason,
+          balanceAfter: Value(balanceAfter),
+          refId: Value(refId),
+          note: Value(note),
+          actorName: Value(actorName),
+          createdAt: DateTime.now().millisecondsSinceEpoch,
+        ),
+      );
+}
+
 int? _asEpoch(Object? value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
@@ -2198,7 +2376,9 @@ class PurchaseRepository {
 
   final BusinessHubDatabase _db;
 
-  Future<void> recordPurchase({
+  /// Records the purchase and returns its id (so the caller can link any
+  /// auto stock-in movements back to this purchase).
+  Future<String> recordPurchase({
     required String supplierName,
     required double total,
     required DateTime purchaseDate,
@@ -2210,6 +2390,7 @@ class PurchaseRepository {
     String? actorName,
   }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
+    final id = 'purchase-${DateTime.now().microsecondsSinceEpoch}';
     // A payment can never exceed the bill, and neither value can be negative.
     final safeTotal = total < 0 ? 0.0 : total;
     final safePaid = amountPaid < 0
@@ -2217,7 +2398,7 @@ class PurchaseRepository {
         : (amountPaid > safeTotal ? safeTotal : amountPaid);
     await _db.into(_db.purchaseEntries).insert(
           PurchaseEntriesCompanion.insert(
-            id: 'purchase-${DateTime.now().microsecondsSinceEpoch}',
+            id: id,
             supplierName: supplierName.trim().isEmpty
                 ? 'Unnamed supplier'
                 : supplierName.trim(),
@@ -2233,6 +2414,7 @@ class PurchaseRepository {
             updatedAt: Value(now),
           ),
         );
+    return id;
   }
 
   /// Add a payment against an existing purchase, capped at its outstanding

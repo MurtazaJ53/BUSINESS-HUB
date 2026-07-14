@@ -210,6 +210,14 @@ final expenseSummaryProvider = StreamProvider<ExpenseSummarySnapshot?>((ref) {
   });
 });
 
+// Per-item stock audit trail (sold / received / returned / adjusted).
+final stockMovementsProvider =
+    StreamProvider.family<List<StockMovement>, String>((ref, itemId) {
+      return ref
+          .watch(inventoryRepositoryProvider)
+          .watchStockMovements(itemId: itemId);
+    });
+
 // Stock buying (money-out to suppliers) is local-first, same as expenses.
 final purchasesProvider = StreamProvider<List<PurchaseRecord>>((ref) {
   return ref.watch(purchaseRepositoryProvider).watchPurchases();
