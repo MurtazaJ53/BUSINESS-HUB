@@ -210,6 +210,19 @@ final expenseSummaryProvider = StreamProvider<ExpenseSummarySnapshot?>((ref) {
   });
 });
 
+// P&L / financial reporting for a period. Sales + expenses stream separately
+// and the screen folds them with the pure computeProfitAndLoss, so both a new
+// sale and a new expense update the report live.
+final reportSalesProvider =
+    StreamProvider.family<List<ReportSale>, HistoryDateWindow>((ref, window) {
+      return ref.watch(reportsRepositoryProvider).watchReportSales(window);
+    });
+
+final reportExpensesProvider =
+    StreamProvider.family<double, HistoryDateWindow>((ref, window) {
+      return ref.watch(reportsRepositoryProvider).watchPeriodExpenses(window);
+    });
+
 // Per-item stock audit trail (sold / received / returned / adjusted).
 final stockMovementsProvider =
     StreamProvider.family<List<StockMovement>, String>((ref, itemId) {

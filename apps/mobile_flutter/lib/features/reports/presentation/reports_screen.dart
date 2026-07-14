@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
+import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
@@ -47,6 +48,20 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     }
     final mixEntries = mix.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
+
+    // P&L: fold sale lines (with per-line cost) + period expenses.
+    final reportSales =
+        ref.watch(reportSalesProvider(_window)).asData?.value ??
+        const <ReportSale>[];
+    final periodExpenses =
+        ref.watch(reportExpensesProvider(_window)).asData?.value ?? 0.0;
+    final pl = computeProfitAndLoss(
+      sales: reportSales,
+      expenses: periodExpenses,
+    );
+    // A cashier shouldn't see cost/profit — hide the whole P&L for them.
+    final canViewProfit =
+        ref.watch(mobileSessionProvider).asData?.value?.canViewCost ?? false;
 
     return MobileStandaloneScaffold(
       title: 'Reports',
@@ -154,6 +169,107 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                         .toList(growable: false),
                   ),
           ),
+          if (canViewProfit) ...<Widget>[
+            const SizedBox(height: 18),
+            MobilePanel(
+              title: 'Profit & loss',
+              action: MobileTag(
+                label: '${pl.marginPct.toStringAsFixed(0)}% MARGIN',
+                icon: Icons.trending_up_rounded,
+                accent: pl.netProfit >= 0
+                    ? AppPalette.success
+                    : AppPalette.error,
+              ),
+              child: Column(
+                children: <Widget>[
+                  _StatRow(
+                    label: 'Gross sales',
+                    value: formatCurrency(pl.grossSales),
+                    accent: AppPalette.primary,
+                  ),
+                  const SizedBox(height: 10),
+                  _StatRow(
+                    label: '− Cost of goods sold',
+                    value: formatCurrency(pl.cogs),
+                    accent: AppPalette.warning,
+                  ),
+                  const SizedBox(height: 10),
+                  _StatRow(
+                    label: '= Gross profit',
+                    value: formatCurrency(pl.grossProfit),
+                    accent: AppPalette.info,
+                  ),
+                  const SizedBox(height: 10),
+                  _StatRow(
+                    label: '− Expenses',
+                    value: formatCurrency(pl.expenses),
+                    accent: AppPalette.warning,
+                  ),
+                  const Divider(height: 22),
+                  _StatRow(
+                    label: '= Net profit',
+                    value: formatCurrency(pl.netProfit),
+                    accent: pl.netProfit >= 0
+                        ? AppPalette.success
+                        : AppPalette.error,
+                    strong: true,
+                  ),
+                  const SizedBox(height: 10),
+                  _StatRow(
+                    label: 'GST collected',
+                    value: formatCurrency(pl.gstCollected),
+                    accent: AppPalette.info,
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (pl.topProducts.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 18),
+            MobilePanel(
+              title: 'Top products',
+              action: const MobileTag(
+                label: 'BY REVENUE',
+                icon: Icons.inventory_2_rounded,
+              ),
+              child: Column(
+                children: <Widget>[
+                  for (final p in pl.topProducts)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _StatRow(
+                        label: '${p.name}  ·  ${p.quantity} sold',
+                        value: formatCurrency(p.revenue),
+                        accent: AppPalette.primary,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+          if (pl.topCustomers.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 18),
+            MobilePanel(
+              title: 'Top customers',
+              action: const MobileTag(
+                label: 'BY SPEND',
+                icon: Icons.people_alt_rounded,
+              ),
+              child: Column(
+                children: <Widget>[
+                  for (final c in pl.topCustomers)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _StatRow(
+                        label: '${c.name}  ·  ${c.orders} order(s)',
+                        value: formatCurrency(c.spend),
+                        accent: AppPalette.info,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -2098,6 +2098,16 @@ double _asDouble(Object? value) {
   return 0;
 }
 
+double? _asDoubleOrNull(Object? value) {
+  if (value == null) return null;
+  if (value is num) return value.toDouble();
+  if (value is String) {
+    final t = value.trim();
+    return t.isEmpty ? null : double.tryParse(t);
+  }
+  return null;
+}
+
 bool _asBool(Object? value, {bool fallback = false}) {
   if (value is bool) return value;
   if (value is num) return value != 0;
@@ -2547,5 +2557,99 @@ class PurchaseRepository {
       actorName: _asStringOrNull(row.readNullable<String>('actor_name')),
       tombstone: row.read<int>('tombstone') == 1,
     );
+  }
+}
+
+final reportsRepositoryProvider = Provider<ReportsRepository>((ref) {
+  return ReportsRepository(ref.watch(localDatabaseProvider));
+});
+
+/// Read side for financial reporting. Parses stored sale rows into the shape
+/// [computeProfitAndLoss] expects; expenses for the same window come through a
+/// sibling stream so the pure P&L math stays in one place.
+class ReportsRepository {
+  ReportsRepository(this._db);
+
+  final BusinessHubDatabase _db;
+
+  Stream<List<ReportSale>> watchReportSales(HistoryDateWindow window) {
+    final exactDate = _historyExactDate(window);
+    final sinceDate = _historySinceDate(window);
+    final where = <String>['tombstone = 0'];
+    final vars = <Variable<Object>>[];
+    if (exactDate != null) {
+      where.add('date = ?');
+      vars.add(Variable<String>(exactDate));
+    } else if (sinceDate != null) {
+      where.add('date >= ?');
+      vars.add(Variable<String>(sinceDate));
+    }
+    return _db
+        .customSelect(
+          'SELECT total, customer_name, items_json FROM sales '
+          'WHERE ${where.join(' AND ')};',
+          variables: vars,
+          readsFrom: {_db.salesEntries},
+        )
+        .watch()
+        .map(
+          (rows) => rows
+              .map(
+                (row) => ReportSale(
+                  total: row.read<double>('total'),
+                  customerName: _asStringOrNull(
+                    row.readNullable<String>('customer_name'),
+                  ),
+                  lines: _parseReportLines(row.read<String>('items_json')),
+                ),
+              )
+              .toList(growable: false),
+        );
+  }
+
+  Stream<double> watchPeriodExpenses(HistoryDateWindow window) {
+    final exactDate = _historyExactDate(window);
+    final sinceDate = _historySinceDate(window);
+    final where = <String>['tombstone = 0'];
+    final vars = <Variable<Object>>[];
+    if (exactDate != null) {
+      where.add('expense_date = ?');
+      vars.add(Variable<String>(exactDate));
+    } else if (sinceDate != null) {
+      where.add('expense_date >= ?');
+      vars.add(Variable<String>(sinceDate));
+    }
+    return _db
+        .customSelect(
+          'SELECT COALESCE(SUM(amount), 0) AS total FROM expenses '
+          'WHERE ${where.join(' AND ')};',
+          variables: vars,
+          readsFrom: {_db.expenseEntries},
+        )
+        .watchSingle()
+        .map((row) => row.read<double>('total'));
+  }
+
+  List<ReportSaleLine> _parseReportLines(String itemsJson) {
+    if (itemsJson.trim().isEmpty) return const <ReportSaleLine>[];
+    try {
+      final decoded = jsonDecode(itemsJson);
+      if (decoded is! List) return const <ReportSaleLine>[];
+      return decoded.whereType<Map<String, dynamic>>().map((item) {
+        return ReportSaleLine(
+          name: (item['name'] ?? 'Item').toString(),
+          quantity: _asInt(item['quantity']),
+          price: _asDouble(item['price'] ?? item['unitPrice']),
+          costPrice: _asDoubleOrNull(item['costPrice'] ?? item['unit_cost']),
+          gstRate: _asDouble(item['gstRate'] ?? item['gst_rate']),
+          priceIncludesTax: _asBool(
+            item['priceIncludesTax'] ?? item['price_includes_tax'],
+            fallback: true,
+          ),
+        );
+      }).toList(growable: false);
+    } catch (_) {
+      return const <ReportSaleLine>[];
+    }
   }
 }

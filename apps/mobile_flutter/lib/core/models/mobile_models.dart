@@ -221,6 +221,166 @@ class ExpenseRecord {
   final bool tombstone;
 }
 
+/// A sale reduced to just what a P&L needs. Built from stored sale rows.
+class ReportSaleLine {
+  const ReportSaleLine({
+    required this.name,
+    required this.quantity,
+    required this.price,
+    this.costPrice,
+    this.gstRate = 0,
+    this.priceIncludesTax = true,
+  });
+
+  final String name;
+  final int quantity;
+  final double price;
+  final double? costPrice;
+  final double gstRate;
+  final bool priceIncludesTax;
+}
+
+class ReportSale {
+  const ReportSale({
+    required this.total,
+    required this.lines,
+    this.customerName,
+  });
+
+  final double total;
+  final List<ReportSaleLine> lines;
+  final String? customerName;
+}
+
+class TopProduct {
+  const TopProduct({
+    required this.name,
+    required this.quantity,
+    required this.revenue,
+  });
+  final String name;
+  final int quantity;
+  final double revenue;
+}
+
+class TopSpender {
+  const TopSpender({
+    required this.name,
+    required this.orders,
+    required this.spend,
+  });
+  final String name;
+  final int orders;
+  final double spend;
+}
+
+/// Profit & loss for a period: Gross sales − COGS − Expenses = Net profit,
+/// plus GST collected and the leaderboards.
+class ProfitLossSnapshot {
+  const ProfitLossSnapshot({
+    required this.grossSales,
+    required this.cogs,
+    required this.expenses,
+    required this.gstCollected,
+    required this.orderCount,
+    required this.topProducts,
+    required this.topCustomers,
+  });
+
+  final double grossSales;
+  final double cogs;
+  final double expenses;
+  final double gstCollected;
+  final int orderCount;
+  final List<TopProduct> topProducts;
+  final List<TopSpender> topCustomers;
+
+  double get grossProfit => grossSales - cogs;
+  double get netProfit => grossSales - cogs - expenses;
+  double get marginPct => grossSales <= 0 ? 0 : (grossProfit / grossSales) * 100;
+
+  static const ProfitLossSnapshot empty = ProfitLossSnapshot(
+    grossSales: 0,
+    cogs: 0,
+    expenses: 0,
+    gstCollected: 0,
+    orderCount: 0,
+    topProducts: <TopProduct>[],
+    topCustomers: <TopSpender>[],
+  );
+}
+
+/// Pure aggregation: fold sales + total expenses into a [ProfitLossSnapshot].
+/// Kept free of Drift/JSON so it is unit-testable.
+ProfitLossSnapshot computeProfitAndLoss({
+  required List<ReportSale> sales,
+  required double expenses,
+  int topN = 5,
+}) {
+  var grossSales = 0.0;
+  var cogs = 0.0;
+  var gst = 0.0;
+  final productQty = <String, int>{};
+  final productRevenue = <String, double>{};
+  final customerSpend = <String, double>{};
+  final customerOrders = <String, int>{};
+
+  for (final sale in sales) {
+    grossSales += sale.total;
+    for (final line in sale.lines) {
+      final lineTotal = line.price * line.quantity;
+      cogs += (line.costPrice ?? 0) * line.quantity;
+      final rate = line.gstRate;
+      if (rate > 0) {
+        gst += line.priceIncludesTax
+            ? lineTotal * rate / (100 + rate)
+            : lineTotal * rate / 100;
+      }
+      productQty[line.name] = (productQty[line.name] ?? 0) + line.quantity;
+      productRevenue[line.name] =
+          (productRevenue[line.name] ?? 0) + lineTotal;
+    }
+    final customer = sale.customerName?.trim();
+    if (customer != null && customer.isNotEmpty) {
+      customerSpend[customer] = (customerSpend[customer] ?? 0) + sale.total;
+      customerOrders[customer] = (customerOrders[customer] ?? 0) + 1;
+    }
+  }
+
+  final topProducts =
+      productRevenue.entries
+          .map(
+            (e) => TopProduct(
+              name: e.key,
+              quantity: productQty[e.key] ?? 0,
+              revenue: e.value,
+            ),
+          )
+          .toList()
+        ..sort((a, b) => b.revenue.compareTo(a.revenue));
+  final topCustomers =
+      customerSpend.entries
+          .map(
+            (e) => TopSpender(
+              name: e.key,
+              orders: customerOrders[e.key] ?? 0,
+              spend: e.value,
+            ),
+          )
+          .toList()
+        ..sort((a, b) => b.spend.compareTo(a.spend));
+
+  return ProfitLossSnapshot(
+    grossSales: grossSales,
+    cogs: cogs,
+    expenses: expenses,
+    gstCollected: gst,
+    orderCount: sales.length,
+    topProducts: topProducts.take(topN).toList(growable: false),
+    topCustomers: topCustomers.take(topN).toList(growable: false),
+  );
+}
+
 /// One entry in an item's stock audit trail.
 class StockMovement {
   const StockMovement({
