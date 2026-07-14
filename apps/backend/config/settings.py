@@ -157,30 +157,55 @@ REST_FRAMEWORK = {
 }
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
+
+# Run cache + realtime + Celery in-process (no Redis server) when explicitly
+# requested, or automatically under the test runner, so the suite is green
+# without external infra.
+import sys as _sys  # noqa: E402
+
+_running_tests = ("pytest" in _sys.modules) or ("test" in _sys.argv)
+_USE_INMEMORY_INFRA = _running_tests or os.getenv(
+    "USE_INMEMORY_CHANNELS", ""
+).lower() in ("1", "true", "yes")
+_redis_cache = (
+    REDIS_URL.startswith("redis://") or REDIS_URL.startswith("rediss://")
+) and not _USE_INMEMORY_INFRA
 CACHES = {
     "default": {
         "BACKEND": (
             "django.core.cache.backends.redis.RedisCache"
-            if REDIS_URL.startswith("redis://") or REDIS_URL.startswith("rediss://")
+            if _redis_cache
             else "django.core.cache.backends.locmem.LocMemCache"
         ),
-        "LOCATION": REDIS_URL if REDIS_URL.startswith("redis") else "business-hub-dev-cache",
+        "LOCATION": REDIS_URL if _redis_cache else "business-hub-dev-cache",
     }
 }
 
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", REDIS_URL)
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
+# In tests/dev without infra, run tasks in-process so no broker is contacted.
+if _USE_INMEMORY_INFRA:
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = int(os.getenv("CELERY_TASK_TIME_LIMIT", "300"))
 
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [REDIS_URL],
+# Realtime channel layer. Redis is used in production/dev-with-infra, but tests
+# and lightweight local runs can opt into the in-memory layer so the suite runs
+# green without a Redis server (USE_INMEMORY_CHANNELS=1).
+if _USE_INMEMORY_INFRA:
+    CHANNEL_LAYERS = {
+        "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"},
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [REDIS_URL],
+            },
         },
-    },
-}
+    }
 
 OTEL_SERVICE_NAME = os.getenv("OTEL_SERVICE_NAME", "business-hub-backend")
 

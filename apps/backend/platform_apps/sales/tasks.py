@@ -75,18 +75,26 @@ def process_sale_command_task(receipt_id: str):
 
     logger.info(f"Successfully processed sale command receipt {receipt_id}, created sale {sale.id}")
 
-    # Broadcast to WebSocket
-    channel_layer = get_channel_layer()
-    if channel_layer:
-        async_to_sync(channel_layer.group_send)(
-            f"shop_{receipt.shop.id}",
-            {
-                "type": "shop_message",
-                "message": {
-                    "event": "sale.command.accepted",
-                    "command_id": command_id,
-                    "receipt_id": str(receipt.id),
-                    "sale_id": str(sale.id)
+    # Broadcast to WebSocket. The sale is already committed above, so realtime
+    # delivery is best-effort: a Redis/channel-layer outage must NOT fail the
+    # command or roll back the sale.
+    try:
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            async_to_sync(channel_layer.group_send)(
+                f"shop_{receipt.shop.id}",
+                {
+                    "type": "shop_message",
+                    "message": {
+                        "event": "sale.command.accepted",
+                        "command_id": command_id,
+                        "receipt_id": str(receipt.id),
+                        "sale_id": str(sale.id)
+                    }
                 }
-            }
+            )
+    except Exception as broadcast_error:  # noqa: BLE001 - realtime is best-effort
+        logger.warning(
+            "Realtime broadcast failed for sale command %s (sale %s): %s",
+            command_id, sale.id, broadcast_error,
         )
