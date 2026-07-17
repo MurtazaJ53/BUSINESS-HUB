@@ -1,8 +1,16 @@
 name: Build Android APK
 
-# Builds a debug APK on every push to main (and on demand) and publishes it as a
-# GitHub Release asset, so there is always a downloadable "latest" APK link —
-# without committing the binary into git.
+# Builds an APK on every push to main (and on demand) and publishes it to the
+# "latest-apk" GitHub Release, so there is always a downloadable link — without
+# committing the binary to git.
+#
+# Signing: if the ANDROID_KEYSTORE_BASE64 secret (+ passwords) is set, a SIGNED
+# release APK is produced; otherwise it falls back to a debug APK so the run
+# still succeeds. Required repo secrets for signed builds:
+#   ANDROID_KEYSTORE_BASE64   base64 of business-hub-release.jks
+#   ANDROID_KEYSTORE_PASSWORD store password
+#   ANDROID_KEY_ALIAS         key alias (businesshub)
+#   ANDROID_KEY_PASSWORD      key password
 
 on:
   push:
@@ -13,7 +21,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: write   # needed to create/update the Release
+  contents: write
 
 jobs:
   build-apk:
@@ -32,32 +40,55 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.41.9
           cache: true
 
       - run: flutter pub get
 
-      - name: Build debug APK
-        run: >
-          flutter build apk --debug
-          --dart-define BUSINESS_HUB_UPI_VPA=${{ vars.UPI_VPA || 'demomart@okhdfcbank' }}
-          --dart-define BUSINESS_HUB_MANAGER_PIN=${{ vars.MANAGER_PIN || '4821' }}
-          --dart-define BUSINESS_HUB_API_BASE_URL=${{ vars.API_BASE_URL || 'http://192.168.1.10:8000/api/v1' }}
+      - name: Configure signing (if secret present)
+        id: signing
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          SP: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KA: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KP: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KS" ]; then
+            echo "$KS" | base64 -d > "$RUNNER_TEMP/release.jks"
+            {
+              echo "storeFile=$RUNNER_TEMP/release.jks"
+              echo "storePassword=$SP"
+              echo "keyAlias=$KA"
+              echo "keyPassword=$KP"
+            } > android/key.properties
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+            echo "Signed release build."
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "No keystore secret — falling back to a debug build."
+          fi
 
-      - name: Rename APK
-        run: cp build/app/outputs/flutter-apk/app-debug.apk business-hub-latest.apk
+      - name: Build APK
+        run: |
+          DEFINES="--dart-define BUSINESS_HUB_UPI_VPA=${{ vars.UPI_VPA || 'demomart@okhdfcbank' }} --dart-define BUSINESS_HUB_MANAGER_PIN=${{ vars.MANAGER_PIN || '4821' }} --dart-define BUSINESS_HUB_API_BASE_URL=${{ vars.API_BASE_URL || 'http://192.168.1.10:8000/api/v1' }}"
+          if [ "${{ steps.signing.outputs.signed }}" = "true" ]; then
+            flutter build apk --release $DEFINES
+            cp build/app/outputs/flutter-apk/app-release.apk business-hub-latest.apk
+          else
+            flutter build apk --debug $DEFINES
+            cp build/app/outputs/flutter-apk/app-debug.apk business-hub-latest.apk
+          fi
 
-      # Downloadable from the workflow run's Artifacts (retained 30 days).
       - uses: actions/upload-artifact@v4
         with:
           name: business-hub-apk
           path: apps/mobile_flutter/business-hub-latest.apk
 
-      # Stable download link: always overwrites the "latest-apk" Release.
       - name: Publish to "latest-apk" Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest-apk
           name: Latest APK (auto-built)
-          body: "Auto-built debug APK from the latest push to main. Commit ${{ github.sha }}."
+          body: "Auto-built APK from the latest push to main. Commit ${{ github.sha }}. Signed: ${{ steps.signing.outputs.signed }}."
           files: apps/mobile_flutter/business-hub-latest.apk
           make_latest: "true"

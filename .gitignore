@@ -64,3 +64,8 @@ apps/backend/.erpnext-mock-state.json
 
 # Local build-time secrets (UPI VPA, manager PIN)
 apps/mobile_flutter/dart_defines.json
+
+# Android signing (never commit)
+**/key.properties
+business-hub-release.jks
+keystore.base64.txt
