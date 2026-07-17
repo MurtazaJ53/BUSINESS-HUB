@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/import/universal_import.dart';
@@ -105,9 +107,12 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
       }
       final mapped = mapRows(table, kind, mapping: mapping);
       final service = ref.read(universalImportServiceProvider);
-      final outcome = kind == ImportKind.products
-          ? await service.importProducts(mapped)
-          : await service.importCustomers(mapped);
+      final outcome = switch (kind) {
+        ImportKind.products => await service.importProducts(mapped),
+        ImportKind.customers => await service.importCustomers(mapped),
+        ImportKind.sales => await service.importSales(mapped),
+        ImportKind.suppliers => throw Exception('Suppliers import is not available yet.'),
+      };
       if (!mounted) return;
       setState(() {
         _busy = false;
@@ -120,6 +125,95 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
         _busy = false;
         _error = error.toString();
       });
+    }
+  }
+
+  /// Import customers straight from the phone's address book (name + first
+  /// phone), without saving anything to the device's contacts.
+  Future<void> _importContacts() async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+      _result = null;
+      _successText = null;
+    });
+    try {
+      final status = await FlutterContacts.permissions.request(PermissionType.read);
+      if (status != PermissionStatus.granted && status != PermissionStatus.limited) {
+        throw Exception('Contacts permission denied. Enable it in Settings to import.');
+      }
+      final contacts = await FlutterContacts.getAll(
+        properties: <ContactProperty>{ContactProperty.name, ContactProperty.phone},
+      );
+      final rows = <Map<String, String>>[];
+      for (final c in contacts) {
+        final name = (c.displayName ?? '').trim();
+        final phone = c.phones.isNotEmpty ? c.phones.first.number.trim() : '';
+        if (name.isEmpty && phone.isEmpty) continue;
+        rows.add(<String, String>{'name': name.isEmpty ? phone : name, 'phone': phone});
+      }
+      if (rows.isEmpty) throw Exception('No contacts with a name or phone were found.');
+      final service = ref.read(universalImportServiceProvider);
+      final outcome = await service.importCustomers(
+        MappedImport(rows, const <String>[], ColumnMapping(const <String>[], const <String, int>{})),
+      );
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _successText = '${outcome.imported} customer(s) imported from contacts.';
+      });
+    } catch (e) {
+      if (mounted) setState(() { _busy = false; _error = e.toString(); });
+    }
+  }
+
+  /// Save CSV text to a user-chosen location; returns a status message.
+  Future<void> _saveCsv(String content, String fileName) async {
+    final path = await FilePicker.platform.saveFile(
+      fileName: fileName,
+      type: FileType.custom,
+      allowedExtensions: <String>['csv'],
+      bytes: utf8.encode(content),
+    );
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (path != null) _successText = 'Saved $fileName.';
+    });
+  }
+
+  Future<void> _downloadTemplate(ImportKind kind, String label) async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+      _result = null;
+      _successText = null;
+    });
+    try {
+      await _saveCsv(templateCsvFor(kind), '${label}_template.csv');
+    } catch (e) {
+      if (mounted) setState(() { _busy = false; _error = e.toString(); });
+    }
+  }
+
+  Future<void> _exportCsv(ImportKind kind, String label) async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+      _result = null;
+      _successText = null;
+    });
+    try {
+      final service = ref.read(universalImportServiceProvider);
+      final csv = kind == ImportKind.products
+          ? await service.exportProductsCsv()
+          : await service.exportCustomersCsv();
+      await _saveCsv(csv, '${label}_export.csv');
+    } catch (e) {
+      if (mounted) setState(() { _busy = false; _error = e.toString(); });
     }
   }
 
@@ -139,6 +233,8 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
             icon: Icons.inventory_2_rounded,
             busy: _busy,
             onTap: () => _importUniversal(ImportKind.products, 'products'),
+            onSample: () => _downloadTemplate(ImportKind.products, 'products'),
+            onExport: () => _exportCsv(ImportKind.products, 'products'),
           ),
           const SizedBox(height: 16),
           _UniversalCard(
@@ -149,6 +245,21 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
             icon: Icons.people_alt_rounded,
             busy: _busy,
             onTap: () => _importUniversal(ImportKind.customers, 'customers'),
+            onSample: () => _downloadTemplate(ImportKind.customers, 'customers'),
+            onExport: () => _exportCsv(ImportKind.customers, 'customers'),
+            onContacts: _importContacts,
+          ),
+          const SizedBox(height: 16),
+          _UniversalCard(
+            title: 'Sales history (POS)',
+            subtitle:
+                'CSV or Excel with one row per bill (total, date, payment, '
+                'customer). Imported as historical sales — shown in History & '
+                'Reports; they do not change current stock.',
+            icon: Icons.receipt_long_rounded,
+            busy: _busy,
+            onTap: () => _importUniversal(ImportKind.sales, 'sales'),
+            onSample: () => _downloadTemplate(ImportKind.sales, 'sales'),
           ),
           const SizedBox(height: 16),
           MobilePanel(
@@ -232,6 +343,9 @@ class _UniversalCard extends StatelessWidget {
     required this.icon,
     required this.busy,
     required this.onTap,
+    this.onSample,
+    this.onExport,
+    this.onContacts,
   });
 
   final String title;
@@ -239,6 +353,9 @@ class _UniversalCard extends StatelessWidget {
   final IconData icon;
   final bool busy;
   final VoidCallback onTap;
+  final VoidCallback? onSample;
+  final VoidCallback? onExport;
+  final VoidCallback? onContacts;
 
   @override
   Widget build(BuildContext context) {
@@ -260,7 +377,30 @@ class _UniversalCard extends StatelessWidget {
           FilledButton.icon(
             onPressed: busy ? null : onTap,
             icon: Icon(icon),
-            label: Text('Choose file (.csv / .xlsx)'),
+            label: const Text('Choose file (.csv / .xlsx)'),
+          ),
+          if (onContacts != null)
+            TextButton.icon(
+              onPressed: busy ? null : onContacts,
+              icon: const Icon(Icons.contacts_rounded, size: 18),
+              label: const Text('Import from phone contacts'),
+            ),
+          Wrap(
+            spacing: 8,
+            children: <Widget>[
+              if (onSample != null)
+                TextButton.icon(
+                  onPressed: busy ? null : onSample,
+                  icon: const Icon(Icons.description_outlined, size: 18),
+                  label: const Text('Sample'),
+                ),
+              if (onExport != null)
+                TextButton.icon(
+                  onPressed: busy ? null : onExport,
+                  icon: const Icon(Icons.download_rounded, size: 18),
+                  label: const Text('Export CSV'),
+                ),
+            ],
           ),
         ],
       ),

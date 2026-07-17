@@ -7,7 +7,7 @@ import 'package:excel/excel.dart';
 /// Pure + UI-free so it can be unit-tested; the UI adds file picking, a mapping
 /// preview the user can override, and writing rows via the repositories.
 
-enum ImportKind { products, customers, suppliers }
+enum ImportKind { products, customers, suppliers, sales }
 
 enum FieldType { text, number }
 
@@ -85,6 +85,22 @@ const Map<ImportKind, List<ImportField>> importSchemas = <ImportKind, List<Impor
     ImportField('amountDue', 'Payable',
         type: FieldType.number,
         synonyms: <String>['balance', 'payable', 'due', 'outstanding']),
+  ],
+  ImportKind.sales: <ImportField>[
+    ImportField('total', 'Total',
+        required: true,
+        type: FieldType.number,
+        synonyms: <String>['amount', 'grand total', 'net amount', 'bill amount', 'invoice value', 'paid']),
+    ImportField('date', 'Date',
+        synonyms: <String>['sale date', 'invoice date', 'bill date', 'txn date', 'order date']),
+    ImportField('discount', 'Discount',
+        type: FieldType.number, synonyms: <String>['disc']),
+    ImportField('payment', 'Payment mode',
+        synonyms: <String>['payment', 'mode', 'method', 'paid via', 'tender', 'payment type']),
+    ImportField('customerName', 'Customer',
+        synonyms: <String>['customer name', 'client', 'party', 'name']),
+    ImportField('customerPhone', 'Customer phone',
+        synonyms: <String>['phone', 'mobile', 'contact', 'number']),
   ],
 };
 
@@ -286,4 +302,55 @@ double parseNum(String? s) {
   if (s == null) return 0;
   final cleaned = s.replaceAll(RegExp(r'[^0-9.\-]'), '');
   return double.tryParse(cleaned) ?? 0;
+}
+
+// --------------------------------------------------------------------------- //
+// CSV writing (templates + export round-trip)
+// --------------------------------------------------------------------------- //
+
+String _csvField(String v) {
+  if (v.contains(',') || v.contains('"') || v.contains('\n')) {
+    return '"${v.replaceAll('"', '""')}"';
+  }
+  return v;
+}
+
+/// Serialize [rows] (each a list of cells) to CSV text.
+String toCsv(List<List<String>> rows) =>
+    rows.map((r) => r.map(_csvField).join(',')).join('\n');
+
+/// A sample CSV for [kind] — a header row of our canonical labels plus a couple
+/// of example rows, so a shop can see the exact expected shape.
+String templateCsvFor(ImportKind kind) {
+  final fields = importSchemas[kind]!;
+  final header = fields.map((f) => f.label).toList();
+  const samples = <ImportKind, List<List<String>>>{
+    ImportKind.products: <List<String>>[
+      <String>['Parle-G Biscuits', '10', '7.5', '120', 'BISC-001', '', 'Snacks', '', '18'],
+      <String>['Tomatoes (loose)', '40', '24', '35.5', '12345', '', 'Vegetables', '', '0'],
+    ],
+    ImportKind.customers: <List<String>>[
+      <String>['Rahul Sharma', '9876543210', 'rahul@example.com', '250', '0'],
+      <String>['Priya Patel', '9823001122', '', '0', '100'],
+    ],
+    ImportKind.suppliers: <List<String>>[
+      <String>['Metro Wholesale', '9820011111', '', '27AAACM1234A1Z1', '0'],
+    ],
+    ImportKind.sales: <List<String>>[
+      <String>['118', '2026-07-10', '0', 'Cash', 'Rahul Sharma', '9876543210'],
+      <String>['540', '2026-07-12', '15', 'UPI', 'Sneha Iyer', '9900112233'],
+    ],
+  };
+  return toCsv(<List<String>>[header, ...samples[kind]!]);
+}
+
+/// Export canonical [rows] for [kind] to CSV (header of labels + one row per
+/// record). Round-trips with the importer.
+String exportCsvFor(ImportKind kind, List<Map<String, String>> rows) {
+  final fields = importSchemas[kind]!;
+  final out = <List<String>>[fields.map((f) => f.label).toList()];
+  for (final row in rows) {
+    out.add(fields.map((f) => row[f.key] ?? '').toList());
+  }
+  return toCsv(out);
 }

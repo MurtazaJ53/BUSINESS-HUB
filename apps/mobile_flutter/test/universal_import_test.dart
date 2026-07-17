@@ -83,6 +83,48 @@ void main() {
     });
   });
 
+  group('autoMap sales', () {
+    test('maps Amount->total, Bill Date->date, Mode->payment', () {
+      final m = autoMap(
+        ['Bill Date', 'Amount', 'Mode', 'Customer'],
+        ImportKind.sales,
+      );
+      expect(m.columnFor('total'), 1);
+      expect(m.columnFor('date'), 0);
+      expect(m.columnFor('payment'), 2);
+      expect(m.columnFor('customerName'), 3);
+    });
+  });
+
+  group('CSV writing', () {
+    test('toCsv quotes fields with commas/quotes/newlines', () {
+      final csv = toCsv([
+        ['a', 'b'],
+        ['x,y', 'he "said"'],
+      ]);
+      expect(csv, 'a,b\n"x,y","he ""said"""');
+    });
+
+    test('templateCsvFor(products) has our labels + sample rows', () {
+      final csv = templateCsvFor(ImportKind.products);
+      final table = parseCsv(csv);
+      expect(table.headers, contains('Item name'));
+      expect(table.headers, contains('Stock'));
+      expect(table.rows, isNotEmpty);
+    });
+
+    test('exportCsvFor round-trips back through the importer', () {
+      final rows = <Map<String, String>>[
+        <String, String>{'name': 'Pen', 'price': '10', 'stock': '5'},
+      ];
+      final csv = exportCsvFor(ImportKind.products, rows);
+      final reimported = mapRows(parseCsv(csv), ImportKind.products);
+      expect(reimported.rows.single['name'], 'Pen');
+      expect(reimported.rows.single['price'], '10');
+      expect(reimported.rows.single['stock'], '5');
+    });
+  });
+
   group('parseNum', () {
     test('strips currency symbols, commas and spaces', () {
       expect(parseNum(r'₹ 1,250.50'), closeTo(1250.50, 0.001));
