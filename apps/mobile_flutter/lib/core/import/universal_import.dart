@@ -1,0 +1,289 @@
+import 'package:excel/excel.dart';
+
+/// A format-agnostic import engine: read CSV or XLSX from *any* layout, then
+/// auto-map its columns onto our canonical fields by fuzzy header matching, so
+/// a shop can import a products/customers file exported from almost anywhere.
+///
+/// Pure + UI-free so it can be unit-tested; the UI adds file picking, a mapping
+/// preview the user can override, and writing rows via the repositories.
+
+enum ImportKind { products, customers, suppliers }
+
+enum FieldType { text, number }
+
+class ImportField {
+  const ImportField(
+    this.key,
+    this.label, {
+    this.synonyms = const <String>[],
+    this.required = false,
+    this.type = FieldType.text,
+  });
+
+  final String key;
+  final String label;
+  final List<String> synonyms;
+  final bool required;
+  final FieldType type;
+
+  /// All header spellings this field will match, normalized.
+  Iterable<String> get _needles => <String>[key, label, ...synonyms].map(normalizeHeader);
+}
+
+/// Canonical field definitions per data type. Order matters: earlier fields win
+/// a contested column.
+const Map<ImportKind, List<ImportField>> importSchemas = <ImportKind, List<ImportField>>{
+  ImportKind.products: <ImportField>[
+    ImportField('name', 'Item name',
+        required: true,
+        synonyms: <String>['item', 'product', 'product name', 'title', 'description', 'particulars']),
+    ImportField('price', 'Price',
+        type: FieldType.number,
+        synonyms: <String>['mrp', 'rate', 'selling price', 'sale price', 'sell price', 'unit price', 'amount']),
+    ImportField('costPrice', 'Cost price',
+        type: FieldType.number,
+        synonyms: <String>['cost', 'purchase price', 'buy price', 'cp', 'purchase rate']),
+    ImportField('stock', 'Stock',
+        type: FieldType.number,
+        synonyms: <String>['qty', 'quantity', 'on hand', 'available', 'stock on hand', 'opening stock', 'inventory', 'in stock']),
+    ImportField('sku', 'SKU',
+        synonyms: <String>['code', 'item code', 'product code']),
+    ImportField('barcode', 'Barcode',
+        synonyms: <String>['ean', 'upc', 'qr']),
+    ImportField('category', 'Category',
+        synonyms: <String>['cat', 'group', 'department', 'type']),
+    ImportField('hsnCode', 'HSN',
+        synonyms: <String>['hsn code', 'hsn/sac', 'sac']),
+    ImportField('gstRate', 'GST rate',
+        type: FieldType.number,
+        synonyms: <String>['gst', 'tax', 'tax rate', 'gst %', 'gst percent']),
+  ],
+  ImportKind.customers: <ImportField>[
+    ImportField('name', 'Name',
+        required: true,
+        synonyms: <String>['customer', 'customer name', 'client', 'client name', 'party', 'party name']),
+    ImportField('phone', 'Phone',
+        synonyms: <String>['mobile', 'contact', 'number', 'phone number', 'mobile number', 'whatsapp', 'contact number']),
+    ImportField('email', 'Email',
+        synonyms: <String>['email id', 'e-mail', 'mail']),
+    ImportField('amountDue', 'Amount due',
+        type: FieldType.number,
+        synonyms: <String>['balance', 'due', 'outstanding', 'credit', 'pending', 'closing balance']),
+    ImportField('advance', 'Advance',
+        type: FieldType.number,
+        synonyms: <String>['amount held', 'deposit', 'prepaid', 'advance paid']),
+  ],
+  ImportKind.suppliers: <ImportField>[
+    ImportField('name', 'Name',
+        required: true,
+        synonyms: <String>['supplier', 'supplier name', 'vendor', 'vendor name', 'party']),
+    ImportField('phone', 'Phone',
+        synonyms: <String>['mobile', 'contact', 'number', 'phone number']),
+    ImportField('email', 'Email', synonyms: <String>['mail', 'email id']),
+    ImportField('gstin', 'GSTIN',
+        synonyms: <String>['gst', 'gst no', 'gst number', 'tax id']),
+    ImportField('amountDue', 'Payable',
+        type: FieldType.number,
+        synonyms: <String>['balance', 'payable', 'due', 'outstanding']),
+  ],
+};
+
+/// Lowercase + strip everything but a-z0-9, so "Item Name", "item_name" and
+/// "ITEM-NAME" all collapse to "itemname".
+String normalizeHeader(String h) =>
+    h.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+class ParsedTable {
+  const ParsedTable(this.headers, this.rows);
+  final List<String> headers;
+  final List<List<String>> rows; // data rows only (no header)
+}
+
+/// Minimal RFC-4180 CSV parser: handles quoted fields, escaped quotes (""),
+/// commas and newlines inside quotes. Returns headers + data rows.
+ParsedTable parseCsv(String content) {
+  final rows = <List<String>>[];
+  var field = StringBuffer();
+  var record = <String>[];
+  var inQuotes = false;
+  final s = content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+
+  void endField() {
+    record.add(field.toString());
+    field = StringBuffer();
+  }
+
+  void endRecord() {
+    endField();
+    // Skip fully-empty lines.
+    if (record.any((c) => c.trim().isNotEmpty)) rows.add(record);
+    record = <String>[];
+  }
+
+  for (var i = 0; i < s.length; i++) {
+    final ch = s[i];
+    if (inQuotes) {
+      if (ch == '"') {
+        if (i + 1 < s.length && s[i + 1] == '"') {
+          field.write('"');
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field.write(ch);
+      }
+    } else {
+      if (ch == '"') {
+        inQuotes = true;
+      } else if (ch == ',') {
+        endField();
+      } else if (ch == '\n') {
+        endRecord();
+      } else {
+        field.write(ch);
+      }
+    }
+  }
+  if (field.isNotEmpty || record.isNotEmpty) endRecord();
+
+  if (rows.isEmpty) return const ParsedTable(<String>[], <List<String>>[]);
+  final headers = rows.first.map((c) => c.trim()).toList();
+  return ParsedTable(headers, rows.skip(1).toList());
+}
+
+/// Parse the first non-empty sheet of an XLSX file. Returns null if the `excel`
+/// package fails to decode the file (it is fragile with some exporters) so the
+/// caller can show a clean "save as CSV" message instead of crashing.
+ParsedTable? parseXlsxBytes(List<int> bytes) {
+  try {
+    final excel = Excel.decodeBytes(bytes);
+    for (final name in excel.tables.keys) {
+      final table = excel.tables[name];
+      if (table == null || table.rows.isEmpty) continue;
+      final headers =
+          table.rows.first.map((c) => _xlsxCell(c).trim()).toList(growable: false);
+      if (headers.every((h) => h.isEmpty)) continue;
+      final rows = table.rows
+          .skip(1)
+          .map((r) => r.map(_xlsxCell).toList())
+          .where((r) => r.any((c) => c.trim().isNotEmpty))
+          .toList();
+      return ParsedTable(headers, rows);
+    }
+    return const ParsedTable(<String>[], <List<String>>[]);
+  } catch (_) {
+    return null;
+  }
+}
+
+String _xlsxCell(Data? cell) {
+  final value = cell?.value;
+  if (value == null) return '';
+  if (value is TextCellValue) return value.value.toString().trim();
+  if (value is IntCellValue) return value.value.toString();
+  if (value is DoubleCellValue) return value.value.toString();
+  return value.toString().trim();
+}
+
+/// The result of matching a file's headers to a kind's canonical fields.
+class ColumnMapping {
+  ColumnMapping(this.headers, this.fieldToColumn);
+  final List<String> headers;
+  final Map<String, int> fieldToColumn; // canonical field key -> header index
+
+  int? columnFor(String fieldKey) => fieldToColumn[fieldKey];
+}
+
+/// Auto-map the file's [headers] to the canonical fields of [kind]. Two passes:
+/// exact normalized match first, then a looser contains-match, never reusing a
+/// column.
+ColumnMapping autoMap(List<String> headers, ImportKind kind) {
+  final fields = importSchemas[kind]!;
+  final normHeaders = headers.map(normalizeHeader).toList();
+  final used = <int>{};
+  final mapping = <String, int>{};
+
+  int? findExact(ImportField f) {
+    for (final needle in f._needles) {
+      final idx = normHeaders.indexOf(needle);
+      if (idx >= 0 && !used.contains(idx)) return idx;
+    }
+    return null;
+  }
+
+  int? findFuzzy(ImportField f) {
+    for (var idx = 0; idx < normHeaders.length; idx++) {
+      if (used.contains(idx)) continue;
+      final h = normHeaders[idx];
+      if (h.isEmpty) continue;
+      for (final needle in f._needles) {
+        if (needle.length < 3) continue;
+        if (h.contains(needle) || needle.contains(h)) return idx;
+      }
+    }
+    return null;
+  }
+
+  for (final f in fields) {
+    final idx = findExact(f);
+    if (idx != null) {
+      mapping[f.key] = idx;
+      used.add(idx);
+    }
+  }
+  for (final f in fields) {
+    if (mapping.containsKey(f.key)) continue;
+    final idx = findFuzzy(f);
+    if (idx != null) {
+      mapping[f.key] = idx;
+      used.add(idx);
+    }
+  }
+  return ColumnMapping(headers, mapping);
+}
+
+class MappedImport {
+  const MappedImport(this.rows, this.missingRequired, this.mapping);
+  final List<Map<String, String>> rows; // canonical field -> value
+  final List<String> missingRequired; // required field keys with no column
+  final ColumnMapping mapping;
+
+  bool get ok => missingRequired.isEmpty && rows.isNotEmpty;
+}
+
+/// Apply a [mapping] (auto or user-edited) to produce canonical rows. Rows whose
+/// required fields are all blank are dropped.
+MappedImport mapRows(ParsedTable table, ImportKind kind, {ColumnMapping? mapping}) {
+  final fields = importSchemas[kind]!;
+  final map = mapping ?? autoMap(table.headers, kind);
+  final missing = fields
+      .where((f) => f.required && map.columnFor(f.key) == null)
+      .map((f) => f.key)
+      .toList();
+
+  final out = <Map<String, String>>[];
+  for (final row in table.rows) {
+    final record = <String, String>{};
+    for (final f in fields) {
+      final col = map.columnFor(f.key);
+      if (col == null || col >= row.length) continue;
+      final raw = row[col].trim();
+      if (raw.isEmpty) continue;
+      record[f.key] = raw;
+    }
+    // Require a non-empty value for every required field.
+    final hasRequired = fields
+        .where((f) => f.required)
+        .every((f) => (record[f.key] ?? '').isNotEmpty);
+    if (hasRequired) out.add(record);
+  }
+  return MappedImport(out, missing, map);
+}
+
+/// Parse a numeric string tolerantly (strips currency symbols, commas, spaces).
+double parseNum(String? s) {
+  if (s == null) return 0;
+  final cleaned = s.replaceAll(RegExp(r'[^0-9.\-]'), '');
+  return double.tryParse(cleaned) ?? 0;
+}

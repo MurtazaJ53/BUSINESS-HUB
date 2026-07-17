@@ -1,0 +1,94 @@
+import 'package:business_hub_mobile/core/import/universal_import.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  group('normalizeHeader', () {
+    test('collapses case, spaces, underscores, dashes', () {
+      expect(normalizeHeader('Item Name'), 'itemname');
+      expect(normalizeHeader('item_name'), 'itemname');
+      expect(normalizeHeader('ITEM-NAME'), 'itemname');
+    });
+  });
+
+  group('parseCsv', () {
+    test('parses headers + rows', () {
+      final t = parseCsv('name,price\nPen,10\nBook,50\n');
+      expect(t.headers, ['name', 'price']);
+      expect(t.rows.length, 2);
+      expect(t.rows[1], ['Book', '50']);
+    });
+
+    test('handles quoted fields with commas and escaped quotes', () {
+      final t = parseCsv('name,note\n"Sharma, R","he said ""hi"""\n');
+      expect(t.rows.single, ['Sharma, R', 'he said "hi"']);
+    });
+
+    test('skips blank lines', () {
+      final t = parseCsv('a,b\n\n1,2\n\n');
+      expect(t.rows.length, 1);
+    });
+  });
+
+  group('autoMap products (any layout)', () {
+    test('maps MRP->price, Qty->stock, Item Name->name, Cost->costPrice', () {
+      final m = autoMap(
+        ['Item Name', 'MRP', 'Qty', 'Cost', 'HSN'],
+        ImportKind.products,
+      );
+      expect(m.columnFor('name'), 0);
+      expect(m.columnFor('price'), 1);
+      expect(m.columnFor('stock'), 2);
+      expect(m.columnFor('costPrice'), 3);
+      expect(m.columnFor('hsnCode'), 4);
+    });
+
+    test('never assigns one column to two fields', () {
+      final m = autoMap(['Product', 'Rate'], ImportKind.products);
+      final used = m.fieldToColumn.values.toList();
+      expect(used.toSet().length, used.length);
+    });
+  });
+
+  group('autoMap customers', () {
+    test('maps Customer Name->name, Mobile->phone, Balance->amountDue', () {
+      final m = autoMap(
+        ['Customer Name', 'Mobile', 'Balance', 'E-mail'],
+        ImportKind.customers,
+      );
+      expect(m.columnFor('name'), 0);
+      expect(m.columnFor('phone'), 1);
+      expect(m.columnFor('amountDue'), 2);
+      expect(m.columnFor('email'), 3);
+    });
+  });
+
+  group('mapRows', () {
+    test('produces canonical rows and drops rows missing the required name', () {
+      final table = parseCsv('Product,Rate,Qty\nPen,10,5\n,20,3\nBook,50,2\n');
+      final mapped = mapRows(table, ImportKind.products);
+      expect(mapped.ok, isTrue);
+      expect(mapped.missingRequired, isEmpty);
+      // The nameless middle row is dropped.
+      expect(mapped.rows.length, 2);
+      expect(mapped.rows.first['name'], 'Pen');
+      expect(mapped.rows.first['price'], '10');
+      expect(mapped.rows.first['stock'], '5');
+    });
+
+    test('flags missing required field when no name column exists', () {
+      final table = parseCsv('Rate,Qty\n10,5\n');
+      final mapped = mapRows(table, ImportKind.products);
+      expect(mapped.missingRequired, contains('name'));
+      expect(mapped.ok, isFalse);
+    });
+  });
+
+  group('parseNum', () {
+    test('strips currency symbols, commas and spaces', () {
+      expect(parseNum(r'₹ 1,250.50'), closeTo(1250.50, 0.001));
+      expect(parseNum('-40'), -40);
+      expect(parseNum('abc'), 0);
+      expect(parseNum(null), 0);
+    });
+  });
+}
