@@ -29,7 +29,10 @@ GLOBS_TO_REMOVE=(
   "*.jks"
   "*.keystore"
 )
-STRIP_BLOBS_BIGGER_THAN="5M"
+# Belt-and-suspenders catch for any *huge* blob not matched by the globs above.
+# Kept well above the largest legitimate tracked file (a 6 MB wasm blob in
+# legacy/src/db) so real source is never stripped.
+STRIP_BLOBS_BIGGER_THAN="45M"
 
 require_tool() {
   if ! command -v git-filter-repo >/dev/null 2>&1 && ! python -c "import git_filter_repo" >/dev/null 2>&1; then
