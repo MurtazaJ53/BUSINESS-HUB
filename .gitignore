@@ -61,3 +61,6 @@ apps/backend/media/
 apps/backend/staticfiles/
 apps/backend/.erpnext-mock-state.json
 
+
+# Local build-time secrets (UPI VPA, manager PIN)
+apps/mobile_flutter/dart_defines.json

@@ -1,0 +1,6 @@
+{
+  "_comment": "Copy to dart_defines.json (gitignored) and fill in. Launch with: flutter run --dart-define-from-file=dart_defines.json",
+  "BUSINESS_HUB_API_BASE_URL": "http://192.168.1.10:8000/api/v1",
+  "BUSINESS_HUB_UPI_VPA": "yourshop@okhdfcbank",
+  "BUSINESS_HUB_MANAGER_PIN": "4821"
+}
