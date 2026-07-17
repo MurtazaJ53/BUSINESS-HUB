@@ -9,6 +9,7 @@ from platform_apps.attendance.views import (
 from platform_apps.customers.views import (
     CustomerDetailView,
     CustomerLedgerListCreateView,
+    CustomerLedgerTimelineView,
     CustomerListCreateView,
     CustomerSummaryView,
 )
@@ -21,13 +22,23 @@ from platform_apps.inventory.views import (
 )
 from platform_apps.payments.views import SalePaymentCommandIngestionView, SalePaymentListView
 from platform_apps.payments.views import SalePaymentSummaryView
+from platform_apps.purchases.views import (
+    PurchaseDetailView,
+    PurchaseListCreateView,
+    PurchaseSummaryView,
+    SupplierDetailView,
+    SupplierLedgerView,
+    SupplierListCreateView,
+    SupplierSummaryView,
+)
+from platform_apps.projections.reports import ProfitAndLossView
 from platform_apps.projections.views import (
     ShopDashboardSnapshotView,
     ShopPulseSignalDetailView,
     ShopPulseSignalListView,
     ShopPulseSnapshotView,
 )
-from platform_apps.sales.views import SaleCommandIngestionView, SaleDetailView, SaleListCreateView, SaleVoidView, SaleSummaryView, SaleGstSummaryView, GSTR1ExportView
+from platform_apps.sales.views import SaleCommandIngestionView, SaleDetailView, SaleListCreateView, SaleVoidView, SaleSummaryView, SaleGstSummaryView, GSTR1ExportView, GSTR3BExportView
 from platform_apps.shops.views import (
     ShopDomainStateView,
     ShopMembershipListView,
@@ -77,6 +88,11 @@ urlpatterns = [
         CustomerLedgerListCreateView.as_view(),
         name="customer-ledger",
     ),
+    path(
+        "<uuid:shop_id>/customers/<uuid:customer_id>/timeline/",
+        CustomerLedgerTimelineView.as_view(),
+        name="customer-ledger-timeline",
+    ),
     path("<uuid:shop_id>/attendance/", AttendanceSessionListCreateView.as_view(), name="attendance-list"),
     path("<uuid:shop_id>/attendance/summary/", AttendanceSummaryView.as_view(), name="attendance-summary"),
     path(
@@ -84,6 +100,17 @@ urlpatterns = [
         AttendanceSessionDetailView.as_view(),
         name="attendance-detail",
     ),
+    path("<uuid:shop_id>/suppliers/", SupplierListCreateView.as_view(), name="supplier-list"),
+    path("<uuid:shop_id>/suppliers/summary/", SupplierSummaryView.as_view(), name="supplier-summary"),
+    path("<uuid:shop_id>/suppliers/<uuid:supplier_id>/", SupplierDetailView.as_view(), name="supplier-detail"),
+    path(
+        "<uuid:shop_id>/suppliers/<uuid:supplier_id>/ledger/",
+        SupplierLedgerView.as_view(),
+        name="supplier-ledger",
+    ),
+    path("<uuid:shop_id>/purchases/", PurchaseListCreateView.as_view(), name="purchase-list"),
+    path("<uuid:shop_id>/purchases/summary/", PurchaseSummaryView.as_view(), name="purchase-summary"),
+    path("<uuid:shop_id>/purchases/<uuid:purchase_id>/", PurchaseDetailView.as_view(), name="purchase-detail"),
     path("<uuid:shop_id>/expenses/", ExpenseListCreateView.as_view(), name="expense-list"),
     path("<uuid:shop_id>/expenses/summary/", ExpenseSummaryView.as_view(), name="expense-summary"),
     path("<uuid:shop_id>/expenses/<uuid:expense_id>/", ExpenseDetailView.as_view(), name="expense-detail"),
@@ -103,6 +130,11 @@ urlpatterns = [
         name="projection-dashboard",
     ),
     path(
+        "<uuid:shop_id>/reports/profit-loss/",
+        ProfitAndLossView.as_view(),
+        name="report-profit-loss",
+    ),
+    path(
         "<uuid:shop_id>/projections/pulse/",
         ShopPulseSnapshotView.as_view(),
         name="projection-pulse",
@@ -119,6 +151,7 @@ urlpatterns = [
     ),
     path("<uuid:shop_id>/sales/", SaleListCreateView.as_view(), name="sale-list"),
     path("<uuid:shop_id>/sales/export/gstr1/", GSTR1ExportView.as_view(), name="sale-gstr1-export"),
+    path("<uuid:shop_id>/sales/export/gstr3b/", GSTR3BExportView.as_view(), name="sale-gstr3b-export"),
     path("<uuid:shop_id>/sales/summary/", SaleSummaryView.as_view(), name="sale-summary"),
     path("<uuid:shop_id>/sales/summary/gst/", SaleGstSummaryView.as_view(), name="sale-gst-summary"),
     path("<uuid:shop_id>/sales/commands/", SaleCommandIngestionView.as_view(), name="sale-command-ingestion"),

@@ -62,6 +62,7 @@ class InventoryStockLedger(SourceTrackedModel):
         ADJUSTMENT = "adjustment", "Adjustment"
         SALE = "sale", "Sale"
         RETURN = "return", "Return"
+        PURCHASE = "purchase", "Purchase"
         IMPORT = "import", "Import"
         SYNC = "sync", "Sync"
 
@@ -75,7 +76,7 @@ class InventoryStockLedger(SourceTrackedModel):
         null=True,
     )
     event_type = models.CharField(max_length=32, choices=EventType.choices)
-    quantity_delta = models.IntegerField()
+    quantity_delta = models.DecimalField(max_digits=12, decimal_places=3)
     unit_cost = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
     unit_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
     note = models.TextField(blank=True)

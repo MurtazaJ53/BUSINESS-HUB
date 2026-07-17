@@ -10,7 +10,10 @@ import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/pos/cart_pricing.dart';
 import '../../../core/pos/held_sales.dart';
+import '../../../core/pos/upi_qr.dart';
 import '../../../core/pos/weight_barcode.dart';
+import '../../../core/security/manager_gate.dart';
+import 'upi_qr_view.dart';
 import '../../../core/receipt/receipt_pdf.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/providers/printer_provider.dart';
@@ -532,10 +535,14 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
         return sku == plu || sku.contains(plu) || item.id.toLowerCase() == plu;
       }).toList();
       final name = byPlu.isNotEmpty ? byPlu.first.name : 'Weighed item $plu';
+      // For a weight-embedded barcode charge rate x weight using the matched
+      // item's price; a price-embedded barcode charges the embedded amount.
+      final rate = byPlu.isNotEmpty ? byPlu.first.price : 0.0;
+      final linePrice = weigh.resolveLinePrice(rate);
       _addCartLine(
         id: 'weigh-${DateTime.now().microsecondsSinceEpoch}',
         name: name,
-        price: weigh.embeddedValue,
+        price: linePrice,
         category: byPlu.isNotEmpty ? byPlu.first.category : 'General',
         gstRate: byPlu.isNotEmpty ? byPlu.first.gstRate : 0,
         priceIncludesTax: byPlu.isNotEmpty
@@ -809,6 +816,16 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
     );
     if (result == null || !mounted) return;
 
+    // Fraud guard: a discount above zero needs manager approval (no-op unless a
+    // manager PIN is configured). Same gate can wrap void / Khata-delete flows.
+    if (_discountAmount > 0) {
+      final approved = await ManagerGate.requireManagerApproval(
+        context,
+        reason: 'Approve a ${formatCurrency(_discountAmount)} discount on this sale?',
+      );
+      if (!approved || !mounted) return;
+    }
+
     final payments = result['payments'] as List<PosPayment>;
     final paymentMode = result['paymentMode'] as String;
     final buyerGstin = result['buyerGstin'] as String?;
@@ -905,6 +922,10 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
           builder: (sheetContext, setSheetState) {
             Future<void> printReceipt() async {
               if (printing) return;
+              // Capture the messenger before any async gap so we can show a
+              // confirmation after the sheet is popped without touching a
+              // possibly-unmounted BuildContext.
+              final messenger = ScaffoldMessenger.of(context);
               setSheetState(() => printing = true);
               try {
                 final detail = await ref
@@ -932,10 +953,10 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
                 await printer.disconnect();
                 if (sheetContext.mounted) {
                   Navigator.pop(sheetContext);
-                  ScaffoldMessenger.of(sheetContext).showSnackBar(
-                    const SnackBar(content: Text('Receipt printed.')),
-                  );
                 }
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('Receipt printed.')),
+                );
               } catch (error) {
                 if (sheetContext.mounted) {
                   setSheetState(() => printing = false);
@@ -1065,6 +1086,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
             _buildHeader(context, items),
             if (categories.isNotEmpty) _buildCategoryFilters(categories),
             _buildFavouritesStrip(),
+            _buildQuickWeighGrid(items),
             const SizedBox(height: 4),
             Expanded(
               child: items.isEmpty
@@ -1153,6 +1175,12 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
                   onPressed: _holdCurrentSale,
                   icon: const Icon(Icons.pause_circle_outline_rounded),
                   tooltip: 'Hold sale',
+                ),
+              if (_cart.isNotEmpty)
+                IconButton(
+                  onPressed: () => _showUpiQr(_netTotal),
+                  icon: const Icon(Icons.qr_code_2_rounded),
+                  tooltip: 'Collect via UPI QR',
                 ),
               TextButton.icon(
                 onPressed: _addCustomItem,
@@ -1263,6 +1291,242 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
         },
       ),
     );
+  }
+
+  /// Weight/volume units that mark an item as sold loose (by weight).
+  static const Set<String> _looseUnits = <String>{
+    'kg', 'kgs', 'g', 'gm', 'gms', 'gram', 'grams', 'kilogram', 'kilograms',
+    'l', 'ltr', 'litre', 'liter', 'ml',
+  };
+
+  bool _isLooseItem(InventoryCatalogItem item) {
+    final unit = (item.unit ?? '').trim().toLowerCase();
+    if (_looseUnits.contains(unit)) return true;
+    return item.name.toLowerCase().contains('loose');
+  }
+
+  /// Quick-key grid: visual tap-to-add tiles for loose/by-weight items so the
+  /// operator can skip the search bar during rapid checkouts. The tile set is
+  /// driven by which catalog items are marked as loose (a weight unit or a
+  /// "loose" name), so owners customise it by tagging items.
+  Widget _buildQuickWeighGrid(List<InventoryCatalogItem> items) {
+    final loose = items.where(_isLooseItem).take(8).toList();
+    if (loose.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: const <Widget>[
+              Icon(Icons.scale_rounded, size: 15, color: AppPalette.primary),
+              SizedBox(width: 6),
+              Text(
+                'Quick weigh',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 62,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: loose.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final item = loose[index];
+                return _QuickWeighTile(
+                  item: item,
+                  onTap: () => _tapQuickWeigh(item),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Merchant UPI ID for QR collection. Seeded from --dart-define
+  /// BUSINESS_HUB_UPI_VPA, editable in the dialog, remembered for the session.
+  static String _merchantVpa = const String.fromEnvironment('BUSINESS_HUB_UPI_VPA');
+
+  /// Show a dynamic UPI QR for [amount] so the customer scans and pays the exact
+  /// total — no "did you pay?" guesswork. Prompts for the merchant VPA if unset.
+  Future<void> _showUpiQr(double amount) async {
+    if (amount <= 0) return;
+    final shopName = ref.read(shopInfoProvider).asData?.value.name ?? 'Merchant';
+    final vpaController = TextEditingController(text: _merchantVpa);
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            String? uri;
+            String? error;
+            try {
+              if (_merchantVpa.trim().isNotEmpty) {
+                uri = buildUpiUri(
+                  payeeVpa: _merchantVpa,
+                  payeeName: shopName,
+                  amount: amount,
+                  note: 'Bill $shopName',
+                );
+              }
+            } on UpiRequestError catch (e) {
+              error = e.message;
+            }
+            return AlertDialog(
+              title: Text('Collect ${formatCurrency(amount)}'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  if (uri != null) ...<Widget>[
+                    UpiQrView(data: uri),
+                    const SizedBox(height: 8),
+                    Text(
+                      _merchantVpa,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Scan with any UPI app',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ] else ...<Widget>[
+                    const Text('Enter your UPI ID to generate the QR.'),
+                    if (error != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(error, style: const TextStyle(color: Colors.red)),
+                      ),
+                  ],
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: vpaController,
+                    decoration: const InputDecoration(
+                      labelText: 'Merchant UPI ID',
+                      hintText: 'name@bank',
+                    ),
+                    onChanged: (v) => setDialogState(() => _merchantVpa = v.trim()),
+                  ),
+                ],
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Done'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _tapQuickWeigh(InventoryCatalogItem item) async {
+    final weight = await _promptWeight(item);
+    if (weight == null || weight <= 0 || !mounted) return;
+    _addLooseItem(item, weight);
+  }
+
+  /// Ask for a weight (kg) with quick presets; returns null on cancel.
+  Future<double?> _promptWeight(InventoryCatalogItem item) {
+    final controller = TextEditingController();
+    return showDialog<double>(
+      context: context,
+      builder: (dialogContext) {
+        double? parse() => double.tryParse(controller.text.trim());
+        void submit(double value) => Navigator.pop(dialogContext, value);
+        return AlertDialog(
+          title: Text('Weigh ${item.name}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                '${formatCurrency(item.price)} / ${(item.unit ?? 'kg')}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Weight',
+                  hintText: 'e.g. 1.5',
+                  suffixText: 'kg',
+                ),
+                onSubmitted: (_) {
+                  final v = parse();
+                  if (v != null && v > 0) submit(v);
+                },
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                children: <double>[0.25, 0.5, 1, 2]
+                    .map(
+                      (w) => ActionChip(
+                        label: Text('${formatQty(w)} kg'),
+                        onPressed: () => submit(w),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final v = parse();
+                if (v != null && v > 0) submit(v);
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Add (or top up) a loose line priced rate x weight. Uses the item's real id
+  /// so stock still decrements on sale; quantity is the fractional weight.
+  void _addLooseItem(InventoryCatalogItem item, double weight) {
+    setState(() {
+      final index = _cart.indexWhere((c) => c.id == item.id);
+      if (index >= 0) {
+        _cart[index] = _cart[index].copyWith(
+          quantity: _cart[index].quantity + weight,
+        );
+      } else {
+        _cart.add(
+          PosCartItem(
+            id: item.id,
+            name: item.name,
+            price: item.price,
+            quantity: weight,
+            stock: item.stock,
+            category: item.category,
+            size: item.size,
+            sku: item.sku,
+            costPrice: item.costPrice,
+            hsnCode: item.hsnCode,
+            gstRate: item.gstRate,
+            priceIncludesTax: item.priceIncludesTax,
+          ),
+        );
+      }
+    });
+    HapticFeedback.selectionClick();
   }
 
   Widget _buildCategoryFilters(List<InventoryCategorySummary> categories) {
@@ -1714,6 +1978,58 @@ class _CategoryChip extends StatelessWidget {
               fontWeight: FontWeight.w700,
               color: selected ? Colors.white : colors.textSecondary,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A visual tap-to-add tile for a loose / by-weight item in the quick-key grid.
+class _QuickWeighTile extends StatelessWidget {
+  const _QuickWeighTile({required this.item, required this.onTap});
+
+  final InventoryCatalogItem item;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    return Material(
+      color: colors.surface,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: 132,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: colors.borderSoft),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                item.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '${formatCurrency(item.price)} / ${(item.unit ?? 'kg')}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: colors.textSecondary,
+                ),
+              ),
+            ],
           ),
         ),
       ),

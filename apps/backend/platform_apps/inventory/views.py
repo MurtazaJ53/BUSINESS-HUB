@@ -76,7 +76,7 @@ class InventoryItemListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
         queryset = (
             InventoryItem.objects.filter(shop=membership.shop, tombstone=False)
             .select_related("private")
-            .annotate(stock_on_hand=Coalesce(Sum("ledger_entries__quantity_delta"), 0))
+            .annotate(stock_on_hand=Coalesce(Sum("ledger_entries__quantity_delta"), Decimal("0")))
             .order_by("name", "created_at")
         )
         query = self.request.query_params.get("q", "").strip()
@@ -114,7 +114,7 @@ class InventoryItemListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
         item = (
             InventoryItem.objects.filter(pk=item.pk)
             .select_related("private")
-            .annotate(stock_on_hand=Coalesce(Sum("ledger_entries__quantity_delta"), 0))
+            .annotate(stock_on_hand=Coalesce(Sum("ledger_entries__quantity_delta"), Decimal("0")))
             .get()
         )
         create_workspace_audit_event(
@@ -142,7 +142,7 @@ class InventoryItemDetailView(ShopScopedMixin, generics.RetrieveUpdateDestroyAPI
         return (
             InventoryItem.objects.filter(shop=membership.shop)
             .select_related("private")
-            .annotate(stock_on_hand=Coalesce(Sum("ledger_entries__quantity_delta"), 0))
+            .annotate(stock_on_hand=Coalesce(Sum("ledger_entries__quantity_delta"), Decimal("0")))
         )
 
     def get_serializer_context(self):
@@ -166,7 +166,7 @@ class InventoryItemDetailView(ShopScopedMixin, generics.RetrieveUpdateDestroyAPI
         item = (
             InventoryItem.objects.filter(pk=serializer.instance.pk)
             .select_related("private")
-            .annotate(stock_on_hand=Coalesce(Sum("ledger_entries__quantity_delta"), 0))
+            .annotate(stock_on_hand=Coalesce(Sum("ledger_entries__quantity_delta"), Decimal("0")))
             .get()
         )
         create_workspace_audit_event(
@@ -215,7 +215,7 @@ class InventorySummaryView(ShopScopedMixin, APIView):
         membership = self.get_membership()
         queryset = (
             InventoryItem.objects.filter(shop=membership.shop, tombstone=False)
-            .annotate(stock_on_hand=Coalesce(Sum("ledger_entries__quantity_delta"), 0))
+            .annotate(stock_on_hand=Coalesce(Sum("ledger_entries__quantity_delta"), Decimal("0")))
         )
 
         query = self.request.query_params.get("q", "").strip()
@@ -294,7 +294,7 @@ class InventoryItemAdjustmentView(ShopScopedMixin, APIView):
         )
 
         current_stock = (
-            item.ledger_entries.aggregate(total=Coalesce(Sum("quantity_delta"), 0))["total"]
+            item.ledger_entries.aggregate(total=Coalesce(Sum("quantity_delta"), Decimal("0")))["total"]
         )
         create_workspace_audit_event(
             shop=membership.shop,

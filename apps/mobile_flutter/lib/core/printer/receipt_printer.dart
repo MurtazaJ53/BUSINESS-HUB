@@ -144,9 +144,15 @@ class ReceiptPrinterService {
   Future<void> openCashDrawer() async {
     final isConnected = await bluetooth.isConnected ?? false;
     if (!isConnected) return;
-    // ESC p m t1 t2  -> pin 0 (pin 2), on=25ms, off=250ms.
-    bluetooth.writeBytes(
-      Uint8List.fromList(<int>[0x1B, 0x70, 0x00, 0x19, 0xFA]),
-    );
+    bluetooth.writeBytes(Uint8List.fromList(cashDrawerKickBytes()));
   }
+}
+
+/// ESC/POS "generate pulse" command for an RJ11-connected cash drawer:
+/// `ESC p m t1 t2` = `0x1B 0x70 <pin> <onTime> <offTime>`. Times are in 2 ms
+/// units per the ESC/POS spec, so the defaults are ~50 ms on / ~500 ms off on
+/// drawer pin 2. Swap [pin] to 1 if your drawer is wired to pin 5.
+List<int> cashDrawerKickBytes({int pin = 0, int onTime = 25, int offTime = 250}) {
+  assert(pin == 0 || pin == 1, 'Drawer pin must be 0 (pin 2) or 1 (pin 5).');
+  return <int>[0x1B, 0x70, pin, onTime & 0xFF, offTime & 0xFF];
 }

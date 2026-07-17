@@ -99,7 +99,7 @@ class SaleItem(SourceTrackedModel):
     name_snapshot = models.CharField(max_length=255)
     sku_snapshot = models.CharField(max_length=128, blank=True)
     size_snapshot = models.CharField(max_length=64, blank=True)
-    quantity = models.PositiveIntegerField(default=1)
+    quantity = models.DecimalField(max_digits=12, decimal_places=3, default=Decimal("1"))
     unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     unit_cost = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
     line_total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))

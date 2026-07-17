@@ -94,6 +94,81 @@ class SalesApiTests(TestCase):
             1,
         )
 
+    def test_create_sale_accepts_fractional_quantity(self):
+        # Sell 1.5 kg at Rs.60/kg = Rs.90; stock must decrement by exactly 1.5.
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/",
+            {
+                "items": [
+                    {
+                        "inventory_item_id": str(self.item.id),
+                        "quantity": "1.5",
+                        "unit_price": "60.00",
+                    }
+                ],
+                "payments": [
+                    {"payment_method": "CASH", "amount": "90.00"},
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.content)
+        sale = Sale.objects.get()
+        self.assertEqual(sale.subtotal_amount, Decimal("90.00"))
+        item = SaleItem.objects.get(sale=sale)
+        self.assertEqual(item.quantity, Decimal("1.500"))
+        self.assertEqual(item.line_total, Decimal("90.00"))
+        ledger = InventoryStockLedger.objects.get(
+            item=self.item,
+            event_type=InventoryStockLedger.EventType.SALE,
+        )
+        self.assertEqual(ledger.quantity_delta, Decimal("-1.500"))
+
+    def test_gstr3b_export_returns_rate_wise_summary(self):
+        self.shop.state_code = "27"
+        self.shop.gstin = "27ABCDE1234F1Z5"
+        self.shop.save(update_fields=["state_code", "gstin"])
+        self.item.gst_rate = Decimal("18.00")
+        self.item.save(update_fields=["gst_rate"])
+        self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/",
+            {
+                "items": [
+                    {"inventory_item_id": str(self.item.id), "quantity": 1, "unit_price": "118.00"}
+                ],
+                "payments": [{"payment_method": "CASH", "amount": "118.00"}],
+            },
+            format="json",
+        )
+        today = timezone.localdate()
+        response = self.client.get(
+            f"/api/v1/shops/{self.shop.id}/sales/export/gstr3b/",
+            {"month": today.month, "year": today.year},
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response["Content-Type"], "text/csv")
+        body = response.content.decode()
+        self.assertIn("Outward taxable supplies", body)
+        self.assertIn("Total (3.1a)", body)
+        self.assertIn("18.00", body)  # the tax rate row
+
+    def test_gstr3b_export_blocks_cashier(self):
+        cashier = PlatformUser.objects.create_user(
+            email="cashier@example.com", password="secret", full_name="Cashier"
+        )
+        ShopMembership.objects.create(
+            user=cashier, shop=self.shop, role=ShopMembership.Role.STAFF,
+            status=ShopMembership.Status.ACTIVE,
+        )
+        client = APIClient()
+        client.force_authenticate(user=cashier)
+        response = client.get(
+            f"/api/v1/shops/{self.shop.id}/sales/export/gstr3b/",
+            {"month": 1, "year": 2026},
+        )
+        self.assertEqual(response.status_code, 403, response.content)
+
     def test_sale_computes_intra_state_gst_breakdown(self):
         self.shop.state_code = "27"
         self.shop.save(update_fields=["state_code"])

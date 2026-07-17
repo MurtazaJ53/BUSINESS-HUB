@@ -154,7 +154,7 @@ def build_shop_pulse_snapshot(
         occurred_at__gte=seven_days_ago,
     ).aggregate(
         event_count=Count("id"),
-        quantity_total=Coalesce(Sum("quantity_delta"), 0),
+        quantity_total=Coalesce(Sum("quantity_delta"), Decimal("0")),
     )
 
     credit_payment_count = (

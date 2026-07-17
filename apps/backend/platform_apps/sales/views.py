@@ -525,10 +525,10 @@ class GSTR1ExportView(ShopScopedMixin, APIView):
                     }
                 rate_groups[item.gst_rate]["taxable"] += item.taxable_amount
                 rate_groups[item.gst_rate]["tax"] += item.tax_amount
-                
+
             buyer_gstin = sale.buyer_gstin or ''
             invoice_type = "Regular B2B" if buyer_gstin else "B2C Others"
-            
+
             for rate, amounts in rate_groups.items():
                 if amounts["taxable"] > 0:
                     writer.writerow([
@@ -546,5 +546,86 @@ class GSTR1ExportView(ShopScopedMixin, APIView):
                         amounts["taxable"],
                         ''
                     ])
-                    
+
+        return response
+
+
+class GSTR3BExportView(ShopScopedMixin, APIView):
+    """GSTR-3B summary (section 3.1(a) outward taxable supplies) as CSV — the
+    period totals of taxable value and IGST/CGST/SGST, broken down by tax rate,
+    ready to key into the GST portal's summary return."""
+
+    permission_classes = [permissions.IsAuthenticated]
+    minimum_role = ShopMembership.Role.ADMIN  # RBAC: filings are owner/admin only.
+
+    def get(self, request, shop_id):
+        membership = self.get_membership()
+        shop = membership.shop
+
+        month = request.query_params.get("month")
+        year = request.query_params.get("year")
+        if not month or not year:
+            return Response(
+                {"error": "month and year are required parameters"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            month = int(month)
+            year = int(year)
+        except ValueError:
+            return Response(
+                {"error": "month and year must be integers"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        items = SaleItem.objects.filter(
+            sale__shop=shop,
+            sale__tombstone=False,
+            sale__status=Sale.Status.COMPLETED,
+            sale__sale_date__year=year,
+            sale__sale_date__month=month,
+        )
+
+        # Aggregate by rate: taxable + igst/cgst/sgst.
+        by_rate: dict[Decimal, dict[str, Decimal]] = {}
+        for item in items.values("gst_rate", "taxable_amount", "cgst_amount", "sgst_amount", "igst_amount"):
+            bucket = by_rate.setdefault(
+                item["gst_rate"],
+                {"taxable": Decimal("0.00"), "cgst": Decimal("0.00"), "sgst": Decimal("0.00"), "igst": Decimal("0.00")},
+            )
+            bucket["taxable"] += item["taxable_amount"] or Decimal("0.00")
+            bucket["cgst"] += item["cgst_amount"] or Decimal("0.00")
+            bucket["sgst"] += item["sgst_amount"] or Decimal("0.00")
+            bucket["igst"] += item["igst_amount"] or Decimal("0.00")
+
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="GSTR3B_{shop.name}_{year}_{month}.csv"'
+        writer = csv.writer(response)
+        writer.writerow(["GSTIN", shop.gstin or ""])
+        writer.writerow(["Period", f"{month:02d}-{year}"])
+        writer.writerow([])
+        writer.writerow(["Nature of Supply", "Tax Rate (%)", "Taxable Value", "IGST", "CGST", "SGST", "Total Tax"])
+
+        totals = {"taxable": Decimal("0.00"), "cgst": Decimal("0.00"), "sgst": Decimal("0.00"), "igst": Decimal("0.00")}
+        for rate in sorted(by_rate.keys()):
+            amounts = by_rate[rate]
+            total_tax = amounts["igst"] + amounts["cgst"] + amounts["sgst"]
+            writer.writerow(
+                [
+                    "Outward taxable supplies",
+                    rate,
+                    amounts["taxable"],
+                    amounts["igst"],
+                    amounts["cgst"],
+                    amounts["sgst"],
+                    total_tax,
+                ]
+            )
+            for key in totals:
+                totals[key] += amounts[key]
+
+        grand_tax = totals["igst"] + totals["cgst"] + totals["sgst"]
+        writer.writerow(
+            ["Total (3.1a)", "", totals["taxable"], totals["igst"], totals["cgst"], totals["sgst"], grand_tax]
+        )
         return response

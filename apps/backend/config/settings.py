@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "platform_apps.sales.apps.SalesConfig",
     "platform_apps.payments.apps.PaymentsConfig",
     "platform_apps.expenses.apps.ExpensesConfig",
+    "platform_apps.purchases.apps.PurchasesConfig",
     "platform_apps.attendance.apps.AttendanceConfig",
     "platform_apps.projections.apps.ProjectionsConfig",
     "platform_apps.jobs.apps.JobsConfig",
@@ -136,6 +137,9 @@ AUTH_USER_MODEL = "users.PlatformUser"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        # JWT first: only claims tokens signed with our SECRET_KEY, otherwise
+        # returns None so the Firebase adapter still handles Firebase ID tokens.
+        "platform_apps.users.jwt_auth.JWTAuthentication",
         "platform_apps.users.authentication.FirebaseAuthentication",
         "platform_apps.users.authentication.DevHeaderAuthentication",
         "rest_framework.authentication.SessionAuthentication",

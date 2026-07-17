@@ -10,11 +10,11 @@ from platform_apps.inventory.models import InventoryItem, InventoryItemPrivate, 
 
 
 class InventoryItemSerializer(serializers.ModelSerializer):
-    stock_on_hand = serializers.IntegerField(read_only=True)
+    stock_on_hand = serializers.DecimalField(max_digits=12, decimal_places=3, read_only=True)
     cost_price = serializers.SerializerMethodField()
     supplier_id = serializers.SerializerMethodField()
     last_purchase_date = serializers.SerializerMethodField()
-    opening_stock = serializers.IntegerField(write_only=True, required=False, default=0)
+    opening_stock = serializers.DecimalField(max_digits=12, decimal_places=3, write_only=True, required=False, default=0)
     private_cost_price = serializers.DecimalField(
         source="cost_price_input",
         max_digits=12,
@@ -118,7 +118,7 @@ class InventoryItemSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        opening_stock = int(validated_data.pop("opening_stock", 0))
+        opening_stock = Decimal(str(validated_data.pop("opening_stock", 0)))
         cost_price = validated_data.pop("cost_price_input", None)
         supplier_id = validated_data.pop("supplier_id_input", "")
         last_purchase_date = validated_data.pop("last_purchase_date_input", None)
@@ -199,7 +199,7 @@ class InventoryItemSerializer(serializers.ModelSerializer):
 
 
 class InventoryAdjustmentSerializer(serializers.Serializer):
-    quantity_delta = serializers.IntegerField()
+    quantity_delta = serializers.DecimalField(max_digits=12, decimal_places=3)
     note = serializers.CharField(required=False, allow_blank=True, max_length=2000)
     event_type = serializers.ChoiceField(
         choices=[

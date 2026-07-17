@@ -206,7 +206,7 @@ class SaleSerializer(serializers.ModelSerializer):
         total_paid = Decimal("0.00")
 
         for item in items:
-            quantity = item.get("quantity", 0)
+            quantity = Decimal(str(item.get("quantity", 0)))
             if quantity <= 0:
                 raise serializers.ValidationError({"items": "Each sale item must have a positive quantity."})
             unit_price = item.get("unit_price") or Decimal("0.00")
@@ -319,7 +319,7 @@ class SaleSerializer(serializers.ModelSerializer):
         # GST is computed on the post-discount value per line.
         discount_amount = validated_data.get("discount_amount", Decimal("0.00")) or Decimal("0.00")
         raw_line_totals = [
-            Decimal(ip["quantity"]) * ip["unit_price"] for ip in item_payloads
+            Decimal(str(ip["quantity"])) * ip["unit_price"] for ip in item_payloads
         ]
         line_discounts = apportion_discount(raw_line_totals, discount_amount)
 
@@ -331,7 +331,7 @@ class SaleSerializer(serializers.ModelSerializer):
 
         for idx, item_payload in enumerate(item_payloads):
             inventory_item = self._resolve_inventory_item(shop, item_payload)
-            quantity = item_payload["quantity"]
+            quantity = Decimal(str(item_payload["quantity"]))
             unit_price = item_payload["unit_price"]
             unit_cost = item_payload.get("unit_cost")
             is_return = item_payload.get("is_return", False)

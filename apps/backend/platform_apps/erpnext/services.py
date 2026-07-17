@@ -784,7 +784,7 @@ class ERPNextIntegrationService:
                     skipped += 1
                     continue
                 local_stock = int(
-                    item.ledger_entries.aggregate(total=Coalesce(Sum("quantity_delta"), 0)).get("total") or 0
+                    item.ledger_entries.aggregate(total=Coalesce(Sum("quantity_delta"), Decimal("0"))).get("total") or 0
                 )
                 remote_stock = int(Decimal(str(row.get("actual_qty") or "0")))
                 quantity_delta = remote_stock - local_stock
@@ -1221,7 +1221,7 @@ class ERPNextIntegrationService:
                 {
                     "item_code": item.inventory_item.source_id,
                     "item_name": item.name_snapshot,
-                    "qty": item.quantity,
+                    "qty": str(item.quantity),
                     "rate": str(item.unit_price),
                     "warehouse": binding.warehouse or item.inventory_item.source_meta_json.get("default_warehouse") or "",
                 }

@@ -30,6 +30,36 @@ void main() {
     });
   });
 
+  group('parseWeightBarcode (weight config)', () {
+    test('decodes a weight-embedded scale barcode (grams -> kg)', () {
+      // 2 | 12345 | 001500 | c  -> PLU 12345, weight 1.500 kg
+      final b = parseWeightBarcode(
+        '2123450015000',
+        config: WeightBarcodeConfig.weightStandard,
+      );
+      expect(b, isNotNull);
+      expect(b!.itemCode, '12345');
+      expect(b.isWeight, isTrue);
+      expect(b.embeddedValue, closeTo(1.5, 0.001));
+    });
+
+    test('resolveLinePrice charges rate x weight for a weight barcode', () {
+      final b = parseWeightBarcode(
+        '2123450015000',
+        config: WeightBarcodeConfig.weightStandard,
+      );
+      // 1.5 kg at Rs.40/kg = Rs.60.
+      expect(b!.resolveLinePrice(40), closeTo(60, 0.001));
+    });
+
+    test('resolveLinePrice charges the embedded amount for a price barcode', () {
+      final b = parseWeightBarcode('2123450012508');
+      // Price barcode ignores the item rate and charges the embedded value.
+      expect(b!.isWeight, isFalse);
+      expect(b.resolveLinePrice(999), closeTo(12.50, 0.001));
+    });
+  });
+
   group('weighedLinePrice', () {
     test('1.5 kg at Rs.60/kg = Rs.90', () {
       expect(weighedLinePrice(rate: 60, weight: 1.5), 90);

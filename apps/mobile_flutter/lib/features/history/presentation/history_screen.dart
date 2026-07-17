@@ -1120,7 +1120,6 @@ class _SyncFilterChip extends StatelessWidget {
   }
 }
 
-
 class _HistorySaleRow extends StatelessWidget {
   const _HistorySaleRow({required this.sale, required this.onTap});
 

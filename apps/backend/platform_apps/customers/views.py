@@ -219,6 +219,57 @@ class CustomerLedgerListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
         )
 
 
+class CustomerLedgerTimelineView(ShopScopedMixin, APIView):
+    """Khata timeline for one customer: credit sales, payments and adjustments
+    in chronological order with a running balance (oldest-to-newest), returned
+    newest-first for display."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, shop_id, customer_id):
+        membership = self.get_membership()
+        customer = Customer.objects.filter(
+            shop=membership.shop, pk=customer_id, tombstone=False
+        ).first()
+        if customer is None:
+            raise exceptions.NotFound("Customer not found.")
+
+        entries = list(
+            CustomerLedgerEntry.objects.filter(customer=customer)
+            .select_related("actor_user")
+            .order_by("occurred_at", "created_at")
+        )
+        running = Decimal("0.00")
+        timeline = []
+        for entry in entries:
+            running += entry.amount_delta
+            actor_name = None
+            if entry.actor_user_id:
+                actor_name = entry.actor_user.full_name or entry.actor_user.email
+            timeline.append(
+                {
+                    "id": str(entry.id),
+                    "event_type": entry.event_type,
+                    "amount_delta": entry.amount_delta,
+                    "total_spent_delta": entry.total_spent_delta,
+                    "note": entry.note,
+                    "occurred_at": entry.occurred_at,
+                    "running_balance": running,
+                    "actor_name": actor_name,
+                }
+            )
+        timeline.reverse()
+        return Response(
+            {
+                "customer_id": str(customer.id),
+                "customer_name": customer.name,
+                "balance": customer.balance,
+                "total_spent": customer.total_spent,
+                "entries": timeline,
+            }
+        )
+
+
 class CustomerSummaryView(ShopScopedMixin, APIView):
     permission_classes = [permissions.IsAuthenticated]
 

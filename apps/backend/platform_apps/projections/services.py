@@ -20,7 +20,7 @@ def refresh_shop_dashboard_projection(shop: Shop) -> ShopDashboardSnapshot:
 
     inventory_rows = list(
         InventoryItem.objects.filter(shop=shop, tombstone=False)
-        .annotate(stock_on_hand=Coalesce(Sum("ledger_entries__quantity_delta"), 0))
+        .annotate(stock_on_hand=Coalesce(Sum("ledger_entries__quantity_delta"), Decimal("0")))
         .values("id", "name", "sku", "category", "status", "sell_price", "stock_on_hand")
     )
     inventory_items_count = len(inventory_rows)
