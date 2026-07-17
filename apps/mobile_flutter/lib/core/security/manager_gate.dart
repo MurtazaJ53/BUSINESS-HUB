@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:local_auth/local_auth.dart';
 
 /// Manager-authorization gate for high-risk POS actions (void a sale, delete a
-/// Khata entry, open the drawer without a sale). Today it verifies a manager
-/// PIN; to upgrade to a fingerprint prompt, add the `local_auth` package and
-/// call `LocalAuthentication().authenticate(...)` inside [requireManagerApproval]
-/// before/instead of the PIN dialog — the call sites don't change.
+/// Khata entry, open the drawer without a sale). When enabled it asks for the
+/// manager's **fingerprint** first (Android BiometricPrompt via local_auth) and
+/// falls back to a manager **PIN** if biometrics aren't available/enrolled or
+/// the user cancels the fingerprint scan.
 class ManagerGate {
+  static final LocalAuthentication _localAuth = LocalAuthentication();
   /// Manager PIN, seeded from --dart-define BUSINESS_HUB_MANAGER_PIN.
   /// When empty, the gate is disabled (approval auto-granted) so a shop that
   /// hasn't configured a PIN isn't locked out.
@@ -27,13 +29,35 @@ class ManagerGate {
     return mismatch == 0;
   }
 
-  /// Prompt for the manager PIN guarding [reason]. Returns true if approved (or
-  /// if the gate is disabled). Never throws.
+  /// Try a fingerprint/biometric check. Returns true if the manager
+  /// authenticated, false if biometrics are unavailable, not enrolled, or the
+  /// scan was cancelled/failed. Never throws.
+  static Future<bool> tryBiometric(String reason) async {
+    try {
+      final supported =
+          await _localAuth.isDeviceSupported() && await _localAuth.canCheckBiometrics;
+      if (!supported) return false;
+      return await _localAuth.authenticate(
+        localizedReason: reason,
+        biometricOnly: true,
+        persistAcrossBackgrounding: true,
+      );
+    } on LocalAuthException {
+      return false; // no hardware / not enrolled / locked out -> fall back to PIN
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Approve [reason]: fingerprint first, PIN fallback. Returns true if approved
+  /// (or if the gate is disabled). Never throws.
   static Future<bool> requireManagerApproval(
     BuildContext context, {
     required String reason,
   }) async {
     if (!isEnabled) return true;
+    if (await tryBiometric(reason)) return true;
+    if (!context.mounted) return false;
     final controller = TextEditingController();
     final approved = await showDialog<bool>(
       context: context,
