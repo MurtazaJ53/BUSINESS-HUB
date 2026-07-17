@@ -37,8 +37,9 @@ it is in git history and must be treated as public. Rotate it:
 ~700 MB of `*.apk`, `*.zip`, `*.jks` and the old `service-account.json` live in
 history. They are already gitignored, so **new** commits are clean, but history
 still carries them — bloating clones and keeping the secret retrievable. Purging
-history **rewrites every commit SHA** and requires a **force-push to both remotes**
-(`hub`, `origin`), which breaks every existing clone, open PR and CI checkout.
+history **rewrites every commit SHA** and requires a **force-push to `hub`**
+(github.com/MurtazaJ53/BUSINESS-HUB.git — the APK-only `origin` remote was removed),
+which breaks every existing clone, open PR and CI checkout.
 
 **Coordinate with everyone who has a clone before running this.** A ready script is
 staged at [`scripts/purge_git_history.sh`](../scripts/purge_git_history.sh):
@@ -58,8 +59,9 @@ bash scripts/purge_git_history.sh --run
 
 # 4. Review: git log, sizes, and that the tree still builds.
 # 5. Force-push the rewritten history (DESTRUCTIVE — everyone must re-clone).
+#    filter-repo removes remotes for safety, so re-add hub first:
+git remote add hub https://github.com/MurtazaJ53/BUSINESS-HUB.git
 git push --force --all hub && git push --force --tags hub
-git push --force --all origin && git push --force --tags origin
 ```
 
 After the force-push, **every collaborator must re-clone** (a plain `git pull`
