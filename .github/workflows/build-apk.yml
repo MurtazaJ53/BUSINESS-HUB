@@ -1,0 +1,63 @@
+name: Build Android APK
+
+# Builds a debug APK on every push to main (and on demand) and publishes it as a
+# GitHub Release asset, so there is always a downloadable "latest" APK link —
+# without committing the binary into git.
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "apps/mobile_flutter/**"
+      - ".github/workflows/build-apk.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # needed to create/update the Release
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile_flutter
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Build debug APK
+        run: >
+          flutter build apk --debug
+          --dart-define BUSINESS_HUB_UPI_VPA=${{ vars.UPI_VPA || 'demomart@okhdfcbank' }}
+          --dart-define BUSINESS_HUB_MANAGER_PIN=${{ vars.MANAGER_PIN || '4821' }}
+          --dart-define BUSINESS_HUB_API_BASE_URL=${{ vars.API_BASE_URL || 'http://192.168.1.10:8000/api/v1' }}
+
+      - name: Rename APK
+        run: cp build/app/outputs/flutter-apk/app-debug.apk business-hub-latest.apk
+
+      # Downloadable from the workflow run's Artifacts (retained 30 days).
+      - uses: actions/upload-artifact@v4
+        with:
+          name: business-hub-apk
+          path: apps/mobile_flutter/business-hub-latest.apk
+
+      # Stable download link: always overwrites the "latest-apk" Release.
+      - name: Publish to "latest-apk" Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-apk
+          name: Latest APK (auto-built)
+          body: "Auto-built debug APK from the latest push to main. Commit ${{ github.sha }}."
+          files: apps/mobile_flutter/business-hub-latest.apk
+          make_latest: "true"
