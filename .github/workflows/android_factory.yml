@@ -1,9 +1,8 @@
 name: Continuous Build Factory
 
 on:
-  push:
-    branches:
-      - main
+  # Auto-run disabled: this legacy "Build Web + Android" factory builds the
+  # archived web app and duplicates build-apk.yml. Run manually if ever needed.
   workflow_dispatch:
 
 permissions:

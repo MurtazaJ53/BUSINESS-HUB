@@ -1,16 +1,8 @@
 name: Flutter Mobile Validation
 
 on:
-  pull_request:
-    paths:
-      - 'apps/mobile_flutter/**'
-      - '.github/workflows/flutter_mobile_validate.yml'
-  push:
-    branches:
-      - main
-    paths:
-      - 'apps/mobile_flutter/**'
-      - '.github/workflows/flutter_mobile_validate.yml'
+  # Auto-run disabled: the CI workflow already runs analyze + test on every
+  # push/PR. Kept for manual runs only.
   workflow_dispatch:
 
 jobs:
