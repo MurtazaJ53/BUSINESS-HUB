@@ -96,6 +96,21 @@ void main() {
     });
   });
 
+  group('detectKind (smart import routing)', () {
+    test('detects products from Item Name/MRP/Qty', () {
+      expect(detectKind(['Item Name', 'MRP', 'Qty', 'SKU']), ImportKind.products);
+    });
+    test('detects customers from Customer Name/Mobile/Balance', () {
+      expect(detectKind(['Customer Name', 'Mobile', 'Balance']), ImportKind.customers);
+    });
+    test('detects sales from Amount/Bill Date/Mode', () {
+      expect(detectKind(['Amount', 'Bill Date', 'Mode', 'Customer']), ImportKind.sales);
+    });
+    test('returns null when no required column maps', () {
+      expect(detectKind(['Foo', 'Bar', 'Baz']), isNull);
+    });
+  });
+
   group('CSV writing', () {
     test('toCsv quotes fields with commas/quotes/newlines', () {
       final csv = toCsv([

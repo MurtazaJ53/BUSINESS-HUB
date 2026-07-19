@@ -115,6 +115,46 @@ class ParsedTable {
   final List<List<String>> rows; // data rows only (no header)
 }
 
+/// Kinds we can auto-detect + execute today (suppliers has no local store yet).
+const List<ImportKind> detectableKinds = <ImportKind>[
+  ImportKind.products,
+  ImportKind.customers,
+  ImportKind.sales,
+];
+
+/// Score how well [headers] fit a [kind]: required fields count 3, others 1.
+/// Returns 0 if a required field can't be mapped (that kind is impossible).
+int scoreKind(List<String> headers, ImportKind kind) {
+  final map = autoMap(headers, kind);
+  final fields = importSchemas[kind]!;
+  final requiredOk = fields
+      .where((f) => f.required)
+      .every((f) => map.columnFor(f.key) != null);
+  if (!requiredOk) return 0;
+  var score = 0;
+  for (final f in fields) {
+    if (map.columnFor(f.key) != null) score += f.required ? 3 : 1;
+  }
+  return score;
+}
+
+/// Auto-detect which data type a file is, purely from its header row — so
+/// "smart import" can route any exported file (Zobaze, Vyapar, Khatabook,
+/// Excel, …) to the right importer without the user choosing. Returns null if
+/// nothing fits (e.g. no required column maps).
+ImportKind? detectKind(List<String> headers) {
+  ImportKind? best;
+  var bestScore = 0;
+  for (final kind in detectableKinds) {
+    final s = scoreKind(headers, kind);
+    if (s > bestScore) {
+      bestScore = s;
+      best = kind;
+    }
+  }
+  return best;
+}
+
 /// Minimal RFC-4180 CSV parser: handles quoted fields, escaped quotes (""),
 /// commas and newlines inside quotes. Returns headers + data rows.
 ParsedTable parseCsv(String content) {

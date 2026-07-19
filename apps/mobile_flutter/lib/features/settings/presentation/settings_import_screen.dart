@@ -61,72 +61,123 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
 
   /// Pick a CSV/XLSX file of any layout, auto-map its columns, let the user
   /// confirm, then import via the universal engine.
-  Future<void> _importUniversal(ImportKind kind, String label) async {
-    if (_busy) return;
+  static String _labelFor(ImportKind k) => switch (k) {
+    ImportKind.products => 'products',
+    ImportKind.customers => 'customers',
+    ImportKind.sales => 'sales',
+    ImportKind.suppliers => 'suppliers',
+  };
+
+  void _startBusy() => setState(() {
+    _busy = true;
+    _error = null;
+    _result = null;
+    _successText = null;
+  });
+
+  /// Pick a CSV/XLSX and parse it. Returns null (resetting busy) on cancel; throws
+  /// with a clean message on an unreadable file.
+  Future<ParsedTable?> _pickTable() async {
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: <String>['csv', 'xlsx', 'xls'],
+    );
+    final path = picked?.files.single.path;
+    if (path == null) {
+      if (mounted) setState(() => _busy = false);
+      return null;
+    }
+    final file = File(path);
+    final table = path.toLowerCase().endsWith('.csv')
+        ? parseCsv(await file.readAsString())
+        : parseXlsxBytes(await file.readAsBytes());
+    if (table == null) {
+      throw Exception("Couldn't read this Excel file. Please re-save it as CSV and try again.");
+    }
+    if (table.headers.isEmpty || table.rows.isEmpty) {
+      throw Exception('No rows found. The first line must be column headers.');
+    }
+    return table;
+  }
+
+  /// Show the mapping preview for [kind] + [table] and write the confirmed rows.
+  Future<void> _runImport(ImportKind kind, ParsedTable table) async {
+    final label = _labelFor(kind);
+    if (!mounted) return;
+    final mapping = await showMappingSheet(
+      context, table: table, kind: kind, title: 'Import $label',
+    );
+    if (mapping == null) {
+      if (mounted) setState(() => _busy = false);
+      return; // cancelled
+    }
+    final mapped = mapRows(table, kind, mapping: mapping);
+    final service = ref.read(universalImportServiceProvider);
+    final outcome = switch (kind) {
+      ImportKind.products => await service.importProducts(mapped),
+      ImportKind.customers => await service.importCustomers(mapped),
+      ImportKind.sales => await service.importSales(mapped),
+      ImportKind.suppliers => throw Exception('Suppliers import is not available yet.'),
+    };
+    if (!mounted) return;
     setState(() {
-      _busy = true;
-      _error = null;
-      _result = null;
-      _successText = null;
+      _busy = false;
+      _successText = '${outcome.imported} $label imported'
+          '${outcome.skipped > 0 ? ' (${outcome.skipped} skipped)' : ''}.';
     });
+  }
+
+  /// Import a specific data type (user picked the icon).
+  Future<void> _importUniversal(ImportKind kind) async {
+    if (_busy) return;
+    _startBusy();
     try {
-      final picked = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: <String>['csv', 'xlsx', 'xls'],
-      );
-      final path = picked?.files.single.path;
-      if (path == null) {
-        if (mounted) setState(() => _busy = false);
-        return;
-      }
-      final file = File(path);
-      ParsedTable? table;
-      if (path.toLowerCase().endsWith('.csv')) {
-        table = parseCsv(await file.readAsString());
-      } else {
-        table = parseXlsxBytes(await file.readAsBytes());
-      }
-      if (table == null) {
-        throw Exception(
-          "Couldn't read this Excel file. Please re-save it as CSV and try again.",
-        );
-      }
-      if (table.headers.isEmpty || table.rows.isEmpty) {
-        throw Exception('No rows found. The first line must be column headers.');
-      }
-      if (!mounted) return;
-      final mapping = await showMappingSheet(
-        context,
-        table: table,
-        kind: kind,
-        title: 'Import $label',
-      );
-      if (mapping == null) {
-        if (mounted) setState(() => _busy = false);
-        return; // cancelled
-      }
-      final mapped = mapRows(table, kind, mapping: mapping);
-      final service = ref.read(universalImportServiceProvider);
-      final outcome = switch (kind) {
-        ImportKind.products => await service.importProducts(mapped),
-        ImportKind.customers => await service.importCustomers(mapped),
-        ImportKind.sales => await service.importSales(mapped),
-        ImportKind.suppliers => throw Exception('Suppliers import is not available yet.'),
-      };
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _successText = '${outcome.imported} $label imported'
-            '${outcome.skipped > 0 ? ' (${outcome.skipped} skipped)' : ''}.';
-      });
+      final table = await _pickTable();
+      if (table == null) return;
+      await _runImport(kind, table);
     } catch (error) {
       if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _error = error.toString();
-      });
+      setState(() { _busy = false; _error = error.toString(); });
     }
   }
+
+  /// Smart import: pick ANY exported file, auto-detect whether it's products /
+  /// customers / sales, then route it (asks only if we can't tell).
+  Future<void> _smartImport() async {
+    if (_busy) return;
+    _startBusy();
+    try {
+      final table = await _pickTable();
+      if (table == null) return;
+      var kind = detectKind(table.headers);
+      if (kind == null) {
+        if (!mounted) return;
+        kind = await _chooseKind();
+        if (kind == null) {
+          if (mounted) setState(() => _busy = false);
+          return;
+        }
+      }
+      await _runImport(kind, table);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() { _busy = false; _error = error.toString(); });
+    }
+  }
+
+  Future<ImportKind?> _chooseKind() => showDialog<ImportKind>(
+    context: context,
+    builder: (ctx) => SimpleDialog(
+      title: const Text("Couldn't auto-detect — what is this file?"),
+      children: <Widget>[
+        for (final k in detectableKinds)
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, k),
+            child: Text('${_labelFor(k)[0].toUpperCase()}${_labelFor(k).substring(1)}'),
+          ),
+      ],
+    ),
+  );
 
   /// Import customers straight from the phone's address book (name + first
   /// phone), without saving anything to the device's contacts.
@@ -225,41 +276,77 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
         children: <Widget>[
-          _UniversalCard(
-            title: 'Products & inventory',
-            subtitle:
-                'CSV or Excel from any app. We auto-detect columns like name, '
-                'price, stock, SKU — you confirm before importing.',
-            icon: Icons.inventory_2_rounded,
-            busy: _busy,
-            onTap: () => _importUniversal(ImportKind.products, 'products'),
-            onSample: () => _downloadTemplate(ImportKind.products, 'products'),
-            onExport: () => _exportCsv(ImportKind.products, 'products'),
+          // 1) Smart import — auto-detect the type from ANY exported file.
+          _SmartImportCard(busy: _busy, onTap: _smartImport),
+          const SizedBox(height: 16),
+          // 2) Or pick a specific type (individual icons).
+          MobilePanel(
+            title: 'Import a specific type',
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: <Widget>[
+                _ImportTile(
+                  icon: Icons.inventory_2_rounded,
+                  label: 'Stock\n& items',
+                  busy: _busy,
+                  onTap: () => _importUniversal(ImportKind.products),
+                ),
+                _ImportTile(
+                  icon: Icons.people_alt_rounded,
+                  label: 'Clients',
+                  busy: _busy,
+                  onTap: () => _importUniversal(ImportKind.customers),
+                ),
+                _ImportTile(
+                  icon: Icons.receipt_long_rounded,
+                  label: 'Sales\n(history)',
+                  busy: _busy,
+                  onTap: () => _importUniversal(ImportKind.sales),
+                ),
+                _ImportTile(
+                  icon: Icons.contacts_rounded,
+                  label: 'Phone\ncontacts',
+                  busy: _busy,
+                  onTap: _importContacts,
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
-          _UniversalCard(
-            title: 'Customers (clients)',
-            subtitle:
-                'CSV or Excel with name, phone, balance/advance in any column '
-                'order. Existing customers are updated, not duplicated.',
-            icon: Icons.people_alt_rounded,
-            busy: _busy,
-            onTap: () => _importUniversal(ImportKind.customers, 'customers'),
-            onSample: () => _downloadTemplate(ImportKind.customers, 'customers'),
-            onExport: () => _exportCsv(ImportKind.customers, 'customers'),
-            onContacts: _importContacts,
-          ),
-          const SizedBox(height: 16),
-          _UniversalCard(
-            title: 'Sales history (POS)',
-            subtitle:
-                'CSV or Excel with one row per bill (total, date, payment, '
-                'customer). Imported as historical sales — shown in History & '
-                'Reports; they do not change current stock.',
-            icon: Icons.receipt_long_rounded,
-            busy: _busy,
-            onTap: () => _importUniversal(ImportKind.sales, 'sales'),
-            onSample: () => _downloadTemplate(ImportKind.sales, 'sales'),
+          // 3) Sample templates + CSV export (round-trip).
+          MobilePanel(
+            title: 'Templates & export',
+            child: Wrap(
+              spacing: 8,
+              children: <Widget>[
+                TextButton.icon(
+                  onPressed: _busy ? null : () => _downloadTemplate(ImportKind.products, 'products'),
+                  icon: const Icon(Icons.description_outlined, size: 18),
+                  label: const Text('Products sample'),
+                ),
+                TextButton.icon(
+                  onPressed: _busy ? null : () => _downloadTemplate(ImportKind.customers, 'customers'),
+                  icon: const Icon(Icons.description_outlined, size: 18),
+                  label: const Text('Customers sample'),
+                ),
+                TextButton.icon(
+                  onPressed: _busy ? null : () => _downloadTemplate(ImportKind.sales, 'sales'),
+                  icon: const Icon(Icons.description_outlined, size: 18),
+                  label: const Text('Sales sample'),
+                ),
+                TextButton.icon(
+                  onPressed: _busy ? null : () => _exportCsv(ImportKind.products, 'products'),
+                  icon: const Icon(Icons.download_rounded, size: 18),
+                  label: const Text('Export products'),
+                ),
+                TextButton.icon(
+                  onPressed: _busy ? null : () => _exportCsv(ImportKind.customers, 'customers'),
+                  icon: const Icon(Icons.download_rounded, size: 18),
+                  label: const Text('Export customers'),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           MobilePanel(
@@ -336,38 +423,26 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
   }
 }
 
-class _UniversalCard extends StatelessWidget {
-  const _UniversalCard({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.busy,
-    required this.onTap,
-    this.onSample,
-    this.onExport,
-    this.onContacts,
-  });
+/// Big primary "import any file" card that auto-detects the data type.
+class _SmartImportCard extends StatelessWidget {
+  const _SmartImportCard({required this.busy, required this.onTap});
 
-  final String title;
-  final String subtitle;
-  final IconData icon;
   final bool busy;
   final VoidCallback onTap;
-  final VoidCallback? onSample;
-  final VoidCallback? onExport;
-  final VoidCallback? onContacts;
 
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
     return MobilePanel(
-      title: title,
-      action: const MobileTag(label: 'ANY FORMAT', icon: Icons.auto_awesome_rounded),
+      title: 'Smart import',
+      action: const MobileTag(label: 'ANY APP', icon: Icons.auto_awesome_rounded),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           Text(
-            subtitle,
+            'Have an export from Zobaze, Vyapar, Khatabook, Excel — anything? '
+            'Pick the file and we auto-detect whether it is products, customers '
+            'or sales, match the columns, and let you confirm before importing.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colors.textSecondary,
               height: 1.4,
@@ -376,33 +451,60 @@ class _UniversalCard extends StatelessWidget {
           const SizedBox(height: 14),
           FilledButton.icon(
             onPressed: busy ? null : onTap,
-            icon: Icon(icon),
-            label: const Text('Choose file (.csv / .xlsx)'),
-          ),
-          if (onContacts != null)
-            TextButton.icon(
-              onPressed: busy ? null : onContacts,
-              icon: const Icon(Icons.contacts_rounded, size: 18),
-              label: const Text('Import from phone contacts'),
-            ),
-          Wrap(
-            spacing: 8,
-            children: <Widget>[
-              if (onSample != null)
-                TextButton.icon(
-                  onPressed: busy ? null : onSample,
-                  icon: const Icon(Icons.description_outlined, size: 18),
-                  label: const Text('Sample'),
-                ),
-              if (onExport != null)
-                TextButton.icon(
-                  onPressed: busy ? null : onExport,
-                  icon: const Icon(Icons.download_rounded, size: 18),
-                  label: const Text('Export CSV'),
-                ),
-            ],
+            icon: const Icon(Icons.auto_fix_high_rounded),
+            label: const Text('Import any file (.csv / .xlsx)'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A tappable icon tile for importing one specific data type.
+class _ImportTile extends StatelessWidget {
+  const _ImportTile({
+    required this.icon,
+    required this.label,
+    required this.busy,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool busy;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    return SizedBox(
+      width: 78,
+      child: Material(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: busy ? null : onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colors.borderSoft),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(icon, color: AppPalette.primary, size: 26),
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, height: 1.15),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
