@@ -7,7 +7,7 @@ import 'package:excel/excel.dart';
 /// Pure + UI-free so it can be unit-tested; the UI adds file picking, a mapping
 /// preview the user can override, and writing rows via the repositories.
 
-enum ImportKind { products, customers, suppliers, sales }
+enum ImportKind { products, customers, suppliers, sales, expenses }
 
 enum FieldType { text, number }
 
@@ -101,6 +101,20 @@ const Map<ImportKind, List<ImportField>> importSchemas = <ImportKind, List<Impor
         synonyms: <String>['customer name', 'client', 'party', 'name']),
     ImportField('customerPhone', 'Customer phone',
         synonyms: <String>['phone', 'mobile', 'contact', 'number']),
+  ],
+  ImportKind.expenses: <ImportField>[
+    ImportField('amount', 'Amount',
+        required: true,
+        type: FieldType.number,
+        synonyms: <String>['spent', 'expense amount', 'value', 'debit', 'total', 'paid']),
+    ImportField('category', 'Category',
+        synonyms: <String>['head', 'expense head', 'type', 'account', 'group']),
+    ImportField('date', 'Date',
+        synonyms: <String>['expense date', 'spent on', 'txn date', 'paid on']),
+    ImportField('description', 'Description',
+        synonyms: <String>['note', 'particulars', 'details', 'narration', 'remark', 'remarks']),
+    ImportField('payment', 'Payment mode',
+        synonyms: <String>['mode', 'paid via', 'method', 'payment type']),
   ],
 };
 
@@ -379,6 +393,10 @@ String templateCsvFor(ImportKind kind) {
     ImportKind.sales: <List<String>>[
       <String>['118', '2026-07-10', '0', 'Cash', 'Rahul Sharma', '9876543210'],
       <String>['540', '2026-07-12', '15', 'UPI', 'Sneha Iyer', '9900112233'],
+    ],
+    ImportKind.expenses: <List<String>>[
+      <String>['1200', 'Rent', '2026-07-01', 'Shop rent', 'Cash'],
+      <String>['350', 'Electricity', '2026-07-05', 'June bill', 'UPI'],
     ],
   };
   return toCsv(<List<String>>[header, ...samples[kind]!]);

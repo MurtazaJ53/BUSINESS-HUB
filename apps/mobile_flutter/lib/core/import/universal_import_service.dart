@@ -8,6 +8,7 @@ final universalImportServiceProvider = Provider<UniversalImportService>((ref) {
     ref.watch(inventoryRepositoryProvider),
     ref.watch(customerRepositoryProvider),
     ref.watch(salesRepositoryProvider),
+    ref.watch(expenseRepositoryProvider),
   );
 });
 
@@ -21,11 +22,12 @@ class ImportOutcome {
 /// and customers are supported (both have repository merge methods); an entry
 /// with the same key is updated, not duplicated.
 class UniversalImportService {
-  UniversalImportService(this._inventory, this._customers, this._sales);
+  UniversalImportService(this._inventory, this._customers, this._sales, this._expenses);
 
   final InventoryRepository _inventory;
   final CustomerRepository _customers;
   final SalesRepository _sales;
+  final ExpenseRepository _expenses;
 
   Future<ImportOutcome> importProducts(MappedImport mapped) async {
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -92,6 +94,26 @@ class UniversalImportService {
         payments: <Map<String, dynamic>>[
           <String, dynamic>{'mode': pay, 'amount': total},
         ],
+      );
+      imported++;
+    }
+    return ImportOutcome(imported: imported, skipped: mapped.rows.length - imported);
+  }
+
+  /// Import expenses (money-out). Category defaults to General; date defaults to
+  /// today; payment mode normalized.
+  Future<ImportOutcome> importExpenses(MappedImport mapped) async {
+    var imported = 0;
+    for (final row in mapped.rows) {
+      final amount = parseNum(row['amount']);
+      if (amount <= 0) continue;
+      final dt = DateTime.tryParse((row['date'] ?? '').trim()) ?? DateTime.now();
+      await _expenses.recordExpense(
+        category: (row['category'] ?? '').trim().isEmpty ? 'General' : row['category']!.trim(),
+        amount: amount,
+        expenseDate: dt,
+        description: row['description'] ?? '',
+        paymentMethod: _normalizePayment(row['payment'] ?? 'CASH'),
       );
       imported++;
     }

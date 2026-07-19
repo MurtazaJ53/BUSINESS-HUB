@@ -65,6 +65,7 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
     ImportKind.products => 'products',
     ImportKind.customers => 'customers',
     ImportKind.sales => 'sales',
+    ImportKind.expenses => 'expenses',
     ImportKind.suppliers => 'suppliers',
   };
 
@@ -117,6 +118,7 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
       ImportKind.products => await service.importProducts(mapped),
       ImportKind.customers => await service.importCustomers(mapped),
       ImportKind.sales => await service.importSales(mapped),
+      ImportKind.expenses => await service.importExpenses(mapped),
       ImportKind.suppliers => throw Exception('Suppliers import is not available yet.'),
     };
     if (!mounted) return;
@@ -305,6 +307,12 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
                   onTap: () => _importUniversal(ImportKind.sales),
                 ),
                 _ImportTile(
+                  icon: Icons.account_balance_wallet_rounded,
+                  label: 'Expenses',
+                  busy: _busy,
+                  onTap: () => _importUniversal(ImportKind.expenses),
+                ),
+                _ImportTile(
                   icon: Icons.contacts_rounded,
                   label: 'Phone\ncontacts',
                   busy: _busy,
@@ -334,6 +342,11 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
                   onPressed: _busy ? null : () => _downloadTemplate(ImportKind.sales, 'sales'),
                   icon: const Icon(Icons.description_outlined, size: 18),
                   label: const Text('Sales sample'),
+                ),
+                TextButton.icon(
+                  onPressed: _busy ? null : () => _downloadTemplate(ImportKind.expenses, 'expenses'),
+                  icon: const Icon(Icons.description_outlined, size: 18),
+                  label: const Text('Expenses sample'),
                 ),
                 TextButton.icon(
                   onPressed: _busy ? null : () => _exportCsv(ImportKind.products, 'products'),

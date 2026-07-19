@@ -111,6 +111,42 @@ void main() {
     });
   });
 
+  group('known-app header presets (fuzzy)', () {
+    test('Vyapar-style product headers map correctly', () {
+      final m = autoMap(
+        ['Item Name', 'Sale Price', 'Purchase Price', 'Closing Stock', 'Item Code'],
+        ImportKind.products,
+      );
+      expect(m.columnFor('name'), 0);
+      expect(m.columnFor('price'), 1);
+      expect(m.columnFor('costPrice'), 2);
+      expect(m.columnFor('stock'), 3);
+      expect(m.columnFor('sku'), 4);
+    });
+
+    test('Khatabook-style customer headers map correctly', () {
+      final m = autoMap(['Party Name', 'Mobile Number', 'Closing Balance'], ImportKind.customers);
+      expect(m.columnFor('name'), 0);
+      expect(m.columnFor('phone'), 1);
+      expect(m.columnFor('amountDue'), 2);
+    });
+  });
+
+  group('expenses import', () {
+    test('maps Amount/Category/Date and requires amount', () {
+      final table = parseCsv('Category,Amount,Date,Note\nRent,1200,2026-07-01,Shop\n');
+      final mapped = mapRows(table, ImportKind.expenses);
+      expect(mapped.ok, isTrue);
+      expect(mapped.rows.single['amount'], '1200');
+      expect(mapped.rows.single['category'], 'Rent');
+    });
+
+    test('expenses is NOT auto-detected (avoids sales ambiguity)', () {
+      // A bare amount+date file routes to sales, not expenses.
+      expect(detectKind(['Amount', 'Date']), isNot(ImportKind.expenses));
+    });
+  });
+
   group('CSV writing', () {
     test('toCsv quotes fields with commas/quotes/newlines', () {
       final csv = toCsv([
