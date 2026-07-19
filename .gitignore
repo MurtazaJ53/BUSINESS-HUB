@@ -69,3 +69,8 @@ apps/mobile_flutter/dart_defines.json
 **/key.properties
 business-hub-release.jks
 keystore.base64.txt
+
+# Local demo/import data artifacts (not source)
+*_large.csv
+demo_import.xlsx
+sc*.png
