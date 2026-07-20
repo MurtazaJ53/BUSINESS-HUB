@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../database/local_database.dart' show CommerceOutboxEntry;
 import '../database/mobile_repository.dart';
 import '../backend/backend_api_client.dart';
 import '../models/mobile_models.dart';
@@ -22,6 +23,17 @@ final historyOverviewProvider = StreamProvider<HistoryOverview>((ref) {
 final pendingOutboxCountProvider = StreamProvider<int>((ref) {
   final salesRepository = ref.watch(salesRepositoryProvider);
   return salesRepository.watchPendingOutboxCount();
+});
+
+/// Count of sales the backend permanently rejected (dead-letter) — drives the
+/// "needs attention" badge.
+final deadLetterCountProvider = StreamProvider<int>((ref) {
+  return ref.watch(salesRepositoryProvider).watchDeadLetterCount();
+});
+
+/// The dead-lettered commands themselves, for the resolution screen.
+final deadLetterEntriesProvider = StreamProvider<List<CommerceOutboxEntry>>((ref) {
+  return ref.watch(salesRepositoryProvider).watchDeadLetterEntries();
 });
 
 final customersProvider = StreamProvider<List<BackendCustomerSummary>>((ref) {

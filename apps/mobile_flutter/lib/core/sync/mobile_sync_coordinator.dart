@@ -10,6 +10,7 @@ import '../database/mobile_repository.dart';
 import '../models/mobile_models.dart';
 import '../models/mobile_session.dart';
 import '../runtime/app_runtime_info.dart';
+import 'outbox_error.dart';
 import '../runtime/mobile_runtime_config.dart';
 import '../session/mobile_session_controller.dart';
 
@@ -762,6 +763,25 @@ class MobileSyncCoordinator {
             );
           }
         } catch (error) {
+          final status = error is BackendApiException ? error.statusCode : null;
+          if (isPermanentOutboxRejection(status)) {
+            // The server permanently rejected this payload (4xx validation).
+            // Dead-letter it and CONTINUE so valid sales behind it still sync —
+            // one bad command can never block the whole offline queue.
+            await _salesRepository.markOutboxDeadLetter(
+              entry.commandId,
+              error.toString(),
+            );
+            if (entry.commandId == triggerCommandId) {
+              targetResult = CommerceSyncResult(
+                commandId: entry.commandId,
+                state: CommerceSyncState.failed,
+                message:
+                    'This sale was rejected by the backend and needs attention.',
+              );
+            }
+            continue;
+          }
           debugPrint('Commerce outbox sync failed: $error');
           hadFailure = true;
           await _salesRepository.markCommandFailed(

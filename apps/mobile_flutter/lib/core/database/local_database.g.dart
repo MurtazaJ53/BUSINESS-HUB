@@ -3889,6 +3889,32 @@ class $CommerceOutboxEntriesTable extends CommerceOutboxEntries
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _isDeadLetterMeta = const VerificationMeta(
+    'isDeadLetter',
+  );
+  @override
+  late final GeneratedColumn<bool> isDeadLetter = GeneratedColumn<bool>(
+    'is_dead_letter',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_dead_letter" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _deadLetterReasonMeta = const VerificationMeta(
+    'deadLetterReason',
+  );
+  @override
+  late final GeneratedColumn<String> deadLetterReason = GeneratedColumn<String>(
+    'dead_letter_reason',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     commandId,
@@ -3904,6 +3930,8 @@ class $CommerceOutboxEntriesTable extends CommerceOutboxEntries
     updatedAt,
     lastAttemptAt,
     completedAt,
+    isDeadLetter,
+    deadLetterReason,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4025,6 +4053,24 @@ class $CommerceOutboxEntriesTable extends CommerceOutboxEntries
         ),
       );
     }
+    if (data.containsKey('is_dead_letter')) {
+      context.handle(
+        _isDeadLetterMeta,
+        isDeadLetter.isAcceptableOrUnknown(
+          data['is_dead_letter']!,
+          _isDeadLetterMeta,
+        ),
+      );
+    }
+    if (data.containsKey('dead_letter_reason')) {
+      context.handle(
+        _deadLetterReasonMeta,
+        deadLetterReason.isAcceptableOrUnknown(
+          data['dead_letter_reason']!,
+          _deadLetterReasonMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -4086,6 +4132,14 @@ class $CommerceOutboxEntriesTable extends CommerceOutboxEntries
         DriftSqlType.int,
         data['${effectivePrefix}completed_at'],
       ),
+      isDeadLetter: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_dead_letter'],
+      )!,
+      deadLetterReason: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}dead_letter_reason'],
+      ),
     );
   }
 
@@ -4110,6 +4164,8 @@ class CommerceOutboxEntry extends DataClass
   final int updatedAt;
   final int? lastAttemptAt;
   final int? completedAt;
+  final bool isDeadLetter;
+  final String? deadLetterReason;
   const CommerceOutboxEntry({
     required this.commandId,
     required this.shopId,
@@ -4124,6 +4180,8 @@ class CommerceOutboxEntry extends DataClass
     required this.updatedAt,
     this.lastAttemptAt,
     this.completedAt,
+    required this.isDeadLetter,
+    this.deadLetterReason,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -4146,6 +4204,10 @@ class CommerceOutboxEntry extends DataClass
     }
     if (!nullToAbsent || completedAt != null) {
       map['completed_at'] = Variable<int>(completedAt);
+    }
+    map['is_dead_letter'] = Variable<bool>(isDeadLetter);
+    if (!nullToAbsent || deadLetterReason != null) {
+      map['dead_letter_reason'] = Variable<String>(deadLetterReason);
     }
     return map;
   }
@@ -4171,6 +4233,10 @@ class CommerceOutboxEntry extends DataClass
       completedAt: completedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(completedAt),
+      isDeadLetter: Value(isDeadLetter),
+      deadLetterReason: deadLetterReason == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deadLetterReason),
     );
   }
 
@@ -4193,6 +4259,8 @@ class CommerceOutboxEntry extends DataClass
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
       lastAttemptAt: serializer.fromJson<int?>(json['lastAttemptAt']),
       completedAt: serializer.fromJson<int?>(json['completedAt']),
+      isDeadLetter: serializer.fromJson<bool>(json['isDeadLetter']),
+      deadLetterReason: serializer.fromJson<String?>(json['deadLetterReason']),
     );
   }
   @override
@@ -4212,6 +4280,8 @@ class CommerceOutboxEntry extends DataClass
       'updatedAt': serializer.toJson<int>(updatedAt),
       'lastAttemptAt': serializer.toJson<int?>(lastAttemptAt),
       'completedAt': serializer.toJson<int?>(completedAt),
+      'isDeadLetter': serializer.toJson<bool>(isDeadLetter),
+      'deadLetterReason': serializer.toJson<String?>(deadLetterReason),
     };
   }
 
@@ -4229,6 +4299,8 @@ class CommerceOutboxEntry extends DataClass
     int? updatedAt,
     Value<int?> lastAttemptAt = const Value.absent(),
     Value<int?> completedAt = const Value.absent(),
+    bool? isDeadLetter,
+    Value<String?> deadLetterReason = const Value.absent(),
   }) => CommerceOutboxEntry(
     commandId: commandId ?? this.commandId,
     shopId: shopId ?? this.shopId,
@@ -4245,6 +4317,10 @@ class CommerceOutboxEntry extends DataClass
         ? lastAttemptAt.value
         : this.lastAttemptAt,
     completedAt: completedAt.present ? completedAt.value : this.completedAt,
+    isDeadLetter: isDeadLetter ?? this.isDeadLetter,
+    deadLetterReason: deadLetterReason.present
+        ? deadLetterReason.value
+        : this.deadLetterReason,
   );
   CommerceOutboxEntry copyWithCompanion(CommerceOutboxEntriesCompanion data) {
     return CommerceOutboxEntry(
@@ -4275,6 +4351,12 @@ class CommerceOutboxEntry extends DataClass
       completedAt: data.completedAt.present
           ? data.completedAt.value
           : this.completedAt,
+      isDeadLetter: data.isDeadLetter.present
+          ? data.isDeadLetter.value
+          : this.isDeadLetter,
+      deadLetterReason: data.deadLetterReason.present
+          ? data.deadLetterReason.value
+          : this.deadLetterReason,
     );
   }
 
@@ -4293,7 +4375,9 @@ class CommerceOutboxEntry extends DataClass
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('lastAttemptAt: $lastAttemptAt, ')
-          ..write('completedAt: $completedAt')
+          ..write('completedAt: $completedAt, ')
+          ..write('isDeadLetter: $isDeadLetter, ')
+          ..write('deadLetterReason: $deadLetterReason')
           ..write(')'))
         .toString();
   }
@@ -4313,6 +4397,8 @@ class CommerceOutboxEntry extends DataClass
     updatedAt,
     lastAttemptAt,
     completedAt,
+    isDeadLetter,
+    deadLetterReason,
   );
   @override
   bool operator ==(Object other) =>
@@ -4330,7 +4416,9 @@ class CommerceOutboxEntry extends DataClass
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.lastAttemptAt == this.lastAttemptAt &&
-          other.completedAt == this.completedAt);
+          other.completedAt == this.completedAt &&
+          other.isDeadLetter == this.isDeadLetter &&
+          other.deadLetterReason == this.deadLetterReason);
 }
 
 class CommerceOutboxEntriesCompanion
@@ -4348,6 +4436,8 @@ class CommerceOutboxEntriesCompanion
   final Value<int> updatedAt;
   final Value<int?> lastAttemptAt;
   final Value<int?> completedAt;
+  final Value<bool> isDeadLetter;
+  final Value<String?> deadLetterReason;
   final Value<int> rowid;
   const CommerceOutboxEntriesCompanion({
     this.commandId = const Value.absent(),
@@ -4363,6 +4453,8 @@ class CommerceOutboxEntriesCompanion
     this.updatedAt = const Value.absent(),
     this.lastAttemptAt = const Value.absent(),
     this.completedAt = const Value.absent(),
+    this.isDeadLetter = const Value.absent(),
+    this.deadLetterReason = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CommerceOutboxEntriesCompanion.insert({
@@ -4379,6 +4471,8 @@ class CommerceOutboxEntriesCompanion
     this.updatedAt = const Value.absent(),
     this.lastAttemptAt = const Value.absent(),
     this.completedAt = const Value.absent(),
+    this.isDeadLetter = const Value.absent(),
+    this.deadLetterReason = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : commandId = Value(commandId),
        shopId = Value(shopId),
@@ -4400,6 +4494,8 @@ class CommerceOutboxEntriesCompanion
     Expression<int>? updatedAt,
     Expression<int>? lastAttemptAt,
     Expression<int>? completedAt,
+    Expression<bool>? isDeadLetter,
+    Expression<String>? deadLetterReason,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4416,6 +4512,8 @@ class CommerceOutboxEntriesCompanion
       if (updatedAt != null) 'updated_at': updatedAt,
       if (lastAttemptAt != null) 'last_attempt_at': lastAttemptAt,
       if (completedAt != null) 'completed_at': completedAt,
+      if (isDeadLetter != null) 'is_dead_letter': isDeadLetter,
+      if (deadLetterReason != null) 'dead_letter_reason': deadLetterReason,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4434,6 +4532,8 @@ class CommerceOutboxEntriesCompanion
     Value<int>? updatedAt,
     Value<int?>? lastAttemptAt,
     Value<int?>? completedAt,
+    Value<bool>? isDeadLetter,
+    Value<String?>? deadLetterReason,
     Value<int>? rowid,
   }) {
     return CommerceOutboxEntriesCompanion(
@@ -4450,6 +4550,8 @@ class CommerceOutboxEntriesCompanion
       updatedAt: updatedAt ?? this.updatedAt,
       lastAttemptAt: lastAttemptAt ?? this.lastAttemptAt,
       completedAt: completedAt ?? this.completedAt,
+      isDeadLetter: isDeadLetter ?? this.isDeadLetter,
+      deadLetterReason: deadLetterReason ?? this.deadLetterReason,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4496,6 +4598,12 @@ class CommerceOutboxEntriesCompanion
     if (completedAt.present) {
       map['completed_at'] = Variable<int>(completedAt.value);
     }
+    if (isDeadLetter.present) {
+      map['is_dead_letter'] = Variable<bool>(isDeadLetter.value);
+    }
+    if (deadLetterReason.present) {
+      map['dead_letter_reason'] = Variable<String>(deadLetterReason.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4518,6 +4626,8 @@ class CommerceOutboxEntriesCompanion
           ..write('updatedAt: $updatedAt, ')
           ..write('lastAttemptAt: $lastAttemptAt, ')
           ..write('completedAt: $completedAt, ')
+          ..write('isDeadLetter: $isDeadLetter, ')
+          ..write('deadLetterReason: $deadLetterReason, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -9051,6 +9161,8 @@ typedef $$CommerceOutboxEntriesTableCreateCompanionBuilder =
       Value<int> updatedAt,
       Value<int?> lastAttemptAt,
       Value<int?> completedAt,
+      Value<bool> isDeadLetter,
+      Value<String?> deadLetterReason,
       Value<int> rowid,
     });
 typedef $$CommerceOutboxEntriesTableUpdateCompanionBuilder =
@@ -9068,6 +9180,8 @@ typedef $$CommerceOutboxEntriesTableUpdateCompanionBuilder =
       Value<int> updatedAt,
       Value<int?> lastAttemptAt,
       Value<int?> completedAt,
+      Value<bool> isDeadLetter,
+      Value<String?> deadLetterReason,
       Value<int> rowid,
     });
 
@@ -9142,6 +9256,16 @@ class $$CommerceOutboxEntriesTableFilterComposer
 
   ColumnFilters<int> get completedAt => $composableBuilder(
     column: $table.completedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDeadLetter => $composableBuilder(
+    column: $table.isDeadLetter,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deadLetterReason => $composableBuilder(
+    column: $table.deadLetterReason,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -9219,6 +9343,16 @@ class $$CommerceOutboxEntriesTableOrderingComposer
     column: $table.completedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get isDeadLetter => $composableBuilder(
+    column: $table.isDeadLetter,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deadLetterReason => $composableBuilder(
+    column: $table.deadLetterReason,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$CommerceOutboxEntriesTableAnnotationComposer
@@ -9282,6 +9416,16 @@ class $$CommerceOutboxEntriesTableAnnotationComposer
     column: $table.completedAt,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get isDeadLetter => $composableBuilder(
+    column: $table.isDeadLetter,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get deadLetterReason => $composableBuilder(
+    column: $table.deadLetterReason,
+    builder: (column) => column,
+  );
 }
 
 class $$CommerceOutboxEntriesTableTableManager
@@ -9343,6 +9487,8 @@ class $$CommerceOutboxEntriesTableTableManager
                 Value<int> updatedAt = const Value.absent(),
                 Value<int?> lastAttemptAt = const Value.absent(),
                 Value<int?> completedAt = const Value.absent(),
+                Value<bool> isDeadLetter = const Value.absent(),
+                Value<String?> deadLetterReason = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CommerceOutboxEntriesCompanion(
                 commandId: commandId,
@@ -9358,6 +9504,8 @@ class $$CommerceOutboxEntriesTableTableManager
                 updatedAt: updatedAt,
                 lastAttemptAt: lastAttemptAt,
                 completedAt: completedAt,
+                isDeadLetter: isDeadLetter,
+                deadLetterReason: deadLetterReason,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9375,6 +9523,8 @@ class $$CommerceOutboxEntriesTableTableManager
                 Value<int> updatedAt = const Value.absent(),
                 Value<int?> lastAttemptAt = const Value.absent(),
                 Value<int?> completedAt = const Value.absent(),
+                Value<bool> isDeadLetter = const Value.absent(),
+                Value<String?> deadLetterReason = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CommerceOutboxEntriesCompanion.insert(
                 commandId: commandId,
@@ -9390,6 +9540,8 @@ class $$CommerceOutboxEntriesTableTableManager
                 updatedAt: updatedAt,
                 lastAttemptAt: lastAttemptAt,
                 completedAt: completedAt,
+                isDeadLetter: isDeadLetter,
+                deadLetterReason: deadLetterReason,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

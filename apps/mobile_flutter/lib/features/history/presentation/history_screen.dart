@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'dead_letter_banner.dart';
 import '../../../core/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
@@ -84,6 +85,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
       children: <Widget>[
+        const DeadLetterBanner(),
         MobileScreenLead(
           title: roleProfile.leadTitle,
           subtitle: roleProfile.leadSubtitle,

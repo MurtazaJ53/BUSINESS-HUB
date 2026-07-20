@@ -1977,8 +1977,9 @@ class SalesRepository {
         await (_db.select(_db.commerceOutboxEntries)
               ..where(
                 (tbl) =>
-                    tbl.syncStatus.equals('pending') |
-                    tbl.syncStatus.equals('failed'),
+                    (tbl.syncStatus.equals('pending') |
+                        tbl.syncStatus.equals('failed')) &
+                    tbl.isDeadLetter.equals(false),
               )
               ..orderBy([(tbl) => OrderingTerm.asc(tbl.createdAt)]))
             .get();
@@ -2012,6 +2013,77 @@ class SalesRepository {
           ),
         )
         .toList(growable: false);
+  }
+
+  /// Move a command to the dead-letter queue: the server permanently rejected
+  /// it (4xx), so it stops retrying and surfaces for a human to resolve. The
+  /// linked local sale is flagged so the UI can show it needs attention.
+  Future<void> markOutboxDeadLetter(String commandId, String reason) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final trimmed = reason.length > 2000 ? reason.substring(0, 2000) : reason;
+    await (_db.update(_db.commerceOutboxEntries)
+          ..where((tbl) => tbl.commandId.equals(commandId)))
+        .write(
+      CommerceOutboxEntriesCompanion(
+        syncStatus: const Value('dead_letter'),
+        isDeadLetter: const Value(true),
+        deadLetterReason: Value(trimmed),
+        lastError: Value('Moved to DLQ: $trimmed'),
+        updatedAt: Value(now),
+      ),
+    );
+    await (_db.update(_db.salesEntries)
+          ..where((tbl) => tbl.commandId.equals(commandId)))
+        .write(
+      SalesEntriesCompanion(
+        syncStatus: const Value('rejected'),
+        lastSyncError: Value(trimmed),
+        updatedAt: Value(now),
+      ),
+    );
+  }
+
+  /// Live count of dead-lettered commands, for a "needs attention" badge.
+  Stream<int> watchDeadLetterCount() {
+    final query = _db.selectOnly(_db.commerceOutboxEntries)
+      ..addColumns([_db.commerceOutboxEntries.commandId.count()])
+      ..where(_db.commerceOutboxEntries.isDeadLetter.equals(true));
+    return query
+        .map((row) => row.read(_db.commerceOutboxEntries.commandId.count()) ?? 0)
+        .watchSingle();
+  }
+
+  /// Live list of dead-lettered commands for the resolution screen.
+  Stream<List<CommerceOutboxEntry>> watchDeadLetterEntries() {
+    return (_db.select(_db.commerceOutboxEntries)
+          ..where((tbl) => tbl.isDeadLetter.equals(true))
+          ..orderBy([(tbl) => OrderingTerm.desc(tbl.updatedAt)]))
+        .watch();
+  }
+
+  /// Discard a dead-lettered command: drop the queue entry so it stops nagging.
+  /// The local sale row stays (flagged 'rejected') for the owner's records.
+  Future<void> discardDeadLetter(String commandId) async {
+    await (_db.delete(_db.commerceOutboxEntries)
+          ..where((tbl) => tbl.commandId.equals(commandId)))
+        .go();
+  }
+
+  /// "Force retry" a dead-lettered command (e.g. after the backend was fixed):
+  /// clear the terminal flags and reset attempts so the next flush picks it up.
+  Future<void> retryDeadLetter(String commandId) async {
+    await (_db.update(_db.commerceOutboxEntries)
+          ..where((tbl) => tbl.commandId.equals(commandId)))
+        .write(
+      CommerceOutboxEntriesCompanion(
+        syncStatus: const Value('pending'),
+        isDeadLetter: const Value(false),
+        deadLetterReason: const Value(null),
+        attemptCount: const Value(0),
+        lastAttemptAt: const Value(null),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
   }
 
   Future<void> markOutboxSyncing(String commandId) async {

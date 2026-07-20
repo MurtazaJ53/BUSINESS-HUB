@@ -164,6 +164,12 @@ class CommerceOutboxEntries extends Table {
   IntColumn get lastAttemptAt =>
       integer().named('last_attempt_at').nullable()();
   IntColumn get completedAt => integer().named('completed_at').nullable()();
+  // Dead-letter: a terminal state for commands the server permanently rejected
+  // (4xx validation), so they stop retrying and surface for a human to resolve.
+  BoolColumn get isDeadLetter =>
+      boolean().named('is_dead_letter').withDefault(const Constant(false))();
+  TextColumn get deadLetterReason =>
+      text().named('dead_letter_reason').nullable()();
 
   @override
   Set<Column<Object>>? get primaryKey => {commandId};
@@ -290,7 +296,7 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       );
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -298,6 +304,10 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       await m.createAll();
     },
     onUpgrade: (m, from, to) async {
+      if (from < 15) {
+        await m.addColumn(commerceOutboxEntries, commerceOutboxEntries.isDeadLetter);
+        await m.addColumn(commerceOutboxEntries, commerceOutboxEntries.deadLetterReason);
+      }
       if (from < 2) {
         await m.addColumn(salesEntries, salesEntries.commandId);
         await m.addColumn(salesEntries, salesEntries.syncStatus);
