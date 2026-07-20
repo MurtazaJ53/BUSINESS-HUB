@@ -33,6 +33,7 @@ class UniversalImportService {
     final now = DateTime.now().millisecondsSinceEpoch;
     final iso = DateTime.now().toIso8601String();
     var imported = 0;
+    await _inventory.runInTransaction(() async {
     for (final row in mapped.rows) {
       final name = row['name'] ?? '';
       if (name.isEmpty) continue;
@@ -65,6 +66,7 @@ class UniversalImportService {
       }
       imported++;
     }
+    });
     return ImportOutcome(imported: imported, skipped: mapped.rows.length - imported);
   }
 
@@ -72,6 +74,7 @@ class UniversalImportService {
   /// in History/Reports but do not change current stock or balances.
   Future<ImportOutcome> importSales(MappedImport mapped) async {
     var imported = 0;
+    await _inventory.runInTransaction(() async {
     for (final row in mapped.rows) {
       final total = parseNum(row['total']);
       if (total <= 0) continue;
@@ -97,6 +100,7 @@ class UniversalImportService {
       );
       imported++;
     }
+    });
     return ImportOutcome(imported: imported, skipped: mapped.rows.length - imported);
   }
 
@@ -104,6 +108,7 @@ class UniversalImportService {
   /// today; payment mode normalized.
   Future<ImportOutcome> importExpenses(MappedImport mapped) async {
     var imported = 0;
+    await _inventory.runInTransaction(() async {
     for (final row in mapped.rows) {
       final amount = parseNum(row['amount']);
       if (amount <= 0) continue;
@@ -117,6 +122,7 @@ class UniversalImportService {
       );
       imported++;
     }
+    });
     return ImportOutcome(imported: imported, skipped: mapped.rows.length - imported);
   }
 
@@ -171,6 +177,7 @@ class UniversalImportService {
     final now = DateTime.now().millisecondsSinceEpoch;
     final iso = DateTime.now().toIso8601String();
     var imported = 0;
+    await _inventory.runInTransaction(() async {
     for (final row in mapped.rows) {
       final name = row['name'] ?? '';
       if (name.isEmpty) continue;
@@ -193,6 +200,7 @@ class UniversalImportService {
       );
       imported++;
     }
+    });
     return ImportOutcome(imported: imported, skipped: mapped.rows.length - imported);
   }
 }

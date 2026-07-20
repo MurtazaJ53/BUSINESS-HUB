@@ -406,6 +406,12 @@ class InventoryRepository {
 
   final BusinessHubDatabase _db;
 
+  /// Run [action] inside a single DB transaction. All repos share this database
+  /// connection, so bulk imports (products, customers, …) wrapped here commit as
+  /// one fast batch instead of hundreds of individual writes.
+  Future<T> runInTransaction<T>(Future<T> Function() action) =>
+      _db.transaction(action);
+
   Stream<DashboardOverview> watchDashboardOverview({
     required bool includeCost,
   }) {

@@ -7,6 +7,7 @@ import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/khata/khata_reminder.dart';
 import '../../../core/util/whatsapp.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
@@ -499,11 +500,12 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
   ) async {
     final shopName =
         ref.read(shopInfoProvider).asData?.value.name ?? 'our shop';
-    final message = customer.balance > 0
-        ? 'Hello ${customer.name}, this is a friendly reminder from $shopName. '
-              'Your pending balance is ${formatCurrency(customer.balance)}. '
-              'Thank you!'
-        : 'Hello ${customer.name}, thank you for shopping with $shopName!';
+    final message = buildKhataReminder(
+      shopName: shopName,
+      customerName: customer.name,
+      balance: customer.balance,
+      upiVpa: const String.fromEnvironment('BUSINESS_HUB_UPI_VPA'),
+    );
     final ok = await openWhatsApp(phone: customer.phone ?? '', message: message);
     if (!ok && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
