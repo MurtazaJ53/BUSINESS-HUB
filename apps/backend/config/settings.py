@@ -41,6 +41,13 @@ else:
     raise ImproperlyConfigured(
         "FATAL: DJANGO_SECRET_KEY is not set. Refusing to boot with DEBUG off."
     )
+
+# Pepper for blind-index hashing of searchable PII (customer phone). Falls back
+# to SECRET_KEY so it always has a strong value; set a *separate*
+# BLIND_INDEX_PEPPER in prod for key separation. NEVER change it once data
+# exists, or existing phone hashes stop matching.
+BLIND_INDEX_PEPPER = os.getenv("BLIND_INDEX_PEPPER", SECRET_KEY)
+
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", ["localhost", "127.0.0.1", "testserver"])
 CORS_ALLOWED_ORIGINS = env_list("DJANGO_CORS_ALLOWED_ORIGINS")
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")

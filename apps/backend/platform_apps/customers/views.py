@@ -14,6 +14,7 @@ from platform_apps.audit.services import (
     snapshot_customer,
     snapshot_customer_ledger_entry,
 )
+from platform_apps.common.blind_index import generate_blind_index
 from platform_apps.common.migration import MigrationDomain
 from platform_apps.common.migration_guards import assert_postgres_primary_write_enabled
 from platform_apps.common.query import bounded_list_limit
@@ -53,9 +54,12 @@ class CustomerListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
         status_value = self.request.query_params.get("status", "").strip()
 
         if query:
-            queryset = queryset.filter(
-                Q(name__icontains=query) | Q(phone__icontains=query) | Q(email__icontains=query)
-            )
+            # The encrypted phone/email columns aren't searchable; match name by
+            # substring and phone by exact blind-index hash (indexed, no decrypt).
+            filters = Q(name__icontains=query)
+            if any(ch.isdigit() for ch in query):
+                filters |= Q(phone_hash=generate_blind_index(query))
+            queryset = queryset.filter(filters)
         if status_value:
             queryset = queryset.filter(status=status_value)
         return queryset[: bounded_list_limit(self.request.query_params.get("limit"))]

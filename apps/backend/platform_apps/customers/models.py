@@ -6,6 +6,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.db import models
 
+from platform_apps.common.blind_index import generate_blind_index
 from platform_apps.common.models import SourceTrackedModel
 from platform_apps.shops.models import Shop
 
@@ -19,6 +20,10 @@ class Customer(SourceTrackedModel):
     name = models.CharField(max_length=255)
     phone = encrypt(models.CharField(max_length=32, blank=True, default="-"))
     email = encrypt(models.EmailField(blank=True))
+    # Blind index: keyed hash of the (digits-only) phone so a cashier can look a
+    # customer up by number WITHOUT decrypting every row. The encrypted `phone`
+    # stays the source of truth.
+    phone_hash = models.CharField(max_length=64, blank=True, default="", db_index=False)
     total_spent = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     balance = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     notes = models.TextField(blank=True)
@@ -29,9 +34,18 @@ class Customer(SourceTrackedModel):
     class Meta:
         indexes = [
             models.Index(fields=["shop", "name"]),
-            models.Index(fields=["shop", "phone"]),
+            # Search by the blind index, not the (unsearchable) encrypted phone.
+            models.Index(fields=["shop", "phone_hash"]),
             models.Index(fields=["shop", "status"]),
         ]
+
+    def save(self, *args, **kwargs):
+        # Keep the blind index in step with the phone on every write.
+        self.phone_hash = generate_blind_index(self.phone)
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "phone" in update_fields and "phone_hash" not in update_fields:
+            kwargs["update_fields"] = list(update_fields) + ["phone_hash"]
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return f"{self.name} ({self.shop.name})"
