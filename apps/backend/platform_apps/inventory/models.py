@@ -5,6 +5,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.db import models
 
+from platform_apps.common.managers import TenantAwareManager
 from platform_apps.common.models import SourceTrackedModel
 from platform_apps.shops.models import Shop
 
@@ -81,6 +82,11 @@ class InventoryStockLedger(SourceTrackedModel):
     unit_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
     note = models.TextField(blank=True)
     occurred_at = models.DateTimeField()
+
+    # Auto-scopes reads to the current shop when a Celery TenantTask is running;
+    # a no-op in HTTP/admin/tests. Defense against a background job forgetting
+    # an explicit shop filter on this aggregation-heavy ledger.
+    objects = TenantAwareManager()
 
     class Meta:
         ordering = ["-occurred_at", "-created_at"]

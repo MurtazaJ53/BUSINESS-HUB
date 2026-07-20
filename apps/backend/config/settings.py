@@ -24,9 +24,23 @@ def env_list(name: str, default: list[str] | None = None) -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only-change-me")
 DEBUG = env_bool("DJANGO_DEBUG", True)
 ENVIRONMENT = os.getenv("DJANGO_ENV", "development")
+
+# SECRET_KEY: allow an insecure dev fallback ONLY in DEBUG; in production (DEBUG
+# off) refuse to boot without a real key, so a forgotten env var can't ship an
+# instance whose JWTs anyone could forge.
+_SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+if _SECRET_KEY:
+    SECRET_KEY = _SECRET_KEY
+elif DEBUG:
+    SECRET_KEY = "dev-only-change-me"
+else:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "FATAL: DJANGO_SECRET_KEY is not set. Refusing to boot with DEBUG off."
+    )
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", ["localhost", "127.0.0.1", "testserver"])
 CORS_ALLOWED_ORIGINS = env_list("DJANGO_CORS_ALLOWED_ORIGINS")
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
@@ -103,7 +117,12 @@ if DATABASE_URL:
     DATABASES = {
         "default": dj_database_url.parse(
             DATABASE_URL,
-            conn_max_age=int(os.getenv("DATABASE_CONN_MAX_AGE", "600")),
+            # 0 = release the connection after each request. Required behind
+            # PgBouncer in *transaction* pooling mode (the prod setup); keeping
+            # Django connections alive there defeats the pooler and exhausts
+            # Postgres. Set DATABASE_CONN_MAX_AGE>0 only if you point Django at
+            # Postgres directly (no transaction-pooling PgBouncer).
+            conn_max_age=int(os.getenv("DATABASE_CONN_MAX_AGE", "0")),
             ssl_require=env_bool("DATABASE_SSL_REQUIRED", False),
         )
     }

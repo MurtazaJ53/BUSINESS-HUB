@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.your-business-hub.com wss://api.your-business-hub.com; img-src 'self' asset: data: https:; font-src 'self' data:"
     }
   },
   "bundle": {
