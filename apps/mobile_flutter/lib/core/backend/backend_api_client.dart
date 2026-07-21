@@ -960,7 +960,15 @@ class BackendApiClient {
       await _attachAuthHeaders(request, user);
       if (body != null) {
         request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-        request.write(jsonEncode(body));
+        // Encode first and set contentLength explicitly. A bare
+        // request.write() leaves it at -1, which makes dart:io fall back to
+        // Transfer-Encoding: chunked - and plenty of things upstream cannot
+        // read a chunked request body (Django's dev server drops it entirely,
+        // and some proxies/WAFs reject it), so the server sees an empty body
+        // and answers "this field is required" for every field we sent.
+        final encoded = utf8.encode(jsonEncode(body));
+        request.contentLength = encoded.length;
+        request.add(encoded);
       }
 
       final response = await request.close().timeout(_requestTimeout);
