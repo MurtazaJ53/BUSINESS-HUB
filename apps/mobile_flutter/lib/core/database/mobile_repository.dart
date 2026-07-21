@@ -1185,6 +1185,36 @@ class CustomerRepository {
     return newBalance;
   }
 
+  /// Record where an imported/brought-forward balance came from.
+  ///
+  /// Setting `balance` on its own leaves a customer showing a due with an
+  /// empty khata - the owner cannot tell the customer what the money is for,
+  /// which is exactly when they need the ledger. The id is derived from the
+  /// customer so re-importing the same sheet corrects the opening row instead
+  /// of stacking duplicates on top of it.
+  Future<void> recordOpeningBalance({
+    required String customerId,
+    required double balance,
+    DateTime? occurredAt,
+    String note = 'Opening balance (imported)',
+  }) async {
+    if (balance == 0) return;
+    final at = (occurredAt ?? DateTime.now()).millisecondsSinceEpoch;
+    await _db
+        .into(_db.customerLedgerEntries)
+        .insertOnConflictUpdate(
+          CustomerLedgerEntriesCompanion.insert(
+            id: 'led-opening-$customerId',
+            customerId: customerId,
+            type: 'OPENING',
+            amount: balance,
+            balanceAfter: balance,
+            note: Value(note),
+            createdAt: at,
+          ),
+        );
+  }
+
   Stream<List<CustomerLedgerRecord>> watchLedger(String customerId) {
     return _db
         .customSelect(

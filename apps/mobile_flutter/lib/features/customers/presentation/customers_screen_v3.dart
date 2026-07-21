@@ -541,11 +541,22 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
                               ?.value ??
                           const <CustomerLedgerRecord>[];
                       if (entries.isEmpty) {
-                        return const Center(
-                          child: Text(
-                            'No credit or payments yet.\nCredit sales and '
-                            'payments will appear here.',
-                            textAlign: TextAlign.center,
+                        // Distinguish "nothing has happened" from "there is a
+                        // due but no record of it" - the second is a real gap
+                        // the owner should understand, not a blank screen.
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Text(
+                              customer.balance != 0
+                                  ? 'This balance was carried over (imported or '
+                                        'set directly), so there are no entries '
+                                        'behind it. New credit sales and payments '
+                                        'will be listed here.'
+                                  : 'No credit or payments yet.\nCredit sales and '
+                                        'payments will appear here.',
+                              textAlign: TextAlign.center,
+                            ),
                           ),
                         );
                       }
@@ -559,13 +570,17 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
                             leading: Icon(
                               e.isPayment
                                   ? Icons.south_west_rounded
-                                  : Icons.north_east_rounded,
+                                  : e.isOpening
+                                      ? Icons.flag_rounded
+                                      : Icons.north_east_rounded,
                               color: e.isPayment
                                   ? AppPalette.success
-                                  : AppPalette.error,
+                                  : e.isOpening
+                                      ? AppPalette.info
+                                      : AppPalette.error,
                             ),
                             title: Text(
-                              '${e.isPayment ? 'Payment' : 'Credit'} '
+                              '${e.typeLabel} '
                               '${formatCurrency(e.amount.abs())}',
                               style: const TextStyle(
                                 fontWeight: FontWeight.w600,

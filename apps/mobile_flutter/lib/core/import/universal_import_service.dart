@@ -228,6 +228,13 @@ class UniversalImportService {
         },
         updatedAt: now,
       );
+      // Give the imported due a visible origin, otherwise the customer shows
+      // a balance with an empty khata and nobody can say what it is for.
+      await _customers.recordOpeningBalance(
+        customerId: id,
+        balance: balance,
+        occurredAt: addedOn,
+      );
       imported++;
     }
     });

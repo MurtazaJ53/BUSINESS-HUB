@@ -242,6 +242,13 @@ class ZobazeImportService {
             },
             updatedAt: now,
           );
+          // Same reason as the universal importer: a due with no khata row is
+          // a number the owner cannot explain to the customer.
+          await _customers.recordOpeningBalance(
+            customerId: id,
+            balance: due - advance,
+            note: 'Opening balance (imported from Zobaze)',
+          );
           customerCount++;
         }
       }

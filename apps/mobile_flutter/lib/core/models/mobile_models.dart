@@ -446,6 +446,17 @@ class CustomerLedgerRecord {
   final String? actorName;
 
   bool get isPayment => type == 'PAYMENT';
+
+  /// A balance brought forward from an import rather than earned on a sale.
+  bool get isOpening => type == 'OPENING';
+
+  /// Label for the khata timeline.
+  String get typeLabel => switch (type) {
+    'PAYMENT' => 'Payment',
+    'OPENING' => 'Opening balance',
+    'ADJUST' => 'Adjustment',
+    _ => 'Credit',
+  };
 }
 
 /// One entry in an item's stock audit trail.
