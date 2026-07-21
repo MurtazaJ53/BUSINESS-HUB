@@ -108,6 +108,12 @@ const Map<ImportKind, List<ImportField>> importSchemas = <ImportKind, List<Impor
         synonyms: <String>['customer name', 'client', 'party', 'name']),
     ImportField('customerPhone', 'Customer phone',
         synonyms: <String>['phone', 'mobile', 'contact', 'number']),
+    ImportField('reference', 'Invoice no',
+        synonyms: <String>[
+          'invoice', 'invoice number', 'bill no', 'bill number', 'receipt no',
+          'receipt number', 'receipt id', 'order no', 'order id', 'txn id',
+          'transaction id', 'voucher no', 'ref', 'reference',
+        ]),
   ],
   ImportKind.expenses: <ImportField>[
     ImportField('amount', 'Amount',
@@ -436,4 +442,48 @@ String exportCsvFor(ImportKind kind, List<Map<String, String>> rows) {
     out.add(fields.map((f) => row[f.key] ?? '').toList());
   }
   return toCsv(out);
+}
+
+/// Deterministic 64-bit FNV-1a hash of [parts], as 16 hex chars.
+///
+/// Import ids must survive across app runs and SDK upgrades, which rules out
+/// Object.hashCode: `Map.hashCode` is identity-based, so the same spreadsheet
+/// row hashed differently on every import and sales were re-inserted as new
+/// records instead of updating. String.hashCode is content-based but Dart
+/// gives no cross-version stability guarantee, so we pin our own.
+String stableRowKey(Iterable<String> parts) {
+  const int offsetBasis = 0xcbf29ce484222325;
+  const int prime = 0x100000001b3;
+  var hash = offsetBasis;
+  for (final part in parts) {
+    for (final unit in part.trim().toLowerCase().codeUnits) {
+      hash = ((hash ^ unit) * prime).toUnsigned(64);
+    }
+    // Field separator, so ['ab','c'] cannot collide with ['a','bc'].
+    hash = ((hash ^ 0x7c) * prime).toUnsigned(64);
+  }
+  return hash.toRadixString(16).padLeft(16, '0');
+}
+
+/// Stable identity for an imported row.
+///
+/// A reference number (invoice/bill no) is the row's real primary key, so it
+/// wins when present. Otherwise we hash the content, and disambiguate rows
+/// that are legitimately identical - a shop really can ring up two Rs.50 cash
+/// sales on the same day - with an occurrence counter. Counting occurrences
+/// rather than using the row's position means adding rows elsewhere in the
+/// file does not renumber, and therefore does not duplicate, the existing ones.
+String importRowId(
+  String prefix,
+  Map<String, String> row,
+  List<String> keys, {
+  required Map<String, int> occurrences,
+  String? reference,
+}) {
+  final ref = (reference ?? '').trim();
+  if (ref.isNotEmpty) return '$prefix-ref-${stableRowKey(<String>[ref])}';
+  final key = stableRowKey(keys.map((k) => row[k] ?? ''));
+  final seen = occurrences[key] ?? 0;
+  occurrences[key] = seen + 1;
+  return seen == 0 ? '$prefix-$key' : '$prefix-$key-$seen';
 }

@@ -18,6 +18,7 @@ class ImportOutcome {
     required this.imported,
     required this.skipped,
     this.undatedRows = 0,
+    this.replacedRows = 0,
   });
   final int imported;
   final int skipped;
@@ -26,6 +27,11 @@ class ImportOutcome {
   /// Surfaced to the user - silently re-dating a shop's history is the kind
   /// of damage they should hear about rather than discover months later.
   final int undatedRows;
+
+  /// Rows that matched something already stored and overwrote it. Non-zero
+  /// almost always means "this file was imported before" - worth saying out
+  /// loud, because the alternative reading is that nothing happened.
+  final int replacedRows;
 }
 
 /// Writes canonical rows produced by [mapRows] into the local store. Products
@@ -85,6 +91,11 @@ class UniversalImportService {
   Future<ImportOutcome> importSales(MappedImport mapped) async {
     var imported = 0;
     var undated = 0;
+    var replaced = 0;
+    // Tracks rows that are legitimately identical within one file so they get
+    // distinct - but still reproducible - ids.
+    final occurrences = <String, int>{};
+    final existing = await _sales.existingSaleIds();
     await _inventory.runInTransaction(() async {
     for (final row in mapped.rows) {
       final total = parseNum(row['total']);
@@ -94,7 +105,17 @@ class UniversalImportService {
       final dt = parsed ?? DateTime.now();
       final date = dt.toIso8601String().split('T').first;
       final pay = _normalizePayment(row['payment'] ?? 'CASH');
-      final id = 'import-sale-${row.hashCode}-${dt.millisecondsSinceEpoch}';
+      // Content-derived, NOT row.hashCode: Map.hashCode is identity-based, so
+      // the same receipt hashed differently on every import and re-importing a
+      // file silently duplicated every sale in it, inflating revenue.
+      final id = importRowId(
+        'import-sale',
+        row,
+        const <String>['date', 'total', 'discount', 'payment', 'customerName', 'customerPhone'],
+        occurrences: occurrences,
+        reference: row['reference'],
+      );
+      if (existing.contains(id)) replaced++;
       await _sales.importHistoricalSale(
         id: id,
         date: date,
@@ -117,6 +138,7 @@ class UniversalImportService {
       imported: imported,
       skipped: mapped.rows.length - imported,
       undatedRows: undated,
+      replacedRows: replaced,
     );
   }
 

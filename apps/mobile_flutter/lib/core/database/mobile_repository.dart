@@ -1379,6 +1379,16 @@ class SalesRepository {
   /// Insert a historical sale (e.g. imported from another POS). Idempotent by
   /// [id]; does NOT touch inventory stock or the sync outbox — it is treated
   /// as settled past history.
+  /// Ids of sales already stored, so an importer can tell the user how many
+  /// rows a re-import will overwrite rather than silently reprocessing them.
+  Future<Set<String>> existingSaleIds() async {
+    final rows = await (_db.selectOnly(_db.salesEntries)
+          ..addColumns([_db.salesEntries.id]))
+        .map((row) => row.read(_db.salesEntries.id))
+        .get();
+    return rows.whereType<String>().toSet();
+  }
+
   Future<void> importHistoricalSale({
     required String id,
     required String date,

@@ -143,7 +143,11 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
           // Say it plainly when dates could not be read - these rows got
           // stamped with today, and the owner needs to know their history
           // was re-dated rather than find out from a wrong report later.
-          '${outcome.undatedRows > 0 ? ' ${outcome.undatedRows} had an unreadable date and were set to today.' : ''}';
+          '${outcome.undatedRows > 0 ? ' ${outcome.undatedRows} had an unreadable date and were set to today.' : ''}'
+          // Tell them the file was already imported. Without this, a repeat
+          // import looks identical to a fresh one and the only way to find out
+          // is to go hunting through History.
+          '${outcome.replacedRows > 0 ? ' ${outcome.replacedRows} already existed and were updated, not duplicated.' : ''}';
     });
   }
 
