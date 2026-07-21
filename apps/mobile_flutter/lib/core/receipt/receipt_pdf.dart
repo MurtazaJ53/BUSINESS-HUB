@@ -4,6 +4,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../models/mobile_models.dart';
+import '../pos/upi_qr.dart';
 import '../tax/gst.dart';
 import '../utils/formatters.dart';
 
@@ -141,6 +142,29 @@ Future<Uint8List> buildReceiptPdf(SaleRecordDetail detail, ShopInfo shop) async 
             _row('Paid', _money(detail.amountReceived)),
             if (detail.amountDue > 0.009) _row('Balance due', _money(detail.amountDue)),
             pw.SizedBox(height: 10),
+            // UPI pay QR so the customer can settle the balance from the PDF bill.
+            if (receiptUpiUri(shopName: shop.name, amountDue: detail.amountDue) != null) ...<pw.Widget>[
+              pw.Center(
+                child: pw.Text(
+                  'Scan to pay via UPI',
+                  style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+                ),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.BarcodeWidget(
+                  barcode: pw.Barcode.qrCode(),
+                  data: receiptUpiUri(
+                    shopName: shop.name,
+                    amountDue: detail.amountDue,
+                  )!,
+                  width: 96,
+                  height: 96,
+                  drawText: false,
+                ),
+              ),
+              pw.SizedBox(height: 10),
+            ],
             if (footer.isNotEmpty)
               pw.Center(
                 child: pw.Text(

@@ -41,6 +41,24 @@ void main() {
       );
     });
 
+    test('receiptUpiUri builds a pay link for the balance due', () {
+      final uri = receiptUpiUri(
+        shopName: 'Demo Mart',
+        amountDue: 340,
+        vpa: 'demomart@okhdfcbank',
+      );
+      expect(uri, isNotNull);
+      expect(Uri.parse(uri!).queryParameters['am'], '340.00');
+      expect(Uri.parse(uri).queryParameters['pa'], 'demomart@okhdfcbank');
+    });
+
+    test('receiptUpiUri is null when nothing is due or no VPA configured', () {
+      expect(receiptUpiUri(shopName: 'X', amountDue: 0, vpa: 'a@bank'), isNull);
+      expect(receiptUpiUri(shopName: 'X', amountDue: 100, vpa: ''), isNull);
+      // A misconfigured VPA must not break receipt printing.
+      expect(receiptUpiUri(shopName: 'X', amountDue: 100, vpa: 'bad-vpa'), isNull);
+    });
+
     test('omits optional note/ref when empty', () {
       final uri = buildUpiUri(payeeVpa: 'a@bank', payeeName: 'X', amount: 5);
       final parsed = Uri.parse(uri);

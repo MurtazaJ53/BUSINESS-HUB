@@ -54,3 +54,30 @@ String buildUpiUri({
       .join('&');
   return 'upi://pay?$query';
 }
+
+/// Merchant UPI id configured at build time
+/// (`--dart-define BUSINESS_HUB_UPI_VPA=shop@bank`).
+const String configuredMerchantVpa =
+    String.fromEnvironment('BUSINESS_HUB_UPI_VPA');
+
+/// UPI pay link to print on a receipt, so a customer can clear the bill straight
+/// from the paper/PDF. Returns null when nothing is due or no merchant VPA is
+/// configured — the receipt then simply omits the QR.
+String? receiptUpiUri({
+  required String shopName,
+  required double amountDue,
+  String? vpa,
+}) {
+  final payee = (vpa ?? configuredMerchantVpa).trim();
+  if (payee.isEmpty || amountDue <= 0) return null;
+  try {
+    return buildUpiUri(
+      payeeVpa: payee,
+      payeeName: shopName,
+      amount: amountDue,
+      note: 'Bill payment',
+    );
+  } on UpiRequestError {
+    return null; // misconfigured VPA -> print the receipt without a QR
+  }
+}

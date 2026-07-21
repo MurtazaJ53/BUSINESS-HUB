@@ -3,6 +3,7 @@ import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 
 import '../models/mobile_models.dart';
+import '../pos/upi_qr.dart';
 
 class ReceiptPrinterService {
   final BlueThermalPrinter bluetooth = BlueThermalPrinter.instance;
@@ -128,6 +129,21 @@ class ReceiptPrinterService {
       PosColumn(text: detail.amountDue.toStringAsFixed(2), width: 4, styles: const PosStyles(align: PosAlign.right, bold: true)),
     ]);
     
+    // UPI pay QR on the paper bill: the customer can clear the balance straight
+    // from the receipt. Omitted when nothing is due or no merchant VPA is set.
+    final payUri = receiptUpiUri(
+      shopName: shop.name,
+      amountDue: detail.amountDue,
+    );
+    if (payUri != null) {
+      bytes += generator.emptyLines(1);
+      bytes += generator.text(
+        'Scan to pay via UPI',
+        styles: const PosStyles(align: PosAlign.center, bold: true),
+      );
+      bytes += generator.qrcode(payUri);
+    }
+
     bytes += generator.emptyLines(1);
     bytes += generator.text(
       'Thank you for your business!',
