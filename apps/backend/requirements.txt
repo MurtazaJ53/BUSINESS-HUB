@@ -14,7 +14,10 @@ opentelemetry-sdk==1.41.1
 opentelemetry-exporter-otlp==1.41.1
 opentelemetry-instrumentation-django==0.62b1
 opentelemetry-instrumentation-psycopg==0.62b1
-django-cryptography
-channels
-channels-redis
-django-ratelimit
+# Upstream django-cryptography is abandoned at 1.1 (2021) and imports
+# django.utils.baseconv, removed in Django 5 - unpinned, it silently breaks
+# the boot. This fork tracks modern Django and keeps the same import name.
+django-cryptography-django5==2.2
+channels==4.3.2
+channels-redis==4.3.0
+django-ratelimit==4.1.0

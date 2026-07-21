@@ -74,3 +74,6 @@ keystore.base64.txt
 *_large.csv
 demo_import.xlsx
 sc*.png
+
+# Local laptop test database (fresh, unencrypted-key-safe)
+apps/backend/laptop-dev.sqlite3
