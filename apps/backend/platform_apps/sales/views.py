@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 import csv
+import io
+import zipfile
 from django.http import HttpResponse
 
 from django.db import transaction
@@ -629,3 +631,134 @@ class GSTR3BExportView(ShopScopedMixin, APIView):
             ["Total (3.1a)", "", totals["taxable"], totals["igst"], totals["cgst"], totals["sgst"], grand_tax]
         )
         return response
+
+
+class GSTFilingPackView(ShopScopedMixin, APIView):
+    """One-tap monthly filing pack for the shop's CA: a ZIP with GSTR-1,
+    GSTR-3B (3.1a) and an HSN summary CSV for the period. Admin/owner only."""
+
+    permission_classes = [permissions.IsAuthenticated]
+    minimum_role = ShopMembership.Role.ADMIN
+
+    def get(self, request, shop_id):
+        membership = self.get_membership()
+        shop = membership.shop
+        month = request.query_params.get("month")
+        year = request.query_params.get("year")
+        if not month or not year:
+            return Response(
+                {"error": "month and year are required parameters"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            month = int(month)
+            year = int(year)
+        except ValueError:
+            return Response(
+                {"error": "month and year must be integers"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        sales = list(
+            Sale.objects.filter(
+                shop=shop,
+                tombstone=False,
+                status=Sale.Status.COMPLETED,
+                sale_date__year=year,
+                sale_date__month=month,
+            ).prefetch_related("items")
+        )
+
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr(f"GSTR1_{year}_{month:02d}.csv", self._gstr1_csv(shop, sales))
+            archive.writestr(f"GSTR3B_{year}_{month:02d}.csv", self._gstr3b_csv(shop, sales))
+            archive.writestr(f"HSN_summary_{year}_{month:02d}.csv", self._hsn_csv(sales))
+
+        response = HttpResponse(buffer.getvalue(), content_type="application/zip")
+        response["Content-Disposition"] = (
+            f'attachment; filename="GST_filing_pack_{shop.name}_{year}_{month:02d}.zip"'
+        )
+        return response
+
+    @staticmethod
+    def _gstr1_csv(shop, sales) -> str:
+        out = io.StringIO()
+        w = csv.writer(out)
+        w.writerow(
+            ["GSTIN/UIN of Recipient", "Receiver Name", "Invoice Number", "Invoice Date",
+             "Invoice Value", "Place Of Supply", "Reverse Charge", "Invoice Type",
+             "Rate", "Taxable Value"]
+        )
+        for sale in sales:
+            rate_groups: dict = {}
+            for item in sale.items.all():
+                rate_groups.setdefault(item.gst_rate, Decimal("0.00"))
+                rate_groups[item.gst_rate] += item.taxable_amount or Decimal("0.00")
+            buyer_gstin = sale.buyer_gstin or ""
+            invoice_type = "Regular B2B" if buyer_gstin else "B2C Others"
+            for rate, taxable in rate_groups.items():
+                if taxable > 0:
+                    w.writerow([
+                        buyer_gstin, sale.customer_name_snapshot, sale.receipt_number,
+                        sale.sale_date.strftime("%d-%b-%y"), sale.total_amount,
+                        sale.place_of_supply_state or shop.state_code, "N",
+                        invoice_type, rate, taxable,
+                    ])
+        return out.getvalue()
+
+    @staticmethod
+    def _gstr3b_csv(shop, sales) -> str:
+        by_rate: dict = {}
+        for sale in sales:
+            for item in sale.items.all():
+                bucket = by_rate.setdefault(
+                    item.gst_rate,
+                    {"taxable": Decimal("0.00"), "cgst": Decimal("0.00"),
+                     "sgst": Decimal("0.00"), "igst": Decimal("0.00")},
+                )
+                bucket["taxable"] += item.taxable_amount or Decimal("0.00")
+                bucket["cgst"] += item.cgst_amount or Decimal("0.00")
+                bucket["sgst"] += item.sgst_amount or Decimal("0.00")
+                bucket["igst"] += item.igst_amount or Decimal("0.00")
+        out = io.StringIO()
+        w = csv.writer(out)
+        w.writerow(["GSTIN", shop.gstin or ""])
+        w.writerow([])
+        w.writerow(["Nature of Supply", "Tax Rate (%)", "Taxable Value", "IGST", "CGST", "SGST", "Total Tax"])
+        totals = {"taxable": Decimal("0.00"), "cgst": Decimal("0.00"), "sgst": Decimal("0.00"), "igst": Decimal("0.00")}
+        for rate in sorted(by_rate.keys()):
+            a = by_rate[rate]
+            w.writerow(["Outward taxable supplies", rate, a["taxable"], a["igst"], a["cgst"], a["sgst"],
+                        a["igst"] + a["cgst"] + a["sgst"]])
+            for k in totals:
+                totals[k] += a[k]
+        w.writerow(["Total (3.1a)", "", totals["taxable"], totals["igst"], totals["cgst"], totals["sgst"],
+                    totals["igst"] + totals["cgst"] + totals["sgst"]])
+        return out.getvalue()
+
+    @staticmethod
+    def _hsn_csv(sales) -> str:
+        by_hsn: dict = {}
+        for sale in sales:
+            for item in sale.items.all():
+                key = (item.hsn_snapshot or "", item.gst_rate)
+                bucket = by_hsn.setdefault(
+                    key,
+                    {"qty": Decimal("0.000"), "taxable": Decimal("0.00"),
+                     "cgst": Decimal("0.00"), "sgst": Decimal("0.00"), "igst": Decimal("0.00")},
+                )
+                sign = Decimal("-1") if item.is_return else Decimal("1")
+                bucket["qty"] += sign * (item.quantity or Decimal("0.000"))
+                bucket["taxable"] += item.taxable_amount or Decimal("0.00")
+                bucket["cgst"] += item.cgst_amount or Decimal("0.00")
+                bucket["sgst"] += item.sgst_amount or Decimal("0.00")
+                bucket["igst"] += item.igst_amount or Decimal("0.00")
+        out = io.StringIO()
+        w = csv.writer(out)
+        w.writerow(["HSN", "Rate (%)", "Total Quantity", "Taxable Value", "IGST", "CGST", "SGST", "Total Tax"])
+        for (hsn, rate) in sorted(by_hsn.keys(), key=lambda k: (str(k[0]), k[1])):
+            a = by_hsn[(hsn, rate)]
+            w.writerow([hsn, rate, a["qty"], a["taxable"], a["igst"], a["cgst"], a["sgst"],
+                        a["igst"] + a["cgst"] + a["sgst"]])
+        return out.getvalue()

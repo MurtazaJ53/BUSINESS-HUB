@@ -153,6 +153,56 @@ class SalesApiTests(TestCase):
         self.assertIn("Total (3.1a)", body)
         self.assertIn("18.00", body)  # the tax rate row
 
+    def test_gst_filing_pack_returns_zip_with_three_reports(self):
+        import io
+        import zipfile
+
+        self.shop.state_code = "27"
+        self.shop.gstin = "27ABCDE1234F1Z5"
+        self.shop.save(update_fields=["state_code", "gstin"])
+        self.item.gst_rate = Decimal("18.00")
+        self.item.hsn_code = "1905"
+        self.item.save(update_fields=["gst_rate", "hsn_code"])
+        self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/",
+            {
+                "items": [{"inventory_item_id": str(self.item.id), "quantity": 2, "unit_price": "118.00"}],
+                "payments": [{"payment_method": "CASH", "amount": "236.00"}],
+            },
+            format="json",
+        )
+        today = timezone.localdate()
+        response = self.client.get(
+            f"/api/v1/shops/{self.shop.id}/sales/export/gst-pack/",
+            {"month": today.month, "year": today.year},
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response["Content-Type"], "application/zip")
+        archive = zipfile.ZipFile(io.BytesIO(response.content))
+        names = archive.namelist()
+        self.assertEqual(len(names), 3)
+        self.assertTrue(any(n.startswith("GSTR1_") for n in names))
+        self.assertTrue(any(n.startswith("GSTR3B_") for n in names))
+        hsn_name = next(n for n in names if n.startswith("HSN_summary_"))
+        hsn = archive.read(hsn_name).decode()
+        self.assertIn("1905", hsn)  # the HSN code appears in the summary
+
+    def test_gst_filing_pack_blocks_cashier(self):
+        cashier = PlatformUser.objects.create_user(
+            email="cashier2@example.com", password="secret", full_name="Cashier"
+        )
+        ShopMembership.objects.create(
+            user=cashier, shop=self.shop, role=ShopMembership.Role.STAFF,
+            status=ShopMembership.Status.ACTIVE,
+        )
+        client = APIClient()
+        client.force_authenticate(user=cashier)
+        response = client.get(
+            f"/api/v1/shops/{self.shop.id}/sales/export/gst-pack/",
+            {"month": 1, "year": 2026},
+        )
+        self.assertEqual(response.status_code, 403, response.content)
+
     def test_gstr3b_export_blocks_cashier(self):
         cashier = PlatformUser.objects.create_user(
             email="cashier@example.com", password="secret", full_name="Cashier"
