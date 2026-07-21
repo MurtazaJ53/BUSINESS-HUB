@@ -295,6 +295,11 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
         ),
       );
 
+  /// Backs the database with a caller-supplied executor (an in-memory one in
+  /// tests), so raw-SQL work can be exercised against real SQLite rather than
+  /// mocked away - which is the only way to prove a destructive statement.
+  BusinessHubDatabase.forTesting(super.executor) : super();
+
   @override
   int get schemaVersion => 15;
 

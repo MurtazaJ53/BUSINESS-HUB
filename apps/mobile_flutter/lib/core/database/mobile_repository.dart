@@ -1379,6 +1379,64 @@ class SalesRepository {
   /// Insert a historical sale (e.g. imported from another POS). Idempotent by
   /// [id]; does NOT touch inventory stock or the sync outbox — it is treated
   /// as settled past history.
+  /// SQL grouping that defines "the same imported receipt". Kept in one place
+  /// so the preview and the cleanup can never drift apart and delete something
+  /// the preview did not show.
+  static const String _importedDuplicateGrouping =
+      'GROUP BY date, total, discount, payment_mode, '
+      "IFNULL(customer_name, ''), IFNULL(customer_phone, '')";
+
+  static const String _importedDuplicateScope =
+      "WHERE id LIKE 'import-sale-%' AND tombstone = 0";
+
+  /// Preview duplicate imported receipts, worst offenders first.
+  ///
+  /// Scoped to `import-sale-%` so real POS sales are never considered. Note
+  /// this cannot distinguish a file imported twice from a shop that genuinely
+  /// rang up two identical sales in a day - the caller must show the user what
+  /// would go before removing anything.
+  Future<List<ImportedDuplicateGroup>> findImportedSaleDuplicates() async {
+    final rows = await _db.customSelect(
+      'SELECT date, total, COUNT(*) AS copies, '
+      "IFNULL(customer_name, '') AS who FROM sales "
+      '$_importedDuplicateScope $_importedDuplicateGrouping '
+      'HAVING COUNT(*) > 1 ORDER BY COUNT(*) DESC, total DESC;',
+      readsFrom: {_db.salesEntries},
+    ).get();
+    return rows
+        .map(
+          (row) => ImportedDuplicateGroup(
+            date: row.read<String>('date'),
+            total: row.read<double>('total'),
+            customerName: row.read<String>('who'),
+            copies: row.read<int>('copies'),
+          ),
+        )
+        .toList();
+  }
+
+  /// Collapse duplicate imported receipts to one copy each.
+  ///
+  /// Tombstones rather than deletes, so a wrong call is recoverable and the
+  /// rows stay auditable. Imported sales touch no stock ledger and no customer
+  /// balance, so this only affects History and Reports. Returns how many rows
+  /// were retired.
+  Future<int> removeImportedSaleDuplicates() async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return _db.transaction(() async {
+      // Keep the lexicographically first id in each group; deterministic, so
+      // re-running is a no-op rather than eating another copy.
+      return _db.customUpdate(
+        'UPDATE sales SET tombstone = 1, updated_at = ? '
+        '$_importedDuplicateScope AND id NOT IN ('
+        'SELECT MIN(id) FROM sales $_importedDuplicateScope '
+        '$_importedDuplicateGrouping);',
+        variables: [Variable<int>(now)],
+        updates: {_db.salesEntries},
+      );
+    });
+  }
+
   /// Ids of sales already stored, so an importer can tell the user how many
   /// rows a re-import will overwrite rather than silently reprocessing them.
   Future<Set<String>> existingSaleIds() async {

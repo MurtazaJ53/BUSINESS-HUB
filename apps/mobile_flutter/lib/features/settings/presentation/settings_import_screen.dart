@@ -9,9 +9,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/import/universal_import.dart';
 import '../../../core/import/xlsx_reader.dart' show looksLikeXlsx;
 import '../../../core/import/universal_import_service.dart';
+import '../../../core/database/mobile_repository.dart';
 import '../../../core/import/zobaze_import.dart';
+import '../../../core/models/mobile_models.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/formatters.dart';
 import '../../shell/presentation/mobile_surface.dart';
 import 'universal_import_sheet.dart';
 
@@ -384,6 +387,8 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
             ),
           ),
           const SizedBox(height: 16),
+          const _DuplicateCleanupPanel(),
+          const SizedBox(height: 16),
           MobilePanel(
             title: 'Import from Zobaze',
             action: const MobileTag(
@@ -586,6 +591,144 @@ class _Banner extends StatelessWidget {
                 Text(body, style: Theme.of(context).textTheme.bodySmall),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Cleans up receipts duplicated by the old import id bug.
+///
+/// Hidden entirely when there is nothing to clean, so it never invites a
+/// destructive action on a healthy database. Always previews before removing:
+/// identical content cannot prove a double import - a shop can legitimately
+/// ring up the same sale twice in a day - so the decision stays with the owner.
+class _DuplicateCleanupPanel extends ConsumerStatefulWidget {
+  const _DuplicateCleanupPanel();
+
+  @override
+  ConsumerState<_DuplicateCleanupPanel> createState() =>
+      _DuplicateCleanupPanelState();
+}
+
+class _DuplicateCleanupPanelState
+    extends ConsumerState<_DuplicateCleanupPanel> {
+  List<ImportedDuplicateGroup>? _groups;
+  bool _busy = false;
+  String? _done;
+
+  @override
+  void initState() {
+    super.initState();
+    _scan();
+  }
+
+  Future<void> _scan() async {
+    final found = await ref
+        .read(salesRepositoryProvider)
+        .findImportedSaleDuplicates();
+    if (!mounted) return;
+    setState(() => _groups = found);
+  }
+
+  Future<void> _clean() async {
+    setState(() => _busy = true);
+    try {
+      final removed = await ref
+          .read(salesRepositoryProvider)
+          .removeImportedSaleDuplicates();
+      if (!mounted) return;
+      setState(() {
+        _done = '$removed duplicate receipt(s) removed from History.';
+        _groups = const <ImportedDuplicateGroup>[];
+      });
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _confirm() async {
+    final groups = _groups ?? const <ImportedDuplicateGroup>[];
+    final extras = groups.fold<int>(0, (sum, g) => sum + g.extras);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Remove duplicate receipts?'),
+        content: Text(
+          'This keeps one copy of each receipt and removes $extras extra '
+          'row(s) from History.\n\n'
+          'If your shop genuinely rang up the same sale twice on a day, that '
+          'copy would be removed too. Nothing is erased permanently - the rows '
+          'are retired and stock and customer balances are untouched.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text('Remove $extras'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) await _clean();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final groups = _groups;
+    if (_done != null) {
+      return MobilePanel(
+        title: 'Duplicate receipts',
+        child: Text(_done!),
+      );
+    }
+    // Nothing to clean: stay out of the way rather than offering a
+    // destructive button with no work to do.
+    if (groups == null || groups.isEmpty) return const SizedBox.shrink();
+
+    final extras = groups.fold<int>(0, (sum, g) => sum + g.extras);
+    return MobilePanel(
+      title: 'Duplicate receipts',
+      action: const MobileTag(
+        label: 'CLEANUP',
+        icon: Icons.cleaning_services_rounded,
+        accent: AppPalette.warning,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(
+            '$extras imported receipt(s) look like copies of another one, '
+            'across ${groups.length} sale(s). Older builds gave every import '
+            'a fresh id, so re-importing a file added the sales again instead '
+            'of updating them.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 12),
+          for (final g in groups.take(5))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                '• ${g.date} · ${formatCurrency(g.total)}'
+                '${g.customerName.isEmpty ? '' : ' · ${g.customerName}'}'
+                ' — ${g.copies} copies',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          if (groups.length > 5)
+            Text(
+              '…and ${groups.length - 5} more.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _busy ? null : _confirm,
+            icon: const Icon(Icons.auto_fix_high_rounded),
+            label: Text(_busy ? 'Cleaning…' : 'Review & remove duplicates'),
           ),
         ],
       ),

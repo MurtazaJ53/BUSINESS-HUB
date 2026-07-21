@@ -459,6 +459,26 @@ class CustomerLedgerRecord {
   };
 }
 
+/// A set of imported receipts that look like the same sale stored more than
+/// once - the fallout of re-importing a file before ids were content-derived.
+class ImportedDuplicateGroup {
+  const ImportedDuplicateGroup({
+    required this.date,
+    required this.total,
+    required this.customerName,
+    required this.copies,
+  });
+
+  final String date;
+  final double total;
+  final String customerName;
+
+  /// How many rows exist; one is kept, so [copies] - 1 would be retired.
+  final int copies;
+
+  int get extras => copies - 1;
+}
+
 /// One entry in an item's stock audit trail.
 class StockMovement {
   const StockMovement({
