@@ -388,6 +388,7 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
           ),
           const SizedBox(height: 16),
           const _DuplicateCleanupPanel(),
+          const _OpeningBalanceBackfillPanel(),
           const SizedBox(height: 16),
           MobilePanel(
             title: 'Import from Zobaze',
@@ -729,6 +730,94 @@ class _DuplicateCleanupPanelState
             onPressed: _busy ? null : _confirm,
             icon: const Icon(Icons.auto_fix_high_rounded),
             label: Text(_busy ? 'Cleaning…' : 'Review & remove duplicates'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One-time repair for customers imported before opening balances were
+/// recorded: their khata is empty even though they owe money.
+///
+/// Hidden when there is nothing to repair. Records the balance already on the
+/// account rather than inventing one, and labels it "carried over" so it is
+/// never mistaken for a real sale.
+class _OpeningBalanceBackfillPanel extends ConsumerStatefulWidget {
+  const _OpeningBalanceBackfillPanel();
+
+  @override
+  ConsumerState<_OpeningBalanceBackfillPanel> createState() =>
+      _OpeningBalanceBackfillPanelState();
+}
+
+class _OpeningBalanceBackfillPanelState
+    extends ConsumerState<_OpeningBalanceBackfillPanel> {
+  int? _pending;
+  bool _busy = false;
+  String? _done;
+
+  @override
+  void initState() {
+    super.initState();
+    _scan();
+  }
+
+  Future<void> _scan() async {
+    final count = await ref
+        .read(customerRepositoryProvider)
+        .countUnexplainedBalances();
+    if (!mounted) return;
+    setState(() => _pending = count);
+  }
+
+  Future<void> _run() async {
+    setState(() => _busy = true);
+    try {
+      final written = await ref
+          .read(customerRepositoryProvider)
+          .backfillOpeningBalances();
+      if (!mounted) return;
+      setState(() {
+        _done = '$written customer(s) now show an opening balance in Khata.';
+        _pending = 0;
+      });
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_done != null) {
+      return MobilePanel(title: 'Khata opening balances', child: Text(_done!));
+    }
+    final pending = _pending;
+    if (pending == null || pending == 0) return const SizedBox.shrink();
+
+    return MobilePanel(
+      title: 'Khata opening balances',
+      action: const MobileTag(
+        label: 'REPAIR',
+        icon: Icons.build_rounded,
+        accent: AppPalette.info,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(
+            '$pending customer(s) owe money but have nothing in their khata to '
+            'explain it, because older imports set a balance without recording '
+            'where it came from. This adds one "carried over" entry each, dated '
+            'to when the customer was added. Nothing is recalculated and no '
+            'balance changes.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _busy ? null : _run,
+            icon: const Icon(Icons.history_edu_rounded),
+            label: Text(_busy ? 'Writing…' : 'Add opening balances'),
           ),
         ],
       ),

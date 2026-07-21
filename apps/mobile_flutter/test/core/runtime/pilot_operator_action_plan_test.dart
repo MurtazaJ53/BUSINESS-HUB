@@ -12,6 +12,7 @@ void main() {
     MobileSyncStatus syncStatus = MobileSyncStatus.idle,
     int pendingOutboxCount = 0,
     int failedSales = 0,
+    int rejectedSales = 0,
     String? operatorEmail,
     String? workspaceId,
   }) {
@@ -43,6 +44,7 @@ void main() {
         syncedSales: 9,
         queuedSales: pendingOutboxCount,
         failedSales: failedSales,
+        rejectedSales: rejectedSales,
         totalRevenue: 5200,
         queuedRevenue: pendingOutboxCount > 0 ? 500 : 0,
         lastSyncedAt: null,
@@ -60,6 +62,7 @@ void main() {
     final diagnostics = buildDiagnostics(
       syncStatus: MobileSyncStatus.error,
       failedSales: 1,
+      rejectedSales: 1,
       operatorEmail: 'owner@pilot.test',
       workspaceId: 'shop-bhavnagar-1',
     );

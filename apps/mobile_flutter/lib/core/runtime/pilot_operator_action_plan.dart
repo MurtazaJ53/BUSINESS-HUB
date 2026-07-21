@@ -35,14 +35,16 @@ class PilotOperatorActionPlan {
   }) {
     final reasons = <String>[];
 
+    // Transient push failures retry themselves, so they are not a reason to
+    // hold a device back - only server rejections are.
     if (readinessReport.isBlocked ||
-        diagnosticsSnapshot.historyOverview.failedSales > 0 ||
+        diagnosticsSnapshot.historyOverview.rejectedSales > 0 ||
         recoveryReport.attentionEntries.any((entry) => entry.isFailed)) {
       if (readinessReport.isBlocked) {
         reasons.add('Readiness is blocked for this device.');
       }
-      if (diagnosticsSnapshot.historyOverview.failedSales > 0) {
-        reasons.add('Failed receipts are still recorded on the device.');
+      if (diagnosticsSnapshot.historyOverview.rejectedSales > 0) {
+        reasons.add('Receipts rejected by the server are still on the device.');
       }
       if (recoveryReport.attentionEntries.any((entry) => entry.isFailed)) {
         reasons.add('Recovery desk still contains failed commerce commands.');

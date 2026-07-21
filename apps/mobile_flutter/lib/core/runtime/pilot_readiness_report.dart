@@ -60,9 +60,13 @@ class PilotReadinessReport {
       blockers.add('This device is not bound to a workspace yet.');
     }
 
-    if (diagnosticsSnapshot.historyOverview.failedSales > 0) {
+    // Only a permanent rejection blocks a shift. A transient push failure is
+    // retried automatically by the outbox, so gating on it meant a till that
+    // briefly lost signal could not open - refusing to trade over a problem
+    // that fixes itself.
+    if (diagnosticsSnapshot.historyOverview.rejectedSales > 0) {
       blockers.add(
-        'Failed receipts are still recorded on the device and must be reviewed before shift start.',
+        'Receipts rejected by the server are still on the device and must be resolved before shift start.',
       );
     }
 

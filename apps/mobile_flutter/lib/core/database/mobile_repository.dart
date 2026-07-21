@@ -1215,6 +1215,45 @@ class CustomerRepository {
         );
   }
 
+  /// How many customers carry a balance with nothing in their khata to explain
+  /// it - the fallout of imports that set a balance and wrote no ledger row.
+  Future<int> countUnexplainedBalances() async {
+    final rows = await _db.customSelect(
+      'SELECT COUNT(*) AS c FROM customers c WHERE c.balance != 0 '
+      'AND c.tombstone = 0 AND NOT EXISTS ('
+      'SELECT 1 FROM customer_ledger l WHERE l.customer_id = c.id);',
+      readsFrom: {_db.customerEntries, _db.customerLedgerEntries},
+    ).get();
+    return rows.first.read<int>('c');
+  }
+
+  /// Give those balances an origin row, dated to when the customer was added.
+  ///
+  /// This records the balance that is already there rather than inventing an
+  /// amount, and labels it "carried over" so nobody mistakes it for a real
+  /// sale. Customers who already have any ledger history are left alone, so it
+  /// cannot double-count, and re-running it is a no-op.
+  Future<int> backfillOpeningBalances() async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return _db.transaction(() async {
+      // customUpdate, not customInsert: drift's customInsert returns the new
+      // rowid, which for an INSERT...SELECT is meaningless as a count and
+      // silently reads as "1 row written" even when nothing was.
+      return _db.customUpdate(
+        'INSERT INTO customer_ledger '
+        '(id, customer_id, type, amount, balance_after, note, created_at) '
+        "SELECT 'led-opening-' || c.id, c.id, 'OPENING', c.balance, c.balance, "
+        "'Opening balance (carried over)', "
+        'CASE WHEN c.created_at > 0 THEN c.created_at ELSE ? END '
+        'FROM customers c WHERE c.balance != 0 AND c.tombstone = 0 '
+        'AND NOT EXISTS ('
+        'SELECT 1 FROM customer_ledger l WHERE l.customer_id = c.id);',
+        variables: [Variable<int>(now)],
+        updates: {_db.customerLedgerEntries},
+      );
+    });
+  }
+
   Stream<List<CustomerLedgerRecord>> watchLedger(String customerId) {
     return _db
         .customSelect(
