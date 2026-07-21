@@ -1049,6 +1049,7 @@ class HistoryOverview {
     required this.syncedSales,
     required this.queuedSales,
     required this.failedSales,
+    this.rejectedSales = 0,
     required this.totalRevenue,
     required this.queuedRevenue,
     this.lastSyncedAt,
@@ -1057,7 +1058,15 @@ class HistoryOverview {
   final int totalSales;
   final int syncedSales;
   final int queuedSales;
+
+  /// Sales whose last push attempt failed for a *transient* reason (offline,
+  /// 5xx, timeout). The outbox flush picks these up again automatically, so
+  /// they are informational — not something the owner must act on.
   final int failedSales;
+
+  /// Sales the server *permanently* rejected (dead-lettered 4xx). These never
+  /// retry on their own and are the only ones that genuinely need attention.
+  final int rejectedSales;
   final double totalRevenue;
   final double queuedRevenue;
   final DateTime? lastSyncedAt;
@@ -1068,6 +1077,7 @@ class HistoryOverview {
       syncedSales: 0,
       queuedSales: 0,
       failedSales: 0,
+      rejectedSales: 0,
       totalRevenue: 0,
       queuedRevenue: 0,
     );

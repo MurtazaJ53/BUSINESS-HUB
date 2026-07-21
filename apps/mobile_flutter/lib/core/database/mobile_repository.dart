@@ -1241,6 +1241,7 @@ class SalesRepository {
               COALESCE(SUM(CASE WHEN sync_status IN ('queued', 'syncing') THEN 1 ELSE 0 END), 0) AS queued_sales,
               COALESCE(SUM(CASE WHEN sync_status IN ('queued', 'syncing') THEN total ELSE 0 END), 0.0) AS queued_revenue,
               COALESCE(SUM(CASE WHEN sync_status IN ('failed_backend', 'failed') THEN 1 ELSE 0 END), 0) AS failed_sales,
+              COALESCE(SUM(CASE WHEN sync_status = 'rejected' THEN 1 ELSE 0 END), 0) AS rejected_sales,
               MAX(last_synced_at) AS last_synced_at
             FROM sales
             WHERE tombstone = 0;
@@ -1254,6 +1255,7 @@ class SalesRepository {
             syncedSales: row.read<int>('synced_sales'),
             queuedSales: row.read<int>('queued_sales'),
             failedSales: row.read<int>('failed_sales'),
+            rejectedSales: row.read<int>('rejected_sales'),
             totalRevenue: row.read<double>('total_revenue'),
             queuedRevenue: row.read<double>('queued_revenue'),
             lastSyncedAt: row.readNullable<int>('last_synced_at') == null

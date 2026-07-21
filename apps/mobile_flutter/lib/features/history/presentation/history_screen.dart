@@ -138,15 +138,31 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   icon: Icons.cloud_upload_rounded,
                   accent: AppPalette.warning,
                 ),
-                MobileMetricCard(
-                  label: 'Attention',
-                  value: '${overview.failedSales}',
-                  caption: overview.failedSales > 0
-                      ? 'Needs replay review'
-                      : 'No failed receipts',
-                  icon: Icons.error_outline_rounded,
-                  accent: AppPalette.error,
-                ),
+                // Only a server *rejection* needs the owner. A transient push
+                // failure retries itself on the next flush, so showing it in
+                // alarm-red as "needs review" sent people hunting for nothing.
+                if (overview.rejectedSales > 0)
+                  MobileMetricCard(
+                    label: 'Attention',
+                    value: '${overview.rejectedSales}',
+                    caption: 'Rejected — tap banner',
+                    icon: Icons.error_outline_rounded,
+                    accent: AppPalette.error,
+                  )
+                else
+                  MobileMetricCard(
+                    label: 'Retrying',
+                    value: '${overview.failedSales}',
+                    caption: overview.failedSales > 0
+                        ? 'Auto-retries when online'
+                        : 'All receipts healthy',
+                    icon: overview.failedSales > 0
+                        ? Icons.sync_problem_rounded
+                        : Icons.verified_rounded,
+                    accent: overview.failedSales > 0
+                        ? AppPalette.warning
+                        : AppPalette.success,
+                  ),
               ],
             );
           },
@@ -1473,7 +1489,8 @@ String _syncLabel(CommerceSyncState state) {
     CommerceSyncState.queued => 'QUEUED',
     CommerceSyncState.syncing => 'SYNCING',
     CommerceSyncState.synced => 'SYNCED',
-    CommerceSyncState.failed => 'FAILED',
+    // Transient: the outbox re-picks these up automatically.
+    CommerceSyncState.failed => 'RETRYING',
   };
 }
 
@@ -1493,7 +1510,7 @@ Color _syncTone(CommerceSyncState state) {
     CommerceSyncState.synced => AppPalette.success,
     CommerceSyncState.queued => AppPalette.warning,
     CommerceSyncState.syncing => AppPalette.primary,
-    CommerceSyncState.failed => AppPalette.error,
+    CommerceSyncState.failed => AppPalette.warning,
     CommerceSyncState.localOnly => AppPalette.textTertiary,
   };
 }
