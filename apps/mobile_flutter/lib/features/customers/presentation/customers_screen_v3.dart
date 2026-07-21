@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
@@ -98,23 +97,22 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddCustomerSheet(context),
         backgroundColor: AppPalette.primary,
-        icon: const Icon(Icons.person_add_rounded, size: 24),
-        label: Text(
-          'Add Customer',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.2,
-          ),
+        icon: const Icon(Icons.person_add_rounded, size: 20),
+        label: const Text(
+          'Add',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
         ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      // End-aligned: a centre-floating FAB sat on top of the customer rows.
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
   Widget _buildHeader(BuildContext context) {
+    // No title/back here — the surrounding shell already shows "Customers" and a
+    // back button; a second one wasted a whole row and read as a nested screen.
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       decoration: BoxDecoration(
         color: AppColors.of(context).surface,
         border: Border(
@@ -124,26 +122,6 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back_rounded),
-                onPressed: () => context.pop(),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Customers',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.3,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
           PremiumSearchBar(
             controller: _searchController,
             hintText: 'Search customers...',
@@ -169,7 +147,7 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
     required int customersWithDues,
   }) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       decoration: BoxDecoration(
         color: AppColors.of(context).surface,
         border: Border(
@@ -206,38 +184,45 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
     required IconData icon,
     required Color color,
   }) {
+    // Compact single-line stat: icon + label on one row, value right under it.
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
-              Icon(icon, size: 20, color: color),
-              const SizedBox(width: 8),
+              Icon(icon, size: 15, color: color),
+              const SizedBox(width: 6),
               Text(
                 label.toUpperCase(),
                 style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1.2,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
                   color: color,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: color,
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
             ),
           ),
         ],

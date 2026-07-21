@@ -102,7 +102,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             accent: roleProfile.secondaryTagAccent,
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 12),
         LayoutBuilder(
           builder: (context, constraints) {
             final count = constraints.maxWidth > 520 ? 4 : 2;
@@ -112,7 +112,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               physics: const NeverScrollableScrollPhysics(),
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
-              childAspectRatio: 1.02,
+              // Phones use the dense inline-icon card, so the tile can be much
+              // shorter; wider screens keep the taller stacked layout.
+              childAspectRatio: constraints.maxWidth < 420 ? 1.45 : 1.02,
               children: <Widget>[
                 MobileMetricCard(
                   label: 'Gross',
@@ -961,8 +963,7 @@ class _HistoryRoleProfile {
         leadTitle: overview.totalSales > 0
             ? 'Recent sales are ready'
             : 'Receipt search is ready',
-        leadSubtitle:
-            'Find receipts fast, check queued sync, and open exact sale details without leaving the floor workflow.',
+        leadSubtitle: 'Find receipts, check sync, open sale details.',
         leadIcon: Icons.receipt_long_rounded,
         leadAccent: AppPalette.warning,
         primaryTagLabel: primaryLabel,
@@ -982,8 +983,7 @@ class _HistoryRoleProfile {
         leadTitle: overview.totalSales > 0
             ? 'Sales history is live'
             : 'History is ready',
-        leadSubtitle:
-            'Track recent receipts, queue posture, and filter-driven sales summaries from one cleaner history view.',
+        leadSubtitle: 'Recent receipts, queue posture and summaries.',
         leadIcon: Icons.receipt_long_rounded,
         leadAccent: AppPalette.warning,
         primaryTagLabel: primaryLabel,
@@ -1002,8 +1002,7 @@ class _HistoryRoleProfile {
       leadTitle: overview.totalSales > 0
           ? 'Receipt history is live'
           : 'History pulse is ready',
-      leadSubtitle:
-          'Review revenue flow, replay posture, and recent sales without turning the mobile app into a dense reporting console.',
+      leadSubtitle: 'Revenue, sync posture and recent sales at a glance.',
       leadIcon: Icons.receipt_long_rounded,
       leadAccent: AppPalette.warning,
       primaryTagLabel: primaryLabel,

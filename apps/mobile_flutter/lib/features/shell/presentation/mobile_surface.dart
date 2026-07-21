@@ -426,52 +426,109 @@ class MobileMetricCard extends StatelessWidget {
             border: Border.all(color: AppPalette.borderSoft),
           ),
           child: Padding(
-            padding: EdgeInsets.all(compact ? 14 : 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Container(
-                  width: compact ? 38 : 42,
-                  height: compact ? 38 : 42,
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(compact ? 12 : 14),
-                  ),
-                  child: Icon(icon, color: accent, size: compact ? 18 : 22),
-                ),
-                SizedBox(height: compact ? 14 : 18),
-                Text(
-                  label.toUpperCase(),
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: AppPalette.textTertiary,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.25,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  value,
-                  style:
-                      (compact
-                              ? theme.textTheme.titleLarge
-                              : theme.textTheme.headlineSmall)
-                          ?.copyWith(
+            padding: EdgeInsets.all(compact ? 12 : 18),
+            // On phones the stacked icon-above-label layout made these tiles
+            // near-square and they ate a third of the screen. Compact puts the
+            // icon inline with the label and keeps the caption to one line.
+            child: compact
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Row(
+                        children: <Widget>[
+                          Container(
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              color: accent.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(9),
+                            ),
+                            child: Icon(icon, color: accent, size: 15),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              label.toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: AppPalette.textTertiary,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          value,
+                          maxLines: 1,
+                          style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w900,
                             letterSpacing: -0.7,
                           ),
-                ),
-                if (caption != null) ...<Widget>[
-                  const SizedBox(height: 8),
-                  Text(
-                    caption!,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppPalette.textTertiary,
-                      fontWeight: FontWeight.w600,
-                    ),
+                        ),
+                      ),
+                      if (caption != null) ...<Widget>[
+                        const SizedBox(height: 2),
+                        Text(
+                          caption!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: AppPalette.textTertiary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(icon, color: accent, size: 22),
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        label.toUpperCase(),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: AppPalette.textTertiary,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        value,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.7,
+                        ),
+                      ),
+                      if (caption != null) ...<Widget>[
+                        const SizedBox(height: 8),
+                        Text(
+                          caption!,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: AppPalette.textTertiary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                ],
-              ],
-            ),
           ),
         ),
       ),

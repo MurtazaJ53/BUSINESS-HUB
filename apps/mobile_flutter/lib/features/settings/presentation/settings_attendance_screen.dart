@@ -460,7 +460,7 @@ class _SettingsAttendanceScreenState
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisSpacing: 10,
                 mainAxisSpacing: 10,
-                childAspectRatio: 1.02,
+                childAspectRatio: constraints.maxWidth < 420 ? 1.45 : 1.02,
                 children: <Widget>[
                   MobileMetricCard(
                     label: 'Records',
