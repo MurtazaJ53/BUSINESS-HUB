@@ -7,6 +7,7 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/import/universal_import.dart';
+import '../../../core/import/xlsx_reader.dart' show looksLikeXlsx;
 import '../../../core/import/universal_import_service.dart';
 import '../../../core/import/zobaze_import.dart';
 import '../../../core/theme/app_colors.dart';
@@ -89,11 +90,24 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
       return null;
     }
     final file = File(path);
-    final table = path.toLowerCase().endsWith('.csv')
-        ? parseCsv(await file.readAsString())
-        : parseXlsxBytes(await file.readAsBytes());
+    ParsedTable? table;
+    if (path.toLowerCase().endsWith('.csv')) {
+      table = parseCsv(await file.readAsString());
+    } else {
+      final bytes = await file.readAsBytes();
+      if (!looksLikeXlsx(bytes)) {
+        // Legacy .xls (BIFF) isn't a zip and can't be read by any reader here.
+        throw Exception(
+          'This is an old .xls file. Open it in Excel/Google Sheets and save it '
+          'as .xlsx (or .csv), then import again.',
+        );
+      }
+      table = parseXlsxBytes(bytes);
+    }
     if (table == null) {
-      throw Exception("Couldn't read this Excel file. Please re-save it as CSV and try again.");
+      throw Exception(
+        "Couldn't read this spreadsheet. Please re-save it as .csv and try again.",
+      );
     }
     if (table.headers.isEmpty || table.rows.isEmpty) {
       throw Exception('No rows found. The first line must be column headers.');

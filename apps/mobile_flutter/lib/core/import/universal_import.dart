@@ -1,5 +1,7 @@
 import 'package:excel/excel.dart';
 
+import 'xlsx_reader.dart';
+
 /// A format-agnostic import engine: read CSV or XLSX from *any* layout, then
 /// auto-map its columns onto our canonical fields by fuzzy header matching, so
 /// a shop can import a products/customers file exported from almost anywhere.
@@ -226,6 +228,24 @@ ParsedTable parseCsv(String content) {
 /// package fails to decode the file (it is fragile with some exporters) so the
 /// caller can show a clean "save as CSV" message instead of crashing.
 ParsedTable? parseXlsxBytes(List<int> bytes) {
+  // 1) Our own reader first — it handles far more real-world exports than the
+  //    `excel` package, which throws on many valid files.
+  try {
+    for (final sheet in readXlsx(bytes)) {
+      if (sheet.rows.isEmpty) continue;
+      final headers = sheet.rows.first.map((c) => c.trim()).toList(growable: false);
+      if (headers.every((h) => h.isEmpty)) continue;
+      final rows = sheet.rows
+          .skip(1)
+          .where((r) => r.any((c) => c.trim().isNotEmpty))
+          .toList();
+      return ParsedTable(headers, rows);
+    }
+  } catch (_) {
+    // fall through to the package reader
+  }
+
+  // 2) Fallback: the `excel` package (kept so nothing regresses).
   try {
     final excel = Excel.decodeBytes(bytes);
     for (final name in excel.tables.keys) {

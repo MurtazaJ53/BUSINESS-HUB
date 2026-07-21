@@ -1,10 +1,10 @@
 import 'dart:io';
 
-import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../database/mobile_repository.dart';
+import 'xlsx_reader.dart';
 
 final zobazeImportServiceProvider = Provider<ZobazeImportService>((ref) {
   return ZobazeImportService(
@@ -75,19 +75,18 @@ class ZobazeImportService {
     return path == null ? null : File(path);
   }
 
-  static String _cellString(Data? cell) {
-    final value = cell?.value;
-    if (value == null) return '';
-    if (value is TextCellValue) return value.value.toString().trim();
-    if (value is IntCellValue) return value.value.toString();
-    if (value is DoubleCellValue) return value.value.toString();
-    return value.toString().trim();
-  }
-
   static double _num(String s) => double.tryParse(s.replaceAll(',', '')) ?? 0;
 
   Future<ZobazeImportResult> importFile(File file) async {
-    final excel = Excel.decodeBytes(await file.readAsBytes());
+    final bytes = await file.readAsBytes();
+    if (!looksLikeXlsx(bytes)) {
+      throw Exception(
+        'This is an old .xls file. Open it in Excel/Google Sheets and save it '
+        'as .xlsx (or .csv), then import again.',
+      );
+    }
+    // Our own reader — the `excel` package throws on many real exports.
+    final sheets = readXlsx(bytes);
     var inventoryCount = 0;
     var customerCount = 0;
     var salesCount = 0;
@@ -95,16 +94,16 @@ class ZobazeImportService {
     final now = DateTime.now().millisecondsSinceEpoch;
     final iso = DateTime.now().toIso8601String();
 
-    for (final sheetName in excel.tables.keys) {
-      final table = excel.tables[sheetName];
-      if (table == null || table.rows.length < 2) continue;
+    for (final sheet in sheets) {
+      final sheetName = sheet.name;
+      final tableRows = sheet.rows;
+      if (tableRows.length < 2) continue;
 
-      final headers =
-          table.rows.first.map(_cellString).toList(growable: false);
+      final headers = tableRows.first;
       int col(String h) => headers.indexOf(h);
-      String cell(List<Data?> row, String h) {
+      String cell(List<String> row, String h) {
         final i = col(h);
-        return (i < 0 || i >= row.length) ? '' : _cellString(row[i]);
+        return (i < 0 || i >= row.length) ? '' : row[i].trim();
       }
 
       final isInventory = const <String>['CATEGORY', 'ITEM_NAME', 'PRICE', 'STOCK']
@@ -117,7 +116,7 @@ class ZobazeImportService {
 
       if (isSales) {
         final receipts = <String, _ZobazeReceipt>{};
-        for (final row in table.rows.skip(1)) {
+        for (final row in tableRows.skip(1)) {
           final receiptId = cell(row, 'ReceiptId');
           if (receiptId.isEmpty) continue;
           final r =
@@ -178,7 +177,7 @@ class ZobazeImportService {
           salesCount++;
         }
       } else if (isInventory) {
-        for (final row in table.rows.skip(1)) {
+        for (final row in tableRows.skip(1)) {
           final name = cell(row, 'ITEM_NAME');
           if (name.isEmpty) continue;
           final variant = cell(row, 'VARIANT_NAME');
@@ -219,7 +218,7 @@ class ZobazeImportService {
           inventoryCount++;
         }
       } else if (isCustomer) {
-        for (final row in table.rows.skip(1)) {
+        for (final row in tableRows.skip(1)) {
           final name = cell(row, 'Name');
           if (name.isEmpty) continue;
           final phone = cell(row, 'Phone');
