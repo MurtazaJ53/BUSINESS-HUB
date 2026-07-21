@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../database/mobile_repository.dart';
+import 'date_parse.dart';
 import 'universal_import.dart';
 
 final universalImportServiceProvider = Provider<UniversalImportService>((ref) {
@@ -13,9 +14,18 @@ final universalImportServiceProvider = Provider<UniversalImportService>((ref) {
 });
 
 class ImportOutcome {
-  const ImportOutcome({required this.imported, required this.skipped});
+  const ImportOutcome({
+    required this.imported,
+    required this.skipped,
+    this.undatedRows = 0,
+  });
   final int imported;
   final int skipped;
+
+  /// Rows whose date cell could not be read, so they fell back to today.
+  /// Surfaced to the user - silently re-dating a shop's history is the kind
+  /// of damage they should hear about rather than discover months later.
+  final int undatedRows;
 }
 
 /// Writes canonical rows produced by [mapRows] into the local store. Products
@@ -74,12 +84,14 @@ class UniversalImportService {
   /// in History/Reports but do not change current stock or balances.
   Future<ImportOutcome> importSales(MappedImport mapped) async {
     var imported = 0;
+    var undated = 0;
     await _inventory.runInTransaction(() async {
     for (final row in mapped.rows) {
       final total = parseNum(row['total']);
       if (total <= 0) continue;
-      final rawDate = (row['date'] ?? '').trim();
-      final dt = DateTime.tryParse(rawDate) ?? DateTime.now();
+      final parsed = parseImportDate(row['date']);
+      if (parsed == null) undated++;
+      final dt = parsed ?? DateTime.now();
       final date = dt.toIso8601String().split('T').first;
       final pay = _normalizePayment(row['payment'] ?? 'CASH');
       final id = 'import-sale-${row.hashCode}-${dt.millisecondsSinceEpoch}';
@@ -101,18 +113,25 @@ class UniversalImportService {
       imported++;
     }
     });
-    return ImportOutcome(imported: imported, skipped: mapped.rows.length - imported);
+    return ImportOutcome(
+      imported: imported,
+      skipped: mapped.rows.length - imported,
+      undatedRows: undated,
+    );
   }
 
   /// Import expenses (money-out). Category defaults to General; date defaults to
   /// today; payment mode normalized.
   Future<ImportOutcome> importExpenses(MappedImport mapped) async {
     var imported = 0;
+    var undated = 0;
     await _inventory.runInTransaction(() async {
     for (final row in mapped.rows) {
       final amount = parseNum(row['amount']);
       if (amount <= 0) continue;
-      final dt = DateTime.tryParse((row['date'] ?? '').trim()) ?? DateTime.now();
+      final parsed = parseImportDate(row['date']);
+      if (parsed == null) undated++;
+      final dt = parsed ?? DateTime.now();
       await _expenses.recordExpense(
         category: (row['category'] ?? '').trim().isEmpty ? 'General' : row['category']!.trim(),
         amount: amount,
@@ -123,7 +142,11 @@ class UniversalImportService {
       imported++;
     }
     });
-    return ImportOutcome(imported: imported, skipped: mapped.rows.length - imported);
+    return ImportOutcome(
+      imported: imported,
+      skipped: mapped.rows.length - imported,
+      undatedRows: undated,
+    );
   }
 
   /// Export all products as CSV (round-trips with the products importer).
@@ -177,6 +200,7 @@ class UniversalImportService {
     final now = DateTime.now().millisecondsSinceEpoch;
     final iso = DateTime.now().toIso8601String();
     var imported = 0;
+    var undated = 0;
     await _inventory.runInTransaction(() async {
     for (final row in mapped.rows) {
       final name = row['name'] ?? '';
@@ -184,6 +208,11 @@ class UniversalImportService {
       final phone = row['phone'] ?? '';
       final balance = parseNum(row['amountDue']) - parseNum(row['advance']);
       final id = 'import-cust-${phone.hashCode}-${name.hashCode}';
+      // Keep the date the customer was actually acquired. Without this every
+      // imported client looked like it was added today, which wrecks "new
+      // customers this month" and any ageing view built on created_at.
+      final addedOn = parseImportDate(row['date']);
+      if (addedOn == null) undated++;
       await _customers.mergeRemoteCustomerDocument(
         id,
         <String, dynamic>{
@@ -194,6 +223,7 @@ class UniversalImportService {
           'balance': balance,
           'total_spent': 0,
           'tombstone': false,
+          'createdAt': (addedOn ?? DateTime.now()).millisecondsSinceEpoch,
           'updatedAt': iso,
         },
         updatedAt: now,
@@ -201,6 +231,10 @@ class UniversalImportService {
       imported++;
     }
     });
-    return ImportOutcome(imported: imported, skipped: mapped.rows.length - imported);
+    return ImportOutcome(
+      imported: imported,
+      skipped: mapped.rows.length - imported,
+      undatedRows: undated,
+    );
   }
 }

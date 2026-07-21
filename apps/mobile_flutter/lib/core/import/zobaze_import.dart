@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../database/mobile_repository.dart';
+import 'date_parse.dart';
 import 'xlsx_reader.dart';
 
 final zobazeImportServiceProvider = Provider<ZobazeImportService>((ref) {
@@ -158,7 +159,9 @@ class ZobazeImportService {
           }
         }
         for (final r in receipts.values) {
-          final dt = DateTime.tryParse(r.dateRaw) ?? DateTime.now();
+          // Same trap as the universal importer: tryParse is ISO-only, so a
+          // dd/MM/yyyy export silently became "today".
+          final dt = parseImportDate(r.dateRaw) ?? DateTime.now();
           await _sales.importHistoricalSale(
             id: 'zobaze-${r.id}',
             date: dt.toIso8601String().split('T').first,

@@ -139,7 +139,11 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
     setState(() {
       _busy = false;
       _successText = '${outcome.imported} $label imported'
-          '${outcome.skipped > 0 ? ' (${outcome.skipped} skipped)' : ''}.';
+          '${outcome.skipped > 0 ? ' (${outcome.skipped} skipped)' : ''}.'
+          // Say it plainly when dates could not be read - these rows got
+          // stamped with today, and the owner needs to know their history
+          // was re-dated rather than find out from a wrong report later.
+          '${outcome.undatedRows > 0 ? ' ${outcome.undatedRows} had an unreadable date and were set to today.' : ''}';
     });
   }
 

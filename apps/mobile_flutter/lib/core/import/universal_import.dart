@@ -74,6 +74,11 @@ const Map<ImportKind, List<ImportField>> importSchemas = <ImportKind, List<Impor
     ImportField('advance', 'Advance',
         type: FieldType.number,
         synonyms: <String>['amount held', 'deposit', 'prepaid', 'advance paid']),
+    ImportField('date', 'Added on',
+        synonyms: <String>[
+          'created', 'created at', 'created on', 'date added', 'added date',
+          'joined', 'joined on', 'registration date', 'since', 'first visit',
+        ]),
   ],
   ImportKind.suppliers: <ImportField>[
     ImportField('name', 'Name',
