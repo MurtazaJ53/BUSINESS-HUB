@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/runtime/app_runtime_info.dart';
+import '../../../core/runtime/mobile_runtime_config.dart';
+import 'shop_switcher_screen.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/theme/app_theme.dart';
@@ -88,6 +90,17 @@ class SettingsScreen extends ConsumerWidget {
               subtitle: 'Workspace members (cloud)',
               leadingIcon: Icons.groups_rounded,
               onTap: () => context.push('/settings/team'),
+            ),
+          if (MobileRuntimeConfig.backendAuthMode == 'jwt')
+            MobileListTile(
+              title: 'Switch shop',
+              subtitle: 'Change the active workspace',
+              leadingIcon: Icons.swap_horiz_rounded,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const ShopSwitcherScreen(),
+                ),
+              ),
             ),
           if (shop.supportsAttendance)
             MobileListTile(

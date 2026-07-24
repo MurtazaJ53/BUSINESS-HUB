@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../backend/backend_api_client.dart';
 import '../database/mobile_repository.dart';
 import '../models/mobile_auth_user.dart';
+import '../models/mobile_models.dart';
 import '../models/mobile_session.dart';
 import '../runtime/mobile_runtime_config.dart';
 
@@ -323,7 +324,12 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
         state = const AsyncValue.data(null);
         return 'This account has no active shop yet.';
       }
-      final m = active.first;
+      // Prefer the last-selected shop if the user still belongs to it, so a
+      // multi-shop user returns to where they were.
+      final remembered = await repo.readSetting(_activeShopKey) ?? '';
+      final rememberedMatches =
+          active.where((x) => x.shopId == remembered).toList();
+      final m = rememberedMatches.isNotEmpty ? rememberedMatches.first : active.first;
 
       // Signing into this shop: if it differs from the last active shop on
       // this device, wipe the previous tenant's cached data first.
@@ -528,6 +534,77 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
     final staff = await _loadStaff();
     staff.removeWhere((s) => s.id == id);
     await _saveStaff(staff);
+  }
+
+  /// Switch the active shop for a user who belongs to several, without logging
+  /// out. Same JWT authorizes all their shops. Wipes the previous shop's local
+  /// cache (isolation), loads the new shop's role + permissions, and remembers
+  /// the choice. Returns null on success or an error message.
+  Future<String?> switchShop(String shopId) async {
+    final session = state.asData?.value;
+    if (session == null) return 'You are not signed in.';
+    final client = ref.read(backendApiClientProvider);
+    final repo = ref.read(shopRepositoryProvider);
+    try {
+      final memberships = await client.getShopMemberships(user: session.user);
+      final matches = memberships
+          .where((m) => m.shopId == shopId && m.status == 'active')
+          .toList();
+      if (matches.isEmpty) {
+        return 'You are not an active member of that shop.';
+      }
+      final m = matches.first;
+      if (m.shopId == (session.shopId ?? '')) return null; // already here
+
+      state = const AsyncValue.loading();
+      await _wipeIfShopChanged(m.shopId); // clears the previous shop's cache
+      await repo.writeSetting(_jwtShopKey, m.shopId);
+      await repo.writeSetting(_jwtRoleKey, m.role);
+      await repo.writeSetting(_jwtMembershipKey, m.id);
+      await repo.writeSetting(_jwtPermsKey, jsonEncode(m.permissions));
+      await _seedShopDocFromMembership(repo, m);
+
+      state = AsyncValue.data(
+        _sessionFromStored(
+          access: session.user.authToken ?? '',
+          email: session.email,
+          shopId: m.shopId,
+          role: m.role,
+          membershipId: m.id,
+          customPermissions: m.permissions,
+        ),
+      );
+      return null;
+    } catch (e) {
+      // restore the previous session on failure
+      state = AsyncValue.data(session);
+      return 'Could not switch shop. Check your connection.';
+    }
+  }
+
+  Future<void> _seedShopDocFromMembership(
+    ShopRepository repo,
+    ShopMembershipAccessRecord m,
+  ) async {
+    await repo.saveShopDocument(<String, dynamic>{
+      'name': m.shopName,
+      'tagline': 'Business Hub',
+      'footer': 'Thank you for your business!',
+      'currency': m.shopCurrencyCode,
+      'plan_tier': m.shopPlanTier,
+      'enabled_features': m.shopEnabledFeatures.isNotEmpty
+          ? m.shopEnabledFeatures
+          : <String, bool>{
+              'inventory': true,
+              'pos': true,
+              'customers': true,
+              'history': true,
+              'team': true,
+              'attendance': true,
+              'expenses': true,
+              'advanced_ops': true,
+            },
+    });
   }
 
   /// Re-fetch this member's role + custom permissions from the backend and
