@@ -71,6 +71,11 @@ def send_email(*, to: str, subject: str, html: str, text: str = "") -> dict:
             headers={
                 "Authorization": f"Bearer {key}",
                 "Content-Type": "application/json",
+                # A real User-Agent is required: Resend sits behind Cloudflare,
+                # which blocks urllib's default "Python-urllib/x" UA with a 1010
+                # error, so requests never reach the API.
+                "User-Agent": "BusinessHub/1.0 (+https://businesshub.pro)",
+                "Accept": "application/json",
             },
         )
         try:
