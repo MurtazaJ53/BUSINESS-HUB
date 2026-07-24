@@ -1,0 +1,47 @@
+# Render Blueprint for the Business Hub backend (free tier).
+#
+# This lives in apps/backend/ but Render reads a blueprint from the repo root by
+# default. Two ways to use it:
+#   A) Easiest: ignore this file and create the service manually in the Render
+#      dashboard (see docs/RENDER_DEPLOY_GUIDE.md) with Root Directory = apps/backend.
+#   B) Blueprint: copy this file to the REPO ROOT as `render.yaml`, commit, then
+#      "New + > Blueprint" in Render and point it at the repo.
+#
+# Free tier notes:
+#   - Web service sleeps after ~15 min idle (first request wakes it in ~30-50s).
+#   - Free Postgres is fine to start; it expires after 90 days.
+#   - No Redis on free tier -> USE_INMEMORY_CHANNELS=true makes Celery run
+#     in-process and channels/cache use memory. Core POS + sync do NOT need Redis.
+
+databases:
+  - name: business-hub-db
+    plan: free
+    databaseName: business_hub
+    user: business_hub
+
+services:
+  - type: web
+    name: business-hub-api
+    runtime: python
+    plan: free
+    rootDir: apps/backend
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn config.wsgi:application -c gunicorn.conf.py"
+    healthCheckPath: /api/v1/
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.4"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true          # Render generates a strong secret
+      - key: DJANGO_DEBUG
+        value: "0"
+      - key: DJANGO_ALLOWED_HOSTS
+        sync: false                  # set to your onrender.com host after first deploy
+      - key: USE_INMEMORY_CHANNELS
+        value: "true"                # no Redis on free tier -> run tasks in-process
+      - key: DATABASE_URL
+        fromDatabase:
+          name: business-hub-db
+          property: connectionString
+      - key: DATABASE_SSL_REQUIRED
+        value: "true"
