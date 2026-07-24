@@ -10,6 +10,7 @@ import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/runtime/mobile_runtime_config.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../shell/presentation/mobile_surface.dart';
+import 'permission_editor_screen.dart';
 
 class SettingsTeamScreen extends ConsumerWidget {
   const SettingsTeamScreen({super.key});
@@ -612,6 +613,26 @@ class SettingsTeamScreen extends ConsumerWidget {
                               ),
                             ),
                           ),
+                          if (MobileRuntimeConfig.backendAuthMode == 'jwt') ...[
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => PermissionEditorScreen(
+                                        member: member,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.tune_rounded),
+                                label: const Text('Manage permissions'),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),

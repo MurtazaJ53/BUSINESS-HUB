@@ -19,6 +19,9 @@ const String _jwtShopKey = 'jwt_shop_id';
 const String _jwtRoleKey = 'jwt_role';
 const String _jwtEmailKey = 'jwt_email';
 const String _jwtMembershipKey = 'jwt_membership';
+// The member's custom permission set (JSON), so the UI enforces it after a
+// restart without another network fetch.
+const String _jwtPermsKey = 'jwt_permissions';
 // The last workspace this device was signed into. Used to detect a shop switch
 // and wipe the previous tenant's cached data. Survives logout on purpose.
 const String _activeShopKey = 'active_shop_id';
@@ -70,12 +73,14 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
         final email = await repo.readSetting(_jwtEmailKey) ?? '';
         final role = await repo.readSetting(_jwtRoleKey) ?? 'owner';
         final membershipId = await repo.readSetting(_jwtMembershipKey) ?? '';
+        final perms = _decodePerms(await repo.readSetting(_jwtPermsKey));
         return _sessionFromStored(
           access: access,
           email: email,
           shopId: shopId,
           role: role,
           membershipId: membershipId,
+          customPermissions: perms,
         );
       }
     }
@@ -101,6 +106,7 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
     required String shopId,
     required String role,
     required String membershipId,
+    Map<String, dynamic>? customPermissions,
   }) {
     final user = MobileAuthUser.cloud(
       uid: email,
@@ -114,7 +120,18 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
       role: role,
       membershipId: membershipId,
       email: email,
+      customPermissions: customPermissions,
     );
+  }
+
+  Map<String, dynamic> _decodePerms(String? raw) {
+    if (raw == null || raw.isEmpty) return const <String, dynamic>{};
+    try {
+      final decoded = jsonDecode(raw);
+      return decoded is Map ? Map<String, dynamic>.from(decoded) : const {};
+    } catch (_) {
+      return const <String, dynamic>{};
+    }
   }
 
   /// Register a new owner + shop, then sign in. Returns null on success or a
@@ -317,6 +334,7 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
       await repo.writeSetting(_jwtRoleKey, m.role);
       await repo.writeSetting(_jwtEmailKey, trimmedEmail);
       await repo.writeSetting(_jwtMembershipKey, m.id);
+      await repo.writeSetting(_jwtPermsKey, jsonEncode(m.permissions));
 
       // Seed the local shop document from the backend shop, once.
       final existing = await repo.readSetting('settings');
@@ -338,6 +356,7 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
           shopId: m.shopId,
           role: m.role,
           membershipId: m.id,
+          customPermissions: m.permissions,
         ),
       );
       return null;
@@ -509,6 +528,39 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
     final staff = await _loadStaff();
     staff.removeWhere((s) => s.id == id);
     await _saveStaff(staff);
+  }
+
+  /// Re-fetch this member's role + custom permissions from the backend and
+  /// apply them to the live session, so an admin's permission change takes
+  /// effect without the member logging in again. Best-effort; safe to call on
+  /// app resume. Does nothing outside cloud mode.
+  Future<void> refreshPermissions() async {
+    if (!_cloudAuthMode) return;
+    final session = state.asData?.value;
+    if (session == null || (session.shopId ?? '').isEmpty) return;
+    final client = ref.read(backendApiClientProvider);
+    final repo = ref.read(shopRepositoryProvider);
+    try {
+      final memberships = await client.getShopMemberships(user: session.user);
+      final matches =
+          memberships.where((x) => x.shopId == session.shopId).toList();
+      if (matches.isEmpty) return;
+      final m = matches.first;
+      await repo.writeSetting(_jwtRoleKey, m.role);
+      await repo.writeSetting(_jwtPermsKey, jsonEncode(m.permissions));
+      state = AsyncValue.data(
+        _sessionFromStored(
+          access: session.user.authToken ?? '',
+          email: session.email,
+          shopId: session.shopId!,
+          role: m.role,
+          membershipId: m.id,
+          customPermissions: m.permissions,
+        ),
+      );
+    } catch (_) {
+      // best effort - keep the current session on any failure
+    }
   }
 
   /// Send a shop invitation to a teammate (owner/manager). Requires an active

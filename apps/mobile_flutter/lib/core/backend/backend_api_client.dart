@@ -143,6 +143,10 @@ class BackendApiClient {
                     ),
                   )
                 : const <String, bool>{},
+            permissions: row['permissions_json'] is Map
+                ? Map<String, dynamic>.from(row['permissions_json'] as Map)
+                : const <String, dynamic>{},
+            permissionsVersion: _asInt(row['permissions_version']),
           ),
         )
         .toList(growable: false);
@@ -188,6 +192,7 @@ class BackendApiClient {
     required String membershipId,
     String? role,
     String? status,
+    Map<String, dynamic>? permissions,
   }) async {
     final body = <String, dynamic>{};
     if (role != null) {
@@ -196,6 +201,9 @@ class BackendApiClient {
     if (status != null) {
       body['status'] = status;
     }
+    if (permissions != null) {
+      body['permissions_json'] = permissions;
+    }
     final decoded = await _request(
       user: user,
       method: 'PATCH',
@@ -203,6 +211,18 @@ class BackendApiClient {
       body: body,
     );
     return _mapWorkspaceTeamMember(decoded);
+  }
+
+  /// The module/action permission catalog for the editor UI.
+  Future<Map<String, dynamic>> getPermissionCatalog({
+    required User user,
+    required String shopId,
+  }) async {
+    return _request(
+      user: user,
+      method: 'GET',
+      path: '/shops/$shopId/permission-catalog/',
+    );
   }
 
   Future<AttendanceSummarySnapshot> getAttendanceSummary({

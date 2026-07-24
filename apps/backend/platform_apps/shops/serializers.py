@@ -331,7 +331,11 @@ class WorkspaceTeamMemberUpdateSerializer(serializers.Serializer):
             updated_fields.append("status")
 
         if "permissions_json" in validated:
-            target_membership.permissions_json = validated["permissions_json"] or {}
+            from platform_apps.shops.permission_catalog import sanitize_permissions
+
+            target_membership.permissions_json = sanitize_permissions(
+                validated["permissions_json"]
+            )
             # Bump the version so clients can detect a permission change and
             # re-apply it without a full re-login.
             target_membership.permissions_version = (

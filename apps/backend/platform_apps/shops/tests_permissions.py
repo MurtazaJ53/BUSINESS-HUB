@@ -37,13 +37,21 @@ class PermissionManagementTests(APITestCase):
 
     def test_owner_can_set_custom_permissions_and_version_bumps(self):
         self.auth(self.owner)
-        perms = {"inventory": {"view": True, "edit": False}, "sales": {"view": True}}
+        # 'edit: False' is dropped (only granted actions stored); valid modules
+        # are kept.
+        perms = {
+            "inventory": {"view": True, "edit": False},
+            "reports": {"view": True},
+        }
         resp = self.client.patch(
             self.url, {"permissions_json": perms}, format="json"
         )
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.staff_membership.refresh_from_db()
-        self.assertEqual(self.staff_membership.permissions_json, perms)
+        self.assertEqual(
+            self.staff_membership.permissions_json,
+            {"inventory": {"view": True}, "reports": {"view": True}},
+        )
         self.assertEqual(self.staff_membership.permissions_version, 2)  # was 1
 
     def test_owner_can_change_role(self):
@@ -70,3 +78,32 @@ class PermissionManagementTests(APITestCase):
             self.url, {"permissions_json": {"sales": {"view": True}}}, format="json"
         )
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_permission_catalog_is_available(self):
+        self.auth(self.staff)  # any active member may read the catalog
+        from django.urls import reverse as r
+
+        resp = self.client.get(r("permission-catalog", args=[self.shop.id]))
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        body = resp.json()
+        self.assertTrue(len(body["catalog"]) >= 5)
+        self.assertIn("action_labels", body)
+
+    def test_unknown_permission_keys_are_stripped(self):
+        self.auth(self.owner)
+        # Inject a bogus module + a bogus action; only valid keys survive.
+        resp = self.client.patch(
+            self.url,
+            {
+                "permissions_json": {
+                    "inventory": {"view": True, "hack": True},
+                    "evil_module": {"x": True},
+                }
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.staff_membership.refresh_from_db()
+        self.assertEqual(
+            self.staff_membership.permissions_json, {"inventory": {"view": True}}
+        )

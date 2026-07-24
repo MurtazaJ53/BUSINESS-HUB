@@ -62,16 +62,28 @@ class MobileSession {
     required String role,
     required String membershipId,
     required String email,
+    Map<String, dynamic>? customPermissions,
   }) {
     final normalized = role.trim().toLowerCase();
     final elevated = normalized == 'owner' || normalized == 'admin';
+    // Owner/admin always get full control. Everyone else uses their explicit
+    // custom permission set when one is configured, else an empty set (the
+    // role's baseline is applied by the UI's role getters).
+    final Map<String, dynamic> perms;
+    if (elevated) {
+      perms = fullControlPermissions;
+    } else if (customPermissions != null && customPermissions.isNotEmpty) {
+      perms = customPermissions;
+    } else {
+      perms = const <String, dynamic>{};
+    }
     return MobileSession(
       user: user,
       email: email,
       uid: user.uid,
       role: normalized.isEmpty ? 'staff' : normalized,
       membershipId: membershipId,
-      permissions: elevated ? fullControlPermissions : const <String, dynamic>{},
+      permissions: perms,
       shopId: shopId,
       isElevatedAdmin: elevated,
     );
