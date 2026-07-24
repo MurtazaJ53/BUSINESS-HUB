@@ -341,6 +341,33 @@ class ShopRepository {
     }
   }
 
+  /// Wipe EVERY shop-scoped local data table. Called when the active shop
+  /// changes (login/register/accept into a different workspace) so a new
+  /// tenant never sees the previous tenant's cached data. This is the local
+  /// half of tenant isolation - the backend is already row-level isolated.
+  ///
+  /// Deliberately clears all data tables directly (not the per-repository
+  /// clearWorkspace helpers) so nothing is ever missed - expenses and
+  /// purchases had no clear helper at all. Shop settings (tokens, shop
+  /// document, app-instance id) are left intact; the caller re-seeds the shop
+  /// document for the new workspace.
+  Future<void> clearAllWorkspaceData() async {
+    await _db.transaction(() async {
+      await _db.delete(_db.inventoryPrivateEntries).go();
+      await _db.delete(_db.inventoryEntries).go();
+      await _db.delete(_db.stockMovementEntries).go();
+      await _db.delete(_db.customerLedgerEntries).go();
+      await _db.delete(_db.customerEntries).go();
+      await _db.delete(_db.commerceOutboxEntries).go();
+      await _db.delete(_db.salesEntries).go();
+      await _db.delete(_db.expenseEntries).go();
+      await _db.delete(_db.purchaseEntries).go();
+    });
+    // Drop the previous shop's document so the new workspace's name/settings
+    // replace it rather than lingering.
+    await _saveShopSetting('settings', '');
+  }
+
   PilotEvidenceTrackerState _decodePilotEvidenceTracker(String rawValue) {
     try {
       final decoded = jsonDecode(rawValue) as Map<String, dynamic>;

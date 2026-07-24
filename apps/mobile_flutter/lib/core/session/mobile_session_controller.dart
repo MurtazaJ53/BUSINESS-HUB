@@ -19,6 +19,9 @@ const String _jwtShopKey = 'jwt_shop_id';
 const String _jwtRoleKey = 'jwt_role';
 const String _jwtEmailKey = 'jwt_email';
 const String _jwtMembershipKey = 'jwt_membership';
+// The last workspace this device was signed into. Used to detect a shop switch
+// and wipe the previous tenant's cached data. Survives logout on purpose.
+const String _activeShopKey = 'active_shop_id';
 
 bool get _cloudAuthMode => MobileRuntimeConfig.backendAuthMode == 'jwt';
 
@@ -77,6 +80,19 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
       }
     }
     return null;
+  }
+
+  /// Tenant isolation on the client: if this device was last signed into a
+  /// DIFFERENT shop, wipe all locally-cached workspace data before the new
+  /// session opens, so the new tenant never sees the previous one's records.
+  /// Same-shop re-login keeps local (possibly-unsynced) data.
+  Future<void> _wipeIfShopChanged(String newShopId) async {
+    final repo = ref.read(shopRepositoryProvider);
+    final active = await repo.readSetting(_activeShopKey) ?? '';
+    if (active != newShopId) {
+      await repo.clearAllWorkspaceData();
+    }
+    await repo.writeSetting(_activeShopKey, newShopId);
   }
 
   MobileSession _sessionFromStored({
@@ -138,6 +154,8 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
       final role = (result['role'] ?? 'owner').toString();
       final shopName = (result['shop_name'] ?? businessName).toString();
 
+      // A newly-registered shop is a different tenant: wipe any cached data.
+      await _wipeIfShopChanged(shopId);
       await repo.writeSetting(_jwtAccessKey, access);
       await repo.writeSetting(_jwtRefreshKey, (result['refresh'] ?? '').toString());
       await repo.writeSetting(_jwtShopKey, shopId);
@@ -209,6 +227,8 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
       final email = (result['email'] ?? '').toString();
       final shopName = (result['shop_name'] ?? 'Your shop').toString();
 
+      // Joining a shop is a (potentially different) tenant: wipe cached data.
+      await _wipeIfShopChanged(shopId);
       await repo.writeSetting(_jwtAccessKey, access);
       await repo.writeSetting(_jwtRefreshKey, (result['refresh'] ?? '').toString());
       await repo.writeSetting(_jwtShopKey, shopId);
@@ -288,6 +308,9 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
       }
       final m = active.first;
 
+      // Signing into this shop: if it differs from the last active shop on
+      // this device, wipe the previous tenant's cached data first.
+      await _wipeIfShopChanged(m.shopId);
       await repo.writeSetting(_jwtAccessKey, access);
       await repo.writeSetting(_jwtRefreshKey, tokens['refresh'] ?? '');
       await repo.writeSetting(_jwtShopKey, m.shopId);
