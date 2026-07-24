@@ -33,7 +33,12 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
   final _regStateController = TextEditingController();
   final _regGstinController = TextEditingController();
   String _regBusinessType = 'retail';
+  // Join an existing shop with an invite code.
+  final _joinCodeController = TextEditingController();
+  final _joinNameController = TextEditingController();
+  final _joinPasswordController = TextEditingController();
   bool _showRegister = false;
+  bool _showJoin = false;
   bool _isLoggingIn = false;
   bool _hasPin = true; // assume returning user until checked
   bool get _cloudMode => MobileRuntimeConfig.backendAuthMode == 'jwt';
@@ -67,7 +72,40 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
     _regMobileController.dispose();
     _regStateController.dispose();
     _regGstinController.dispose();
+    _joinCodeController.dispose();
+    _joinNameController.dispose();
+    _joinPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleJoin() async {
+    if (_joinCodeController.text.trim().isEmpty ||
+        _joinPasswordController.text.length < 8) {
+      _triggerShake();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter the invite code and a password of 8+ characters.'),
+        ),
+      );
+      return;
+    }
+    setState(() => _isLoggingIn = true);
+    final error = await ref.read(mobileSessionProvider.notifier).cloudAcceptInvite(
+          code: _joinCodeController.text,
+          name: _joinNameController.text,
+          password: _joinPasswordController.text,
+        );
+    if (!mounted) return;
+    setState(() => _isLoggingIn = false);
+    if (error != null) {
+      _triggerShake();
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Joined! Welcome to the team.')),
+      );
+    }
   }
 
   Future<void> _handleRegister() async {
@@ -226,12 +264,23 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
                           letterSpacing: 1.2)),
             ),
           ),
-          const SizedBox(height: 10),
-          TextButton(
-            onPressed: _isLoggingIn
-                ? null
-                : () => setState(() => _showRegister = true),
-            child: const Text("New here? Create a shop"),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              TextButton(
+                onPressed: _isLoggingIn
+                    ? null
+                    : () => setState(() => _showRegister = true),
+                child: const Text("Create a shop"),
+              ),
+              TextButton(
+                onPressed: _isLoggingIn
+                    ? null
+                    : () => setState(() => _showJoin = true),
+                child: const Text("Join with a code"),
+              ),
+            ],
           ),
           Text(
             'First request may take ~40s while the free server wakes up.',
@@ -377,6 +426,79 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
     );
   }
 
+  Widget _buildCloudJoinPanel(BuildContext context) {
+    return MobilePanel(
+      title: 'Join a shop',
+      action: const MobileTag(label: 'INVITE', icon: Icons.group_add_outlined),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 4),
+          Text(
+            'Enter the invite code from your email to join your team.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: AppPalette.textSecondary, height: 1.4),
+          ),
+          const SizedBox(height: 18),
+          TextField(
+            controller: _joinCodeController,
+            autocorrect: false,
+            decoration: _fieldDecoration('Invite code *'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _joinNameController,
+            textCapitalization: TextCapitalization.words,
+            decoration: _fieldDecoration('Your name'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _joinPasswordController,
+            obscureText: true,
+            decoration: _fieldDecoration('Set a password (8+ characters) *'),
+            onSubmitted: (_) => _handleJoin(),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 54,
+            child: ElevatedButton(
+              onPressed: _isLoggingIn ? null : _handleJoin,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppPalette.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: _isLoggingIn
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Text('JOIN SHOP',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _isLoggingIn
+                ? null
+                : () => setState(() => _showJoin = false),
+            child: const Text('Back to sign in'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final sessionAsync = ref.watch(mobileSessionProvider);
@@ -416,9 +538,12 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
               children: [
                 const _BrandHero(),
                 const SizedBox(height: 24),
-                _showRegister
-                    ? _buildCloudRegisterPanel(context)
-                    : _buildCloudLoginPanel(context),
+                if (_showJoin)
+                  _buildCloudJoinPanel(context)
+                else if (_showRegister)
+                  _buildCloudRegisterPanel(context)
+                else
+                  _buildCloudLoginPanel(context),
               ],
             ),
           );

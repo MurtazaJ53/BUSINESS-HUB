@@ -7,10 +7,36 @@ from platform_apps.shops.plans import normalize_plan_tier
 
 ROLE_ORDER = {
     ShopMembership.Role.VIEWER: 10,
+    # Operational staff — same coarse level; day-to-day fine-grained differences
+    # are expressed via each role's permission set (permissions_json).
+    ShopMembership.Role.CASHIER: 20,
+    ShopMembership.Role.SALES_STAFF: 20,
+    ShopMembership.Role.INVENTORY_STAFF: 20,
     ShopMembership.Role.STAFF: 20,
+    # Functional specialists.
+    ShopMembership.Role.ACCOUNTANT: 25,
+    ShopMembership.Role.HR: 25,
+    ShopMembership.Role.SUPERVISOR: 28,
+    # Management.
+    ShopMembership.Role.MANAGER: 30,
     ShopMembership.Role.ADMIN: 30,
     ShopMembership.Role.OWNER: 40,
 }
+
+# Roles an owner/manager may assign, ordered. Owner can assign anything below
+# owner; manager/admin can assign anything strictly below their own rank.
+_ASSIGNABLE_BY_OWNER = [
+    ShopMembership.Role.ADMIN,
+    ShopMembership.Role.MANAGER,
+    ShopMembership.Role.SUPERVISOR,
+    ShopMembership.Role.ACCOUNTANT,
+    ShopMembership.Role.HR,
+    ShopMembership.Role.CASHIER,
+    ShopMembership.Role.SALES_STAFF,
+    ShopMembership.Role.INVENTORY_STAFF,
+    ShopMembership.Role.STAFF,
+    ShopMembership.Role.VIEWER,
+]
 
 FEATURE_LABELS = {
     "expenses": "Expenses",
@@ -40,37 +66,24 @@ def get_membership_or_403(user, shop_id, minimum_role: str = ShopMembership.Role
 
 
 def can_assign_workspace_role(actor_role: str, target_role: str) -> bool:
-    if actor_role == ShopMembership.Role.OWNER:
-        return target_role in {
-            ShopMembership.Role.ADMIN,
-            ShopMembership.Role.STAFF,
-            ShopMembership.Role.VIEWER,
-        }
-
-    if actor_role == ShopMembership.Role.ADMIN:
-        return target_role in {
-            ShopMembership.Role.STAFF,
-            ShopMembership.Role.VIEWER,
-        }
-
-    return False
+    return _can_act_on_role(actor_role, target_role)
 
 
 def can_manage_workspace_membership(actor_role: str, target_role: str) -> bool:
-    if actor_role == ShopMembership.Role.OWNER:
-        return target_role in {
-            ShopMembership.Role.ADMIN,
-            ShopMembership.Role.STAFF,
-            ShopMembership.Role.VIEWER,
-        }
+    return _can_act_on_role(actor_role, target_role)
 
-    if actor_role == ShopMembership.Role.ADMIN:
-        return target_role in {
-            ShopMembership.Role.STAFF,
-            ShopMembership.Role.VIEWER,
-        }
 
-    return False
+def _can_act_on_role(actor_role: str, target_role: str) -> bool:
+    """An actor may assign/manage any role that is strictly below their own
+    rank and is itself assignable (never OWNER). Owner may assign anything
+    below owner."""
+    if actor_role not in ROLE_ORDER or target_role not in ROLE_ORDER:
+        return False
+    if target_role == ShopMembership.Role.OWNER:
+        return False  # ownership changes go through the dedicated transfer flow
+    if target_role not in _ASSIGNABLE_BY_OWNER:
+        return False
+    return ROLE_ORDER[actor_role] > ROLE_ORDER[target_role]
 
 
 def ensure_workspace_role_assignment_or_403(actor_membership: ShopMembership, target_role: str) -> None:

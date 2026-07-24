@@ -111,6 +111,10 @@ class SettingsTeamScreen extends ConsumerWidget {
               ],
             ),
           ),
+          if (MobileRuntimeConfig.backendAuthMode == 'jwt') ...<Widget>[
+            const SizedBox(height: 18),
+            const _CloudInvitePanel(),
+          ],
           const SizedBox(height: 18),
           MobilePanel(
             title: 'Team roster',
@@ -738,6 +742,179 @@ class _TeamBullet extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Cloud invitation panel (JWT mode): invite a teammate by email + role.
+/// The backend emails them an invite code; the code is also shown here so the
+/// owner can share it directly (WhatsApp/SMS) if needed.
+class _CloudInvitePanel extends ConsumerStatefulWidget {
+  const _CloudInvitePanel();
+
+  @override
+  ConsumerState<_CloudInvitePanel> createState() => _CloudInvitePanelState();
+}
+
+class _CloudInvitePanelState extends ConsumerState<_CloudInvitePanel> {
+  final _emailController = TextEditingController();
+  String _role = 'cashier';
+  bool _sending = false;
+  String? _lastCode;
+
+  static const _roles = <(String, String)>[
+    ('manager', 'Manager'),
+    ('supervisor', 'Supervisor'),
+    ('accountant', 'Accountant'),
+    ('hr', 'HR'),
+    ('cashier', 'Cashier'),
+    ('sales_staff', 'Sales Staff'),
+    ('inventory_staff', 'Inventory Staff'),
+    ('viewer', 'Viewer'),
+  ];
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid email address.')),
+      );
+      return;
+    }
+    setState(() => _sending = true);
+    final result = await ref
+        .read(mobileSessionProvider.notifier)
+        .sendInvite(email: email, role: _role);
+    if (!mounted) return;
+    setState(() {
+      _sending = false;
+      _lastCode = result.code;
+    });
+    if (result.error != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(result.error!)));
+    } else {
+      _emailController.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Invite sent to $email.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MobilePanel(
+      title: 'Invite a teammate',
+      action: const MobileTag(
+        label: 'CLOUD',
+        icon: Icons.group_add_rounded,
+        accent: AppPalette.info,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(
+            'They get an email with a code. In the app they choose '
+            '"Join with a code" to set a password and join your shop.',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: AppPalette.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            autocorrect: false,
+            decoration: InputDecoration(
+              labelText: 'Teammate email',
+              isDense: true,
+              filled: true,
+              fillColor: AppPalette.backgroundSoft,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: _role,
+                  isDense: true,
+                  decoration: InputDecoration(
+                    labelText: 'Role',
+                    isDense: true,
+                    filled: true,
+                    fillColor: AppPalette.backgroundSoft,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  items: _roles
+                      .map((r) => DropdownMenuItem(
+                          value: r.$1, child: Text(r.$2)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _role = v ?? 'cashier'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              SizedBox(
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: _sending ? null : _send,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppPalette.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: _sending
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Text('Invite'),
+                ),
+              ),
+            ],
+          ),
+          if (_lastCode != null && _lastCode!.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppPalette.info.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text('Share this code directly if needed:',
+                      style: Theme.of(context).textTheme.bodySmall),
+                  const SizedBox(height: 4),
+                  SelectableText(
+                    _lastCode!,
+                    style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

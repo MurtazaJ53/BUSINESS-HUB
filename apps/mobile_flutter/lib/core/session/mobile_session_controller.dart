@@ -183,6 +183,79 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
     }
   }
 
+  /// Accept a shop invitation with a code, creating/activating the account and
+  /// signing into the shop. Returns null on success or an error message.
+  Future<String?> cloudAcceptInvite({
+    required String code,
+    required String name,
+    required String password,
+  }) async {
+    final repo = ref.read(shopRepositoryProvider);
+    final client = ref.read(backendApiClientProvider);
+    try {
+      state = const AsyncValue.loading();
+      final result = await client.acceptInvite(
+        token: code.trim(),
+        name: name.trim(),
+        password: password,
+      );
+      final access = (result['access'] ?? '').toString();
+      final shopId = (result['shop_id'] ?? '').toString();
+      if (access.isEmpty || shopId.isEmpty) {
+        state = const AsyncValue.data(null);
+        return 'Could not join - please try again.';
+      }
+      final role = (result['role'] ?? 'staff').toString();
+      final email = (result['email'] ?? '').toString();
+      final shopName = (result['shop_name'] ?? 'Your shop').toString();
+
+      await repo.writeSetting(_jwtAccessKey, access);
+      await repo.writeSetting(_jwtRefreshKey, (result['refresh'] ?? '').toString());
+      await repo.writeSetting(_jwtShopKey, shopId);
+      await repo.writeSetting(_jwtRoleKey, role);
+      await repo.writeSetting(_jwtEmailKey, email);
+      await repo.writeSetting(_jwtMembershipKey, '');
+
+      final existing = await repo.readSetting('settings');
+      if (existing == null || existing.isEmpty) {
+        await repo.saveShopDocument(<String, dynamic>{
+          'name': shopName,
+          'tagline': 'Business Hub',
+          'footer': 'Thank you for your business!',
+          'currency': 'INR',
+          'plan_tier': 'starter',
+          'enabled_features': <String, bool>{
+            'inventory': true,
+            'pos': true,
+            'customers': true,
+            'history': true,
+            'team': true,
+            'attendance': true,
+            'expenses': true,
+            'advanced_ops': true,
+          },
+        });
+      }
+
+      state = AsyncValue.data(
+        _sessionFromStored(
+          access: access,
+          email: email,
+          shopId: shopId,
+          role: role,
+          membershipId: '',
+        ),
+      );
+      return null;
+    } on BackendApiException catch (e) {
+      state = const AsyncValue.data(null);
+      return e.message;
+    } catch (e) {
+      state = const AsyncValue.data(null);
+      return 'Could not join. Check the code and your connection.';
+    }
+  }
+
   /// Sign in against the backend with email + password (JWT). Returns null on
   /// success, or a user-facing error message. Resolves the caller's shop from
   /// their membership so sync targets the real backend workspace.
@@ -413,6 +486,36 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
     final staff = await _loadStaff();
     staff.removeWhere((s) => s.id == id);
     await _saveStaff(staff);
+  }
+
+  /// Send a shop invitation to a teammate (owner/manager). Requires an active
+  /// cloud session. Returns (error, code): on success error is null and code is
+  /// the invite code (also emailed to the invitee); on failure code is null.
+  Future<({String? error, String? code})> sendInvite({
+    required String email,
+    required String role,
+  }) async {
+    final session = state.asData?.value;
+    if (session == null || (session.shopId ?? '').isEmpty) {
+      return (
+        error: 'You need to be signed in to a shop to invite people.',
+        code: null,
+      );
+    }
+    final client = ref.read(backendApiClientProvider);
+    try {
+      final result = await client.createInvite(
+        user: session.user,
+        shopId: session.shopId!,
+        email: email.trim(),
+        role: role,
+      );
+      return (error: null, code: (result['invite_code'] ?? '').toString());
+    } on BackendApiException catch (e) {
+      return (error: e.message, code: null);
+    } catch (e) {
+      return (error: 'Could not send the invite. Please try again.', code: null);
+    }
   }
 
   Future<void> logout() async {

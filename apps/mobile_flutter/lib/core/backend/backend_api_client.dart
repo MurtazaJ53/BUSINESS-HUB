@@ -1093,6 +1093,35 @@ class BackendApiClient {
     });
   }
 
+  /// Accept a shop invitation with a code. Unauthenticated. Creates/links the
+  /// user and returns a JWT pair + shop, so the invitee is signed straight in.
+  Future<Map<String, dynamic>> acceptInvite({
+    required String token,
+    required String name,
+    required String password,
+  }) async {
+    return _postUnauthenticated('/invites/accept/', <String, dynamic>{
+      'token': token,
+      'name': name,
+      'password': password,
+    });
+  }
+
+  /// Send a shop invitation (owner/manager). Authenticated.
+  Future<Map<String, dynamic>> createInvite({
+    required User user,
+    required String shopId,
+    required String email,
+    required String role,
+  }) async {
+    return _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/invites/',
+      body: <String, dynamic>{'email': email, 'role': role},
+    );
+  }
+
   /// Exchange a refresh token for a fresh access token.
   Future<String> refreshAccessToken(String refresh) async {
     final decoded = await _postUnauthenticated(

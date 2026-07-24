@@ -63,6 +63,13 @@ class ShopMembership(SourceTrackedModel):
     class Role(models.TextChoices):
         OWNER = "owner", "Owner"
         ADMIN = "admin", "Admin"
+        MANAGER = "manager", "Manager"
+        SUPERVISOR = "supervisor", "Supervisor"
+        ACCOUNTANT = "accountant", "Accountant"
+        HR = "hr", "HR"
+        CASHIER = "cashier", "Cashier"
+        SALES_STAFF = "sales_staff", "Sales Staff"
+        INVENTORY_STAFF = "inventory_staff", "Inventory Staff"
         STAFF = "staff", "Staff"
         VIEWER = "viewer", "Viewer"
 
@@ -85,6 +92,60 @@ class ShopMembership(SourceTrackedModel):
 
     def __str__(self) -> str:
         return f"{self.user} -> {self.shop} ({self.role})"
+
+
+class ShopInvite(SourceTrackedModel):
+    """A pending invitation for someone to join a shop with a given role.
+
+    The token is the secret credential (delivered by email / link / QR). An
+    invite is single-use and time-boxed; accepting it creates or activates the
+    invitee's membership.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        ACCEPTED = "accepted", "Accepted"
+        REVOKED = "revoked", "Revoked"
+        EXPIRED = "expired", "Expired"
+
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="invites")
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    email = models.EmailField()
+    role = models.CharField(
+        max_length=16,
+        choices=ShopMembership.Role.choices,
+        default=ShopMembership.Role.STAFF,
+    )
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.PENDING
+    )
+    invited_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="sent_invites",
+    )
+    message = models.CharField(max_length=280, blank=True)
+    expires_at = models.DateTimeField()
+    accepted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["shop", "status"]),
+            models.Index(fields=["email"]),
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"invite {self.email} -> {self.shop} ({self.role}, {self.status})"
+
+    @property
+    def is_live(self) -> bool:
+        from django.utils import timezone
+
+        return (
+            self.status == self.Status.PENDING and self.expires_at > timezone.now()
+        )
 
 
 class ShopPlanRequest(SourceTrackedModel):
