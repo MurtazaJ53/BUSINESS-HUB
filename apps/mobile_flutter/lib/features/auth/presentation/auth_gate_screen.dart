@@ -24,6 +24,16 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
   final _emailController =
       TextEditingController(text: 'demo@businesshub.test');
   final _passwordController = TextEditingController(text: 'demo12345');
+  // Sign-up (create a new shop).
+  final _regOwnerController = TextEditingController();
+  final _regBusinessController = TextEditingController();
+  final _regEmailController = TextEditingController();
+  final _regPasswordController = TextEditingController();
+  final _regMobileController = TextEditingController();
+  final _regStateController = TextEditingController();
+  final _regGstinController = TextEditingController();
+  String _regBusinessType = 'retail';
+  bool _showRegister = false;
   bool _isLoggingIn = false;
   bool _hasPin = true; // assume returning user until checked
   bool get _cloudMode => MobileRuntimeConfig.backendAuthMode == 'jwt';
@@ -50,7 +60,54 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
     _pinController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _regOwnerController.dispose();
+    _regBusinessController.dispose();
+    _regEmailController.dispose();
+    _regPasswordController.dispose();
+    _regMobileController.dispose();
+    _regStateController.dispose();
+    _regGstinController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleRegister() async {
+    if (_regOwnerController.text.trim().isEmpty ||
+        _regBusinessController.text.trim().isEmpty ||
+        _regEmailController.text.trim().isEmpty ||
+        _regPasswordController.text.length < 8) {
+      _triggerShake();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Fill name, business, email and a password of 8+ characters.',
+          ),
+        ),
+      );
+      return;
+    }
+    setState(() => _isLoggingIn = true);
+    final error =
+        await ref.read(mobileSessionProvider.notifier).cloudRegister(
+              ownerName: _regOwnerController.text,
+              email: _regEmailController.text,
+              password: _regPasswordController.text,
+              businessName: _regBusinessController.text,
+              mobile: _regMobileController.text,
+              businessType: _regBusinessType,
+              stateCode: _regStateController.text,
+              gstin: _regGstinController.text,
+            );
+    if (!mounted) return;
+    setState(() => _isLoggingIn = false);
+    if (error != null) {
+      _triggerShake();
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Shop created! Welcome to Business Hub.')),
+      );
+    }
   }
 
   Future<void> _handleCloudLogin() async {
@@ -102,6 +159,224 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
     }
   }
 
+  InputDecoration _fieldDecoration(String label) => InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: AppPalette.backgroundSoft,
+        isDense: true,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+      );
+
+  Widget _buildCloudLoginPanel(BuildContext context) {
+    return MobilePanel(
+      title: 'Cloud Sign-in',
+      action: const MobileTag(label: 'CLOUD', icon: Icons.cloud_outlined),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 4),
+          Text(
+            'Sign in to sync with the cloud backend.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppPalette.textSecondary,
+                  height: 1.5,
+                ),
+          ),
+          const SizedBox(height: 20),
+          TextField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            autocorrect: false,
+            decoration: _fieldDecoration('Email'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _passwordController,
+            obscureText: true,
+            decoration: _fieldDecoration('Password'),
+            onSubmitted: (_) => _handleCloudLogin(),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 54,
+            child: ElevatedButton(
+              onPressed: _isLoggingIn ? null : _handleCloudLogin,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppPalette.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: _isLoggingIn
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Text('SIGN IN',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2)),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextButton(
+            onPressed: _isLoggingIn
+                ? null
+                : () => setState(() => _showRegister = true),
+            child: const Text("New here? Create a shop"),
+          ),
+          Text(
+            'First request may take ~40s while the free server wakes up.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: AppPalette.textTertiary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCloudRegisterPanel(BuildContext context) {
+    return MobilePanel(
+      title: 'Create your shop',
+      action: const MobileTag(
+          label: 'SIGN UP', icon: Icons.storefront_outlined),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 4),
+          Text(
+            'Set up a new business workspace in under a minute.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: AppPalette.textSecondary, height: 1.4),
+          ),
+          const SizedBox(height: 18),
+          TextField(
+            controller: _regOwnerController,
+            textCapitalization: TextCapitalization.words,
+            decoration: _fieldDecoration('Your name *'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _regBusinessController,
+            textCapitalization: TextCapitalization.words,
+            decoration: _fieldDecoration('Business name *'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _regEmailController,
+            keyboardType: TextInputType.emailAddress,
+            autocorrect: false,
+            decoration: _fieldDecoration('Email *'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _regPasswordController,
+            obscureText: true,
+            decoration: _fieldDecoration('Password (8+ characters) *'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _regMobileController,
+            keyboardType: TextInputType.phone,
+            decoration: _fieldDecoration('Mobile (optional)'),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: _regBusinessType,
+                  isDense: true,
+                  decoration: _fieldDecoration('Type'),
+                  items: const [
+                    DropdownMenuItem(value: 'retail', child: Text('Retail')),
+                    DropdownMenuItem(
+                        value: 'wholesale', child: Text('Wholesale')),
+                    DropdownMenuItem(
+                        value: 'grocery', child: Text('Grocery')),
+                    DropdownMenuItem(
+                        value: 'pharmacy', child: Text('Pharmacy')),
+                    DropdownMenuItem(
+                        value: 'restaurant', child: Text('Restaurant')),
+                    DropdownMenuItem(
+                        value: 'service', child: Text('Service')),
+                    DropdownMenuItem(value: 'other', child: Text('Other')),
+                  ],
+                  onChanged: (v) =>
+                      setState(() => _regBusinessType = v ?? 'retail'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 96,
+                child: TextField(
+                  controller: _regStateController,
+                  maxLength: 2,
+                  keyboardType: TextInputType.number,
+                  decoration: _fieldDecoration('State')
+                      .copyWith(counterText: ''),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _regGstinController,
+            textCapitalization: TextCapitalization.characters,
+            decoration: _fieldDecoration('GSTIN (optional)'),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 54,
+            child: ElevatedButton(
+              onPressed: _isLoggingIn ? null : _handleRegister,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppPalette.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: _isLoggingIn
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Text('CREATE SHOP',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _isLoggingIn
+                ? null
+                : () => setState(() => _showRegister = false),
+            child: const Text('Already have an account? Sign in'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final sessionAsync = ref.watch(mobileSessionProvider);
@@ -140,97 +415,10 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 const _BrandHero(),
-                const SizedBox(height: 28),
-                MobilePanel(
-                  title: 'Cloud Sign-in',
-                  action: const MobileTag(
-                    label: 'CLOUD',
-                    icon: Icons.cloud_outlined,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: 4),
-                      Text(
-                        'Sign in with your Business Hub account to sync with the cloud backend.',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppPalette.textSecondary,
-                          height: 1.5,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      TextField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        autocorrect: false,
-                        decoration: InputDecoration(
-                          labelText: 'Email',
-                          filled: true,
-                          fillColor: AppPalette.backgroundSoft,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      TextField(
-                        controller: _passwordController,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          filled: true,
-                          fillColor: AppPalette.backgroundSoft,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                        onSubmitted: (_) => _handleCloudLogin(),
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: _isLoggingIn ? null : _handleCloudLogin,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppPalette.primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: _isLoggingIn
-                              ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text(
-                                  'SIGN IN TO CLOUD',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.2,
-                                  ),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'First sign-in may take ~40s while the free server wakes up.',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppPalette.textTertiary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                const SizedBox(height: 24),
+                _showRegister
+                    ? _buildCloudRegisterPanel(context)
+                    : _buildCloudLoginPanel(context),
               ],
             ),
           );

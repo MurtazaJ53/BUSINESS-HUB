@@ -1067,6 +1067,32 @@ class BackendApiClient {
     };
   }
 
+  /// Register a new owner + shop. Unauthenticated. Returns the JWT pair plus
+  /// the newly-provisioned shop, so the caller is signed in immediately.
+  Future<Map<String, dynamic>> register({
+    required String ownerName,
+    required String email,
+    required String password,
+    required String businessName,
+    String mobile = '',
+    String businessType = 'retail',
+    String stateCode = '',
+    String gstin = '',
+    String planTier = 'starter',
+  }) async {
+    return _postUnauthenticated('/register/', <String, dynamic>{
+      'owner_name': ownerName,
+      'email': email,
+      'password': password,
+      'business_name': businessName,
+      'mobile': mobile,
+      'business_type': businessType,
+      'state_code': stateCode,
+      'gstin': gstin,
+      'plan_tier': planTier,
+    });
+  }
+
   /// Exchange a refresh token for a fresh access token.
   Future<String> refreshAccessToken(String refresh) async {
     final decoded = await _postUnauthenticated(
@@ -1099,22 +1125,41 @@ class BackendApiClient {
       request.add(encoded);
       final response = await request.close().timeout(authTimeout);
       final text = await utf8.decodeStream(response).timeout(authTimeout);
-      if (response.statusCode == 400 || response.statusCode == 401) {
-        throw BackendApiException('Invalid email or password.',
-            statusCode: response.statusCode);
-      }
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw BackendApiException('Sign-in failed (${response.statusCode}).',
-            statusCode: response.statusCode);
+        throw BackendApiException(
+          _firstErrorMessage(text, response.statusCode),
+          statusCode: response.statusCode,
+        );
       }
       return Map<String, dynamic>.from(jsonDecode(text) as Map<String, dynamic>);
     } on TimeoutException {
       throw BackendApiException(
-        'Sign-in timed out. The server may be waking up - please try again.',
+        'Request timed out. The server may be waking up - please try again.',
       );
     } finally {
       client.close(force: true);
     }
+  }
+
+  /// Extract a human-readable message from a DRF error body. DRF returns either
+  /// {"field": ["message", ...]} or {"detail": "message"}; fall back to a
+  /// status-based message so the user never sees a raw JSON blob.
+  String _firstErrorMessage(String body, int statusCode) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map) {
+        final detail = decoded['detail'];
+        if (detail is String && detail.isNotEmpty) return detail;
+        for (final value in decoded.values) {
+          if (value is List && value.isNotEmpty) return value.first.toString();
+          if (value is String && value.isNotEmpty) return value;
+        }
+      }
+    } catch (_) {
+      // fall through to the generic message
+    }
+    if (statusCode == 401) return 'Invalid email or password.';
+    return 'Request failed ($statusCode). Please try again.';
   }
 
   Future<void> _attachAuthHeaders(HttpClientRequest request, User user) async {

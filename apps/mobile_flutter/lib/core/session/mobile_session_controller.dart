@@ -101,6 +101,88 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
     );
   }
 
+  /// Register a new owner + shop, then sign in. Returns null on success or a
+  /// user-facing error message. The register endpoint provisions the shop and
+  /// returns tokens + shop, so no separate login or membership fetch is needed.
+  Future<String?> cloudRegister({
+    required String ownerName,
+    required String email,
+    required String password,
+    required String businessName,
+    String mobile = '',
+    String businessType = 'retail',
+    String stateCode = '',
+    String gstin = '',
+  }) async {
+    final repo = ref.read(shopRepositoryProvider);
+    final client = ref.read(backendApiClientProvider);
+    final trimmedEmail = email.trim();
+    try {
+      state = const AsyncValue.loading();
+      final result = await client.register(
+        ownerName: ownerName.trim(),
+        email: trimmedEmail,
+        password: password,
+        businessName: businessName.trim(),
+        mobile: mobile.trim(),
+        businessType: businessType,
+        stateCode: stateCode.trim(),
+        gstin: gstin.trim(),
+      );
+      final access = (result['access'] ?? '').toString();
+      final shopId = (result['shop_id'] ?? '').toString();
+      if (access.isEmpty || shopId.isEmpty) {
+        state = const AsyncValue.data(null);
+        return 'Registration failed - please try again.';
+      }
+      final role = (result['role'] ?? 'owner').toString();
+      final shopName = (result['shop_name'] ?? businessName).toString();
+
+      await repo.writeSetting(_jwtAccessKey, access);
+      await repo.writeSetting(_jwtRefreshKey, (result['refresh'] ?? '').toString());
+      await repo.writeSetting(_jwtShopKey, shopId);
+      await repo.writeSetting(_jwtRoleKey, role);
+      await repo.writeSetting(_jwtEmailKey, trimmedEmail);
+      await repo.writeSetting(_jwtMembershipKey, '');
+
+      // Seed the local shop document for the fresh workspace.
+      await repo.saveShopDocument(<String, dynamic>{
+        'name': shopName,
+        'tagline': 'Business Hub',
+        'footer': 'Thank you for your business!',
+        'currency': 'INR',
+        'plan_tier': 'starter',
+        'enabled_features': <String, bool>{
+          'inventory': true,
+          'pos': true,
+          'customers': true,
+          'history': true,
+          'team': true,
+          'attendance': true,
+          'expenses': true,
+          'advanced_ops': true,
+        },
+      });
+
+      state = AsyncValue.data(
+        _sessionFromStored(
+          access: access,
+          email: trimmedEmail,
+          shopId: shopId,
+          role: role,
+          membershipId: '',
+        ),
+      );
+      return null;
+    } on BackendApiException catch (e) {
+      state = const AsyncValue.data(null);
+      return e.message;
+    } catch (e) {
+      state = const AsyncValue.data(null);
+      return 'Registration failed. Check your connection and try again.';
+    }
+  }
+
   /// Sign in against the backend with email + password (JWT). Returns null on
   /// success, or a user-facing error message. Resolves the caller's shop from
   /// their membership so sync targets the real backend workspace.
