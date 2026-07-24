@@ -71,13 +71,15 @@ def create_invite(*, shop, invited_by, actor_role, email, role, message=""):
         source_system="invitation",
     )
 
-    send_invite_email(
+    email_result = send_invite_email(
         to=email,
         shop_name=shop.name,
         role_label=_role_label(role),
         invite_code=invite.token,
         inviter=getattr(invited_by, "full_name", "") or "",
     )
+    # Expose the real delivery outcome to the caller (never blocks the invite).
+    invite._email_result = email_result
 
     create_workspace_audit_event(
         shop=shop,

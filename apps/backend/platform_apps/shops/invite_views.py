@@ -18,7 +18,8 @@ from platform_apps.users.jwt_auth import issue_tokens
 
 
 def _serialize_invite(invite: ShopInvite) -> dict:
-    return {
+    email_result = getattr(invite, "_email_result", None)
+    data = {
         "id": str(invite.id),
         "email": invite.email,
         "role": invite.role,
@@ -29,6 +30,12 @@ def _serialize_invite(invite: ShopInvite) -> dict:
         # The token is only echoed to the inviter, for a shareable link / QR.
         "invite_code": invite.token,
     }
+    if email_result is not None:
+        # Honest email delivery status, so the UI never falsely says "sent".
+        data["email_sent"] = bool(email_result.get("ok"))
+        data["email_status"] = email_result.get("status", "")
+        data["email_error"] = email_result.get("error", "")
+    return data
 
 
 class InviteCreateSerializer(serializers.Serializer):

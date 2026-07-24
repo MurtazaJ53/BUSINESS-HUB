@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 import urllib.error
 import urllib.request
 
@@ -28,16 +29,28 @@ def _from_address() -> str:
     return os.getenv("RESEND_FROM", "Business Hub <onboarding@resend.dev>")
 
 
-def send_email(*, to: str, subject: str, html: str, text: str = "") -> bool:
-    """Send one email. Returns True if handed to Resend, False if skipped/failed.
+_MAX_ATTEMPTS = 3
 
-    Never raises - callers treat email as best-effort so a mail outage can't
-    break registration or invitations.
+
+def send_email(*, to: str, subject: str, html: str, text: str = "") -> dict:
+    """Send one email via Resend. Never raises.
+
+    Returns a structured result so callers/admins can see what actually
+    happened, instead of a misleading blanket "sent":
+      {"ok": bool, "skipped": bool, "id": str, "error": str, "status": str}
+    - skipped: no API key configured (dev/test)
+    - ok: Resend accepted the message (has an id)
+    - error/status: the provider's message on failure (e.g. test-mode recipient
+      restriction) so it can be surfaced and logged.
+
+    Transient failures (5xx / network) are retried with backoff; permanent 4xx
+    failures (bad recipient, unverified domain) are not.
     """
     key = _api_key()
     if not key:
         logger.info("Email skipped (no RESEND_API_KEY): to=%s subject=%s", to, subject)
-        return False
+        return {"ok": False, "skipped": True, "id": "", "error": "",
+                "status": "skipped: RESEND_API_KEY not set"}
 
     payload = json.dumps(
         {
@@ -49,33 +62,61 @@ def send_email(*, to: str, subject: str, html: str, text: str = "") -> bool:
         }
     ).encode("utf-8")
 
-    request = urllib.request.Request(
-        _RESEND_ENDPOINT,
-        data=payload,
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {key}",
-            "Content-Type": "application/json",
-        },
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=15) as response:
-            if 200 <= response.status < 300:
-                return True
-            logger.warning("Resend returned %s for to=%s", response.status, to)
-            return False
-    except urllib.error.HTTPError as exc:  # pragma: no cover - network dependent
-        body = exc.read().decode("utf-8", "replace")[:300]
-        logger.warning("Resend HTTPError %s for to=%s: %s", exc.code, to, body)
-        return False
-    except Exception as exc:  # pragma: no cover - network dependent
-        logger.warning("Resend send failed for to=%s: %s", to, exc)
-        return False
+    last_error = ""
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
+        request = urllib.request.Request(
+            _RESEND_ENDPOINT,
+            data=payload,
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=15) as response:
+                raw = response.read().decode("utf-8", "replace")
+                message_id = ""
+                try:
+                    message_id = (json.loads(raw) or {}).get("id", "")
+                except Exception:
+                    pass
+                logger.info(
+                    "Email sent to=%s id=%s (attempt %d)", to, message_id, attempt
+                )
+                return {"ok": True, "skipped": False, "id": message_id,
+                        "error": "", "status": "sent"}
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", "replace")
+            detail = body
+            try:
+                detail = (json.loads(body) or {}).get("message", body)
+            except Exception:
+                pass
+            last_error = f"{exc.code}: {detail}"[:400]
+            logger.warning(
+                "Resend HTTPError %s for to=%s (attempt %d): %s",
+                exc.code, to, attempt, detail,
+            )
+            # 4xx is permanent (bad recipient, unverified domain) - don't retry.
+            if 400 <= exc.code < 500:
+                return {"ok": False, "skipped": False, "id": "",
+                        "error": last_error, "status": "failed"}
+        except Exception as exc:
+            last_error = str(exc)[:400]
+            logger.warning(
+                "Resend send failed for to=%s (attempt %d): %s", to, attempt, exc
+            )
+        if attempt < _MAX_ATTEMPTS:
+            time.sleep(0.5 * attempt)  # linear backoff
+
+    return {"ok": False, "skipped": False, "id": "", "error": last_error,
+            "status": "failed after retries"}
 
 
 def send_invite_email(
     *, to: str, shop_name: str, role_label: str, invite_code: str, inviter: str = ""
-) -> bool:
+) -> dict:
     """Compose and send a shop invitation email."""
     who = f"{inviter} invited you" if inviter else "You've been invited"
     subject = f"{who} to join {shop_name} on Business Hub"

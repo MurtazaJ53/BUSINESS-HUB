@@ -287,6 +287,9 @@ class WorkspaceTeamMemberUpdateSerializer(serializers.Serializer):
             ShopMembership.Status.DISABLED,
         ],
     )
+    # Per-member custom permission overrides: {module: {action: bool}}. When
+    # set, the client gates the UI on these instead of the role defaults.
+    permissions_json = serializers.DictField(required=False)
 
     def validate(self, attrs):
         actor_membership = self.context["actor_membership"]
@@ -326,6 +329,15 @@ class WorkspaceTeamMemberUpdateSerializer(serializers.Serializer):
         if "status" in validated and target_membership.status != validated["status"]:
             target_membership.status = validated["status"]
             updated_fields.append("status")
+
+        if "permissions_json" in validated:
+            target_membership.permissions_json = validated["permissions_json"] or {}
+            # Bump the version so clients can detect a permission change and
+            # re-apply it without a full re-login.
+            target_membership.permissions_version = (
+                target_membership.permissions_version + 1
+            )
+            updated_fields.extend(["permissions_json", "permissions_version"])
 
         if updated_fields:
             updated_fields.append("updated_at")

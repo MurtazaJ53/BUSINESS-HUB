@@ -803,9 +803,15 @@ class _CloudInvitePanelState extends ConsumerState<_CloudInvitePanel> {
           .showSnackBar(SnackBar(content: Text(result.error!)));
     } else {
       _emailController.clear();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Invite sent to $email.')),
-      );
+      // Honest feedback: distinguish "email delivered" from "invite created
+      // but email couldn't be delivered" (e.g. Resend not domain-verified).
+      final msg = result.emailSent
+          ? 'Invite emailed to $email.'
+          : 'Invite created. Email not delivered'
+              '${result.emailError.isNotEmpty ? ' (${result.emailError})' : ''} '
+              '- share the code below instead.';
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(msg), duration: const Duration(seconds: 6)));
     }
   }
 

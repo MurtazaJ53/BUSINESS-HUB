@@ -198,9 +198,9 @@ class SettingsScreen extends ConsumerWidget {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () {
-                ref.read(mobileSessionProvider.notifier).logout();
-                context.go('/');
+              onPressed: () async {
+                await ref.read(mobileSessionProvider.notifier).logout();
+                if (context.mounted) context.go('/');
               },
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppPalette.error,

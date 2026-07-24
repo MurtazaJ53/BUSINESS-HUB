@@ -491,7 +491,8 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
   /// Send a shop invitation to a teammate (owner/manager). Requires an active
   /// cloud session. Returns (error, code): on success error is null and code is
   /// the invite code (also emailed to the invitee); on failure code is null.
-  Future<({String? error, String? code})> sendInvite({
+  Future<({String? error, String? code, bool emailSent, String emailError})>
+      sendInvite({
     required String email,
     required String role,
   }) async {
@@ -500,6 +501,8 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
       return (
         error: 'You need to be signed in to a shop to invite people.',
         code: null,
+        emailSent: false,
+        emailError: '',
       );
     }
     final client = ref.read(backendApiClientProvider);
@@ -510,15 +513,30 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
         email: email.trim(),
         role: role,
       );
-      return (error: null, code: (result['invite_code'] ?? '').toString());
+      return (
+        error: null,
+        code: (result['invite_code'] ?? '').toString(),
+        emailSent: result['email_sent'] == true,
+        emailError: (result['email_error'] ?? '').toString(),
+      );
     } on BackendApiException catch (e) {
-      return (error: e.message, code: null);
+      return (error: e.message, code: null, emailSent: false, emailError: '');
     } catch (e) {
-      return (error: 'Could not send the invite. Please try again.', code: null);
+      return (
+        error: 'Could not send the invite. Please try again.',
+        code: null,
+        emailSent: false,
+        emailError: '',
+      );
     }
   }
 
   Future<void> logout() async {
+    // Clear the in-memory session FIRST and synchronously, so the UI reacts to
+    // a signed-out state immediately (a single click). Persisted tokens are
+    // then wiped in the background - the live session is already gone.
+    _currentStaffId = null;
+    state = const AsyncValue.data(null);
     if (_cloudAuthMode) {
       final repo = ref.read(shopRepositoryProvider);
       for (final key in <String>[
@@ -532,8 +550,6 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
         await repo.writeSetting(key, '');
       }
     }
-    _currentStaffId = null;
-    state = const AsyncValue.data(null);
   }
 }
 
