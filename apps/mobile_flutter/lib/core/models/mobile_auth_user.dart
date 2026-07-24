@@ -16,6 +16,22 @@ class MobileAuthUser {
     );
   }
 
+  /// A user authenticated against the backend; [accessToken] is the JWT the
+  /// client sends as a Bearer credential on every request.
+  factory MobileAuthUser.cloud({
+    required String uid,
+    required String email,
+    required String displayName,
+    required String accessToken,
+  }) {
+    return MobileAuthUser(
+      uid: uid,
+      email: email,
+      displayName: displayName.trim().isEmpty ? email : displayName.trim(),
+      authToken: accessToken,
+    );
+  }
+
   factory MobileAuthUser.local({required String id, required String name}) {
     return MobileAuthUser(
       uid: id,

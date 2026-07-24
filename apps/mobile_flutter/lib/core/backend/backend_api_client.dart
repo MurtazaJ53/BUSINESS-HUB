@@ -1052,6 +1052,71 @@ class BackendApiClient {
     }
   }
 
+  /// Exchange email + password for a JWT pair. Unauthenticated.
+  Future<Map<String, String>> obtainToken({
+    required String email,
+    required String password,
+  }) async {
+    final decoded = await _postUnauthenticated('/session/token/', <String, dynamic>{
+      'email': email,
+      'password': password,
+    });
+    return <String, String>{
+      'access': (decoded['access'] ?? '').toString(),
+      'refresh': (decoded['refresh'] ?? '').toString(),
+    };
+  }
+
+  /// Exchange a refresh token for a fresh access token.
+  Future<String> refreshAccessToken(String refresh) async {
+    final decoded = await _postUnauthenticated(
+      '/session/token/refresh/',
+      <String, dynamic>{'refresh': refresh},
+    );
+    return (decoded['access'] ?? '').toString();
+  }
+
+  /// POST without auth headers, with a long timeout: a free-tier backend can
+  /// cold-start slowly (30-50s), which the normal short timeout would abort.
+  Future<Map<String, dynamic>> _postUnauthenticated(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    if (baseUrl.trim().isEmpty) {
+      throw BackendApiException('Backend URL is not configured.');
+    }
+    const authTimeout = Duration(seconds: 60);
+    final client = HttpClient();
+    client.connectionTimeout = authTimeout;
+    try {
+      final url = Uri.parse('${baseUrl.replaceAll(RegExp(r"/$"), "")}$path');
+      final request = await client.postUrl(url).timeout(authTimeout);
+      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+      // Explicit Content-Length (never chunked) - some servers drop chunked bodies.
+      final encoded = utf8.encode(jsonEncode(body));
+      request.contentLength = encoded.length;
+      request.add(encoded);
+      final response = await request.close().timeout(authTimeout);
+      final text = await utf8.decodeStream(response).timeout(authTimeout);
+      if (response.statusCode == 400 || response.statusCode == 401) {
+        throw BackendApiException('Invalid email or password.',
+            statusCode: response.statusCode);
+      }
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw BackendApiException('Sign-in failed (${response.statusCode}).',
+            statusCode: response.statusCode);
+      }
+      return Map<String, dynamic>.from(jsonDecode(text) as Map<String, dynamic>);
+    } on TimeoutException {
+      throw BackendApiException(
+        'Sign-in timed out. The server may be waking up - please try again.',
+      );
+    } finally {
+      client.close(force: true);
+    }
+  }
+
   Future<void> _attachAuthHeaders(HttpClientRequest request, User user) async {
     final token = await user.getIdToken();
     if (token != null && token.isNotEmpty) {

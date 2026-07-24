@@ -13,6 +13,31 @@ class MobileSession {
     required this.isElevatedAdmin,
   });
 
+  /// Full owner/admin permission set, shared by the local owner and by a
+  /// cloud-authenticated owner/admin.
+  static const Map<String, dynamic> fullControlPermissions = <String, dynamic>{
+    'inventory': {
+      'view': true,
+      'create': true,
+      'edit': true,
+      'delete': true,
+      'view_cost': true,
+    },
+    'sales': {
+      'view': true,
+      'create': true,
+      'edit': true,
+      'void_sale': true,
+      'view_profit': true,
+      'override_price': true,
+    },
+    'customers': {'view': true, 'create': true, 'edit': true, 'delete': true},
+    'expenses': {'view': true, 'create': true, 'delete': true},
+    'team': {'view': true, 'edit': true, 'view_cost': true},
+    'analytics': {'view': true},
+    'settings': {'view': true, 'edit': true},
+  };
+
   factory MobileSession.localOwner() {
     final user = MobileAuthUser.localOwner();
     return MobileSession(
@@ -21,35 +46,34 @@ class MobileSession {
       uid: user.uid,
       role: 'owner',
       membershipId: 'local-owner-membership',
-      permissions: const <String, dynamic>{
-        'inventory': {
-          'view': true,
-          'create': true,
-          'edit': true,
-          'delete': true,
-          'view_cost': true,
-        },
-        'sales': {
-          'view': true,
-          'create': true,
-          'edit': true,
-          'void_sale': true,
-          'view_profit': true,
-          'override_price': true,
-        },
-        'customers': {
-          'view': true,
-          'create': true,
-          'edit': true,
-          'delete': true,
-        },
-        'expenses': {'view': true, 'create': true, 'delete': true},
-        'team': {'view': true, 'edit': true, 'view_cost': true},
-        'analytics': {'view': true},
-        'settings': {'view': true, 'edit': true},
-      },
+      permissions: fullControlPermissions,
       shopId: MobileRuntimeConfig.localShopId,
       isElevatedAdmin: true,
+    );
+  }
+
+  /// A session backed by a real backend login (JWT). The [user] carries the
+  /// access token as its auth token, so backend requests send it as a Bearer
+  /// credential. [shopId] is the real backend shop, resolved from the caller's
+  /// membership.
+  factory MobileSession.authenticated({
+    required MobileAuthUser user,
+    required String shopId,
+    required String role,
+    required String membershipId,
+    required String email,
+  }) {
+    final normalized = role.trim().toLowerCase();
+    final elevated = normalized == 'owner' || normalized == 'admin';
+    return MobileSession(
+      user: user,
+      email: email,
+      uid: user.uid,
+      role: normalized.isEmpty ? 'staff' : normalized,
+      membershipId: membershipId,
+      permissions: elevated ? fullControlPermissions : const <String, dynamic>{},
+      shopId: shopId,
+      isElevatedAdmin: elevated,
     );
   }
 

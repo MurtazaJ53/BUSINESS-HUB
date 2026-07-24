@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/runtime/mobile_runtime_config.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../shell/presentation/mobile_surface.dart';
@@ -19,8 +20,13 @@ class AuthGateScreen extends ConsumerStatefulWidget {
 class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
     with SingleTickerProviderStateMixin {
   final _pinController = TextEditingController();
+  // Cloud (JWT) login. Prefilled with the demo workspace so testing is one tap.
+  final _emailController =
+      TextEditingController(text: 'demo@businesshub.test');
+  final _passwordController = TextEditingController(text: 'demo12345');
   bool _isLoggingIn = false;
   bool _hasPin = true; // assume returning user until checked
+  bool get _cloudMode => MobileRuntimeConfig.backendAuthMode == 'jwt';
   late final AnimationController _shakeController;
 
   @override
@@ -42,7 +48,28 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
   void dispose() {
     _shakeController.dispose();
     _pinController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleCloudLogin() async {
+    if (_emailController.text.trim().isEmpty ||
+        _passwordController.text.isEmpty) {
+      _triggerShake();
+      return;
+    }
+    setState(() => _isLoggingIn = true);
+    final error = await ref
+        .read(mobileSessionProvider.notifier)
+        .cloudLogin(_emailController.text, _passwordController.text);
+    if (!mounted) return;
+    setState(() => _isLoggingIn = false);
+    if (error != null) {
+      _triggerShake();
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
+    }
   }
 
   void _triggerShake() {
@@ -107,6 +134,108 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
         }
 
         // SHOW LOGIN SCREEN IF NO SESSION
+        if (_cloudMode) {
+          return _AuthScaffold(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const _BrandHero(),
+                const SizedBox(height: 28),
+                MobilePanel(
+                  title: 'Cloud Sign-in',
+                  action: const MobileTag(
+                    label: 'CLOUD',
+                    icon: Icons.cloud_outlined,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 4),
+                      Text(
+                        'Sign in with your Business Hub account to sync with the cloud backend.',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppPalette.textSecondary,
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      TextField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        autocorrect: false,
+                        decoration: InputDecoration(
+                          labelText: 'Email',
+                          filled: true,
+                          fillColor: AppPalette.backgroundSoft,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _passwordController,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          filled: true,
+                          fillColor: AppPalette.backgroundSoft,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                        onSubmitted: (_) => _handleCloudLogin(),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: _isLoggingIn ? null : _handleCloudLogin,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppPalette.primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: _isLoggingIn
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  'SIGN IN TO CLOUD',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'First sign-in may take ~40s while the free server wakes up.',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppPalette.textTertiary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
         return _AuthScaffold(
           child: Column(
             mainAxisSize: MainAxisSize.min,

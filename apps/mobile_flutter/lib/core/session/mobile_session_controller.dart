@@ -3,12 +3,24 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../backend/backend_api_client.dart';
 import '../database/mobile_repository.dart';
+import '../models/mobile_auth_user.dart';
 import '../models/mobile_session.dart';
 import '../runtime/mobile_runtime_config.dart';
 
 const String _staffKey = 'staff_users';
 const String _legacyPinKey = 'owner_pin_hash';
+
+// Persisted JWT session (cloud auth mode), so a login survives app restarts.
+const String _jwtAccessKey = 'jwt_access';
+const String _jwtRefreshKey = 'jwt_refresh';
+const String _jwtShopKey = 'jwt_shop_id';
+const String _jwtRoleKey = 'jwt_role';
+const String _jwtEmailKey = 'jwt_email';
+const String _jwtMembershipKey = 'jwt_membership';
+
+bool get _cloudAuthMode => MobileRuntimeConfig.backendAuthMode == 'jwt';
 
 /// A local staff account: name + role + hashed PIN.
 class StaffUser {
@@ -43,7 +55,122 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
   String? _currentStaffId;
 
   @override
-  Future<MobileSession?> build() async => null;
+  Future<MobileSession?> build() async {
+    // In cloud (JWT) mode, restore a persisted login so the user stays signed
+    // in across restarts. The stored access token is reused directly; if it has
+    // expired, the next backend call fails and the user re-signs in.
+    if (_cloudAuthMode) {
+      final repo = ref.read(shopRepositoryProvider);
+      final access = await repo.readSetting(_jwtAccessKey) ?? '';
+      final shopId = await repo.readSetting(_jwtShopKey) ?? '';
+      if (access.isNotEmpty && shopId.isNotEmpty) {
+        final email = await repo.readSetting(_jwtEmailKey) ?? '';
+        final role = await repo.readSetting(_jwtRoleKey) ?? 'owner';
+        final membershipId = await repo.readSetting(_jwtMembershipKey) ?? '';
+        return _sessionFromStored(
+          access: access,
+          email: email,
+          shopId: shopId,
+          role: role,
+          membershipId: membershipId,
+        );
+      }
+    }
+    return null;
+  }
+
+  MobileSession _sessionFromStored({
+    required String access,
+    required String email,
+    required String shopId,
+    required String role,
+    required String membershipId,
+  }) {
+    final user = MobileAuthUser.cloud(
+      uid: email,
+      email: email,
+      displayName: email,
+      accessToken: access,
+    );
+    return MobileSession.authenticated(
+      user: user,
+      shopId: shopId,
+      role: role,
+      membershipId: membershipId,
+      email: email,
+    );
+  }
+
+  /// Sign in against the backend with email + password (JWT). Returns null on
+  /// success, or a user-facing error message. Resolves the caller's shop from
+  /// their membership so sync targets the real backend workspace.
+  Future<String?> cloudLogin(String email, String password) async {
+    final repo = ref.read(shopRepositoryProvider);
+    final client = ref.read(backendApiClientProvider);
+    final trimmedEmail = email.trim();
+    try {
+      state = const AsyncValue.loading();
+      final tokens = await client.obtainToken(
+        email: trimmedEmail,
+        password: password,
+      );
+      final access = tokens['access'] ?? '';
+      if (access.isEmpty) {
+        state = const AsyncValue.data(null);
+        return 'Sign-in failed - no token returned.';
+      }
+      final tempUser = MobileAuthUser.cloud(
+        uid: trimmedEmail,
+        email: trimmedEmail,
+        displayName: trimmedEmail,
+        accessToken: access,
+      );
+      final memberships = await client.getShopMemberships(user: tempUser);
+      final active = memberships.where((m) => m.status == 'active').toList();
+      if (active.isEmpty) {
+        state = const AsyncValue.data(null);
+        return 'This account has no active shop yet.';
+      }
+      final m = active.first;
+
+      await repo.writeSetting(_jwtAccessKey, access);
+      await repo.writeSetting(_jwtRefreshKey, tokens['refresh'] ?? '');
+      await repo.writeSetting(_jwtShopKey, m.shopId);
+      await repo.writeSetting(_jwtRoleKey, m.role);
+      await repo.writeSetting(_jwtEmailKey, trimmedEmail);
+      await repo.writeSetting(_jwtMembershipKey, m.id);
+
+      // Seed the local shop document from the backend shop, once.
+      final existing = await repo.readSetting('settings');
+      if (existing == null || existing.isEmpty) {
+        await repo.saveShopDocument(<String, dynamic>{
+          'name': m.shopName,
+          'tagline': 'Business Hub',
+          'footer': 'Thank you for your business!',
+          'currency': m.shopCurrencyCode,
+          'plan_tier': m.shopPlanTier,
+          'enabled_features': m.shopEnabledFeatures,
+        });
+      }
+
+      state = AsyncValue.data(
+        _sessionFromStored(
+          access: access,
+          email: trimmedEmail,
+          shopId: m.shopId,
+          role: m.role,
+          membershipId: m.id,
+        ),
+      );
+      return null;
+    } on BackendApiException catch (e) {
+      state = const AsyncValue.data(null);
+      return e.message;
+    } catch (e) {
+      state = const AsyncValue.data(null);
+      return 'Sign-in failed. Check your connection and try again.';
+    }
+  }
 
   String _hash(String pin) =>
       sha256.convert(utf8.encode('business-hub:$pin')).toString();
@@ -206,7 +333,20 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
     await _saveStaff(staff);
   }
 
-  void logout() {
+  Future<void> logout() async {
+    if (_cloudAuthMode) {
+      final repo = ref.read(shopRepositoryProvider);
+      for (final key in <String>[
+        _jwtAccessKey,
+        _jwtRefreshKey,
+        _jwtShopKey,
+        _jwtRoleKey,
+        _jwtEmailKey,
+        _jwtMembershipKey,
+      ]) {
+        await repo.writeSetting(key, '');
+      }
+    }
     _currentStaffId = null;
     state = const AsyncValue.data(null);
   }
