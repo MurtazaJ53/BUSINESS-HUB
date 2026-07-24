@@ -674,6 +674,8 @@ class WorkspaceAccessSessionRecord {
     required this.canManage,
     required this.createdAt,
     required this.updatedAt,
+    this.ipAddress = '',
+    this.userAgent = '',
   });
 
   final String id;
@@ -703,6 +705,8 @@ class WorkspaceAccessSessionRecord {
   final bool canManage;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String ipAddress;
+  final String userAgent;
 
   bool get isActive => status == 'active';
   bool get isRevoked => status == 'revoked';

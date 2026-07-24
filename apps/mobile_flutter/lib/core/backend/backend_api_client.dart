@@ -213,6 +213,22 @@ class BackendApiClient {
     return _mapWorkspaceTeamMember(decoded);
   }
 
+  /// Sign out all active sessions for a shop, keeping the current device.
+  /// Returns the number of devices signed out.
+  Future<int> revokeAllWorkspaceSessions({
+    required User user,
+    required String shopId,
+    String keepAppInstanceId = '',
+  }) async {
+    final decoded = await _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/sessions/revoke-all/',
+      body: <String, dynamic>{'keep_app_instance_id': keepAppInstanceId},
+    );
+    return _asInt(decoded['revoked']);
+  }
+
   /// The module/action permission catalog for the editor UI.
   Future<Map<String, dynamic>> getPermissionCatalog({
     required User user,
@@ -867,6 +883,8 @@ class BackendApiClient {
             releaseChannel: (row['release_channel'] ?? '').toString(),
             releaseTag: (row['release_tag'] ?? '').toString(),
             lastSeenAt: _asNullableDateTime(row['last_seen_at']),
+            ipAddress: (row['ip_address'] ?? '').toString(),
+            userAgent: (row['user_agent'] ?? '').toString(),
             revokedAt: _asNullableDateTime(row['revoked_at']),
             revokeReason: _nullableText(row['revoke_reason']),
             wipeRequested: row['wipe_requested'] == true,

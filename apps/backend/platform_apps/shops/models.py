@@ -204,6 +204,9 @@ class WorkspaceAccessSession(SourceTrackedModel):
     release_channel = models.CharField(max_length=32, blank=True)
     release_tag = models.CharField(max_length=64, blank=True)
     last_seen_at = models.DateTimeField(blank=True, null=True)
+    # Captured server-side from the request for the devices screen.
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    user_agent = models.CharField(max_length=400, blank=True)
     revoked_at = models.DateTimeField(blank=True, null=True)
     revoked_by_user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

@@ -52,6 +52,7 @@ from platform_apps.shops.views import (
     WorkspaceAccessSessionDetailView,
     WorkspaceAccessSessionHeartbeatView,
     WorkspaceAccessSessionListView,
+    WorkspaceAccessSessionRevokeAllView,
     WorkspaceAccessSessionWipeAcknowledgeView,
     WorkspaceTeamDetailView,
     WorkspaceTeamListCreateView,
@@ -68,6 +69,11 @@ urlpatterns = [
     path("<uuid:shop_id>/invites/<uuid:invite_id>/revoke/", ShopInviteRevokeView.as_view(), name="shop-invite-revoke"),
     path("<uuid:shop_id>/audit/", WorkspaceAuditEventListView.as_view(), name="workspace-audit"),
     path("<uuid:shop_id>/sessions/", WorkspaceAccessSessionListView.as_view(), name="workspace-sessions"),
+    path(
+        "<uuid:shop_id>/sessions/revoke-all/",
+        WorkspaceAccessSessionRevokeAllView.as_view(),
+        name="workspace-sessions-revoke-all",
+    ),
     path(
         "<uuid:shop_id>/sessions/mobile/heartbeat/",
         WorkspaceAccessSessionHeartbeatView.as_view(),

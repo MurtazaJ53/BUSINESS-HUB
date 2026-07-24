@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/backend/backend_api_client.dart';
+import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/models/mobile_session.dart';
 import '../../../core/providers/mobile_data_providers.dart';
@@ -25,6 +26,36 @@ class _SettingsSessionsScreenState
   String? _message;
   bool _messageIsError = false;
   String? _busySessionId;
+  bool _signingOutAll = false;
+
+  Future<void> _signOutAllOthers(MobileSession session) async {
+    setState(() => _signingOutAll = true);
+    try {
+      final keep =
+          await ref.read(shopRepositoryProvider).ensureAppInstanceId();
+      final count = await ref
+          .read(backendApiClientProvider)
+          .revokeAllWorkspaceSessions(
+            user: session.user,
+            shopId: session.shopId!,
+            keepAppInstanceId: keep,
+          );
+      await _refreshSessions();
+      if (!mounted) return;
+      setState(() {
+        _messageIsError = false;
+        _message = 'Signed out $count other device(s).';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _messageIsError = true;
+        _message = 'Could not sign out all devices. Try again.';
+      });
+    } finally {
+      if (mounted) setState(() => _signingOutAll = false);
+    }
+  }
 
   Future<void> _refreshSessions() async {
     ref.invalidate(workspaceAccessSessionsProvider);
@@ -43,6 +74,7 @@ class _SettingsSessionsScreenState
     if (_busySessionId != null) {
       return;
     }
+    // (revoke-all handler lives just below _runSessionAction)
     setState(() {
       _busySessionId = record.id;
       _message = null;
@@ -171,7 +203,30 @@ class _SettingsSessionsScreenState
                   : AppPalette.success,
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
+          if (session.isOwnerLike && sessions.length > 1)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed:
+                    _signingOutAll ? null : () => _signOutAllOthers(session),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppPalette.error,
+                  side: const BorderSide(color: AppPalette.error),
+                ),
+                icon: _signingOutAll
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.logout_rounded),
+                label: Text(_signingOutAll
+                    ? 'Signing out…'
+                    : 'Sign out all other devices'),
+              ),
+            ),
+          const SizedBox(height: 12),
           if (!hasFreshSecurityWindow)
             MobilePanel(
               title: 'Security check required',
@@ -420,6 +475,15 @@ class _WorkspaceSessionCard extends StatelessWidget {
                 height: 1.35,
               ),
             ),
+            if (record.ipAddress.trim().isNotEmpty)
+              Text(
+                'IP ${record.ipAddress}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  fontFamily: 'monospace',
+                  height: 1.35,
+                ),
+              ),
             if (record.platformName.trim().isNotEmpty ||
                 record.appVersion.trim().isNotEmpty ||
                 record.releaseChannel.trim().isNotEmpty) ...<Widget>[

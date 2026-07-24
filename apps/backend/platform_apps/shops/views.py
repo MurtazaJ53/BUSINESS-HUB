@@ -363,6 +363,22 @@ class WorkspaceAccessSessionHeartbeatView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         session = serializer.upsert()
+        # Capture request-side device context (IP / User-Agent) for the devices
+        # screen. X-Forwarded-For's first hop is the client when behind a proxy.
+        forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
+        ip = (forwarded.split(",")[0].strip() if forwarded
+              else request.META.get("REMOTE_ADDR")) or None
+        user_agent = request.META.get("HTTP_USER_AGENT", "")[:400]
+        updates = []
+        if ip and session.ip_address != ip:
+            session.ip_address = ip
+            updates.append("ip_address")
+        if user_agent and session.user_agent != user_agent:
+            session.user_agent = user_agent
+            updates.append("user_agent")
+        if updates:
+            updates.append("updated_at")
+            session.save(update_fields=updates)
         response_serializer = WorkspaceAccessSessionHeartbeatResultSerializer(
             {
                 "session_id": session.id,
@@ -456,6 +472,46 @@ class WorkspaceAccessSessionDetailView(APIView):
             context={"actor_membership": actor_membership},
         )
         return Response(response_serializer.data)
+
+
+class WorkspaceAccessSessionRevokeAllView(APIView):
+    """Sign out every active session for the shop, optionally keeping the
+    caller's current device (by app_instance_id). Owner/admin only."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, shop_id):
+        actor_membership = get_membership_or_403(
+            request.user, shop_id, ShopMembership.Role.ADMIN
+        )
+        keep = (request.data or {}).get("keep_app_instance_id", "")
+        from django.utils import timezone
+
+        qs = WorkspaceAccessSession.objects.filter(
+            shop=actor_membership.shop,
+            status=WorkspaceAccessSession.Status.ACTIVE,
+        )
+        if keep:
+            qs = qs.exclude(app_instance_id=keep)
+        count = qs.update(
+            status=WorkspaceAccessSession.Status.REVOKED,
+            revoke_reason="Signed out from all devices by an admin.",
+            revoked_at=timezone.now(),
+            revoked_by_user=request.user,
+        )
+        create_workspace_audit_event(
+            shop=actor_membership.shop,
+            actor_user=request.user,
+            actor_role=actor_membership.role,
+            category="security",
+            event_type="sessions_revoked_all",
+            entity_type="session",
+            entity_id="",
+            entity_label=f"{count} devices",
+            summary=f"Signed out {count} device(s).",
+            source_surface="devices",
+        )
+        return Response({"revoked": count})
 
 
 class WorkspaceAccessSessionWipeAcknowledgeView(APIView):
