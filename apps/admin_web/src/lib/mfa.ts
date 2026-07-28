@@ -16,11 +16,13 @@ type AdminWebMfaPosture = {
 };
 
 function getMfaCookieSecret() {
-  return (
-    process.env.BUSINESS_HUB_ADMIN_MFA_SECRET?.trim() ||
-    process.env.BUSINESS_HUB_API_BASE_URL?.trim() ||
-    "business-hub-admin-mfa-dev-secret"
-  );
+  const secret = process.env.BUSINESS_HUB_ADMIN_MFA_SECRET?.trim() || process.env.BUSINESS_HUB_API_BASE_URL?.trim();
+  if (secret) return secret;
+  
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("FATAL: BUSINESS_HUB_ADMIN_MFA_SECRET is not set in production.");
+  }
+  return "business-hub-admin-mfa-dev-secret";
 }
 
 function createSignature(userId: string, enabledAt: string, verifiedUntil: string) {

@@ -47,10 +47,13 @@ def create_invite(*, shop, invited_by, actor_role, email, role, message=""):
         )
 
     # If they already have an ACTIVE membership, there's nothing to invite.
-    existing = ShopMembership.objects.filter(
-        shop=shop, email__iexact=email, status=ShopMembership.Status.ACTIVE
-    ).first()
-    if existing:
+    # ShopMembership.email is encrypted and can't be filtered, so resolve the
+    # person through the (unencrypted, indexed) User.email and check membership
+    # by the user FK instead.
+    existing_user = User.objects.filter(email__iexact=email).first()
+    if existing_user and ShopMembership.objects.filter(
+        shop=shop, user=existing_user, status=ShopMembership.Status.ACTIVE
+    ).exists():
         raise exceptions.ValidationError(
             {"email": "This person is already an active member of the shop."}
         )

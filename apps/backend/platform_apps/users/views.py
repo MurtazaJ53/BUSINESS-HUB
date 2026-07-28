@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.throttling import UserRateThrottle
 
 from platform_apps.shops.models import ShopMembership
 from platform_apps.users.authentication import bootstrap_memberships_from_firestore
@@ -22,6 +23,10 @@ from platform_apps.users.serializers import (
     UserMfaVerifySerializer,
     build_user_mfa_status_payload,
 )
+
+
+class MfaRateThrottle(UserRateThrottle):
+    rate = '5/min'
 
 
 class SessionBootstrapView(APIView):
@@ -72,6 +77,7 @@ class SessionMfaEnrollView(APIView):
 
 class SessionMfaVerifyView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [MfaRateThrottle]
 
     def post(self, request):
         serializer = UserMfaVerifySerializer(
@@ -188,10 +194,24 @@ class SessionAccountDeleteView(APIView):
 
     def delete(self, request):
         user = request.user
-        # Right to be forgotten: hard delete the user and cascading data
-        # Note: In a production system, you might want to reassign ownership of
-        # shops if the user is the sole owner, but for simplicity we assume
-        # standard deletion here, or that the application layer handles shop 
-        # cleanup via signals.
-        user.delete()
+        
+        from django.db import transaction
+        from platform_apps.shops.models import Shop, ShopMembership
+        
+        with transaction.atomic():
+            # Right to be forgotten: to prevent orphaned PII, we delete any Shop 
+            # where this user is the sole owner before deleting the user.
+            owned_shops = Shop.objects.filter(owner_user=user)
+            for shop in owned_shops:
+                other_owners_exist = ShopMembership.objects.filter(
+                    shop=shop, 
+                    role=ShopMembership.Role.OWNER
+                ).exclude(user=user).exists()
+                
+                if not other_owners_exist:
+                    shop.delete()
+                    
+            # Hard delete the user and cascading data
+            user.delete()
+            
         return Response(status=status.HTTP_204_NO_CONTENT)

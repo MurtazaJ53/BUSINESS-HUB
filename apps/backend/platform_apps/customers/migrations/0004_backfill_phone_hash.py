@@ -8,10 +8,19 @@ def backfill_phone_hash(apps, schema_editor):
     # `phone` field; a one-time backfill of the blind index for existing rows.
     from platform_apps.customers.models import Customer
 
-    for customer in Customer.objects.all().iterator():
-        new_hash = generate_blind_index(customer.phone)
-        if customer.phone_hash != new_hash:
-            Customer.objects.filter(pk=customer.pk).update(phone_hash=new_hash)
+    # Query IDs first so we can load each Customer individually and handle decryption failures.
+    ids = list(Customer.objects.values_list('pk', flat=True))
+    for pk in ids:
+        try:
+            customer = Customer.objects.get(pk=pk)
+            # Accessing phone triggers decryption
+            phone_val = customer.phone
+            new_hash = generate_blind_index(phone_val)
+            if customer.phone_hash != new_hash:
+                Customer.objects.filter(pk=pk).update(phone_hash=new_hash)
+        except Exception:
+            # Skip rows where decryption fails due to SECRET_KEY changes
+            pass
 
 
 def noop(apps, schema_editor):

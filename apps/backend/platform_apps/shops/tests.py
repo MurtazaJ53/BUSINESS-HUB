@@ -346,7 +346,9 @@ class WorkspaceTeamApiTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 201)
-        membership = ShopMembership.objects.get(email="new-admin@example.com", shop=self.shop)
+        membership = ShopMembership.objects.get(
+            user__email="new-admin@example.com", shop=self.shop
+        )
         self.assertEqual(membership.role, ShopMembership.Role.ADMIN)
         self.assertEqual(membership.status, ShopMembership.Status.INVITED)
 
