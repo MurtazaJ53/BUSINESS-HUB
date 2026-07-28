@@ -93,6 +93,7 @@ INSTALLED_APPS = [
     "platform_apps.jobs.apps.JobsConfig",
     "platform_apps.audit.apps.AuditConfig",
     "platform_apps.erpnext.apps.ERPNextConfig",
+    "platform_apps.notifications.apps.NotificationsConfig",
 ]
 
 MIDDLEWARE = [

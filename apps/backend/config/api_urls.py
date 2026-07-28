@@ -16,4 +16,5 @@ urlpatterns = [
     path("session/", include("platform_apps.users.urls")),
     path("shops/", include("platform_apps.shops.urls")),
     path("platform/", include("platform_apps.platform_admin.urls")),
+    path("notifications/", include("platform_apps.notifications.urls")),
 ]
