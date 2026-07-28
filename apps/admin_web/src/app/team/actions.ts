@@ -75,6 +75,44 @@ export async function inviteWorkspaceMemberAction(formData: FormData) {
   );
 }
 
+export async function resendWorkspaceInviteAction(formData: FormData) {
+  const shopId = getRequiredField(formData, "shopId", "shop id");
+  const email = getRequiredField(formData, "email", "team member email");
+  const member = getOptionalField(formData, "member");
+
+  try {
+    await requireWorkspaceManagerAccess(shopId, "Workspace invite resend");
+    // Re-creating the invite for the same email will revoke the old one and send a new email
+    await apiMutation<WorkspaceTeamMemberPayload>(`/shops/${shopId}/team/`, {
+      method: "POST",
+      body: {
+        email,
+        role: "staff", // Backend will use existing role if member already exists
+      },
+    });
+  } catch (error) {
+    const message = getSafeErrorMessage(error, "Unknown invite resend failure.");
+    redirect(
+      buildRedirectUrl({
+        status: "error",
+        action: "resend",
+        member: email,
+        message,
+      }),
+    );
+  }
+
+  revalidatePath("/");
+  revalidatePath("/team");
+  redirect(
+    buildRedirectUrl({
+      status: "success",
+      action: "resend",
+      member: member || email,
+    }),
+  );
+}
+
 export async function updateWorkspaceMemberAction(formData: FormData) {
   const shopId = getRequiredField(formData, "shopId", "shop id");
   const membershipId = getRequiredField(formData, "membershipId", "membership id");

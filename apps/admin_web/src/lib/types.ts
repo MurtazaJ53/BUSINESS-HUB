@@ -114,6 +114,7 @@ export type ShopMembership = {
     is_active: boolean;
     plan_tier: BusinessHubPlanTier;
     enabled_features: Record<string, boolean>;
+    business_phone?: string;
   };
 };
 
@@ -1340,4 +1341,70 @@ export type ERPNextSupplierPaymentMirror = {
   last_synced_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type PlatformShopStatus = "pending" | "active" | "suspended";
+
+export type PlatformShopPayload = {
+  id: string;
+  name: string;
+  slug: string;
+  legal_name: string;
+  currency_code: string;
+  timezone: string;
+  region_code: string;
+  is_active: boolean;
+  status: PlatformShopStatus;
+  status_display: string;
+  status_reason: string;
+  plan_tier: BusinessHubPlanTier;
+  owner_email: string | null;
+  owner_name: string | null;
+  member_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PlatformShopListPayload = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: PlatformShopPayload[];
+};
+
+export type PlatformAuditEventPayload = {
+  id: string;
+  action: string;
+  reason: string;
+  actor_user: string | null;
+  actor_name: string | null;
+  actor_email: string | null;
+  shop: string | null;
+  shop_name: string | null;
+  shop_slug: string | null;
+  before_json: Record<string, unknown>;
+  after_json: Record<string, unknown>;
+  metadata_json: Record<string, unknown>;
+  ip_address: string | null;
+  created_at: string;
+};
+
+export type PlatformAuditListPayload = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: PlatformAuditEventPayload[];
+};
+
+export type PlatformMetricsPayload = {
+  total_shops: number;
+  active_shops: number;
+  pending_shops: number;
+  suspended_shops: number;
+  total_users: number;
+  starter_shops: number;
+  growth_shops: number;
+  pro_shops: number;
+  shops_created_last_30d: number;
+  open_plan_requests: number;
 };

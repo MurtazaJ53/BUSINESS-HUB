@@ -5,6 +5,7 @@ import {
   inviteWorkspaceMemberAction,
   transferWorkspaceOwnershipAction,
   updateWorkspaceMemberAction,
+  resendWorkspaceInviteAction,
 } from "@/app/team/actions";
 import { getSession, getWorkspaceTeamMembers, resolveActiveShop } from "@/lib/admin-api";
 import { getAdminWebMfaPosture } from "@/lib/mfa";
@@ -41,12 +42,16 @@ function buildActionBanner(searchParams: SearchParams) {
           ? "Workspace member saved"
           : action === "transfer"
             ? "Workspace ownership transferred"
+          : action === "resend"
+            ? "Invitation resent"
           : "Workspace member updated",
       body:
         action === "invite"
           ? `${member || "The member"} is now attached to this workspace.`
           : action === "transfer"
             ? `${member || "The selected member"} now controls workspace ownership for this store.`
+          : action === "resend"
+            ? `A new invitation email has been sent to ${member || "the member"}.`
           : `${member || "The member"} now has the updated role or status.`,
     };
   }
@@ -228,43 +233,58 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
                               </div>
 
                               {member.can_manage ? (
-                                <form action={updateWorkspaceMemberAction} className="grid min-w-[280px] gap-3">
-                                  <input type="hidden" name="shopId" value={activeShop.shop.id} />
-                                  <input type="hidden" name="membershipId" value={member.id} />
-                                  <input type="hidden" name="member" value={member.member_email} />
-                                  <label className="block">
-                                    <span className="eyebrow">Role</span>
-                                    <select
-                                      name="role"
-                                      defaultValue={member.role}
-                                      className="mt-2 w-full rounded-[18px] border border-[rgba(152,164,189,0.14)] bg-[rgba(8,14,24,0.72)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none"
+                                <div className="grid min-w-[280px] gap-3">
+                                  <form action={updateWorkspaceMemberAction} className="grid gap-3">
+                                    <input type="hidden" name="shopId" value={activeShop.shop.id} />
+                                    <input type="hidden" name="membershipId" value={member.id} />
+                                    <input type="hidden" name="member" value={member.member_email} />
+                                    <label className="block">
+                                      <span className="eyebrow">Role</span>
+                                      <select
+                                        name="role"
+                                        defaultValue={member.role}
+                                        className="mt-2 w-full rounded-[18px] border border-[rgba(152,164,189,0.14)] bg-[rgba(8,14,24,0.72)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none"
+                                      >
+                                        {roleChoices.map((choice) => (
+                                          <option key={choice.value} value={choice.value}>
+                                            {choice.label}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                    <label className="block">
+                                      <span className="eyebrow">Status</span>
+                                      <select
+                                        name="status"
+                                        defaultValue={member.status}
+                                        className="mt-2 w-full rounded-[18px] border border-[rgba(152,164,189,0.14)] bg-[rgba(8,14,24,0.72)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none"
+                                      >
+                                        <option value="active">Active</option>
+                                        <option value="invited">Invited</option>
+                                        <option value="disabled">Disabled</option>
+                                      </select>
+                                    </label>
+                                    <button
+                                      type="submit"
+                                      className="inline-flex items-center justify-center rounded-full border border-[rgba(71,176,255,0.16)] bg-[rgba(71,176,255,0.12)] px-4 py-2 text-sm font-semibold text-[var(--accent)] transition hover:bg-[rgba(71,176,255,0.18)]"
                                     >
-                                      {roleChoices.map((choice) => (
-                                        <option key={choice.value} value={choice.value}>
-                                          {choice.label}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </label>
-                                  <label className="block">
-                                    <span className="eyebrow">Status</span>
-                                    <select
-                                      name="status"
-                                      defaultValue={member.status}
-                                      className="mt-2 w-full rounded-[18px] border border-[rgba(152,164,189,0.14)] bg-[rgba(8,14,24,0.72)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none"
-                                    >
-                                      <option value="active">Active</option>
-                                      <option value="invited">Invited</option>
-                                      <option value="disabled">Disabled</option>
-                                    </select>
-                                  </label>
-                                  <button
-                                    type="submit"
-                                    className="inline-flex items-center justify-center rounded-full border border-[rgba(71,176,255,0.16)] bg-[rgba(71,176,255,0.12)] px-4 py-2 text-sm font-semibold text-[var(--accent)] transition hover:bg-[rgba(71,176,255,0.18)]"
-                                  >
-                                    Save member
-                                  </button>
-                                </form>
+                                      Save member
+                                    </button>
+                                  </form>
+                                  {member.status === "invited" && (
+                                    <form action={resendWorkspaceInviteAction} className="grid gap-3">
+                                      <input type="hidden" name="shopId" value={activeShop.shop.id} />
+                                      <input type="hidden" name="email" value={member.member_email} />
+                                      <input type="hidden" name="member" value={member.member_email} />
+                                      <button
+                                        type="submit"
+                                        className="inline-flex items-center justify-center rounded-full border border-[rgba(245,158,11,0.18)] bg-[rgba(77,49,9,0.34)] px-4 py-2 text-sm font-semibold text-[var(--warning)] transition hover:bg-[rgba(77,49,9,0.46)]"
+                                      >
+                                        Resend invite
+                                      </button>
+                                    </form>
+                                  )}
+                                </div>
                               ) : (
                                 <div className="min-w-[280px] rounded-[20px] border border-[rgba(152,164,189,0.12)] bg-[rgba(13,18,28,0.68)] px-4 py-4 text-sm text-[var(--text-secondary)]">
                                   {member.is_current_user

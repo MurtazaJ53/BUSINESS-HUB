@@ -1,4 +1,4 @@
-import "server-only";
+"use server";
 
 import { cache } from "react";
 
@@ -8,9 +8,6 @@ import type {
   Customer,
   CustomerSummaryPayload,
   DashboardSnapshot,
-  Expense,
-  InventoryItem,
-  InventorySummaryPayload,
   ERPNextDocumentLink,
   ERPNextHealthPayload,
   ERPNextMetaPayload,
@@ -19,45 +16,56 @@ import type {
   ERPNextShopBinding,
   ERPNextSupplierMirror,
   ERPNextSupplierPaymentMirror,
-  ExpenseSummaryPayload,
   ERPNextSyncState,
-  MigrationDomainControl,
+  Expense,
+  ExpenseSummaryPayload,
+  InventoryItem,
+  InventorySummaryPayload,
   MigrationBridgeReceipt,
   MigrationControlEvent,
+  MigrationDomainControl,
   MigrationGoLiveCheckpointEvent,
   MigrationGoLiveReadiness,
   MigrationJobRun,
   MigrationLaunchCheckpointEvent,
   MigrationPhaseCheckpointEvent,
-  MigrationPilotReadiness,
   MigrationPhaseReadiness,
-  MigrationPilotSignoff,
+  MigrationPilotReadiness,
   MigrationPilotShopScorecard,
+  MigrationPilotSignoff,
   MigrationReconciliationEvent,
   MigrationRetirementReadiness,
   MigrationRolloutCheckpointEvent,
   MigrationRolloutReadiness,
+  MigrationShadowSummary,
+  MigrationShopCheckpointEvent,
+  MigrationStats,
   MigrationSteadyStateCheckpointEvent,
   MigrationSteadyStateReadiness,
-  MigrationShopCheckpointEvent,
-  MigrationShadowSummary,
-  MigrationStats,
   PaymentSummaryPayload,
+  PlatformAuditListPayload,
+  PlatformMetricsPayload,
+  PlatformShopListPayload,
+  PlatformShopPayload,
   Sale,
   SalePaymentRecord,
   SalesSummaryPayload,
   SessionPayload,
-  UserMfaStatusPayload,
-  UserPasskeyCredentialPayload,
-  WorkspacePulseSnapshot,
-  WorkspacePulseSignal,
   ShopDomainState,
   ShopMembership,
   ShopPlanRequestPayload,
+  UserMfaStatusPayload,
+  UserPasskeyCredentialPayload,
   WorkspaceAccessSessionPayload,
   WorkspaceAuditEventPayload,
+  WorkspacePulseSignal,
+  WorkspacePulseSnapshot,
   WorkspaceTeamMemberPayload,
 } from "@/lib/types";
+
+/* ------------------------------------------------------------------ */
+/*  Low-level helpers                                                  */
+/* ------------------------------------------------------------------ */
 
 type FetchOptions = {
   query?: Record<string, string | undefined>;
@@ -145,6 +153,10 @@ export async function apiMutation<T>(path: string, options: MutationOptions = {}
   return JSON.parse(bodyText) as T;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Session & auth                                                     */
+/* ------------------------------------------------------------------ */
+
 export const getSession = cache(async (): Promise<SessionPayload> => {
   return apiFetch<SessionPayload>("/session/");
 });
@@ -156,6 +168,10 @@ export const getUserMfaStatus = cache(async (): Promise<UserMfaStatusPayload> =>
 export const getUserPasskeys = cache(async (): Promise<UserPasskeyCredentialPayload[]> => {
   return apiFetch<UserPasskeyCredentialPayload[]>("/session/passkeys/");
 });
+
+/* ------------------------------------------------------------------ */
+/*  Shop / workspace                                                   */
+/* ------------------------------------------------------------------ */
 
 export const getMemberships = cache(async (): Promise<ShopMembership[]> => {
   return apiFetch<ShopMembership[]>("/shops/");
@@ -193,6 +209,10 @@ export const getWorkspaceAccessSessions = cache(
   },
 );
 
+/* ------------------------------------------------------------------ */
+/*  Inventory                                                          */
+/* ------------------------------------------------------------------ */
+
 export const getInventory = cache(async (shopId: string, query?: string): Promise<InventoryItem[]> => {
   return apiFetch<InventoryItem[]>(`/shops/${shopId}/inventory/`, {
     query: {
@@ -211,6 +231,10 @@ export const getShopDomainState = cache(
   },
 );
 
+/* ------------------------------------------------------------------ */
+/*  Dashboard / Pulse                                                  */
+/* ------------------------------------------------------------------ */
+
 export const getDashboardSnapshot = cache(async (shopId: string): Promise<DashboardSnapshot> => {
   return apiFetch<DashboardSnapshot>(`/shops/${shopId}/projections/dashboard/`);
 });
@@ -227,6 +251,10 @@ export const getWorkspacePulseSignals = cache(
   },
 );
 
+/* ------------------------------------------------------------------ */
+/*  Customers                                                          */
+/* ------------------------------------------------------------------ */
+
 export const getCustomers = cache(async (shopId: string, query?: string): Promise<Customer[]> => {
   return apiFetch<Customer[]>(`/shops/${shopId}/customers/`, {
     query: {
@@ -238,6 +266,10 @@ export const getCustomers = cache(async (shopId: string, query?: string): Promis
 export const getCustomerSummary = cache(async (shopId: string): Promise<CustomerSummaryPayload> => {
   return apiFetch<CustomerSummaryPayload>(`/shops/${shopId}/customers/summary/`);
 });
+
+/* ------------------------------------------------------------------ */
+/*  Expenses                                                           */
+/* ------------------------------------------------------------------ */
 
 export const getExpenses = cache(async (shopId: string, query?: string): Promise<Expense[]> => {
   return apiFetch<Expense[]>(`/shops/${shopId}/expenses/`, {
@@ -254,6 +286,10 @@ export const getExpenseSummary = cache(async (shopId: string, query?: string): P
     },
   });
 });
+
+/* ------------------------------------------------------------------ */
+/*  Attendance                                                         */
+/* ------------------------------------------------------------------ */
 
 export const getAttendanceSessions = cache(
   async (shopId: string, query?: { dateFrom?: string; dateTo?: string }): Promise<AttendanceSession[]> => {
@@ -281,6 +317,10 @@ export const getAttendanceSummary = cache(
   },
 );
 
+/* ------------------------------------------------------------------ */
+/*  Sales                                                              */
+/* ------------------------------------------------------------------ */
+
 export const getSales = cache(
   async (
     shopId: string,
@@ -301,6 +341,10 @@ export const getSalesSummary = cache(async (shopId: string): Promise<SalesSummar
   return apiFetch<SalesSummaryPayload>(`/shops/${shopId}/sales/summary/`);
 });
 
+/* ------------------------------------------------------------------ */
+/*  Payments                                                           */
+/* ------------------------------------------------------------------ */
+
 export const getPayments = cache(
   async (
     shopId: string,
@@ -319,6 +363,10 @@ export const getPayments = cache(
 export const getPaymentSummary = cache(async (shopId: string): Promise<PaymentSummaryPayload> => {
   return apiFetch<PaymentSummaryPayload>(`/shops/${shopId}/payments/summary/`);
 });
+
+/* ------------------------------------------------------------------ */
+/*  Migration                                                          */
+/* ------------------------------------------------------------------ */
 
 export const getMigrationControls = cache(async (): Promise<MigrationDomainControl[]> => {
   return apiFetch<MigrationDomainControl[]>("/migration/domains/");
@@ -424,6 +472,10 @@ export const getMigrationReconciliationEvents = cache(
   },
 );
 
+/* ------------------------------------------------------------------ */
+/*  ERPNext                                                            */
+/* ------------------------------------------------------------------ */
+
 export const getERPNextMeta = cache(async (): Promise<ERPNextMetaPayload> => {
   return apiFetch<ERPNextMetaPayload>("/erpnext/meta/");
 });
@@ -461,6 +513,62 @@ export const getERPNextSupplierPayments = cache(
 export const getERPNextDocumentLinks = cache(async (shopId: string): Promise<ERPNextDocumentLink[]> => {
   return apiFetch<ERPNextDocumentLink[]>(`/shops/${shopId}/erpnext/document-links/`);
 });
+
+/* ------------------------------------------------------------------ */
+/*  Platform Administration (Phase 3)                                  */
+/* ------------------------------------------------------------------ */
+
+export const getPlatformShops = cache(
+  async (query?: {
+    status?: string;
+    plan?: string;
+    q?: string;
+    page?: string;
+  }): Promise<PlatformShopListPayload> => {
+    return apiFetch<PlatformShopListPayload>("/platform/shops/", {
+      query: {
+        status: query?.status,
+        plan: query?.plan,
+        q: query?.q,
+        page: query?.page,
+      },
+    });
+  },
+);
+
+export const getPlatformShopDetail = cache(
+  async (shopId: string): Promise<PlatformShopPayload> => {
+    return apiFetch<PlatformShopPayload>(`/platform/shops/${shopId}/`);
+  },
+);
+
+export const getPlatformAuditEvents = cache(
+  async (query?: {
+    shop_id?: string;
+    action?: string;
+    actor_email?: string;
+    q?: string;
+    page?: string;
+  }): Promise<PlatformAuditListPayload> => {
+    return apiFetch<PlatformAuditListPayload>("/platform/audit/", {
+      query: {
+        shop_id: query?.shop_id,
+        action: query?.action,
+        actor_email: query?.actor_email,
+        q: query?.q,
+        page: query?.page,
+      },
+    });
+  },
+);
+
+export const getPlatformMetrics = cache(async (): Promise<PlatformMetricsPayload> => {
+  return apiFetch<PlatformMetricsPayload>("/platform/metrics/");
+});
+
+/* ------------------------------------------------------------------ */
+/*  Utility helpers                                                    */
+/* ------------------------------------------------------------------ */
 
 export function resolveActiveShop(session: SessionPayload): ShopMembership | null {
   if (!session.active_shop_id) {

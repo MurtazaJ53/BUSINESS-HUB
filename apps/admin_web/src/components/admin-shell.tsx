@@ -171,6 +171,11 @@ function getSectionedNav(
         return false;
       }
 
+      // Phase 4 not yet implemented — hide Plans to avoid confusion
+      if (item.key === "plan") {
+        return false;
+      }
+
       if (item.key === "payments") {
         return canAccessPaymentsWorkspace(workspaceRole);
       }
