@@ -28,6 +28,8 @@ def _payload(**overrides):
 
 class RegistrationTests(APITestCase):
     def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
         self.url = reverse("register")
 
     def test_successful_registration_provisions_shop_and_returns_tokens(self):

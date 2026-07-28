@@ -9,6 +9,8 @@ from platform_apps.users.models import PlatformUser
 
 class JwtAuthTests(TestCase):
     def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
         self.user = PlatformUser.objects.create_user(
             email="owner@example.com", password="secret123", full_name="Owner"
         )

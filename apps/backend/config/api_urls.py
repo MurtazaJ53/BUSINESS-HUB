@@ -15,4 +15,5 @@ urlpatterns = [
     path("health/", include("platform_apps.health.urls")),
     path("session/", include("platform_apps.users.urls")),
     path("shops/", include("platform_apps.shops.urls")),
+    path("platform/", include("platform_apps.platform_admin.urls")),
 ]

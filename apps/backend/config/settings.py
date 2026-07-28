@@ -24,22 +24,27 @@ def env_list(name: str, default: list[str] | None = None) -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
-DEBUG = env_bool("DJANGO_DEBUG", True)
+DEBUG = env_bool("DJANGO_DEBUG", False)
 ENVIRONMENT = os.getenv("DJANGO_ENV", "development")
 
-# SECRET_KEY: allow an insecure dev fallback ONLY in DEBUG; in production (DEBUG
-# off) refuse to boot without a real key, so a forgotten env var can't ship an
-# instance whose JWTs anyone could forge.
+if ENVIRONMENT == "production":
+    if not os.getenv("DATABASE_URL"):
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured("FATAL: DATABASE_URL is not set in production.")
+    if not os.getenv("RESEND_API_KEY"):
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured("FATAL: RESEND_API_KEY is not set in production.")
+
+# SECRET_KEY: Refuse to boot without a real key so a forgotten env var 
+# can't ship an instance whose JWTs anyone could forge.
 _SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 if _SECRET_KEY:
     SECRET_KEY = _SECRET_KEY
-elif DEBUG:
-    SECRET_KEY = "dev-only-change-me"
 else:
     from django.core.exceptions import ImproperlyConfigured
 
     raise ImproperlyConfigured(
-        "FATAL: DJANGO_SECRET_KEY is not set. Refusing to boot with DEBUG off."
+        "FATAL: DJANGO_SECRET_KEY is not set. Refusing to boot."
     )
 
 # Pepper for blind-index hashing of searchable PII (customer phone). Falls back
@@ -50,6 +55,7 @@ BLIND_INDEX_PEPPER = os.getenv("BLIND_INDEX_PEPPER", SECRET_KEY)
 
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", ["localhost", "127.0.0.1", "testserver"])
 CORS_ALLOWED_ORIGINS = env_list("DJANGO_CORS_ALLOWED_ORIGINS")
+CORS_ALLOW_ALL_ORIGINS = False
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 BUSINESS_HUB_WEBAUTHN_RP_ID = os.getenv("BUSINESS_HUB_WEBAUTHN_RP_ID", "").strip()
 BUSINESS_HUB_WEBAUTHN_RP_NAME = os.getenv(
@@ -75,6 +81,7 @@ INSTALLED_APPS = [
     "platform_apps.health.apps.HealthConfig",
     "platform_apps.users.apps.UsersConfig",
     "platform_apps.shops.apps.ShopsConfig",
+    "platform_apps.platform_admin.apps.PlatformAdminConfig",
     "platform_apps.inventory.apps.InventoryConfig",
     "platform_apps.customers.apps.CustomersConfig",
     "platform_apps.sales.apps.SalesConfig",
@@ -101,6 +108,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "platform_apps.common.middleware.CSPMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -134,7 +142,7 @@ if DATABASE_URL:
             # Postgres. Set DATABASE_CONN_MAX_AGE>0 only if you point Django at
             # Postgres directly (no transaction-pooling PgBouncer).
             conn_max_age=int(os.getenv("DATABASE_CONN_MAX_AGE", "0")),
-            ssl_require=env_bool("DATABASE_SSL_REQUIRED", False),
+            ssl_require=True if ENVIRONMENT == "production" else env_bool("DATABASE_SSL_REQUIRED", False),
         )
     }
 else:
@@ -145,12 +153,33 @@ else:
         }
     }
 
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
+]
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
+
+SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = "Lax"
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
+SECURE_HSTS_SECONDS = 31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
 
 LANGUAGE_CODE = "en-in"
 TIME_ZONE = os.getenv("DJANGO_TIME_ZONE", "Asia/Kolkata")
@@ -192,7 +221,7 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.UserRateThrottle"
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "100/day",
+        "anon": "100/hour",
         "user": "1000/hour"
     },
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
