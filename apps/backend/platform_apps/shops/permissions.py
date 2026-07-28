@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from rest_framework import exceptions
 
-from platform_apps.shops.models import ShopMembership
+from platform_apps.shops.models import Shop, ShopMembership
 from platform_apps.shops.plans import normalize_plan_tier
 
 ROLE_ORDER = {
@@ -58,6 +58,12 @@ def get_membership_or_403(user, shop_id, minimum_role: str = ShopMembership.Role
     )
     if membership is None:
         raise exceptions.PermissionDenied("You do not have access to this shop.")
+
+    # A suspended shop blocks every member (owner included) at this one gate.
+    if membership.shop.status == Shop.Status.SUSPENDED:
+        raise exceptions.PermissionDenied(
+            "This shop is suspended. Contact the platform administrator."
+        )
 
     if ROLE_ORDER[membership.role] < ROLE_ORDER[minimum_role]:
         raise exceptions.PermissionDenied("Your role does not allow this action.")

@@ -31,6 +31,18 @@ class Shop(SourceTrackedModel):
     state_code = models.CharField(max_length=2, blank=True)
     is_active = models.BooleanField(default=True)
 
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending approval"
+        ACTIVE = "active", "Active"
+        SUSPENDED = "suspended", "Suspended"
+
+    # Platform lifecycle state, controlled by platform admins. A suspended shop
+    # blocks all member access at get_membership_or_403 (the single choke-point).
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.ACTIVE
+    )
+    status_reason = models.CharField(max_length=280, blank=True)
+
     @property
     def plan_tier(self) -> str:
         return normalize_plan_tier(self.settings_json.get("plan_tier"))
@@ -85,6 +97,7 @@ class ShopMembership(SourceTrackedModel):
     permissions_version = models.PositiveIntegerField(default=1)
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=32, blank=True)
+    pos_pin_hash = models.CharField(max_length=128, blank=True)
     permissions_json = models.JSONField(default=dict, blank=True)
 
     class Meta:

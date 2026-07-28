@@ -181,3 +181,17 @@ class SessionPasskeyDeleteView(APIView):
                 ).data,
             }
         )
+
+
+class SessionAccountDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request):
+        user = request.user
+        # Right to be forgotten: hard delete the user and cascading data
+        # Note: In a production system, you might want to reassign ownership of
+        # shops if the user is the sole owner, but for simplicity we assume
+        # standard deletion here, or that the application layer handles shop 
+        # cleanup via signals.
+        user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

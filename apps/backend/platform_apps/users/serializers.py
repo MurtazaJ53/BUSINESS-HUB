@@ -79,6 +79,10 @@ class MembershipShopSerializer(serializers.Serializer):
     enabled_features = serializers.DictField(
         child=serializers.BooleanField(),
     )
+    business_phone = serializers.SerializerMethodField()
+
+    def get_business_phone(self, obj):
+        return obj.settings_json.get("business_phone", "")
 
 
 class SessionMembershipSerializer(serializers.ModelSerializer):

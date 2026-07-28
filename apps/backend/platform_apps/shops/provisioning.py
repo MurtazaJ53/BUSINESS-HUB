@@ -84,6 +84,7 @@ def provision_shop(
             "business_type": normalized_type,
             "enabled_features": DEFAULT_FEATURES,
             "onboarding_completed": False,
+            "business_phone": (owner_phone or "").strip(),
         },
         source_system=source_surface,
     )

@@ -145,6 +145,7 @@ class WorkspaceTeamMemberSerializer(serializers.ModelSerializer):
     role_profile = serializers.SerializerMethodField()
     is_current_user = serializers.SerializerMethodField()
     can_manage = serializers.SerializerMethodField()
+    has_pos_pin = serializers.SerializerMethodField()
 
     class Meta:
         model = ShopMembership
@@ -162,6 +163,7 @@ class WorkspaceTeamMemberSerializer(serializers.ModelSerializer):
             "permissions_json",
             "is_current_user",
             "can_manage",
+            "has_pos_pin",
             "created_at",
             "updated_at",
         )
@@ -192,6 +194,9 @@ class WorkspaceTeamMemberSerializer(serializers.ModelSerializer):
         if actor_membership.user_id == obj.user_id:
             return False
         return can_manage_workspace_membership(actor_membership.role, obj.role)
+
+    def get_has_pos_pin(self, obj):
+        return bool(obj.pos_pin_hash)
 
 
 class WorkspaceTeamMemberCreateSerializer(serializers.Serializer):
@@ -290,6 +295,7 @@ class WorkspaceTeamMemberUpdateSerializer(serializers.Serializer):
     # Per-member custom permission overrides: {module: {action: bool}}. When
     # set, the client gates the UI on these instead of the role defaults.
     permissions_json = serializers.DictField(required=False)
+    pos_pin = serializers.CharField(required=False, allow_blank=True, write_only=True)
 
     def validate(self, attrs):
         actor_membership = self.context["actor_membership"]
@@ -342,6 +348,14 @@ class WorkspaceTeamMemberUpdateSerializer(serializers.Serializer):
                 target_membership.permissions_version + 1
             )
             updated_fields.extend(["permissions_json", "permissions_version"])
+
+        if "pos_pin" in validated:
+            from django.contrib.auth.hashers import make_password
+            if validated["pos_pin"]:
+                target_membership.pos_pin_hash = make_password(validated["pos_pin"])
+            else:
+                target_membership.pos_pin_hash = ""
+            updated_fields.append("pos_pin_hash")
 
         if updated_fields:
             updated_fields.append("updated_at")

@@ -48,7 +48,7 @@ def send_email(*, to: str, subject: str, html: str, text: str = "") -> dict:
     """
     key = _api_key()
     if not key:
-        logger.info("Email skipped (no RESEND_API_KEY): to=%s subject=%s", to, subject)
+        logger.info("Email skipped (no RESEND_API_KEY): to=[REDACTED] subject=%s", subject)
         return {"ok": False, "skipped": True, "id": "", "error": "",
                 "status": "skipped: RESEND_API_KEY not set"}
 
@@ -87,7 +87,7 @@ def send_email(*, to: str, subject: str, html: str, text: str = "") -> dict:
                 except Exception:
                     pass
                 logger.info(
-                    "Email sent to=%s id=%s (attempt %d)", to, message_id, attempt
+                    "Email sent to=[REDACTED] id=%s (attempt %d)", message_id, attempt
                 )
                 return {"ok": True, "skipped": False, "id": message_id,
                         "error": "", "status": "sent"}
@@ -100,8 +100,8 @@ def send_email(*, to: str, subject: str, html: str, text: str = "") -> dict:
                 pass
             last_error = f"{exc.code}: {detail}"[:400]
             logger.warning(
-                "Resend HTTPError %s for to=%s (attempt %d): %s",
-                exc.code, to, attempt, detail,
+                "Resend HTTPError %s for to=[REDACTED] (attempt %d): %s",
+                exc.code, attempt, detail,
             )
             # 4xx is permanent (bad recipient, unverified domain) - don't retry.
             if 400 <= exc.code < 500:
@@ -110,7 +110,7 @@ def send_email(*, to: str, subject: str, html: str, text: str = "") -> dict:
         except Exception as exc:
             last_error = str(exc)[:400]
             logger.warning(
-                "Resend send failed for to=%s (attempt %d): %s", to, attempt, exc
+                "Resend send failed for to=[REDACTED] (attempt %d): %s", attempt, exc
             )
         if attempt < _MAX_ATTEMPTS:
             time.sleep(0.5 * attempt)  # linear backoff
@@ -125,6 +125,9 @@ def send_invite_email(
     """Compose and send a shop invitation email."""
     who = f"{inviter} invited you" if inviter else "You've been invited"
     subject = f"{who} to join {shop_name} on Business Hub"
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    accept_link = f"{frontend_url}/invite/{invite_code}"
+
     html = f"""
     <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:520px;margin:auto">
       <h2 style="color:#0d6e8c">Join {shop_name} on Business Hub</h2>
@@ -132,12 +135,16 @@ def send_invite_email(
       <p>Open the Business Hub app, choose <b>“Join with invite code”</b>, and enter this code:</p>
       <p style="font-size:22px;font-weight:700;letter-spacing:2px;background:#e4f1f5;
                 padding:12px 16px;border-radius:10px;display:inline-block">{invite_code}</p>
+      <p>Or accept the invitation directly in your web browser by clicking here:</p>
+      <p><a href="{accept_link}" style="display:inline-block;background:#0d6e8c;color:#fff;
+                padding:10px 20px;text-decoration:none;border-radius:5px">Accept Invitation</a></p>
       <p style="color:#54617a;font-size:13px">This invite expires in 7 days. If you didn't expect it, you can ignore this email.</p>
     </div>
     """
     text = (
         f"{who} to join {shop_name} as {role_label} on Business Hub.\n"
         f'Open the app, choose "Join with invite code", and enter: {invite_code}\n'
+        f"Or open this link in your browser: {accept_link}\n"
         f"This invite expires in 7 days."
     )
     return send_email(to=to, subject=subject, html=html, text=text)

@@ -13,6 +13,7 @@ from platform_apps.users.views import (
     SessionPasskeyListView,
     SessionPasskeyRegistrationBeginView,
     SessionPasskeyRegistrationFinishView,
+    SessionAccountDeleteView,
 )
 
 urlpatterns = [
@@ -49,4 +50,5 @@ urlpatterns = [
         SessionPasskeyDeleteView.as_view(),
         name="session-passkey-delete",
     ),
+    path("me/", SessionAccountDeleteView.as_view(), name="session-me"),
 ]

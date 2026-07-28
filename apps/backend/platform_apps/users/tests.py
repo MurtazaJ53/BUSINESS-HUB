@@ -172,8 +172,8 @@ class SessionBootstrapTests(TestCase):
         self.assertFalse(membership["shop"]["enabled_features"]["attendance"])
 
     def test_normalize_membership_role_maps_product_aliases(self):
-        self.assertEqual(normalize_membership_role("cashier"), ShopMembership.Role.STAFF)
-        self.assertEqual(normalize_membership_role("manager"), ShopMembership.Role.ADMIN)
+        self.assertEqual(normalize_membership_role("cashier"), ShopMembership.Role.CASHIER)
+        self.assertEqual(normalize_membership_role("manager"), ShopMembership.Role.MANAGER)
         self.assertEqual(normalize_membership_role("viewer"), ShopMembership.Role.VIEWER)
         self.assertEqual(
             normalize_membership_role("staff", is_shop_owner=True),

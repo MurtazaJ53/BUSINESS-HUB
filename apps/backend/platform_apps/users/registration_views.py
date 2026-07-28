@@ -14,8 +14,12 @@ from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.throttling import AnonRateThrottle
 
 from platform_apps.shops.provisioning import provision_shop
+
+class SignupRateThrottle(AnonRateThrottle):
+    rate = '5/min'
 from platform_apps.users.jwt_auth import issue_tokens
 
 User = get_user_model()
@@ -31,7 +35,7 @@ class RegistrationSerializer(serializers.Serializer):
     password = serializers.CharField(
         min_length=8, write_only=True, style={"input_type": "password"}
     )
-    mobile = serializers.CharField(max_length=32, required=False, allow_blank=True)
+    mobile = serializers.CharField(max_length=32, required=True, allow_blank=False)
     business_name = serializers.CharField(max_length=255)
     business_type = serializers.CharField(
         max_length=32, required=False, allow_blank=True
@@ -74,6 +78,7 @@ class RegisterView(APIView):
 
     authentication_classes: list = []
     permission_classes = [AllowAny]
+    throttle_classes = [SignupRateThrottle]
 
     def post(self, request):
         serializer = RegistrationSerializer(data=request.data)

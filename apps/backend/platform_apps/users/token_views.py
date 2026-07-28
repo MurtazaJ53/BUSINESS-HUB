@@ -7,8 +7,12 @@ from django.contrib.auth import authenticate, get_user_model
 from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.throttling import AnonRateThrottle
 
 from platform_apps.users.jwt_auth import decode_token, issue_tokens
+
+class LoginRateThrottle(AnonRateThrottle):
+    rate = '5/min'
 
 User = get_user_model()
 
@@ -27,6 +31,7 @@ class SessionTokenObtainView(APIView):
 
     authentication_classes: list = []
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
         serializer = TokenObtainSerializer(data=request.data)
