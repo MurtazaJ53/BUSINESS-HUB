@@ -67,7 +67,7 @@ class _SettingsBusinessScreenState
         'tagline': _tagline.text.trim(),
         'footer': _footer.text.trim(),
         'currency': _currency,
-        'phone': _phone.text.trim(),
+        'business_phone': _phone.text.trim(),
         'gstin': _gstin.text.trim(),
         // Preserve plan + features (saveShopDocument does a full overwrite).
         'plan_tier': shop.planTier,

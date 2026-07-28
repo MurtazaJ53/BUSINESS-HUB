@@ -82,6 +82,7 @@ class ShopMembershipAccessRecord {
     required this.shopTimezone,
     required this.shopPlanTier,
     required this.shopEnabledFeatures,
+    this.shopPhone = '',
     this.permissions = const <String, dynamic>{},
     this.permissionsVersion = 1,
   });
@@ -99,6 +100,7 @@ class ShopMembershipAccessRecord {
   final String shopTimezone;
   final String shopPlanTier;
   final Map<String, bool> shopEnabledFeatures;
+  final String shopPhone;
   // Per-member custom permission overrides ({module: {action: bool}}).
   final Map<String, dynamic> permissions;
   final int permissionsVersion;

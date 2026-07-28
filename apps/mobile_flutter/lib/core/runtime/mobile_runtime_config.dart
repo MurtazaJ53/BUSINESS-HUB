@@ -8,7 +8,7 @@ final class MobileRuntimeConfig {
 
   static const String backendAuthMode = String.fromEnvironment(
     'BUSINESS_HUB_BACKEND_AUTH_MODE',
-    defaultValue: 'dev_header',
+    defaultValue: 'jwt',
   );
 
   static const String localShopId = String.fromEnvironment(

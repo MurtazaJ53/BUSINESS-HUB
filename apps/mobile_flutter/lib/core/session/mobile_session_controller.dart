@@ -187,6 +187,7 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
         'tagline': 'Business Hub',
         'footer': 'Thank you for your business!',
         'currency': 'INR',
+        'phone': mobile.trim(),
         'plan_tier': 'starter',
         'enabled_features': <String, bool>{
           'inventory': true,
@@ -261,6 +262,7 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
           'tagline': 'Business Hub',
           'footer': 'Thank you for your business!',
           'currency': 'INR',
+          'phone': '',
           'plan_tier': 'starter',
           'enabled_features': <String, bool>{
             'inventory': true,
@@ -350,6 +352,7 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
           'tagline': 'Business Hub',
           'footer': 'Thank you for your business!',
           'currency': m.shopCurrencyCode,
+          'phone': m.shopPhone,
           'plan_tier': m.shopPlanTier,
           'enabled_features': m.shopEnabledFeatures,
         });
@@ -452,6 +455,7 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
         'tagline': 'Business Hub',
         'footer': 'Thank you for your business!',
         'currency': 'INR',
+        'phone': '',
         'plan_tier': 'growth',
         'enabled_features': <String, bool>{
           'inventory': true,
@@ -591,6 +595,7 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
       'tagline': 'Business Hub',
       'footer': 'Thank you for your business!',
       'currency': m.shopCurrencyCode,
+      'phone': m.shopPhone,
       'plan_tier': m.shopPlanTier,
       'enabled_features': m.shopEnabledFeatures.isNotEmpty
           ? m.shopEnabledFeatures

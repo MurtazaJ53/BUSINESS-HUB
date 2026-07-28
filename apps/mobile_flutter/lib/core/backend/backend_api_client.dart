@@ -136,6 +136,7 @@ class BackendApiClient {
             shopCurrencyCode: (row['shop_currency_code'] ?? 'INR').toString(),
             shopTimezone: (row['shop_timezone'] ?? 'Asia/Kolkata').toString(),
             shopPlanTier: (row['shop_plan_tier'] ?? 'growth').toString(),
+            shopPhone: (row['shop_phone'] ?? '').toString(),
             shopEnabledFeatures: row['shop_enabled_features'] is Map
                 ? Map<String, bool>.from(
                     (row['shop_enabled_features'] as Map).map(

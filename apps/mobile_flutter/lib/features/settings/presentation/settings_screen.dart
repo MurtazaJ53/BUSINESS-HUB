@@ -122,12 +122,7 @@ class SettingsScreen extends ConsumerWidget {
             leadingIcon: Icons.local_shipping_rounded,
             onTap: () => context.push('/settings/purchases'),
           ),
-          MobileListTile(
-            title: 'Plan',
-            subtitle: '${shop.planLabel} plan',
-            leadingIcon: Icons.workspace_premium_rounded,
-            onTap: () => context.push('/settings/plan'),
-          ),
+
           MobileListTile(
             title: 'Backup & restore',
             subtitle: 'Protect your books from data loss',
