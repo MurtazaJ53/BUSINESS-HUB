@@ -3,7 +3,6 @@ import uuid
 from django.conf import settings
 from django.core.cache import cache
 from django.db import models
-from django_cryptography.fields import encrypt
 
 from platform_apps.common.models import SourceTrackedModel
 from platform_apps.shops.plans import build_enabled_features, normalize_plan_tier
@@ -96,8 +95,13 @@ class ShopMembership(SourceTrackedModel):
     role = models.CharField(max_length=16, choices=Role.choices, default=Role.STAFF)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
     permissions_version = models.PositiveIntegerField(default=1)
-    email = encrypt(models.EmailField(blank=True))
-    phone = encrypt(models.CharField(max_length=32, blank=True))
+    # NOTE: intentionally NOT encrypted. This is a denormalized copy of
+    # User.email, which is itself stored in plaintext and filtered on directly
+    # (email__iexact) across the codebase, so encrypting the copy adds no real
+    # protection while making it unusable in ORM lookups. If PII-at-rest is
+    # needed, encrypt User.email too and add blind-index columns (see Customer).
+    email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=32, blank=True)
     pos_pin_hash = models.CharField(max_length=128, blank=True)
     permissions_json = models.JSONField(default=dict, blank=True)
 
