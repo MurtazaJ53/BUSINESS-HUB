@@ -11,6 +11,10 @@ this file as the ground truth for "what runs today."
 
 > Status snapshot verified on **2026-07-07** (see [Verification status](#verification-status)).
 
+> [!WARNING]
+> **Secret Exposure in Git History**
+> This repository previously contained hardcoded secrets (e.g., Firebase API keys in `legacy/android/app/google-services.json` and other config files). Although these have been removed and replaced with environment variables, the original values remain in the git history. You **must** immediately rotate these secrets (specifically Firebase and any service account keys) in your cloud provider consoles to ensure security.
+
 ---
 
 ## Repo map
