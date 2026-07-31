@@ -1281,6 +1281,8 @@ class BackendApiClient {
       canManage: row['can_manage'] == true,
       createdAt: _asDateTime(row['created_at']),
       updatedAt: _asDateTime(row['updated_at']),
+      inviteCode: (row['invite_code'] ?? '').toString(),
+      inviteLink: (row['invite_link'] ?? '').toString(),
     );
   }
 

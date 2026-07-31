@@ -16,6 +16,7 @@ from platform_apps.common.migration import (
 )
 from platform_apps.jobs.readiness import build_pilot_signoff
 from platform_apps.jobs.models import MigrationDomainControl
+from platform_apps.shops.invites import build_invite_link, create_invite
 from platform_apps.shops.models import ShopMembership, ShopPlanRequest, WorkspaceAccessSession
 from platform_apps.shops.permissions import get_membership_or_403
 from platform_apps.shops.serializers import (
@@ -236,7 +237,28 @@ class WorkspaceTeamListCreateView(APIView):
             membership,
             context={"actor_membership": actor_membership},
         )
-        return Response(response_serializer.data, status=201)
+        payload = dict(response_serializer.data)
+
+        # Unified invite: a newly-added (not-yet-active) member also gets a
+        # single-use invite token so the owner can hand it over as a QR / code /
+        # link. The invitee sets their password via accept-invite to sign in.
+        if created or membership.status != ShopMembership.Status.ACTIVE:
+            invite = create_invite(
+                shop=actor_membership.shop,
+                invited_by=request.user,
+                actor_role=actor_membership.role,
+                email=membership.email or membership.user.email,
+                role=membership.role,
+            )
+            email_result = getattr(invite, "_email_result", None)
+            payload["invite_code"] = invite.token
+            payload["invite_link"] = build_invite_link(invite.token)
+            payload["invite_expires_at"] = invite.expires_at.isoformat()
+            payload["invite_email_sent"] = bool(
+                email_result and email_result.get("ok")
+            )
+
+        return Response(payload, status=201)
 
 
 class WorkspaceTeamDetailView(APIView):

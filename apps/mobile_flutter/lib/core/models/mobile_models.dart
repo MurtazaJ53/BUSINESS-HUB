@@ -6,6 +6,7 @@ class ShopInfo {
     required this.currency,
     required this.phone,
     this.gstin = '',
+    this.upiVpa = '',
     this.planTier = 'growth',
     this.enabledFeatures = const <String, bool>{},
   });
@@ -16,10 +17,15 @@ class ShopInfo {
   final String currency;
   final String phone;
   final String gstin;
+
+  /// Merchant UPI ID (e.g. `shop@okhdfcbank`) used to build the POS collect-QR
+  /// with the exact bill amount. Set once by the owner in Business settings.
+  final String upiVpa;
   final String planTier;
   final Map<String, bool> enabledFeatures;
 
   bool get hasGstin => gstin.trim().isNotEmpty;
+  bool get hasUpi => upiVpa.trim().isNotEmpty;
 
   String get normalizedPlanTier => _normalizePlanTier(planTier);
   String get planLabel {
@@ -125,6 +131,8 @@ class WorkspaceTeamMemberRecord {
     required this.canManage,
     required this.createdAt,
     required this.updatedAt,
+    this.inviteCode = '',
+    this.inviteLink = '',
   });
 
   final String id;
@@ -142,6 +150,13 @@ class WorkspaceTeamMemberRecord {
   final bool canManage;
   final DateTime createdAt;
   final DateTime updatedAt;
+
+  /// Single-use invite token minted when a new member is added, and the
+  /// shareable deep link that wraps it. Empty for existing/listed members.
+  final String inviteCode;
+  final String inviteLink;
+
+  bool get hasInvite => inviteCode.isNotEmpty;
 }
 
 class AttendanceSummarySnapshot {

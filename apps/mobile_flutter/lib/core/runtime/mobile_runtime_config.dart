@@ -31,8 +31,11 @@ final class MobileRuntimeConfig {
     defaultValue: 'Business Hub Pro',
   );
 
+  // 2s was far too short for a hosted backend over a mobile network (and a
+  // free-tier host that can cold-start). 30s is a sane general default;
+  // override with BUSINESS_HUB_BACKEND_TIMEOUT_MS for slower/faster hosts.
   static const int backendTimeoutMs = int.fromEnvironment(
     'BUSINESS_HUB_BACKEND_TIMEOUT_MS',
-    defaultValue: 2000,
+    defaultValue: 30000,
   );
 }

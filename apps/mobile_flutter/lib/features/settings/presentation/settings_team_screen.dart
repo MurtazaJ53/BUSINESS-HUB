@@ -10,6 +10,7 @@ import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/runtime/mobile_runtime_config.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../shell/presentation/mobile_surface.dart';
+import 'invite_share_sheet.dart';
 import 'permission_editor_screen.dart';
 
 class SettingsTeamScreen extends ConsumerWidget {
@@ -191,6 +192,7 @@ class SettingsTeamScreen extends ConsumerWidget {
                       context: context,
                       ref: ref,
                       session: session,
+                      shopName: shop.name,
                     );
                   },
                   icon: const Icon(Icons.person_add_alt_1_rounded),
@@ -208,6 +210,7 @@ class SettingsTeamScreen extends ConsumerWidget {
     required BuildContext context,
     required WidgetRef ref,
     required MobileSession session,
+    required String shopName,
   }) async {
     if (!session.hasShop) {
       return;
@@ -345,7 +348,7 @@ class SettingsTeamScreen extends ConsumerWidget {
                                         errorText = null;
                                       });
                                       try {
-                                        await ref
+                                        final record = await ref
                                             .read(backendApiClientProvider)
                                             .createWorkspaceTeamMember(
                                               user: session.user,
@@ -365,15 +368,26 @@ class SettingsTeamScreen extends ConsumerWidget {
                                           return;
                                         }
                                         Navigator.of(context).pop();
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Workspace member saved. They can sign in with the same email.',
+                                        // New member -> show the shareable
+                                        // QR / code so they can sign in.
+                                        // Otherwise just confirm the update.
+                                        if (record.hasInvite) {
+                                          await showInviteShareSheet(
+                                            context,
+                                            record: record,
+                                            shopName: shopName,
+                                          );
+                                        } else {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Workspace member updated.',
+                                              ),
                                             ),
-                                          ),
-                                        );
+                                          );
+                                        }
                                       } catch (error) {
                                         setState(() {
                                           errorText = error.toString();

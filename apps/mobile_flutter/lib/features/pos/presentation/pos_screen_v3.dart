@@ -1356,7 +1356,14 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
   /// total — no "did you pay?" guesswork. Prompts for the merchant VPA if unset.
   Future<void> _showUpiQr(double amount) async {
     if (amount <= 0) return;
-    final shopName = ref.read(shopInfoProvider).asData?.value.name ?? 'Merchant';
+    final shop = ref.read(shopInfoProvider).asData?.value;
+    final shopName = shop?.name ?? 'Merchant';
+    // Prefer the UPI ID the owner saved in Business settings (synced to every
+    // cashier); fall back to the build-time default / last session value.
+    final savedVpa = shop?.upiVpa.trim() ?? '';
+    if (savedVpa.isNotEmpty) {
+      _merchantVpa = savedVpa;
+    }
     final vpaController = TextEditingController(text: _merchantVpa);
 
     await showDialog<void>(

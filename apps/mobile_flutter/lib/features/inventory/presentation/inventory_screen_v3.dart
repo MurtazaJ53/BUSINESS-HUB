@@ -95,30 +95,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
 
     return Scaffold(
       backgroundColor: AppColors.of(context).background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header with search
-            _buildHeader(context),
-
-            // Filters
-            _buildFilters(categories),
-
-            // Items list
-            Expanded(
-              child: filteredItems.isEmpty
-                  ? EmptyStateWidget(
-                      icon: Icons.inventory_2_rounded,
-                      title: 'No items found',
-                      message: _search.isEmpty
-                          ? 'Start adding products to your inventory'
-                          : 'Try a different search term or filter',
-                    )
-                  : _buildItemsList(filteredItems),
-            ),
-          ],
-        ),
-      ),
+      body: _buildCatalog(context, categories, filteredItems),
       // Add item FAB
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddChooser(context),
@@ -253,144 +230,150 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.of(context).surface,
-        border: Border(
-          bottom: BorderSide(color: AppColors.of(context).borderSoft, width: 1),
+  /// Scrollable catalog: a floating toolbar (search + actions + filter chips)
+  /// that slides away as you scroll down so the product list fills the screen,
+  /// and snaps back the moment you scroll up. The screen title / back / sync
+  /// already live in the app shell header, so we don't repeat them here.
+  Widget _buildCatalog(
+    BuildContext context,
+    List<InventoryCategorySummary> categories,
+    List<InventoryCatalogItem> items,
+  ) {
+    final colors = AppColors.of(context);
+    return CustomScrollView(
+      slivers: <Widget>[
+        SliverAppBar(
+          floating: true,
+          snap: true,
+          primary: false,
+          automaticallyImplyLeading: false,
+          backgroundColor: colors.surface,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          toolbarHeight: 74,
+          titleSpacing: 16,
+          title: Padding(
+            padding: const EdgeInsets.only(right: 4, top: 6),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: PremiumSearchBar(
+                    controller: _searchController,
+                    hintText: 'Search inventory...',
+                    onChanged: _onSearchChanged,
+                    onClear: () {
+                      _searchDebounce?.cancel();
+                      setState(() => _search = '');
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _ToolbarIconButton(
+                  icon: Icons.category_rounded,
+                  tooltip: 'Categories',
+                  onTap: () => context.push('/categories'),
+                ),
+                const SizedBox(width: 6),
+                _ToolbarIconButton(
+                  icon: Icons.playlist_add_rounded,
+                  tooltip: 'Bulk add',
+                  onTap: () => _showBulkAddSheet(context),
+                ),
+              ],
+            ),
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(50),
+            child: _buildChipsBar(categories),
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back_rounded),
-                onPressed: () => context.pop(),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Inventory',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.3,
-                ),
-              ),
-              const Spacer(),
-              IconButton(
-                onPressed: () => context.push('/categories'),
-                icon: const Icon(Icons.category_rounded),
-                tooltip: 'Categories',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-              const SizedBox(width: 8),
-              TextButton.icon(
-                onPressed: () => _showBulkAddSheet(context),
-                icon: const Icon(Icons.playlist_add_rounded, size: 18),
-                label: const Text('Bulk'),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                ),
-              ),
-            ],
+        if (items.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: EmptyStateWidget(
+              icon: Icons.inventory_2_rounded,
+              title: 'No items found',
+              message: _search.isEmpty
+                  ? 'Start adding products to your inventory'
+                  : 'Try a different search term or filter',
+            ),
+          )
+        else
+          SliverList.builder(
+            itemCount: items.length,
+            itemBuilder: (context, index) => _buildItemRow(items[index]),
           ),
-          const SizedBox(height: 16),
-          PremiumSearchBar(
-            controller: _searchController,
-            hintText: 'Search inventory...',
-            onChanged: _onSearchChanged,
-            onClear: () {
-              _searchDebounce?.cancel();
-              setState(() {
-                _search = '';
-              });
-            },
+        const SliverToBoxAdapter(child: SizedBox(height: 96)),
+      ],
+    );
+  }
+
+  /// Horizontal filter rail: All · Low stock toggle · one chip per category.
+  Widget _buildChipsBar(List<InventoryCategorySummary> categories) {
+    final colors = AppColors.of(context);
+    return Container(
+      height: 50,
+      color: colors.surface,
+      alignment: Alignment.centerLeft,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+        children: <Widget>[
+          _buildCategoryChip(
+            label: 'All',
+            isSelected: _selectedCategory == null && !_showLowStockOnly,
+            onTap: () => setState(() {
+              _selectedCategory = null;
+              _showLowStockOnly = false;
+            }),
           ),
+          const SizedBox(width: 8),
+          _buildLowStockChip(),
+          for (final category in categories) ...<Widget>[
+            const SizedBox(width: 8),
+            _buildCategoryChip(
+              label: category.category,
+              isSelected: _selectedCategory == category.category,
+              onTap: () =>
+                  setState(() => _selectedCategory = category.category),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildFilters(List<InventoryCategorySummary> categories) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: BoxDecoration(
-        color: AppColors.of(context).surface,
-        border: Border(
-          bottom: BorderSide(color: AppColors.of(context).borderSoft, width: 1),
-        ),
-      ),
-      child: Column(
-        children: [
-          // Category filters
-          if (categories.isNotEmpty) ...[
-            SizedBox(
-              height: 40,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: categories.length + 1,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    return _buildCategoryChip(
-                      label: 'All',
-                      isSelected: _selectedCategory == null,
-                      onTap: () {
-                        setState(() {
-                          _selectedCategory = null;
-                        });
-                      },
-                    );
-                  }
-
-                  final category = categories[index - 1];
-                  return _buildCategoryChip(
-                    label: category.category,
-                    isSelected: _selectedCategory == category.category,
-                    onTap: () {
-                      setState(() {
-                        _selectedCategory = category.category;
-                      });
-                    },
-                  );
-                },
+  Widget _buildLowStockChip() {
+    final colors = AppColors.of(context);
+    final selected = _showLowStockOnly;
+    return Material(
+      color: selected ? AppPalette.error : colors.surfaceStrong,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () => setState(() => _showLowStockOnly = !_showLowStockOnly),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(
+                Icons.warning_amber_rounded,
+                size: 15,
+                color: selected ? Colors.white : AppPalette.error,
               ),
-            ),
-            const SizedBox(height: 12),
-          ],
-
-          // Low stock toggle
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Show low stock only',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.of(context).textPrimary,
-                  ),
+              const SizedBox(width: 6),
+              Text(
+                'Low stock',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: selected ? Colors.white : colors.textSecondary,
                 ),
-              ),
-              Switch(
-                value: _showLowStockOnly,
-                onChanged: (value) {
-                  setState(() {
-                    _showLowStockOnly = value;
-                  });
-                },
-                activeThumbColor: AppPalette.primary,
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -438,30 +421,21 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
     );
   }
 
-  Widget _buildItemsList(List<InventoryCatalogItem> items) {
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 100),
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
-        return EnhancedListItem(
-          title: item.name,
-          subtitle:
-              '${item.category} • Stock: ${formatQty(item.stock)}'
-              '${item.unit != null && item.unit!.isNotEmpty ? ' ${item.unit}' : ''}'
-              ' • ${formatCurrency(item.price)}',
-          leading: _productThumb(item),
-          leadingIcon: Icons.inventory_2_rounded,
-          leadingColor: item.isLowStock
-              ? AppPalette.error
-              : AppPalette.inventory,
-          trailing: StatusBadge(
-            label: item.isLowStock ? 'Low' : 'OK',
-            color: item.isLowStock ? AppPalette.error : AppPalette.success,
-          ),
-          onTap: () => _showItemDetails(context, item),
-        );
-      },
+  Widget _buildItemRow(InventoryCatalogItem item) {
+    return EnhancedListItem(
+      title: item.name,
+      subtitle:
+          '${item.category} • Stock: ${formatQty(item.stock)}'
+          '${item.unit != null && item.unit!.isNotEmpty ? ' ${item.unit}' : ''}'
+          ' • ${formatCurrency(item.price)}',
+      leading: _productThumb(item),
+      leadingIcon: Icons.inventory_2_rounded,
+      leadingColor: item.isLowStock ? AppPalette.error : AppPalette.inventory,
+      trailing: StatusBadge(
+        label: item.isLowStock ? 'Low' : 'OK',
+        color: item.isLowStock ? AppPalette.error : AppPalette.success,
+      ),
+      onTap: () => _showItemDetails(context, item),
     );
   }
 
@@ -1522,5 +1496,44 @@ class _BulkRow {
     name.dispose();
     price.dispose();
     qty.dispose();
+  }
+}
+
+/// Square icon button used in the inventory toolbar, sized to line up with the
+/// 60px search bar beside it.
+class _ToolbarIconButton extends StatelessWidget {
+  const _ToolbarIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: colors.surfaceStrong,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colors.borderSoft),
+            ),
+            child: Icon(icon, size: 22, color: AppPalette.primary),
+          ),
+        ),
+      ),
+    );
   }
 }

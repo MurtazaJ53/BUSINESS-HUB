@@ -33,6 +33,14 @@ def _role_label(role: str) -> str:
     return dict(ShopMembership.Role.choices).get(role, role.title())
 
 
+def build_invite_link(token: str) -> str:
+    """Deep link encoded in the invite QR and shared with the invitee. The
+    mobile app registers the `businesshub://` scheme and routes join?token=...
+    into the accept-invite screen; scanned as plain text it still yields the
+    token."""
+    return f"businesshub://join?token={token}"
+
+
 @transaction.atomic
 def create_invite(*, shop, invited_by, actor_role, email, role, message=""):
     """Create a pending invite, email it, and return it. Raises if the actor

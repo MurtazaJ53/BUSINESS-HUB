@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/runtime/mobile_runtime_config.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../pos/presentation/pos_scanner_sheet.dart';
 import '../../shell/presentation/mobile_surface.dart';
 
 class AuthGateScreen extends ConsumerStatefulWidget {
@@ -76,6 +77,37 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
     _joinNameController.dispose();
     _joinPasswordController.dispose();
     super.dispose();
+  }
+
+  /// Open the camera scanner and drop the invite token into the code field.
+  /// Accepts a QR of the deep link (businesshub://join?token=...), an https
+  /// invite URL, or a plain code — all resolve to the same token.
+  Future<void> _scanInviteQr() async {
+    final raw = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const PosScannerSheet(),
+    );
+    if (!mounted || raw == null || raw.trim().isEmpty) return;
+    setState(() => _joinCodeController.text = _extractInviteToken(raw.trim()));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Invite scanned. Set your name and password to join.'),
+      ),
+    );
+  }
+
+  String _extractInviteToken(String raw) {
+    final uri = Uri.tryParse(raw);
+    if (uri != null) {
+      final fromQuery = uri.queryParameters['token'];
+      if (fromQuery != null && fromQuery.isNotEmpty) return fromQuery;
+      if (uri.pathSegments.isNotEmpty && (uri.hasScheme || raw.contains('/'))) {
+        return uri.pathSegments.last;
+      }
+    }
+    return raw;
   }
 
   Future<void> _handleJoin() async {
@@ -443,6 +475,22 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
                 ?.copyWith(color: AppPalette.textSecondary, height: 1.4),
           ),
           const SizedBox(height: 18),
+          SizedBox(
+            height: 52,
+            child: OutlinedButton.icon(
+              onPressed: _isLoggingIn ? null : _scanInviteQr,
+              icon: const Icon(Icons.qr_code_scanner_rounded),
+              label: const Text('Scan invite QR'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppPalette.primary,
+                side: const BorderSide(color: AppPalette.primary),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           TextField(
             controller: _joinCodeController,
             autocorrect: false,

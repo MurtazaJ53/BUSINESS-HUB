@@ -52,6 +52,7 @@ class ShopRepository {
           currency: (decoded['currency'] ?? 'INR').toString(),
           phone: (decoded['business_phone'] ?? decoded['phone'] ?? '').toString(),
           gstin: (decoded['gstin'] ?? '').toString(),
+          upiVpa: (decoded['upi_vpa'] ?? '').toString(),
           planTier: (decoded['plan_tier'] ?? 'growth').toString(),
           enabledFeatures: _coerceEnabledFeatures(
             decoded['enabled_features'],
@@ -82,6 +83,7 @@ class ShopRepository {
     settings['currency'] = settings['currency'] ?? rawData['currency'] ?? 'INR';
     settings['business_phone'] = rawData['business_phone'] ?? rawData['phone'] ?? settings['business_phone'] ?? settings['phone'] ?? '';
     settings['gstin'] = rawData['gstin'] ?? settings['gstin'] ?? '';
+    settings['upi_vpa'] = rawData['upi_vpa'] ?? settings['upi_vpa'] ?? '';
     settings['plan_tier'] =
         rawData['plan_tier'] ?? settings['plan_tier'] ?? 'growth';
     settings['enabled_features'] = _coerceEnabledFeatures(

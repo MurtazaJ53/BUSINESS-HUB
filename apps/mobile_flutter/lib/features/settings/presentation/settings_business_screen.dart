@@ -26,6 +26,7 @@ class _SettingsBusinessScreenState
   final _tagline = TextEditingController();
   final _phone = TextEditingController();
   final _gstin = TextEditingController();
+  final _upi = TextEditingController();
   final _footer = TextEditingController();
   String _currency = 'INR';
   bool _loaded = false;
@@ -37,6 +38,7 @@ class _SettingsBusinessScreenState
     _tagline.text = shop.tagline;
     _phone.text = shop.phone;
     _gstin.text = shop.gstin;
+    _upi.text = shop.upiVpa;
     _footer.text = shop.footer;
     _currency = _currencies.contains(shop.currency) ? shop.currency : 'INR';
     _loaded = true;
@@ -48,6 +50,7 @@ class _SettingsBusinessScreenState
     _tagline.dispose();
     _phone.dispose();
     _gstin.dispose();
+    _upi.dispose();
     _footer.dispose();
     super.dispose();
   }
@@ -60,6 +63,13 @@ class _SettingsBusinessScreenState
       );
       return;
     }
+    final upi = _upi.text.trim();
+    if (upi.isNotEmpty && !RegExp(r'^[\w.\-]{1,256}@[a-zA-Z]{2,64}$').hasMatch(upi)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid UPI ID (e.g. name@bank).')),
+      );
+      return;
+    }
     setState(() => _saving = true);
     try {
       await ref.read(shopRepositoryProvider).saveShopDocument(<String, dynamic>{
@@ -69,6 +79,7 @@ class _SettingsBusinessScreenState
         'currency': _currency,
         'business_phone': _phone.text.trim(),
         'gstin': _gstin.text.trim(),
+        'upi_vpa': upi,
         // Preserve plan + features (saveShopDocument does a full overwrite).
         'plan_tier': shop.planTier,
         'enabled_features': shop.enabledFeatures,
@@ -133,6 +144,39 @@ class _SettingsBusinessScreenState
                   decoration: const InputDecoration(
                     labelText: 'GSTIN (optional)',
                     hintText: 'Shown on GST tax invoices',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          MobilePanel(
+            title: 'Payments',
+            action: const MobileTag(
+              label: 'UPI QR',
+              icon: Icons.qr_code_2_rounded,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const SizedBox(height: 4),
+                TextField(
+                  controller: _upi,
+                  autocorrect: false,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'UPI ID (optional)',
+                    hintText: 'e.g. yourname@okhdfcbank',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Used to auto-generate a UPI QR at checkout with the exact '
+                  'bill amount, so customers pay straight into this account. '
+                  'Applies to every cashier on this shop.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colors.textTertiary,
+                    height: 1.4,
                   ),
                 ),
               ],
