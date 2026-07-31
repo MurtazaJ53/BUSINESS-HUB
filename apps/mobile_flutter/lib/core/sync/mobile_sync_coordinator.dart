@@ -75,7 +75,6 @@ class MobileSyncCoordinator {
   final void Function(MobileSyncStatus status) setStatus;
 
   MobileSession? _session;
-  bool _inventoryReadsUseBackend = false;
   bool _salesReadsUseBackend = false;
   bool _isFlushingOutbox = false;
   Timer? _outboxRetryTimer;
@@ -117,7 +116,6 @@ class MobileSyncCoordinator {
     final shopId = session.shopId!;
     await _ensureLocalWorkspace(session, shopId);
     if (!MobileRuntimeConfig.backendSyncEnabled) {
-      _inventoryReadsUseBackend = false;
       _salesReadsUseBackend = false;
       setStatus(MobileSyncStatus.idle);
       return;
@@ -128,18 +126,23 @@ class MobileSyncCoordinator {
       return;
     }
     final domainStates = await _refreshBackendDomainEpochs(session, shopId);
-    final inventoryState = domainStates['inventory'];
     final salesState = domainStates['sales'];
-    _inventoryReadsUseBackend = inventoryState?.isPostgresPrimary ?? false;
-    _salesReadsUseBackend = salesState?.isPostgresPrimary ?? false;
+    // Default to Postgres-primary when the probe was inconclusive (a slow /
+    // free-tier backend can drop a domain-state request). Native self-serve
+    // shops are always Postgres-primary, so assuming so is safe and avoids
+    // disabling backend reads on a transient hiccup.
+    _salesReadsUseBackend = salesState?.isPostgresPrimary ?? true;
 
-    if (_inventoryReadsUseBackend) {
-      await _syncBackendInventorySnapshot(session, shopId);
-    }
-
-    if (_salesReadsUseBackend) {
-      await _syncBackendSalesSnapshot(session, shopId);
-    }
+    // Always hydrate local from the backend snapshot on login/refresh. Merges
+    // are upserts, so a pull can never lose local data — but it guarantees the
+    // shop is populated even if the domain-state probe flaked, which is what
+    // was intermittently leaving a freshly-signed-in shop empty.
+    await _syncBackendInventorySnapshot(session, shopId);
+    await _syncBackendSalesSnapshot(session, shopId);
+    // Customers were previously only pulled by a manual sync, so a fresh
+    // login (which clears the cache) showed zero customers until the user hit
+    // refresh. Pull them on login too.
+    await _syncBackendCustomersSnapshot(session, shopId);
 
     setStatus(MobileSyncStatus.idle);
     _startOutboxRetryLoop();
@@ -1095,6 +1098,42 @@ class MobileSyncCoordinator {
           item['inventory_item_id'] = null;
         }
       }
+    }
+  }
+
+  Future<void> _syncBackendCustomersSnapshot(
+    MobileSession session,
+    String shopId, {
+    bool updateStatus = false,
+  }) async {
+    try {
+      final customers = await _backendApiClient.fetchCustomers(
+        user: session.user,
+        shopId: shopId,
+      );
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final iso = DateTime.now().toIso8601String();
+      for (final c in customers) {
+        await _customerRepository.mergeRemoteCustomerDocument(
+          c.id,
+          <String, dynamic>{
+            'name': c.name,
+            'phone': c.phone ?? '',
+            'email': c.email ?? '',
+            'notes': c.notes ?? '',
+            'status': c.status,
+            'balance': c.balance,
+            'total_spent': c.totalSpent,
+            'tombstone': false,
+            'updatedAt': iso,
+          },
+          updatedAt: now,
+        );
+      }
+      if (updateStatus) setStatus(MobileSyncStatus.idle);
+    } catch (error) {
+      debugPrint('Backend customers snapshot sync failed: $error');
+      if (updateStatus) setStatus(MobileSyncStatus.error);
     }
   }
 
