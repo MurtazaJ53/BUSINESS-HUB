@@ -723,6 +723,13 @@ class MobileSyncCoordinator {
           final payload = Map<String, dynamic>.from(
             jsonDecode(entry.payloadJson) as Map<String, dynamic>,
           );
+          if (entry.commandType == 'sale_create') {
+            // Safety net for already-queued payloads: the backend requires a
+            // UUID or null for inventory_item_id, so null out any non-UUID
+            // local id (custom/weighed/offline items) before sending. This lets
+            // a previously-rejected sale succeed on retry instead of looping.
+            _sanitizeSaleItemIds(payload);
+          }
           late BackendCommandResponse response;
           switch (entry.commandType) {
             case 'sale_create':
@@ -1065,6 +1072,28 @@ class MobileSyncCoordinator {
       debugPrint('Backend sales snapshot sync failed: $error');
       if (updateStatus) {
         setStatus(MobileSyncStatus.error);
+      }
+    }
+  }
+
+  static final RegExp _uuidPattern = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+
+  /// Null out any non-UUID `inventory_item_id` in a queued sale payload so the
+  /// backend (which requires a UUID or null) accepts it as a named line rather
+  /// than rejecting the whole sale.
+  void _sanitizeSaleItemIds(Map<String, dynamic> payload) {
+    final sale = payload['sale'];
+    if (sale is! Map) return;
+    final items = sale['items'];
+    if (items is! List) return;
+    for (final item in items) {
+      if (item is Map) {
+        final id = (item['inventory_item_id'] ?? '').toString().trim();
+        if (!_uuidPattern.hasMatch(id)) {
+          item['inventory_item_id'] = null;
+        }
       }
     }
   }

@@ -1796,6 +1796,19 @@ class CommerceOutboxAttentionEntry {
   }
 }
 
+final RegExp _uuidRe = RegExp(
+  r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+);
+
+/// The backend's `inventory_item_id` must be a UUID or null. Custom items,
+/// weighed lines, and items created offline carry non-UUID local ids — send
+/// those as null so the sale still syncs (recorded as a named, catalog-less
+/// line) instead of being rejected with "Must be a valid UUID".
+Object? _backendUuidOrNull(Object? id) {
+  final text = (id ?? '').toString().trim();
+  return _uuidRe.hasMatch(text) ? text : null;
+}
+
 class LocalSaleCommit {
   const LocalSaleCommit({
     required this.commandId,
@@ -1857,7 +1870,7 @@ class LocalSaleCommit {
       'items': items
           .map(
             (item) => {
-              'inventory_item_id': item['itemId'],
+              'inventory_item_id': _backendUuidOrNull(item['itemId']),
               'name': item['name'],
               'sku': item['sku'] ?? '',
               'size': item['size'] ?? '',

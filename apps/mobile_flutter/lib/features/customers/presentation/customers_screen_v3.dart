@@ -61,35 +61,42 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
     return Scaffold(
       backgroundColor: AppColors.of(context).background,
       body: SafeArea(
-        child: Column(
-          children: [
-            // Header with search
-            _buildHeader(context),
-
-            // Metrics
-            _buildMetrics(
-              totalCustomers: totalCustomers,
-              totalDues: totalDues,
-              customersWithDues: customersWithDues,
+        // Search, metrics and the dues filter now scroll away with the list so
+        // more customer rows stay visible while scrolling.
+        child: CustomScrollView(
+          slivers: <Widget>[
+            SliverToBoxAdapter(child: _buildHeader(context)),
+            SliverToBoxAdapter(
+              child: _buildMetrics(
+                totalCustomers: totalCustomers,
+                totalDues: totalDues,
+                customersWithDues: customersWithDues,
+              ),
             ),
-
-            // Filters
-            _buildFilters(),
-
-            // Customers list
-            Expanded(
-              child: customersAsync.isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : filteredCustomers.isEmpty
-                  ? EmptyStateWidget(
-                      icon: Icons.groups_rounded,
-                      title: 'No customers found',
-                      message: _search.isEmpty
-                          ? 'Start adding customers to track sales'
-                          : 'Try a different search term',
-                    )
-                  : _buildCustomersList(filteredCustomers),
-            ),
+            SliverToBoxAdapter(child: _buildFilters()),
+            if (customersAsync.isLoading)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (filteredCustomers.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: EmptyStateWidget(
+                  icon: Icons.groups_rounded,
+                  title: 'No customers found',
+                  message: _search.isEmpty
+                      ? 'Start adding customers to track sales'
+                      : 'Try a different search term',
+                ),
+              )
+            else
+              SliverList.builder(
+                itemCount: filteredCustomers.length,
+                itemBuilder: (context, index) =>
+                    _buildCustomerRow(filteredCustomers[index]),
+              ),
+            const SliverToBoxAdapter(child: SizedBox(height: 96)),
           ],
         ),
       ),
@@ -265,33 +272,23 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
     );
   }
 
-  Widget _buildCustomersList(List<BackendCustomerSummary> customers) {
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 100),
-      itemCount: customers.length,
-      itemBuilder: (context, index) {
-        final customer = customers[index];
-        final hasDues = customer.balance > 0;
-
-        return EnhancedListItem(
-          title: customer.name,
-          subtitle: (customer.phone ?? '').isEmpty
-              ? (hasDues
-                    ? 'Due: ${formatCurrency(customer.balance)}'
-                    : 'No dues')
-              : '${customer.phone}${hasDues ? ' • Due: ${formatCurrency(customer.balance)}' : ''}',
-          leadingIcon: Icons.person_rounded,
-          leadingColor: hasDues ? AppPalette.warning : AppPalette.customer,
-          trailing: hasDues
-              ? StatusBadge(
-                  label: formatCurrency(customer.balance),
-                  color: AppPalette.warning,
-                  showDot: false,
-                )
-              : null,
-          onTap: () => _showCustomerDetails(context, customer),
-        );
-      },
+  Widget _buildCustomerRow(BackendCustomerSummary customer) {
+    final hasDues = customer.balance > 0;
+    return EnhancedListItem(
+      title: customer.name,
+      subtitle: (customer.phone ?? '').isEmpty
+          ? (hasDues ? 'Due: ${formatCurrency(customer.balance)}' : 'No dues')
+          : '${customer.phone}${hasDues ? ' • Due: ${formatCurrency(customer.balance)}' : ''}',
+      leadingIcon: Icons.person_rounded,
+      leadingColor: hasDues ? AppPalette.warning : AppPalette.customer,
+      trailing: hasDues
+          ? StatusBadge(
+              label: formatCurrency(customer.balance),
+              color: AppPalette.warning,
+              showDot: false,
+            )
+          : null,
+      onTap: () => _showCustomerDetails(context, customer),
     );
   }
 
