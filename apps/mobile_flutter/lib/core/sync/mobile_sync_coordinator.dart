@@ -463,6 +463,28 @@ class MobileSyncCoordinator {
     setStatus(MobileSyncStatus.syncing);
     final now = DateTime.now();
     final iso = now.toIso8601String();
+    // Push the edit to the server (was local-only). Only for items that carry
+    // a real server id; local-only items sync via their create instead.
+    if (MobileRuntimeConfig.backendSyncEnabled && _uuidPattern.hasMatch(itemId)) {
+      try {
+        await _backendApiClient.updateInventoryItem(
+          user: session.user,
+          shopId: session.shopId!,
+          itemId: itemId,
+          name: name.trim(),
+          sellPrice: sellPrice,
+          category: category,
+          sku: sku,
+          hsnCode: hsnCode,
+          gstRate: gstRate,
+          priceIncludesTax: priceIncludesTax,
+          costPrice: session.canViewCost ? costPrice : null,
+          description: description,
+        );
+      } catch (error) {
+        debugPrint('Backend inventory update failed: $error');
+      }
+    }
     final normalizedCategory =
         category.trim().isEmpty ? 'General' : category.trim();
     final payload = <String, dynamic>{
@@ -523,6 +545,21 @@ class MobileSyncCoordinator {
     }
     setStatus(MobileSyncStatus.syncing);
     final now = DateTime.now();
+    // Push the delete to the server (was previously local-only, so deleted
+    // items reappeared after a fresh login). A non-UUID id is a local-only
+    // item that never synced, so there's nothing to delete on the server.
+    if (MobileRuntimeConfig.backendSyncEnabled &&
+        _uuidPattern.hasMatch(itemId)) {
+      try {
+        await _backendApiClient.deleteInventoryItem(
+          user: session.user,
+          shopId: session.shopId!,
+          itemId: itemId,
+        );
+      } catch (error) {
+        debugPrint('Backend inventory delete failed: $error');
+      }
+    }
     await _inventoryRepository.mergeInventoryDocument(
       itemId,
       <String, dynamic>{

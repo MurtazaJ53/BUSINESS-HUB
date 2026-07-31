@@ -412,6 +412,65 @@ class BackendApiClient {
     );
   }
 
+  Future<Map<String, dynamic>> updateInventoryItem({
+    required User user,
+    required String shopId,
+    required String itemId,
+    required String name,
+    required double sellPrice,
+    String category = 'General',
+    String sku = '',
+    String hsnCode = '',
+    double gstRate = 0,
+    bool priceIncludesTax = true,
+    double? costPrice,
+    String description = '',
+  }) async {
+    final body = <String, dynamic>{
+      'name': name,
+      'sell_price': sellPrice.toStringAsFixed(2),
+      'category': category.trim().isEmpty ? 'General' : category.trim(),
+      'sku': sku,
+      'hsn_code': hsnCode.trim(),
+      'gst_rate': gstRate.toStringAsFixed(2),
+      'price_includes_tax': priceIncludesTax,
+      'description': description,
+    };
+    if (costPrice != null) {
+      body['private_cost_price'] = costPrice.toStringAsFixed(2);
+    }
+    return _request(
+      user: user,
+      method: 'PATCH',
+      path: '/shops/$shopId/inventory/$itemId/',
+      body: body,
+    );
+  }
+
+  Future<void> deleteInventoryItem({
+    required User user,
+    required String shopId,
+    required String itemId,
+  }) async {
+    await _request(
+      user: user,
+      method: 'DELETE',
+      path: '/shops/$shopId/inventory/$itemId/',
+    );
+  }
+
+  Future<void> deleteCustomer({
+    required User user,
+    required String shopId,
+    required String customerId,
+  }) async {
+    await _request(
+      user: user,
+      method: 'DELETE',
+      path: '/shops/$shopId/customers/$customerId/',
+    );
+  }
+
   Future<List<Map<String, dynamic>>> fetchInventoryItems({
     required User user,
     required String shopId,
