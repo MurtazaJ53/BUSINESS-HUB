@@ -634,6 +634,101 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
     }
   }
 
+  /// Mandatory customer capture for a credit (part/unpaid) sale. Name and
+  /// mobile are required; address is optional. Returns null if the cashier
+  /// backs out (the sale is then not completed).
+  Future<Map<String, String>?> _captureCreditCustomer({
+    required double due,
+    required String name,
+    required String phone,
+  }) async {
+    final nameCtrl = TextEditingController(text: name);
+    final phoneCtrl = TextEditingController(text: phone);
+    final addressCtrl = TextEditingController();
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (dialogContext) {
+        String? error;
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              title: const Text('Credit sale — add customer'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    '${formatCurrency(due)} will be recorded as due. A name and '
+                    'mobile number are required so you can recover it later.',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: nameCtrl,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(
+                      labelText: 'Customer name *',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'Mobile number *',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: addressCtrl,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: const InputDecoration(
+                      labelText: 'Address (optional)',
+                    ),
+                  ),
+                  if (error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        error!,
+                        style: const TextStyle(color: Colors.red, fontSize: 12),
+                      ),
+                    ),
+                ],
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final n = nameCtrl.text.trim();
+                    final p = phoneCtrl.text.trim();
+                    if (n.isEmpty || p.length < 7) {
+                      setDialogState(() => error =
+                          'Enter a name and a valid mobile number.');
+                      return;
+                    }
+                    Navigator.pop(dialogContext, <String, String>{
+                      'name': n,
+                      'phone': p,
+                      'address': addressCtrl.text.trim(),
+                    });
+                  },
+                  child: const Text('Save & complete'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    nameCtrl.dispose();
+    phoneCtrl.dispose();
+    addressCtrl.dispose();
+    return result;
+  }
+
   /// When a sale leaves a balance due, attach it to a real customer (matched
   /// by phone, or created) so the due lands in the Clients khata. Returns the
   /// customer id to record on the sale, or null for a fully-paid walk-in.
@@ -641,6 +736,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
     required List<PosPayment> payments,
     required String customerName,
     required String customerPhone,
+    String customerAddress = '',
   }) async {
     final paid = payments.fold<double>(0, (sum, p) => sum + p.amount);
     final saleDue = _netTotal - paid;
@@ -667,6 +763,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
       <String, dynamic>{
         'name': customerName.isEmpty ? 'Customer' : customerName,
         'phone': customerPhone,
+        if (customerAddress.isNotEmpty) 'address': customerAddress,
         'status': 'active',
         'balance': 0,
         'total_spent': 0,
@@ -829,8 +926,31 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
     final payments = result['payments'] as List<PosPayment>;
     final paymentMode = result['paymentMode'] as String;
     final buyerGstin = result['buyerGstin'] as String?;
-    final customerName = _customerNameController.text.trim();
-    final customerPhone = _customerPhoneController.text.trim();
+    var customerName = _customerNameController.text.trim();
+    var customerPhone = _customerPhoneController.text.trim();
+    var customerAddress = '';
+
+    // Credit (udhaar) guard: a sale that leaves a balance due MUST be tied to a
+    // customer with a name and mobile number, so the due is recoverable from
+    // the Clients khata. Address stays optional. Fully-paid sales skip this.
+    final paidNow = payments.fold<double>(0, (sum, p) => sum + p.amount);
+    final creditDue = _netTotal - paidNow;
+    if (creditDue > 0.009 &&
+        (customerName.isEmpty || customerPhone.isEmpty)) {
+      final captured = await _captureCreditCustomer(
+        due: creditDue,
+        name: customerName,
+        phone: customerPhone,
+      );
+      if (captured == null || !mounted) {
+        return; // cancelled — do not complete an untracked credit sale
+      }
+      customerName = (captured['name'] ?? '').trim();
+      customerPhone = (captured['phone'] ?? '').trim();
+      customerAddress = (captured['address'] ?? '').trim();
+      _customerNameController.text = customerName;
+      _customerPhoneController.text = customerPhone;
+    }
 
     setState(() => _saving = true);
     try {
@@ -838,6 +958,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
         payments: payments,
         customerName: customerName,
         customerPhone: customerPhone,
+        customerAddress: customerAddress,
       );
       final commit = await salesRepository.recordLocalSale(
         shopId: activeShopId,
@@ -1077,59 +1198,64 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
         ref.watch(posCatalogPageProvider(catalogFilter)).asData?.value ??
         const <InventoryCatalogItem>[];
 
+    final entries = items.isEmpty ? const [] : groupCatalog(items);
+
     return Scaffold(
       backgroundColor: colors.background,
+      // The header, filters, favourites and quick-weigh rows now live inside
+      // the scroll view, so they slide up out of the way as the operator scrolls
+      // the product list — many more products stay on screen during a busy sale.
       body: SafeArea(
         bottom: false,
-        child: Column(
-          children: <Widget>[
-            _buildHeader(context, items),
-            if (categories.isNotEmpty) _buildCategoryFilters(categories),
-            _buildFavouritesStrip(),
-            _buildQuickWeighGrid(items),
-            const SizedBox(height: 4),
-            Expanded(
-              child: items.isEmpty
-                  ? _EmptyCatalog(searching: _search.isNotEmpty)
-                  : Builder(
-                      builder: (context) {
-                        final entries = groupCatalog(items);
-                        return ListView.separated(
-                          padding: EdgeInsets.fromLTRB(
-                            16,
-                            8,
-                            16,
-                            _cart.isEmpty ? 24 : 108,
-                          ),
-                          itemCount: entries.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (context, index) {
-                            final entry = entries[index];
-                            if (entry is VariantGroup) {
-                              return _VariantGroupRow(
-                                group: entry,
-                                qtyInCart: entry.variants.fold<double>(
-                                  0,
-                                  (sum, v) => sum + _qtyInCart(v.id),
-                                ),
-                                onTap: () => _openVariantPicker(entry),
-                              );
-                            }
-                            final item = entry as InventoryCatalogItem;
-                            return _ProductRow(
-                              item: item,
-                              qtyInCart: _qtyInCart(item.id),
-                              onAdd: () => _addToCart(item),
-                              onInc: () => _changeQtyById(item.id, 1),
-                              onDec: () => _changeQtyById(item.id, -1),
-                              onLongPress: () => _toggleFavourite(item),
-                            );
-                          },
-                        );
-                      },
-                    ),
-            ),
+        child: CustomScrollView(
+          slivers: <Widget>[
+            SliverToBoxAdapter(child: _buildHeader(context, items)),
+            if (categories.isNotEmpty)
+              SliverToBoxAdapter(child: _buildCategoryFilters(categories)),
+            SliverToBoxAdapter(child: _buildFavouritesStrip()),
+            SliverToBoxAdapter(child: _buildQuickWeighGrid(items)),
+            const SliverToBoxAdapter(child: SizedBox(height: 8)),
+            if (items.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _EmptyCatalog(searching: _search.isNotEmpty),
+              )
+            else
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, _cart.isEmpty ? 24 : 108),
+                sliver: SliverGrid.builder(
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 0.60,
+                  ),
+                  itemCount: entries.length,
+                  itemBuilder: (context, index) {
+                    final entry = entries[index];
+                    if (entry is VariantGroup) {
+                      return _VariantGroupCard(
+                        group: entry,
+                        qtyInCart: entry.variants.fold<double>(
+                          0,
+                          (sum, v) => sum + _qtyInCart(v.id),
+                        ),
+                        onTap: () => _openVariantPicker(entry),
+                      );
+                    }
+                    final item = entry as InventoryCatalogItem;
+                    return _ProductCard(
+                      item: item,
+                      qtyInCart: _qtyInCart(item.id),
+                      onAdd: () => _addToCart(item),
+                      onInc: () => _changeQtyById(item.id, 1),
+                      onDec: () => _changeQtyById(item.id, -1),
+                      onLongPress: () => _toggleFavourite(item),
+                    );
+                  },
+                ),
+              ),
           ],
         ),
       ),
@@ -1566,8 +1692,10 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
 
 // ---- product row ------------------------------------------------------------
 
-class _ProductRow extends StatelessWidget {
-  const _ProductRow({
+/// Premium product card for the 2-column POS grid: photo on top (or a gradient
+/// initial), then name, category, price and a full-width add / quantity control.
+class _ProductCard extends StatelessWidget {
+  const _ProductCard({
     required this.item,
     required this.qtyInCart,
     required this.onAdd,
@@ -1587,89 +1715,114 @@ class _ProductRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
     final theme = Theme.of(context);
-    final lowStock = item.isLowStock;
+    final selected = qtyInCart > 0;
+    final category = item.category.trim();
 
     return GestureDetector(
       onLongPress: onLongPress,
       child: Container(
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: qtyInCart > 0
-              ? AppPalette.primary.withValues(alpha: 0.5)
-              : colors.borderSoft,
-          width: qtyInCart > 0 ? 1.5 : 1,
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected
+                ? AppPalette.primary.withValues(alpha: 0.6)
+                : colors.borderSoft,
+            width: selected ? 1.5 : 1,
+          ),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: <Widget>[
-          _ProductTile(name: item.name, imagePath: item.imagePath),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  item.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: <Widget>[
-                    if (item.sku != null && item.sku!.isNotEmpty) ...<Widget>[
-                      Flexible(
-                        child: Text(
-                          item.sku!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colors.textTertiary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text('·', style: TextStyle(color: colors.textTertiary)),
-                      const SizedBox(width: 8),
-                    ],
-                    Text(
-                      '${_fmtQty(item.stock)} in stock',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: lowStock ? AppPalette.warning : colors.textTertiary,
-                        fontWeight: lowStock ? FontWeight.w700 : FontWeight.w500,
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: <Widget>[
+                  _CardImage(name: item.name, imagePath: item.imagePath),
+                  if (item.isLowStock)
+                    const Positioned(
+                      top: 8,
+                      left: 8,
+                      child: _MiniBadge(label: 'Low', color: AppPalette.warning),
+                    ),
+                  if (selected)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: _MiniBadge(
+                        label: '×${_fmtQty(qtyInCart)}',
+                        color: AppPalette.primary,
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  formatCurrency(item.price),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: AppPalette.primary,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          qtyInCart > 0
-              ? _QtyStepper(quantity: qtyInCart, onInc: onInc, onDec: onDec)
-              : _AddButton(onTap: onAdd),
-        ],
-      ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    item.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    category.isNotEmpty
+                        ? category
+                        : '${_fmtQty(item.stock)} in stock',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.textTertiary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    formatCurrency(item.price),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      color: AppPalette.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  selected
+                      ? _CardStepper(
+                          quantity: qtyInCart,
+                          onInc: onInc,
+                          onDec: onDec,
+                        )
+                      : _CardAddButton(onTap: onAdd),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _VariantGroupRow extends StatelessWidget {
-  const _VariantGroupRow({
+/// Variant-group card (same shape as [_ProductCard]) — tapping opens the
+/// variant picker instead of adding directly.
+class _VariantGroupCard extends StatelessWidget {
+  const _VariantGroupCard({
     required this.group,
     required this.qtyInCart,
     required this.onTap,
@@ -1683,94 +1836,207 @@ class _VariantGroupRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
     final theme = Theme.of(context);
-    final minPrice = group.minPrice;
-    final totalStock = group.totalStock;
+    final selected = qtyInCart > 0;
     final firstImage = group.variants
         .map((v) => v.imagePath)
-        .firstWhere(
-          (p) => p != null && p.isNotEmpty,
-          orElse: () => null,
-        );
+        .firstWhere((p) => p != null && p.isNotEmpty, orElse: () => null);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surface,
         borderRadius: BorderRadius.circular(18),
-        child: Container(
-          decoration: BoxDecoration(
-            color: colors.surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: qtyInCart > 0
-                  ? AppPalette.primary.withValues(alpha: 0.5)
-                  : colors.borderSoft,
-              width: qtyInCart > 0 ? 1.5 : 1,
+        border: Border.all(
+          color: selected
+              ? AppPalette.primary.withValues(alpha: 0.6)
+              : colors.borderSoft,
+          width: selected ? 1.5 : 1,
+        ),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                _CardImage(name: group.baseName, imagePath: firstImage),
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: _MiniBadge(
+                    label: '${group.variants.length} options',
+                    color: AppPalette.primary,
+                  ),
+                ),
+              ],
             ),
           ),
-          padding: const EdgeInsets.all(12),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  group.baseName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${_fmtQty(group.totalStock)} in stock',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.textTertiary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11.5,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'from ${formatCurrency(group.minPrice)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: AppPalette.primary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _CardAddButton(
+                  onTap: onTap,
+                  label: 'Choose',
+                  icon: Icons.tune_rounded,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Full-width product image for a grid card, or a gradient initial fallback.
+class _CardImage extends StatelessWidget {
+  const _CardImage({required this.name, this.imagePath});
+
+  final String name;
+  final String? imagePath;
+
+  @override
+  Widget build(BuildContext context) {
+    final path = imagePath;
+    if (path != null && path.isNotEmpty && File(path).existsSync()) {
+      return Image.file(
+        File(path),
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _fallback(),
+      );
+    }
+    return _fallback();
+  }
+
+  Widget _fallback() {
+    final letter = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            AppPalette.primary.withValues(alpha: 0.16),
+            AppPalette.primary.withValues(alpha: 0.06),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Text(
+          letter,
+          style: const TextStyle(
+            fontSize: 40,
+            fontWeight: FontWeight.w800,
+            color: AppPalette.primary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniBadge extends StatelessWidget {
+  const _MiniBadge({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 11,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Full-width "Add" (or custom-labelled) button used at the foot of a card.
+class _CardAddButton extends StatelessWidget {
+  const _CardAddButton({
+    required this.onTap,
+    this.label = 'Add',
+    this.icon = Icons.add_rounded,
+  });
+
+  final VoidCallback onTap;
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppPalette.primary,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          height: 38,
+          width: double.infinity,
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              _ProductTile(name: group.baseName, imagePath: firstImage),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      group.baseName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${group.variants.length} variants · ${_fmtQty(totalStock)} in stock',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colors.textTertiary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'from ${formatCurrency(minPrice)}',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: AppPalette.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: AppPalette.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  children: <Widget>[
-                    if (qtyInCart > 0) ...<Widget>[
-                      Text(
-                        _fmtQty(qtyInCart),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: AppPalette.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    const Icon(
-                      Icons.tune_rounded,
-                      color: AppPalette.primary,
-                      size: 20,
-                    ),
-                  ],
+              Icon(icon, color: Colors.white, size: 18),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
                 ),
               ),
             ],
@@ -1781,44 +2047,96 @@ class _VariantGroupRow extends StatelessWidget {
   }
 }
 
-class _ProductTile extends StatelessWidget {
-  const _ProductTile({required this.name, this.imagePath});
+/// Full-width − / qty / + control used at the foot of a card when in cart.
+class _CardStepper extends StatelessWidget {
+  const _CardStepper({
+    required this.quantity,
+    required this.onInc,
+    required this.onDec,
+  });
 
-  final String name;
-  final String? imagePath;
+  final double quantity;
+  final VoidCallback onInc;
+  final VoidCallback onDec;
 
   @override
   Widget build(BuildContext context) {
-    final path = imagePath;
-    if (path != null && path.isNotEmpty && File(path).existsSync()) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Image.file(
-          File(path),
-          width: 52,
-          height: 52,
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => _letterTile(),
-        ),
-      );
-    }
+    return Container(
+      height: 38,
+      decoration: BoxDecoration(
+        color: AppPalette.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppPalette.primary.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: InkWell(
+              onTap: onDec,
+              child: const Icon(
+                Icons.remove_rounded,
+                size: 20,
+                color: AppPalette.primary,
+              ),
+            ),
+          ),
+          Text(
+            _fmtQty(quantity),
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 15,
+              color: AppPalette.primary,
+            ),
+          ),
+          Expanded(
+            child: InkWell(
+              onTap: onInc,
+              child: const Icon(
+                Icons.add_rounded,
+                size: 20,
+                color: AppPalette.primary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProductTile extends StatelessWidget {
+  const _ProductTile({required this.name});
+
+  final String name;
+
+  static const double _size = 56;
+
+  @override
+  Widget build(BuildContext context) {
     return _letterTile();
   }
 
   Widget _letterTile() {
     final letter = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
     return Container(
-      width: 52,
-      height: 52,
+      width: _size,
+      height: _size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: AppPalette.primary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(14),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            AppPalette.primary.withValues(alpha: 0.18),
+            AppPalette.primary.withValues(alpha: 0.08),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Text(
         letter,
         style: const TextStyle(
-          fontSize: 22,
+          fontSize: 24,
           fontWeight: FontWeight.w800,
           color: AppPalette.primary,
         ),

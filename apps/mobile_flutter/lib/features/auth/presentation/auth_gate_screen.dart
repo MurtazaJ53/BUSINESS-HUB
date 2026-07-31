@@ -21,10 +21,9 @@ class AuthGateScreen extends ConsumerStatefulWidget {
 class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
     with SingleTickerProviderStateMixin {
   final _pinController = TextEditingController();
-  // Cloud (JWT) login. Prefilled with the demo workspace so testing is one tap.
-  final _emailController =
-      TextEditingController(text: 'demo@businesshub.test');
-  final _passwordController = TextEditingController(text: 'demo12345');
+  // Cloud (JWT) login — start empty so users enter their own credentials.
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   // Sign-up (create a new shop).
   final _regOwnerController = TextEditingController();
   final _regBusinessController = TextEditingController();
