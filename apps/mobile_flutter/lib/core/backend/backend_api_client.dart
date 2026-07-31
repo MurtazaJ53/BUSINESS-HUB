@@ -1035,6 +1035,13 @@ class BackendApiClient {
     );
   }
 
+  /// Gateway/unavailable statuses that mean "the server is waking up or
+  /// redeploying" on a free-tier host — worth waiting for and retrying rather
+  /// than surfacing as a failure (which used to make writes silently fall back
+  /// to local and then be lost).
+  static const Set<int> _coldStartStatuses = <int>{502, 503, 504};
+  static const int _maxAttempts = 5;
+
   Future<Map<String, dynamic>> _request({
     required User user,
     required String method,
@@ -1047,51 +1054,65 @@ class BackendApiClient {
       );
     }
 
-    final client = HttpClient();
-    client.connectionTimeout = _requestTimeout;
-    try {
-      final url = Uri.parse('${baseUrl.replaceAll(RegExp(r"/$"), "")}$path');
-      final request = await client
-          .openUrl(method, url)
-          .timeout(_requestTimeout);
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      await _attachAuthHeaders(request, user);
-      if (body != null) {
-        request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-        // Encode first and set contentLength explicitly. A bare
-        // request.write() leaves it at -1, which makes dart:io fall back to
-        // Transfer-Encoding: chunked - and plenty of things upstream cannot
-        // read a chunked request body (Django's dev server drops it entirely,
-        // and some proxies/WAFs reject it), so the server sees an empty body
-        // and answers "this field is required" for every field we sent.
-        final encoded = utf8.encode(jsonEncode(body));
-        request.contentLength = encoded.length;
-        request.add(encoded);
-      }
+    for (var attempt = 1; ; attempt++) {
+      final client = HttpClient();
+      client.connectionTimeout = _requestTimeout;
+      try {
+        final url = Uri.parse('${baseUrl.replaceAll(RegExp(r"/$"), "")}$path');
+        final request = await client
+            .openUrl(method, url)
+            .timeout(_requestTimeout);
+        request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+        await _attachAuthHeaders(request, user);
+        if (body != null) {
+          request.headers
+              .set(HttpHeaders.contentTypeHeader, 'application/json');
+          // Encode first and set contentLength explicitly. A bare
+          // request.write() leaves it at -1, which makes dart:io fall back to
+          // Transfer-Encoding: chunked - and plenty of things upstream cannot
+          // read a chunked request body (Django's dev server drops it entirely,
+          // and some proxies/WAFs reject it), so the server sees an empty body
+          // and answers "this field is required" for every field we sent.
+          final encoded = utf8.encode(jsonEncode(body));
+          request.contentLength = encoded.length;
+          request.add(encoded);
+        }
 
-      final response = await request.close().timeout(_requestTimeout);
-      final bodyText = await utf8
-          .decodeStream(response)
-          .timeout(_requestTimeout);
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw BackendApiException(
-          'Backend request failed (${response.statusCode}) for $path: $bodyText',
-          statusCode: response.statusCode,
+        final response = await request.close().timeout(_requestTimeout);
+        final bodyText =
+            await utf8.decodeStream(response).timeout(_requestTimeout);
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          // The free-tier host returns 502/503/504 while cold-starting or
+          // redeploying — wait and retry so a sleeping server doesn't lose the
+          // write or fail the login.
+          if (_coldStartStatuses.contains(response.statusCode) &&
+              attempt < _maxAttempts) {
+            await Future<void>.delayed(Duration(seconds: 5 * attempt));
+            continue;
+          }
+          throw BackendApiException(
+            'Backend request failed (${response.statusCode}) for $path: $bodyText',
+            statusCode: response.statusCode,
+          );
+        }
+
+        if (bodyText.trim().isEmpty) {
+          return <String, dynamic>{};
+        }
+        return Map<String, dynamic>.from(
+          jsonDecode(bodyText) as Map<String, dynamic>,
         );
+      } on TimeoutException {
+        if (attempt < _maxAttempts) {
+          await Future<void>.delayed(Duration(seconds: 3 * attempt));
+          continue;
+        }
+        throw BackendApiException(
+          'Backend request timed out for $path. Check connectivity or backend load.',
+        );
+      } finally {
+        client.close(force: true);
       }
-
-      if (bodyText.trim().isEmpty) {
-        return <String, dynamic>{};
-      }
-      return Map<String, dynamic>.from(
-        jsonDecode(bodyText) as Map<String, dynamic>,
-      );
-    } on TimeoutException {
-      throw BackendApiException(
-        'Backend request timed out for $path. Check connectivity or backend load.',
-      );
-    } finally {
-      client.close(force: true);
     }
   }
 
@@ -1106,8 +1127,9 @@ class BackendApiClient {
       );
     }
 
-    final client = HttpClient();
-    client.connectionTimeout = _requestTimeout;
+    for (var attempt = 1; ; attempt++) {
+      final client = HttpClient();
+      client.connectionTimeout = _requestTimeout;
     try {
       final url = Uri.parse('${baseUrl.replaceAll(RegExp(r"/$"), "")}$path');
       final request = await client
@@ -1121,6 +1143,11 @@ class BackendApiClient {
           .decodeStream(response)
           .timeout(_requestTimeout);
       if (response.statusCode < 200 || response.statusCode >= 300) {
+        if (_coldStartStatuses.contains(response.statusCode) &&
+            attempt < _maxAttempts) {
+          await Future<void>.delayed(Duration(seconds: 5 * attempt));
+          continue;
+        }
         throw BackendApiException(
           'Backend request failed (${response.statusCode}) for $path: $bodyText',
           statusCode: response.statusCode,
@@ -1142,11 +1169,16 @@ class BackendApiClient {
           .map((item) => Map<String, dynamic>.from(item))
           .toList(growable: false);
     } on TimeoutException {
+      if (attempt < _maxAttempts) {
+        await Future<void>.delayed(Duration(seconds: 3 * attempt));
+        continue;
+      }
       throw BackendApiException(
         'Backend request timed out for $path. Check connectivity or backend load.',
       );
     } finally {
       client.close(force: true);
+    }
     }
   }
 
@@ -1239,32 +1271,48 @@ class BackendApiClient {
       throw BackendApiException('Backend URL is not configured.');
     }
     const authTimeout = Duration(seconds: 60);
-    final client = HttpClient();
-    client.connectionTimeout = authTimeout;
-    try {
-      final url = Uri.parse('${baseUrl.replaceAll(RegExp(r"/$"), "")}$path');
-      final request = await client.postUrl(url).timeout(authTimeout);
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-      // Explicit Content-Length (never chunked) - some servers drop chunked bodies.
-      final encoded = utf8.encode(jsonEncode(body));
-      request.contentLength = encoded.length;
-      request.add(encoded);
-      final response = await request.close().timeout(authTimeout);
-      final text = await utf8.decodeStream(response).timeout(authTimeout);
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw BackendApiException(
-          _firstErrorMessage(text, response.statusCode),
-          statusCode: response.statusCode,
+    for (var attempt = 1; ; attempt++) {
+      final client = HttpClient();
+      client.connectionTimeout = authTimeout;
+      try {
+        final url = Uri.parse('${baseUrl.replaceAll(RegExp(r"/$"), "")}$path');
+        final request = await client.postUrl(url).timeout(authTimeout);
+        request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+        request.headers
+            .set(HttpHeaders.contentTypeHeader, 'application/json');
+        // Explicit Content-Length (never chunked) - some servers drop chunked bodies.
+        final encoded = utf8.encode(jsonEncode(body));
+        request.contentLength = encoded.length;
+        request.add(encoded);
+        final response = await request.close().timeout(authTimeout);
+        final text = await utf8.decodeStream(response).timeout(authTimeout);
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          // Wait out a waking / redeploying free-tier server instead of
+          // failing the login or register with a 503.
+          if (_coldStartStatuses.contains(response.statusCode) &&
+              attempt < _maxAttempts) {
+            await Future<void>.delayed(Duration(seconds: 5 * attempt));
+            continue;
+          }
+          throw BackendApiException(
+            _firstErrorMessage(text, response.statusCode),
+            statusCode: response.statusCode,
+          );
+        }
+        return Map<String, dynamic>.from(
+          jsonDecode(text) as Map<String, dynamic>,
         );
+      } on TimeoutException {
+        if (attempt < _maxAttempts) {
+          await Future<void>.delayed(Duration(seconds: 3 * attempt));
+          continue;
+        }
+        throw BackendApiException(
+          'Request timed out. The server may be waking up - please try again.',
+        );
+      } finally {
+        client.close(force: true);
       }
-      return Map<String, dynamic>.from(jsonDecode(text) as Map<String, dynamic>);
-    } on TimeoutException {
-      throw BackendApiException(
-        'Request timed out. The server may be waking up - please try again.',
-      );
-    } finally {
-      client.close(force: true);
     }
   }
 
