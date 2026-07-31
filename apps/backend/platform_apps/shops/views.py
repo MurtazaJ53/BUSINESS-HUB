@@ -69,17 +69,23 @@ class ShopDomainStateView(APIView):
         )
 
         if control is None:
+            # No migration control row means this shop never came from Firebase —
+            # it was created directly in PostgreSQL by self-serve registration, so
+            # Postgres IS its source of truth. Reporting LEGACY/Firebase here made
+            # the mobile app treat the backend as non-primary and skip pulling the
+            # catalog/sales, so a fresh install showed an empty shop even though
+            # the data was safely in Postgres. Default native shops to primary.
             payload = {
                 "shop_id": membership.shop_id,
                 "domain": domain,
                 "control_present": False,
-                "write_master": MigrationWriteMaster.FIREBASE,
+                "write_master": MigrationWriteMaster.POSTGRES,
                 "bridge_mode": MigrationBridgeMode.DISABLED,
-                "cutover_status": MigrationCutoverStatus.LEGACY,
+                "cutover_status": MigrationCutoverStatus.POSTGRES_PRIMARY,
                 "current_epoch": 1,
                 "shadow_reads_enabled": False,
                 "is_enabled": True,
-                "can_write_on_postgres_surface": False,
+                "can_write_on_postgres_surface": True,
                 "pilot_signoff_status": None,
                 "pilot_signoff_summary": None,
                 "pilot_recommended_action": None,

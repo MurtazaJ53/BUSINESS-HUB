@@ -49,7 +49,10 @@ class ShopDomainStateApiTests(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
 
-    def test_domain_state_returns_legacy_defaults_when_no_control_exists(self):
+    def test_domain_state_defaults_to_postgres_primary_when_no_control_exists(self):
+        # A shop with no migration control was born in Postgres (self-serve),
+        # so the backend must report Postgres as primary — otherwise the mobile
+        # app treats the backend as non-primary and shows an empty shop.
         response = self.client.get(
             f"/api/v1/shops/{self.shop.id}/domain-state/{MigrationDomain.INVENTORY}/",
         )
@@ -59,12 +62,14 @@ class ShopDomainStateApiTests(TestCase):
         self.assertEqual(payload["shop_id"], str(self.shop.id))
         self.assertEqual(payload["domain"], MigrationDomain.INVENTORY)
         self.assertFalse(payload["control_present"])
-        self.assertEqual(payload["write_master"], MigrationWriteMaster.FIREBASE)
+        self.assertEqual(payload["write_master"], MigrationWriteMaster.POSTGRES)
         self.assertEqual(payload["bridge_mode"], MigrationBridgeMode.DISABLED)
-        self.assertEqual(payload["cutover_status"], MigrationCutoverStatus.LEGACY)
+        self.assertEqual(
+            payload["cutover_status"], MigrationCutoverStatus.POSTGRES_PRIMARY
+        )
         self.assertEqual(payload["current_epoch"], 1)
         self.assertFalse(payload["shadow_reads_enabled"])
-        self.assertFalse(payload["can_write_on_postgres_surface"])
+        self.assertTrue(payload["can_write_on_postgres_surface"])
         self.assertIsNone(payload["pilot_signoff_status"])
         self.assertIsNone(payload["pilot_signoff_summary"])
 
