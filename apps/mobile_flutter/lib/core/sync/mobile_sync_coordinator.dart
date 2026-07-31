@@ -1089,6 +1089,10 @@ class MobileSyncCoordinator {
   void _sanitizeSaleItemIds(Map<String, dynamic> payload) {
     final sale = payload['sale'];
     if (sale is! Map) return;
+    final customerId = (sale['customer_id'] ?? '').toString().trim();
+    if (!_uuidPattern.hasMatch(customerId)) {
+      sale['customer_id'] = null;
+    }
     final items = sale['items'];
     if (items is! List) return;
     for (final item in items) {

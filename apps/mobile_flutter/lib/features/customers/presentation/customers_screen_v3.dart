@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/backend/backend_api_client.dart';
 import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
+import '../../../core/runtime/mobile_runtime_config.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/khata/khata_reminder.dart';
@@ -629,32 +631,98 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
             setSheetState(() => isSaving = true);
             try {
               final now = DateTime.now();
-              final id =
-                  existing?.id ?? 'local-cust-${now.microsecondsSinceEpoch}';
+              final phone = phoneController.text.trim();
+              final email = emailController.text.trim();
+              final notes = notesController.text.trim();
               final opening =
                   double.tryParse(balanceController.text.trim()) ?? 0;
-              await ref
-                  .read(customerRepositoryProvider)
-                  .mergeRemoteCustomerDocument(
-                    id,
-                    <String, dynamic>{
-                      'name': name,
-                      'phone': phoneController.text.trim(),
-                      'email': emailController.text.trim(),
-                      'notes': notesController.text.trim(),
-                      'status': 'active',
-                      'balance': isEdit ? existing.balance : opening,
-                      'total_spent': isEdit ? existing.totalSpent : 0,
-                      'tombstone': false,
-                      'updatedAt': now.toIso8601String(),
-                    },
-                    updatedAt: now.millisecondsSinceEpoch,
-                  );
+              final session = ref.read(mobileSessionProvider).asData?.value;
+              final api = ref.read(backendApiClientProvider);
+              final repo = ref.read(customerRepositoryProvider);
+
+              // Push to the server so the customer actually syncs. Falls back to
+              // a local-only record when offline / the backend is unreachable,
+              // so the offline-first flow still works and the outbox-style pull
+              // reconciles later.
+              BackendCustomerSummary? synced;
+              var offline = false;
+              final existingIsRemote =
+                  isEdit && !(existing.id).startsWith('local-');
+              if (session != null &&
+                  session.hasShop &&
+                  MobileRuntimeConfig.backendSyncEnabled) {
+                try {
+                  if (existingIsRemote) {
+                    synced = await api.updateCustomer(
+                      user: session.user,
+                      shopId: session.shopId!,
+                      customerId: existing.id,
+                      name: name,
+                      phone: phone,
+                      email: email,
+                      notes: notes,
+                    );
+                  } else {
+                    synced = await api.createCustomer(
+                      user: session.user,
+                      shopId: session.shopId!,
+                      name: name,
+                      phone: phone,
+                      email: email,
+                      notes: notes,
+                      openingBalance: isEdit ? existing.balance : opening,
+                    );
+                  }
+                } catch (_) {
+                  offline = true;
+                }
+              } else {
+                offline = true;
+              }
+
+              final id = synced?.id ??
+                  existing?.id ??
+                  'local-cust-${now.microsecondsSinceEpoch}';
+              await repo.mergeRemoteCustomerDocument(
+                id,
+                <String, dynamic>{
+                  'name': name,
+                  'phone': phone,
+                  'email': email,
+                  'notes': notes,
+                  'status': 'active',
+                  'balance':
+                      synced?.balance ?? (isEdit ? existing.balance : opening),
+                  'total_spent':
+                      synced?.totalSpent ?? (isEdit ? existing.totalSpent : 0),
+                  'tombstone': false,
+                  'updatedAt': now.toIso8601String(),
+                },
+                updatedAt: now.millisecondsSinceEpoch,
+              );
+              // If a local-only customer was just promoted to a real server
+              // record, tombstone the stale local row so it isn't duplicated.
+              if (synced != null && isEdit && !existingIsRemote) {
+                await repo.mergeRemoteCustomerDocument(
+                  existing.id,
+                  <String, dynamic>{
+                    'tombstone': true,
+                    'status': 'archived',
+                    'updatedAt': now.toIso8601String(),
+                  },
+                  updatedAt: now.millisecondsSinceEpoch,
+                );
+              }
+              ref.invalidate(customersProvider);
               if (!sheetContext.mounted) return;
               Navigator.pop(sheetContext);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('$name ${isEdit ? 'updated' : 'added'}.'),
+                  content: Text(
+                    offline
+                        ? '$name saved on this device — will sync when online.'
+                        : '$name ${isEdit ? 'updated' : 'added'} and synced.',
+                  ),
                 ),
               );
             } catch (error) {

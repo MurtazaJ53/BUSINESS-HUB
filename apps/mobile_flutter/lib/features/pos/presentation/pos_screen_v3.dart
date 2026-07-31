@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
 
+import '../../../core/backend/backend_api_client.dart';
 import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/pos/cart_pricing.dart';
@@ -17,6 +18,7 @@ import 'upi_qr_view.dart';
 import '../../../core/receipt/receipt_pdf.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/providers/printer_provider.dart';
+import '../../../core/runtime/mobile_runtime_config.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/tax/gst.dart';
@@ -757,11 +759,48 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
     }
 
     final now = DateTime.now();
+    final session = ref.read(mobileSessionProvider).asData?.value;
+    final resolvedName = customerName.isEmpty ? 'Customer' : customerName;
+
+    // Push the new customer to the server so the credit due lands in a real,
+    // recoverable khata and the synced sale can reference a valid customer id.
+    // Fall back to a local record when offline (the sale still records the
+    // name/phone; the pull reconciles the customer later).
+    if (session != null &&
+        session.hasShop &&
+        MobileRuntimeConfig.backendSyncEnabled) {
+      try {
+        final created = await ref.read(backendApiClientProvider).createCustomer(
+          user: session.user,
+          shopId: session.shopId!,
+          name: resolvedName,
+          phone: customerPhone,
+          notes: customerAddress.isEmpty ? '' : 'Address: $customerAddress',
+        );
+        await ref.read(customerRepositoryProvider).mergeRemoteCustomerDocument(
+          created.id,
+          <String, dynamic>{
+            'name': created.name,
+            'phone': created.phone ?? customerPhone,
+            'status': 'active',
+            'balance': created.balance,
+            'total_spent': created.totalSpent,
+            'tombstone': false,
+            'updatedAt': now.toIso8601String(),
+          },
+          updatedAt: now.millisecondsSinceEpoch,
+        );
+        return created.id;
+      } catch (_) {
+        // fall through to local-only creation
+      }
+    }
+
     final id = 'local-cust-${now.microsecondsSinceEpoch}';
     await ref.read(customerRepositoryProvider).mergeRemoteCustomerDocument(
       id,
       <String, dynamic>{
-        'name': customerName.isEmpty ? 'Customer' : customerName,
+        'name': resolvedName,
         'phone': customerPhone,
         if (customerAddress.isNotEmpty) 'address': customerAddress,
         'status': 'active',

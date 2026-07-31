@@ -1858,7 +1858,7 @@ class LocalSaleCommit {
     'base_domain_epoch': baseDomainEpoch,
     'source_surface': 'flutter_pos',
     'sale': {
-      'customer_id': customerId,
+      'customer_id': _backendUuidOrNull(customerId),
       'customer_name': customerName ?? '',
       'customer_phone': customerPhone ?? '',
       'buyer_gstin': buyerGstin ?? '',
