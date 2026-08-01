@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -105,7 +105,7 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
     // responding" warning.
     if (path.toLowerCase().endsWith('.csv')) {
       final content = await file.readAsString();
-      table = await Isolate.run(() => parseCsv(content));
+      table = await compute(parseCsv, content);
     } else {
       final bytes = await file.readAsBytes();
       if (!looksLikeXlsx(bytes)) {
@@ -115,7 +115,7 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
           'as .xlsx (or .csv), then import again.',
         );
       }
-      table = await Isolate.run(() => parseXlsxBytes(bytes));
+      table = await compute(parseXlsxBytes, bytes);
     }
     if (table == null) {
       throw Exception(
@@ -139,7 +139,7 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
       if (mounted) setState(() => _busy = false);
       return; // cancelled
     }
-    final mapped = await Isolate.run(() => mapRows(table, kind, mapping: mapping));
+    final mapped = await compute(_mapRowsIsolate, (table, kind, mapping));
     final service = ref.read(universalImportServiceProvider);
     // Products & customers push each row to the server (so imports persist just
     // like manual adds) with a live progress dialog. Sales/expenses stay local
@@ -1033,3 +1033,8 @@ class _ImportProgressDialog extends StatelessWidget {
     );
   }
 }
+
+/// Top-level entry for compute(): maps rows off the UI thread. Must be a
+/// top-level function (no captured widget state) so it's sendable to an isolate.
+MappedImport _mapRowsIsolate((ParsedTable, ImportKind, ColumnMapping?) args) =>
+    mapRows(args.$1, args.$2, mapping: args.$3);
