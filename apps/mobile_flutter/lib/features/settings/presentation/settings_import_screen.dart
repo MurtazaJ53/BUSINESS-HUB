@@ -12,7 +12,6 @@ import '../../../core/import/xlsx_reader.dart' show looksLikeXlsx;
 import '../../../core/import/universal_import_service.dart';
 import '../../../core/backend/backend_api_client.dart';
 import '../../../core/database/mobile_repository.dart';
-import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/import/zobaze_import.dart';
@@ -170,13 +169,13 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
     if (session == null || !session.hasShop) {
       throw Exception('Sign in to a shop before importing.');
     }
-    final coordinator = ref.read(mobileSyncCoordinatorProvider);
     final api = ref.read(backendApiClientProvider);
-    final custRepo = ref.read(customerRepositoryProvider);
-    final total = mapped.rows.length;
+    final rows = mapped.rows;
+    final total = rows.length;
     final progress = ValueNotifier<int>(0);
-    var imported = 0;
+    var created = 0;
     var skipped = 0;
+    const batchSize = 200;
 
     if (mounted) {
       unawaited(
@@ -188,63 +187,63 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
       );
     }
     try {
-      for (var i = 0; i < mapped.rows.length; i++) {
-        final row = mapped.rows[i];
-        final name = (row['name'] ?? '').trim();
-        try {
+      for (var start = 0; start < rows.length; start += batchSize) {
+        final end =
+            (start + batchSize) > rows.length ? rows.length : start + batchSize;
+        final payload = <Map<String, dynamic>>[];
+        for (final row in rows.sublist(start, end)) {
+          final name = (row['name'] ?? '').trim();
           if (name.isEmpty) {
             skipped++;
-          } else if (kind == ImportKind.products) {
-            await coordinator.createInventoryItem(
-              name: name,
-              sellPrice: parseNum(row['price']).toDouble(),
-              openingStock: parseNum(row['stock']).toDouble(),
-              sku: (row['sku'] ?? row['barcode'] ?? '').trim(),
-              category: (row['category'] ?? '').trim().isEmpty
+            continue;
+          }
+          if (kind == ImportKind.products) {
+            final cost = parseNum(row['costPrice']);
+            payload.add(<String, dynamic>{
+              'name': name,
+              'sell_price': parseNum(row['price']).toStringAsFixed(2),
+              'opening_stock': parseNum(row['stock']),
+              'sku': (row['sku'] ?? row['barcode'] ?? '').trim(),
+              'category': (row['category'] ?? '').trim().isEmpty
                   ? 'General'
                   : row['category']!.trim(),
-              hsnCode: (row['hsnCode'] ?? '').trim(),
-              gstRate: parseNum(row['gstRate']).toDouble(),
-              costPrice: parseNum(row['costPrice']) > 0
-                  ? parseNum(row['costPrice']).toDouble()
-                  : null,
-            );
-            imported++;
+              'hsn_code': (row['hsnCode'] ?? '').trim(),
+              'gst_rate': parseNum(row['gstRate']).toStringAsFixed(2),
+              'price_includes_tax': true,
+              'status': 'active',
+              if (cost > 0) 'private_cost_price': cost.toStringAsFixed(2),
+            });
           } else {
-            final created = await api.createCustomer(
-              user: session.user,
-              shopId: session.shopId!,
-              name: name,
-              phone: (row['phone'] ?? '').trim(),
-              email: (row['email'] ?? '').trim(),
-              notes: (row['notes'] ?? '').trim(),
-              openingBalance: parseNum(row['balance']).toDouble(),
-            );
-            await custRepo.mergeRemoteCustomerDocument(
-              created.id,
-              <String, dynamic>{
-                'name': created.name,
-                'phone': created.phone ?? (row['phone'] ?? '').trim(),
-                'status': 'active',
-                'balance': created.balance,
-                'total_spent': created.totalSpent,
-                'tombstone': false,
-                'updatedAt': DateTime.now().toIso8601String(),
-              },
-              updatedAt: DateTime.now().millisecondsSinceEpoch,
-            );
-            imported++;
+            payload.add(<String, dynamic>{
+              'name': name,
+              'phone': (row['phone'] ?? '').trim(),
+              'email': (row['email'] ?? '').trim(),
+              'notes': (row['notes'] ?? '').trim(),
+              'opening_balance': parseNum(row['balance']).toStringAsFixed(2),
+            });
           }
-        } catch (_) {
-          skipped++;
         }
-        progress.value = i + 1;
+        if (payload.isNotEmpty) {
+          try {
+            final res = kind == ImportKind.products
+                ? await api.bulkCreateInventory(
+                    user: session.user, shopId: session.shopId!, items: payload)
+                : await api.bulkCreateCustomers(
+                    user: session.user, shopId: session.shopId!, customers: payload);
+            created += (res['created'] as num?)?.toInt() ?? 0;
+            skipped += (res['skipped'] as num?)?.toInt() ?? 0;
+          } catch (_) {
+            skipped += payload.length;
+          }
+        }
+        progress.value = end;
       }
     } finally {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
     }
-    if (kind == ImportKind.customers) ref.invalidate(customersProvider);
-    return ImportOutcome(imported: imported, skipped: skipped);
+    // Pull the freshly-created server rows into local so they show immediately.
+    await ref.read(mobileSyncCoordinatorProvider).refresh();
+    return ImportOutcome(imported: created, skipped: skipped);
   }
 
   /// Import a specific data type (user picked the icon).

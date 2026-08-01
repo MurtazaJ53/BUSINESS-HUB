@@ -412,6 +412,35 @@ class BackendApiClient {
     );
   }
 
+  /// Bulk-create inventory items (spreadsheet import). Returns the server's
+  /// {created, skipped, errors} summary. Each entry uses the same field names
+  /// as createInventoryItem's body.
+  Future<Map<String, dynamic>> bulkCreateInventory({
+    required User user,
+    required String shopId,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    return _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/inventory/bulk/',
+      body: <String, dynamic>{'items': items},
+    );
+  }
+
+  Future<Map<String, dynamic>> bulkCreateCustomers({
+    required User user,
+    required String shopId,
+    required List<Map<String, dynamic>> customers,
+  }) async {
+    return _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/customers/bulk/',
+      body: <String, dynamic>{'customers': customers},
+    );
+  }
+
   Future<Map<String, dynamic>> updateInventoryItem({
     required User user,
     required String shopId,
