@@ -1,0 +1,67 @@
+# Lightweight single-box deployment for the Business Hub backend.
+#
+# Designed to run ALONGSIDE another site on a small (2 GB) Droplet without
+# starving it: plain Postgres 16 (no Citus), no Redis, no Celery workers.
+# USE_INMEMORY_CHANNELS=1 makes Django run Celery tasks in-process and use an
+# in-memory channel layer + local-memory cache, so only two containers run.
+#
+# The API is published on 127.0.0.1:8001 only (not the public internet); put it
+# behind your existing Nginx on a subdomain with SSL, or change the port
+# mapping to "0.0.0.0:8001:8000" for a quick IP:port demo.
+#
+#   cp .env.demo.example .env.demo   # then edit the secrets
+#   docker compose -f docker-compose.demo.yml --env-file .env.demo up -d --build
+#
+name: business-hub-demo
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bhub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.demo}
+      POSTGRES_DB: ${POSTGRES_DB:-business_hub}
+    volumes:
+      - bhub_db:/var/lib/postgresql/data
+    mem_limit: 512m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bhub}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             gunicorn config.wsgi:application -c gunicorn.conf.py"
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-bhub}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-business_hub}
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env.demo}
+      DJANGO_ENV: ${DJANGO_ENV:-development}
+      DJANGO_DEBUG: "False"
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
+      # One container, no external broker: Celery runs eagerly, channels/cache
+      # stay in-memory, so no Redis is needed for the demo.
+      USE_INMEMORY_CHANNELS: "1"
+      # Optional — email invites/notifications work only if these are set.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM: ${RESEND_FROM:-}
+      # Optional — auto-create a platform admin on boot.
+      ENSURE_PLATFORM_ADMIN_EMAIL: ${ENSURE_PLATFORM_ADMIN_EMAIL:-}
+      ENSURE_PLATFORM_ADMIN_PASSWORD: ${ENSURE_PLATFORM_ADMIN_PASSWORD:-}
+    ports:
+      # Local-only by default; front it with Nginx + SSL. For a quick public
+      # IP:port demo, change to "0.0.0.0:8001:8000" and open the firewall.
+      - "127.0.0.1:8001:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 900m
+    restart: unless-stopped
+
+volumes:
+  bhub_db:

@@ -80,3 +80,6 @@ apps/backend/laptop-dev.sqlite3
 
 # Local security-scan artifacts
 secrets_audit.json
+
+# Docker demo env
+.env.demo
