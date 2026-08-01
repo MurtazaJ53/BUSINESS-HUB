@@ -12,7 +12,7 @@ final backendApiClientProvider = Provider<BackendApiClient>((ref) {
   return BackendApiClient(
     baseUrl: const String.fromEnvironment(
       'BUSINESS_HUB_API_BASE_URL',
-      defaultValue: 'http://192.168.1.10:8000/api/v1',
+      defaultValue: 'https://api.indianwasteportal.com/api/v1',
     ),
   );
 });
