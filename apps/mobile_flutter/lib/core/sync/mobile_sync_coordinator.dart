@@ -1185,6 +1185,62 @@ class MobileSyncCoordinator {
     }
   }
 
+  /// Search inventory on the server and cache matches locally so the catalog
+  /// (which reads local) can show items beyond the recent window. Reuses the
+  /// backend->local merge, so no separate mapping is needed.
+  Future<void> searchInventoryFromServer(String query) async {
+    final session = _session;
+    if (session == null ||
+        !session.hasShop ||
+        !MobileRuntimeConfig.backendSyncEnabled ||
+        query.trim().length < 2) {
+      return;
+    }
+    try {
+      final items = await _backendApiClient.fetchInventoryItems(
+        user: session.user,
+        shopId: session.shopId!,
+        query: query.trim(),
+      );
+      final now = DateTime.now().millisecondsSinceEpoch;
+      for (final item in items) {
+        await _inventoryRepository.mergeBackendInventoryItem(item,
+            updatedAt: now);
+      }
+    } catch (error) {
+      debugPrint('Inventory server search failed: $error');
+    }
+  }
+
+  /// Search sales on the server and cache matches locally so History can show
+  /// receipts beyond the recent window.
+  Future<void> searchSalesFromServer(String query) async {
+    final session = _session;
+    if (session == null ||
+        !session.hasShop ||
+        !MobileRuntimeConfig.backendSyncEnabled ||
+        query.trim().length < 2) {
+      return;
+    }
+    try {
+      final sales = await _backendApiClient.fetchRecentSales(
+        user: session.user,
+        shopId: session.shopId!,
+        query: query.trim(),
+        limit: 200,
+      );
+      for (final sale in sales) {
+        final updatedAt = _toEpoch(
+          sale['occurred_at'] ?? sale['updated_at'] ?? sale['sale_date'],
+        );
+        await _salesRepository.mergeBackendSaleDocument(sale,
+            updatedAt: updatedAt);
+      }
+    } catch (error) {
+      debugPrint('Sales server search failed: $error');
+    }
+  }
+
   Future<void> _syncBackendInventorySnapshot(
     MobileSession session,
     String shopId, {

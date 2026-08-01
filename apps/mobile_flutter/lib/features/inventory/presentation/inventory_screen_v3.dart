@@ -53,7 +53,11 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 300), () {
-      if (mounted) setState(() => _search = value);
+      if (!mounted) return;
+      setState(() => _search = value);
+      // Also pull matching items from the server (in case they're outside the
+      // locally-cached window) and merge them in; the catalog stream updates.
+      ref.read(mobileSyncCoordinatorProvider).searchInventoryFromServer(value);
     });
   }
 

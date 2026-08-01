@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'dead_letter_banner.dart';
@@ -44,6 +46,7 @@ class HistoryScreen extends ConsumerStatefulWidget {
 class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   final TextEditingController _searchController = TextEditingController();
   HistoryFilter _filter = const HistoryFilter();
+  Timer? _histSearchDebounce;
   // Filters are collapsed by default so History opens straight to the receipts.
   bool _showFilters = false;
 
@@ -59,6 +62,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   @override
   void dispose() {
+    _histSearchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -219,6 +223,15 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 onChanged: (value) {
                   setState(() {
                     _filter = _filter.copyWith(search: value);
+                  });
+                  // Pull matching receipts from the server (beyond the local
+                  // window) and cache them; the local list stream updates.
+                  _histSearchDebounce?.cancel();
+                  _histSearchDebounce =
+                      Timer(const Duration(milliseconds: 350), () {
+                    ref
+                        .read(mobileSyncCoordinatorProvider)
+                        .searchSalesFromServer(value);
                   });
                 },
                 decoration: InputDecoration(

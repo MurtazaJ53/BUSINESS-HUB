@@ -519,12 +519,13 @@ class BackendApiClient {
     required User user,
     required String shopId,
     int limit = 500,
+    String query = '',
   }) async {
-    final decoded = await _requestList(
-      user: user,
-      method: 'GET',
-      path: '/shops/$shopId/inventory/',
-    );
+    final q = query.trim();
+    final path = q.isEmpty
+        ? '/shops/$shopId/inventory/'
+        : '/shops/$shopId/inventory/?q=${Uri.encodeQueryComponent(q)}';
+    final decoded = await _requestList(user: user, method: 'GET', path: path);
     return decoded.take(limit).toList(growable: false);
   }
 
@@ -599,12 +600,13 @@ class BackendApiClient {
     required User user,
     required String shopId,
     int limit = 40,
+    String query = '',
   }) async {
-    final decoded = await _requestList(
-      user: user,
-      method: 'GET',
-      path: '/shops/$shopId/sales/',
-    );
+    final q = query.trim();
+    final path = q.isEmpty
+        ? '/shops/$shopId/sales/'
+        : '/shops/$shopId/sales/?q=${Uri.encodeQueryComponent(q)}';
+    final decoded = await _requestList(user: user, method: 'GET', path: path);
 
     if (decoded.length <= limit) {
       return decoded;
