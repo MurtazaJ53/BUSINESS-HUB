@@ -248,9 +248,18 @@ class SaleSummaryView(ShopScopedMixin, APIView):
     def get(self, request, shop_id):
         membership = self.get_membership()
         queryset = Sale.objects.filter(shop=membership.shop, tombstone=False)
+        # Optional date window so Reports can ask the server for period totals
+        # (accurate across ALL sales, not just the recent window on the phone).
+        date_from = request.query_params.get("date_from", "").strip()
+        date_to = request.query_params.get("date_to", "").strip()
+        if date_from:
+            queryset = queryset.filter(sale_date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(sale_date__lte=date_to)
         aggregates = queryset.aggregate(
             total_sales=Count("id"),
             gross_revenue=Coalesce(Sum("total_amount"), Decimal("0.00")),
+            collected_revenue=Coalesce(Sum("amount_received"), Decimal("0.00")),
             outstanding_revenue=Coalesce(Sum("amount_due"), Decimal("0.00")),
         )
 
@@ -259,6 +268,7 @@ class SaleSummaryView(ShopScopedMixin, APIView):
         payload = {
             "total_sales": total_sales,
             "gross_revenue": gross_revenue,
+            "collected_revenue": aggregates["collected_revenue"] or Decimal("0.00"),
             "outstanding_revenue": (
                 aggregates["outstanding_revenue"] or Decimal("0.00")
                 if has_feature_enabled(membership, "finance_summary")

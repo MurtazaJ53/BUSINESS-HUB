@@ -16,6 +16,9 @@ from platform_apps.sales.models import Sale, SaleItem
 class SaleSummarySerializer(serializers.Serializer):
     total_sales = serializers.IntegerField()
     gross_revenue = serializers.DecimalField(max_digits=12, decimal_places=2)
+    collected_revenue = serializers.DecimalField(
+        max_digits=12, decimal_places=2, required=False
+    )
     outstanding_revenue = serializers.DecimalField(
         max_digits=12,
         decimal_places=2,

@@ -580,11 +580,18 @@ class BackendApiClient {
   Future<Map<String, dynamic>> fetchSalesSummary({
     required User user,
     required String shopId,
+    String? dateFrom,
+    String? dateTo,
   }) async {
+    final params = <String>[
+      if (dateFrom != null && dateFrom.isNotEmpty) 'date_from=$dateFrom',
+      if (dateTo != null && dateTo.isNotEmpty) 'date_to=$dateTo',
+    ];
+    final query = params.isEmpty ? '' : '?${params.join('&')}';
     return _request(
       user: user,
       method: 'GET',
-      path: '/shops/$shopId/sales/summary/',
+      path: '/shops/$shopId/sales/summary/$query',
     );
   }
 

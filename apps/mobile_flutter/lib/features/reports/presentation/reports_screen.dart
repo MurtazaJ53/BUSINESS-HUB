@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/backend/backend_api_client.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/session/mobile_session_controller.dart';
@@ -9,6 +10,43 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../shell/presentation/mobile_surface.dart';
+
+String _ymd(DateTime d) =>
+    '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+/// Server-computed totals for the selected reporting window — accurate across
+/// ALL sales in that period, not just the recent window held on the phone.
+final reportsSummaryProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>?, HistoryDateWindow>((ref, window) async {
+  final session = ref.watch(mobileSessionProvider).asData?.value;
+  if (session == null || !session.hasShop) return null;
+  final now = DateTime.now();
+  String? from;
+  String? to;
+  switch (window) {
+    case HistoryDateWindow.all:
+      break;
+    case HistoryDateWindow.today:
+      from = _ymd(now);
+      to = _ymd(now);
+    case HistoryDateWindow.sevenDays:
+      from = _ymd(now.subtract(const Duration(days: 6)));
+    case HistoryDateWindow.thirtyDays:
+      from = _ymd(now.subtract(const Duration(days: 29)));
+    case HistoryDateWindow.ninetyDays:
+      from = _ymd(now.subtract(const Duration(days: 89)));
+  }
+  try {
+    return await ref.read(backendApiClientProvider).fetchSalesSummary(
+          user: session.user,
+          shopId: session.shopId!,
+          dateFrom: from,
+          dateTo: to,
+        );
+  } catch (_) {
+    return null;
+  }
+});
 
 /// Sales reports — period totals, collected vs. due, and payment mix.
 class ReportsScreen extends ConsumerStatefulWidget {
@@ -38,8 +76,21 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final collected = sales.fold<double>(0, (s, x) => s + x.amountReceived);
     final due = sales.fold<double>(0, (s, x) => s + x.amountDue);
     final receipts = sales.length;
-    final avgTicket = receipts == 0 ? 0.0 : gross / receipts;
     final creditCount = sales.where((x) => x.hasOutstandingDue).length;
+
+    // Headline totals come from the server for the selected period so they are
+    // correct across ALL sales, not just the recent window on the phone. The
+    // payment mix / P&L below still use the local window.
+    final serverSummary = ref.watch(reportsSummaryProvider(_window)).asData?.value;
+    final grossV =
+        double.tryParse('${serverSummary?['gross_revenue'] ?? ''}') ?? gross;
+    final collectedV =
+        double.tryParse('${serverSummary?['collected_revenue'] ?? ''}') ??
+        collected;
+    final receiptsV =
+        (serverSummary?['total_sales'] as num?)?.toInt() ?? receipts;
+    final dueV = serverSummary != null ? (grossV - collectedV) : due;
+    final avgTicketV = receiptsV == 0 ? 0.0 : grossV / receiptsV;
 
     final mix = <String, double>{};
     for (final sale in sales) {
@@ -100,7 +151,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           MobilePanel(
             title: 'Sales',
             action: MobileTag(
-              label: '$receipts receipt${receipts == 1 ? '' : 's'}',
+              label: '$receiptsV receipt${receiptsV == 1 ? '' : 's'}',
               icon: Icons.receipt_long_rounded,
               accent: AppPalette.primary,
             ),
@@ -108,26 +159,26 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               children: <Widget>[
                 _StatRow(
                   label: 'Gross sales',
-                  value: formatCurrency(gross),
+                  value: formatCurrency(grossV),
                   accent: AppPalette.primary,
                   strong: true,
                 ),
                 const SizedBox(height: 10),
                 _StatRow(
                   label: 'Collected',
-                  value: formatCurrency(collected),
+                  value: formatCurrency(collectedV),
                   accent: AppPalette.success,
                 ),
                 const SizedBox(height: 10),
                 _StatRow(
                   label: 'Outstanding due',
-                  value: formatCurrency(due),
-                  accent: due > 0 ? AppPalette.warning : AppPalette.success,
+                  value: formatCurrency(dueV),
+                  accent: dueV > 0 ? AppPalette.warning : AppPalette.success,
                 ),
                 const SizedBox(height: 10),
                 _StatRow(
                   label: 'Average ticket',
-                  value: formatCurrency(avgTicket),
+                  value: formatCurrency(avgTicketV),
                   accent: AppPalette.info,
                 ),
                 const SizedBox(height: 10),
