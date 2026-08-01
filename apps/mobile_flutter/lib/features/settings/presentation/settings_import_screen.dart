@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -99,8 +100,12 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
     }
     final file = File(path);
     ParsedTable? table;
+    // Parse in a background isolate — a large (e.g. 27 MB) file would otherwise
+    // block the UI thread for seconds and trigger an Android "app isn't
+    // responding" warning.
     if (path.toLowerCase().endsWith('.csv')) {
-      table = parseCsv(await file.readAsString());
+      final content = await file.readAsString();
+      table = await Isolate.run(() => parseCsv(content));
     } else {
       final bytes = await file.readAsBytes();
       if (!looksLikeXlsx(bytes)) {
@@ -110,7 +115,7 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
           'as .xlsx (or .csv), then import again.',
         );
       }
-      table = parseXlsxBytes(bytes);
+      table = await Isolate.run(() => parseXlsxBytes(bytes));
     }
     if (table == null) {
       throw Exception(
@@ -134,7 +139,7 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
       if (mounted) setState(() => _busy = false);
       return; // cancelled
     }
-    final mapped = mapRows(table, kind, mapping: mapping);
+    final mapped = await Isolate.run(() => mapRows(table, kind, mapping: mapping));
     final service = ref.read(universalImportServiceProvider);
     // Products & customers push each row to the server (so imports persist just
     // like manual adds) with a live progress dialog. Sales/expenses stay local
