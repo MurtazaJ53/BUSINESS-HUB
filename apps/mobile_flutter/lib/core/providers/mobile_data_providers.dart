@@ -10,6 +10,22 @@ import '../models/mobile_session.dart';
 import '../runtime/mobile_runtime_config.dart';
 import '../session/mobile_session_controller.dart';
 
+/// Server-computed sales totals across ALL sales ({total_sales, gross_revenue}),
+/// so revenue is correct even when the phone only holds a recent window of
+/// receipts. Returns null on error → callers fall back to local figures.
+final salesServerSummaryProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>?>((ref) async {
+  final session = ref.watch(mobileSessionProvider).asData?.value;
+  if (session == null || !session.hasShop) return null;
+  try {
+    return await ref
+        .read(backendApiClientProvider)
+        .fetchSalesSummary(user: session.user, shopId: session.shopId!);
+  } catch (_) {
+    return null;
+  }
+});
+
 final shopInfoProvider = StreamProvider<ShopInfo>((ref) {
   final shopRepository = ref.watch(shopRepositoryProvider);
   return shopRepository.watchShopInfo();

@@ -34,6 +34,11 @@ class DashboardScreenV3 extends ConsumerWidget {
 
     final overview = overviewAsync.asData?.value ?? DashboardOverview.empty();
     final history = historyAsync.asData?.value ?? HistoryOverview.empty();
+    // Server-computed all-time totals (correct even when the phone only holds a
+    // recent window of sales); fall back to local when offline.
+    final serverSummary = ref.watch(salesServerSummaryProvider).asData?.value;
+    final serverGross =
+        double.tryParse('${serverSummary?['gross_revenue'] ?? ''}');
 
     final isLoading = shopAsync.isLoading || overviewAsync.isLoading;
     final hasError = shopAsync.hasError || overviewAsync.hasError;
@@ -49,6 +54,7 @@ class DashboardScreenV3 extends ConsumerWidget {
                 context,
                 overview: overview,
                 history: history,
+                serverGross: serverGross,
                 lowStock: lowStock,
                 recentSales: recentSales,
               ),
@@ -81,6 +87,7 @@ class DashboardScreenV3 extends ConsumerWidget {
     BuildContext context, {
     required DashboardOverview overview,
     required HistoryOverview history,
+    required double? serverGross,
     required List<LowStockItem> lowStock,
     required List<RecentSaleSummary> recentSales,
   }) {
@@ -134,7 +141,7 @@ class DashboardScreenV3 extends ConsumerWidget {
             Expanded(
               child: _StatCard(
                 label: 'Total sales',
-                value: formatCurrencyCompact(history.totalRevenue),
+                value: formatCurrencyCompact(serverGross ?? history.totalRevenue),
                 caption: 'View reports',
                 icon: Icons.insights_rounded,
                 accent: AppPalette.info,
