@@ -12,7 +12,7 @@ from django.db.models import Count, Sum
 from django.db.models import Prefetch
 from django.db.models.functions import Coalesce
 from django.utils import timezone
-from rest_framework import generics, permissions, status
+from rest_framework import exceptions, generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -767,3 +767,81 @@ class GSTFilingPackView(ShopScopedMixin, APIView):
             w.writerow([hsn, rate, a["qty"], a["taxable"], a["igst"], a["cgst"], a["sgst"],
                         a["igst"] + a["cgst"] + a["sgst"]])
         return out.getvalue()
+
+
+class SaleHistoryBulkImportView(ShopScopedMixin, APIView):
+    """Bulk-import flat historical sales (past bills from another POS) as
+    records: no line items, no stock/ledger effects. Idempotent by client id so
+    re-importing the same file never duplicates. STAFF+ only."""
+
+    permission_classes = [permissions.IsAuthenticated]
+    minimum_role = ShopMembership.Role.STAFF
+
+    def post(self, request, shop_id):
+        from datetime import datetime, time as _time
+
+        membership = self.get_membership()
+        assert_postgres_primary_write_enabled(
+            shop_id=str(membership.shop_id), domain=MigrationDomain.SALES
+        )
+        rows = request.data.get("sales")
+        if not isinstance(rows, list) or not rows:
+            raise exceptions.ValidationError({"sales": "Provide a non-empty list of sales."})
+        if len(rows) > 1000:
+            raise exceptions.ValidationError({"sales": "Send at most 1000 sales per request."})
+
+        valid_modes = set(Sale.PaymentMode.values)
+        created = 0
+        skipped = 0
+        with transaction.atomic():
+            for raw in rows:
+                try:
+                    total = Decimal(str(raw.get("total") or "0"))
+                    discount = Decimal(str(raw.get("discount") or "0"))
+                except Exception:
+                    skipped += 1
+                    continue
+                if total <= 0:
+                    skipped += 1
+                    continue
+                client_id = str(raw.get("id") or "").strip()
+                if client_id and Sale.objects.filter(
+                    shop=membership.shop, source_id=client_id
+                ).exists():
+                    skipped += 1
+                    continue
+                pay = str(raw.get("payment_mode") or "CASH").upper()
+                if pay not in valid_modes:
+                    pay = "CASH"
+                try:
+                    sale_date = datetime.strptime(str(raw.get("date") or "")[:10], "%Y-%m-%d").date()
+                except Exception:
+                    sale_date = timezone.now().date()
+                occurred = timezone.make_aware(datetime.combine(sale_date, _time.min))
+                if pay == "CREDIT":
+                    received, due = Decimal("0.00"), total
+                else:
+                    received, due = total, Decimal("0.00")
+                sale = Sale.objects.create(
+                    shop=membership.shop,
+                    actor_user=request.user,
+                    subtotal_amount=total + discount,
+                    discount_amount=discount,
+                    total_amount=total,
+                    amount_received=received,
+                    amount_due=due,
+                    payment_mode=pay,
+                    customer_name_snapshot=str(raw.get("customer_name") or "")[:255],
+                    customer_phone_snapshot=str(raw.get("customer_phone") or "")[:32],
+                    footer_note=str(raw.get("footer_note") or ""),
+                    sale_date=sale_date,
+                    occurred_at=occurred,
+                    source_system="import",
+                    source_id=client_id,
+                )
+                sale.receipt_number = f"H-{str(sale.id).replace('-', '')[:8].upper()}"
+                sale.save(update_fields=["receipt_number", "updated_at"])
+                created += 1
+        return Response(
+            {"created": created, "skipped": skipped}, status=status.HTTP_201_CREATED
+        )
