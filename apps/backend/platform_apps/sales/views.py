@@ -420,8 +420,13 @@ class SaleCommandIngestionView(ShopScopedMixin, generics.GenericAPIView):
             # Process the command synchronously so the POS client receives the
             # created sale in the response body. This mirrors the payments
             # command flow and keeps the POS working without a running worker.
+            # Re-validate the RAW client payload (field names like `name`), not
+            # the already-validated sale_payload whose keys were remapped to
+            # their model sources (`name_snapshot`). Feeding the remapped data
+            # back through SaleSerializer made it look for `name` and fail every
+            # non-catalog line with "must include a name".
             sale_serializer = SaleSerializer(
-                data=sale_payload,
+                data=raw_sale_payload,
                 context={"shop": membership.shop, "actor": request.user},
             )
             sale_serializer.is_valid(raise_exception=True)
