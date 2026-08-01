@@ -781,8 +781,8 @@ class SaleHistoryBulkImportView(ShopScopedMixin, APIView):
         from datetime import datetime, time as _time
 
         membership = self.get_membership()
-        assert_postgres_primary_write_enabled(
-            shop_id=str(membership.shop_id), domain=MigrationDomain.SALES
+        assert_postgres_primary_write_enabled_multi(
+            shop_id=str(membership.shop_id), domains=[MigrationDomain.SALES]
         )
         rows = request.data.get("sales")
         if not isinstance(rows, list) or not rows:
