@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
 
+import '../../../core/backend/backend_api_client.dart';
 import '../../../core/database/mobile_repository.dart';
 import '../../../core/insights/mobile_operational_insights.dart';
 import '../../../core/models/mobile_models.dart';
@@ -16,6 +17,22 @@ import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/tax/gst.dart';
 import '../../../core/utils/formatters.dart';
 import '../../shell/presentation/mobile_surface.dart';
+
+/// Server-computed sales totals across ALL sales (accurate even when the phone
+/// only pulls a recent window of receipts). Falls back to null on error so the
+/// screen uses local figures.
+final historyServerSummaryProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>?>((ref) async {
+  final session = ref.watch(mobileSessionProvider).asData?.value;
+  if (session == null || !session.hasShop) return null;
+  try {
+    return await ref
+        .read(backendApiClientProvider)
+        .fetchSalesSummary(user: session.user, shopId: session.shopId!);
+  } catch (_) {
+    return null;
+  }
+});
 
 class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
@@ -64,6 +81,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     final overview =
         ref.watch(historyOverviewProvider).asData?.value ??
         HistoryOverview.empty();
+    // Prefer server-computed totals so revenue is correct across ALL sales,
+    // not just the recent window pulled to the phone.
+    final serverSummary = ref.watch(historyServerSummaryProvider).asData?.value;
+    final grossValue =
+        double.tryParse('${serverSummary?['gross_revenue'] ?? ''}') ??
+        overview.totalRevenue;
+    final grossCount =
+        (serverSummary?['total_sales'] as num?)?.toInt() ?? overview.totalSales;
     final sales =
         ref.watch(historySalesProvider(_filter)).asData?.value ??
         const <RecentSaleSummary>[];
@@ -118,8 +143,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               children: <Widget>[
                 MobileMetricCard(
                   label: 'Gross',
-                  value: formatCurrency(overview.totalRevenue),
-                  caption: '${overview.totalSales} stored receipts',
+                  value: formatCurrency(grossValue),
+                  caption: '$grossCount receipts',
                   icon: Icons.currency_rupee_rounded,
                 ),
                 MobileMetricCard(

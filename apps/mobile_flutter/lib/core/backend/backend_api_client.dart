@@ -574,6 +574,20 @@ class BackendApiClient {
     );
   }
 
+  /// Server-computed sales totals across ALL sales (not just the pulled
+  /// window): {total_sales, gross_revenue, ...}. Used so revenue is accurate on
+  /// shops with more sales than the phone pulls locally.
+  Future<Map<String, dynamic>> fetchSalesSummary({
+    required User user,
+    required String shopId,
+  }) async {
+    return _request(
+      user: user,
+      method: 'GET',
+      path: '/shops/$shopId/sales/summary/',
+    );
+  }
+
   Future<List<Map<String, dynamic>>> fetchRecentSales({
     required User user,
     required String shopId,
