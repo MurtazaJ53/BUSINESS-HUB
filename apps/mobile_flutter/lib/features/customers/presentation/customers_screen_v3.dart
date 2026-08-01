@@ -41,8 +41,21 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
     final customers =
         customersAsync.asData?.value ?? const <BackendCustomerSummary>[];
 
-    final filteredCustomers = customers.where((customer) {
-      if (_search.isNotEmpty &&
+    // When searching, query the SERVER so you can find any customer (not just
+    // the recent window held locally). Otherwise show the local list.
+    final query = _search.trim();
+    final searchingServer = query.length >= 2;
+    final serverResults = searchingServer
+        ? (ref.watch(customerSearchProvider(query)).asData?.value ??
+            const <BackendCustomerSummary>[])
+        : null;
+    final baseList = serverResults ?? customers;
+
+    final filteredCustomers = baseList.where((customer) {
+      // Server search already matched name/phone; only local-filter when not
+      // searching the server.
+      if (!searchingServer &&
+          _search.isNotEmpty &&
           !customer.name.toLowerCase().contains(_search.toLowerCase())) {
         return false;
       }

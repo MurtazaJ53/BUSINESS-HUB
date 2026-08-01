@@ -26,6 +26,25 @@ final salesServerSummaryProvider =
   }
 });
 
+/// Server-side customer search — queries ALL customers on the backend (not just
+/// the recent window on the phone), so you can find anyone by name or phone.
+final customerSearchProvider = FutureProvider.autoDispose
+    .family<List<BackendCustomerSummary>, String>((ref, query) async {
+  final q = query.trim();
+  if (q.length < 2) return const <BackendCustomerSummary>[];
+  final session = ref.watch(mobileSessionProvider).asData?.value;
+  if (session == null || !session.hasShop) {
+    return const <BackendCustomerSummary>[];
+  }
+  try {
+    return await ref
+        .read(backendApiClientProvider)
+        .fetchCustomers(user: session.user, shopId: session.shopId!, query: q);
+  } catch (_) {
+    return const <BackendCustomerSummary>[];
+  }
+});
+
 final shopInfoProvider = StreamProvider<ShopInfo>((ref) {
   final shopRepository = ref.watch(shopRepositoryProvider);
   return shopRepository.watchShopInfo();
