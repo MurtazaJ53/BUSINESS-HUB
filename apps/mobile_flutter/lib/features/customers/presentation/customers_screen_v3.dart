@@ -626,12 +626,22 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
       builder: (sheetContext) => StatefulBuilder(
         builder: (sheetContext, setSheetState) {
           Future<void> save() async {
+            if (isSaving) return;
             final name = nameController.text.trim();
-            if (name.isEmpty || isSaving) return;
+            final phone = phoneController.text.trim();
+            // Name + mobile are required so a customer is always identifiable
+            // and reachable (dues recovery, WhatsApp, matching on next sale).
+            if (name.isEmpty || phone.length < 7) {
+              ScaffoldMessenger.of(sheetContext).showSnackBar(
+                const SnackBar(
+                  content: Text('Enter a name and a valid mobile number.'),
+                ),
+              );
+              return;
+            }
             setSheetState(() => isSaving = true);
             try {
               final now = DateTime.now();
-              final phone = phoneController.text.trim();
               final email = emailController.text.trim();
               final notes = notesController.text.trim();
               final opening =
