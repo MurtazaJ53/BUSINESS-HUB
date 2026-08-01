@@ -888,6 +888,13 @@ class MobileSyncCoordinator {
     MobileSession session,
     String shopId,
   ) async {
+    // Only seed a placeholder when there is no shop doc yet. This used to run
+    // unconditionally and OVERWRITE the real shop the register/login flow just
+    // saved — wiping the shop name and phone number on every session refresh.
+    final existing = await _shopRepository.readSetting('settings');
+    if (existing != null && existing.isNotEmpty) {
+      return;
+    }
     await _shopRepository.saveShopDocument(<String, dynamic>{
       'name': MobileRuntimeConfig.localShopName,
       'tagline': 'LOCAL-FIRST COMMAND CENTER',
