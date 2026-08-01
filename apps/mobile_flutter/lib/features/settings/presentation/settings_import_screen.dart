@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/import/date_parse.dart';
 import '../../../core/import/universal_import.dart';
 import '../../../core/import/xlsx_reader.dart' show looksLikeXlsx;
 import '../../../core/import/universal_import_service.dart';
@@ -141,7 +142,7 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
     final outcome = switch (kind) {
       ImportKind.products => await _pushImport(kind, mapped),
       ImportKind.customers => await _pushImport(kind, mapped),
-      ImportKind.sales => await service.importSales(mapped),
+      ImportKind.sales => await _pushSalesImport(mapped),
       ImportKind.expenses => await service.importExpenses(mapped),
       ImportKind.suppliers => throw Exception('Suppliers import is not available yet.'),
     };
@@ -242,6 +243,75 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
     }
     // Pull the freshly-created server rows into local so they show immediately.
+    await ref.read(mobileSyncCoordinatorProvider).refresh();
+    return ImportOutcome(imported: created, skipped: skipped);
+  }
+
+  /// Import flat historical sales (past bills) to the server so History syncs.
+  /// Batched, with the same progress dialog; dates are parsed to YYYY-MM-DD so
+  /// the original bill date is preserved.
+  Future<ImportOutcome> _pushSalesImport(MappedImport mapped) async {
+    final session = ref.read(mobileSessionProvider).asData?.value;
+    if (session == null || !session.hasShop) {
+      throw Exception('Sign in to a shop before importing.');
+    }
+    final api = ref.read(backendApiClientProvider);
+    final rows = mapped.rows;
+    final total = rows.length;
+    final progress = ValueNotifier<int>(0);
+    var created = 0;
+    var skipped = 0;
+    const batchSize = 200;
+
+    if (mounted) {
+      unawaited(
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => _ImportProgressDialog(total: total, progress: progress),
+        ),
+      );
+    }
+    try {
+      for (var start = 0; start < rows.length; start += batchSize) {
+        final end =
+            (start + batchSize) > rows.length ? rows.length : start + batchSize;
+        final payload = <Map<String, dynamic>>[];
+        for (var j = start; j < end; j++) {
+          final row = rows[j];
+          final amount = parseNum(row['total']);
+          if (amount <= 0) {
+            skipped++;
+            continue;
+          }
+          final dt = parseImportDate(row['date']);
+          final date = dt != null ? dt.toIso8601String().split('T').first : '';
+          payload.add(<String, dynamic>{
+            'id': 'imp-sale-$j-$date-${amount.toStringAsFixed(2)}',
+            'date': date,
+            'total': amount.toStringAsFixed(2),
+            'discount': parseNum(row['discount']).toStringAsFixed(2),
+            'payment_mode': (row['payment'] ?? 'CASH').trim(),
+            'customer_name': (row['customerName'] ?? '').trim(),
+            'customer_phone': (row['customerPhone'] ?? '').trim(),
+            'footer_note': (row['reference'] ?? '').trim(),
+          });
+        }
+        if (payload.isNotEmpty) {
+          try {
+            final res = await api.bulkImportSalesHistory(
+              user: session.user, shopId: session.shopId!, sales: payload);
+            created += (res['created'] as num?)?.toInt() ?? 0;
+            skipped += (res['skipped'] as num?)?.toInt() ?? 0;
+          } catch (_) {
+            skipped += payload.length;
+          }
+        }
+        progress.value = end;
+      }
+    } finally {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+    }
     await ref.read(mobileSyncCoordinatorProvider).refresh();
     return ImportOutcome(imported: created, skipped: skipped);
   }

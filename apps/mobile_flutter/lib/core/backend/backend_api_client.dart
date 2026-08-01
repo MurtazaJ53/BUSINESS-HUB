@@ -441,6 +441,21 @@ class BackendApiClient {
     );
   }
 
+  /// Bulk-import flat historical sales (past bills) as records — no stock
+  /// effects, idempotent by each row's `id`.
+  Future<Map<String, dynamic>> bulkImportSalesHistory({
+    required User user,
+    required String shopId,
+    required List<Map<String, dynamic>> sales,
+  }) async {
+    return _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/sales/history-import/',
+      body: <String, dynamic>{'sales': sales},
+    );
+  }
+
   Future<Map<String, dynamic>> updateInventoryItem({
     required User user,
     required String shopId,
