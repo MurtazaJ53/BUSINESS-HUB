@@ -97,6 +97,42 @@ class CustomerListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
         )
 
 
+class CustomerBulkCreateView(ShopScopedMixin, APIView):
+    """Create many customers in one request (spreadsheet import). Valid rows are
+    saved; invalid rows are skipped and reported."""
+
+    permission_classes = [permissions.IsAuthenticated]
+    minimum_role = ShopMembership.Role.STAFF
+
+    def post(self, request, shop_id):
+        membership = self.get_membership()
+        assert_postgres_primary_write_enabled(
+            shop_id=self.kwargs["shop_id"], domain=MigrationDomain.CUSTOMERS
+        )
+        rows = request.data.get("customers")
+        if not isinstance(rows, list) or not rows:
+            raise exceptions.ValidationError({"customers": "Provide a non-empty list of customers."})
+        if len(rows) > 1000:
+            raise exceptions.ValidationError({"customers": "Send at most 1000 customers per request."})
+        context = {"shop": membership.shop, "actor": request.user}
+        created = 0
+        errors = []
+        from django.db import transaction
+
+        with transaction.atomic():
+            for idx, raw in enumerate(rows):
+                serializer = CustomerSerializer(data=raw, context=context)
+                if serializer.is_valid():
+                    serializer.save()
+                    created += 1
+                else:
+                    errors.append({"index": idx, "errors": serializer.errors})
+        return Response(
+            {"created": created, "skipped": len(errors), "errors": errors[:20]},
+            status=201,
+        )
+
+
 class CustomerDetailView(ShopScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = CustomerSerializer
     permission_classes = [permissions.IsAuthenticated]

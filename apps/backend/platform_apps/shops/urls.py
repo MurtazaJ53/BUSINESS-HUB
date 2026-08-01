@@ -12,6 +12,7 @@ from platform_apps.attendance.views import (
     AttendanceSummaryView,
 )
 from platform_apps.customers.views import (
+    CustomerBulkCreateView,
     CustomerDetailView,
     CustomerLedgerListCreateView,
     CustomerLedgerTimelineView,
@@ -21,6 +22,7 @@ from platform_apps.customers.views import (
 from platform_apps.expenses.views import ExpenseDetailView, ExpenseListCreateView, ExpenseSummaryView
 from platform_apps.inventory.views import (
     InventoryItemAdjustmentView,
+    InventoryItemBulkCreateView,
     InventoryItemDetailView,
     InventoryItemListCreateView,
     InventorySummaryView,
@@ -95,6 +97,7 @@ urlpatterns = [
         name="workspace-team-transfer-ownership",
     ),
     path("<uuid:shop_id>/customers/", CustomerListCreateView.as_view(), name="customer-list"),
+    path("<uuid:shop_id>/customers/bulk/", CustomerBulkCreateView.as_view(), name="customer-bulk"),
     path("<uuid:shop_id>/customers/summary/", CustomerSummaryView.as_view(), name="customer-summary"),
     path("<uuid:shop_id>/customers/<uuid:customer_id>/", CustomerDetailView.as_view(), name="customer-detail"),
     path(
@@ -129,6 +132,7 @@ urlpatterns = [
     path("<uuid:shop_id>/expenses/summary/", ExpenseSummaryView.as_view(), name="expense-summary"),
     path("<uuid:shop_id>/expenses/<uuid:expense_id>/", ExpenseDetailView.as_view(), name="expense-detail"),
     path("<uuid:shop_id>/inventory/", InventoryItemListCreateView.as_view(), name="inventory-list"),
+    path("<uuid:shop_id>/inventory/bulk/", InventoryItemBulkCreateView.as_view(), name="inventory-bulk"),
     path("<uuid:shop_id>/inventory/summary/", InventorySummaryView.as_view(), name="inventory-summary"),
     path("<uuid:shop_id>/inventory/<uuid:item_id>/", InventoryItemDetailView.as_view(), name="inventory-detail"),
     path("<uuid:shop_id>/payments/", SalePaymentListView.as_view(), name="payment-list"),

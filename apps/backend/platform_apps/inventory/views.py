@@ -111,6 +111,9 @@ class InventoryItemListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
         self.assert_inventory_postgres_write_enabled()
         serializer.save()
         item = serializer.instance
+        return self._audit_created(membership, item)
+
+    def _audit_created(self, membership, item):
         item = (
             InventoryItem.objects.filter(pk=item.pk)
             .select_related("private")
@@ -129,6 +132,45 @@ class InventoryItemListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
             summary=f"Created inventory item {item.name}.",
             source_surface="backend_api",
             after=snapshot_inventory_item(item),
+        )
+
+
+class InventoryItemBulkCreateView(ShopScopedMixin, APIView):
+    """Create many inventory items in one request (spreadsheet import). Valid
+    rows are saved; invalid rows are skipped and reported, so one bad row never
+    fails the whole batch."""
+
+    permission_classes = [permissions.IsAuthenticated]
+    minimum_role = ShopMembership.Role.STAFF
+
+    def post(self, request, shop_id):
+        membership = self.get_membership()
+        self.assert_inventory_postgres_write_enabled()
+        rows = request.data.get("items")
+        if not isinstance(rows, list) or not rows:
+            raise exceptions.ValidationError({"items": "Provide a non-empty list of items."})
+        if len(rows) > 1000:
+            raise exceptions.ValidationError({"items": "Send at most 1000 items per request."})
+        context = {
+            "shop": membership.shop,
+            "actor": request.user,
+            "can_view_costs": self.can_view_costs(),
+            "can_view_supplier_directory": False,
+            "can_view_purchase_workflow": False,
+        }
+        created = 0
+        errors = []
+        with transaction.atomic():
+            for idx, raw in enumerate(rows):
+                serializer = InventoryItemSerializer(data=raw, context=context)
+                if serializer.is_valid():
+                    serializer.save()
+                    created += 1
+                else:
+                    errors.append({"index": idx, "errors": serializer.errors})
+        return Response(
+            {"created": created, "skipped": len(errors), "errors": errors[:20]},
+            status=status.HTTP_201_CREATED,
         )
 
 
