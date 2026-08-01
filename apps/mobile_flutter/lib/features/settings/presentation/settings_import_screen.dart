@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -9,7 +10,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/import/universal_import.dart';
 import '../../../core/import/xlsx_reader.dart' show looksLikeXlsx;
 import '../../../core/import/universal_import_service.dart';
+import '../../../core/backend/backend_api_client.dart';
 import '../../../core/database/mobile_repository.dart';
+import '../../../core/providers/mobile_data_providers.dart';
+import '../../../core/session/mobile_session_controller.dart';
+import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/import/zobaze_import.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/theme/app_colors.dart';
@@ -131,9 +136,12 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
     }
     final mapped = mapRows(table, kind, mapping: mapping);
     final service = ref.read(universalImportServiceProvider);
+    // Products & customers push each row to the server (so imports persist just
+    // like manual adds) with a live progress dialog. Sales/expenses stay local
+    // history imports.
     final outcome = switch (kind) {
-      ImportKind.products => await service.importProducts(mapped),
-      ImportKind.customers => await service.importCustomers(mapped),
+      ImportKind.products => await _pushImport(kind, mapped),
+      ImportKind.customers => await _pushImport(kind, mapped),
       ImportKind.sales => await service.importSales(mapped),
       ImportKind.expenses => await service.importExpenses(mapped),
       ImportKind.suppliers => throw Exception('Suppliers import is not available yet.'),
@@ -152,6 +160,91 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
           // is to go hunting through History.
           '${outcome.replacedRows > 0 ? ' ${outcome.replacedRows} already existed and were updated, not duplicated.' : ''}';
     });
+  }
+
+  /// Import products/customers by pushing each row to the server (so they
+  /// persist like manual adds), showing a live progress bar. Each network call
+  /// yields the UI thread, so the bar animates instead of freezing.
+  Future<ImportOutcome> _pushImport(ImportKind kind, MappedImport mapped) async {
+    final session = ref.read(mobileSessionProvider).asData?.value;
+    if (session == null || !session.hasShop) {
+      throw Exception('Sign in to a shop before importing.');
+    }
+    final coordinator = ref.read(mobileSyncCoordinatorProvider);
+    final api = ref.read(backendApiClientProvider);
+    final custRepo = ref.read(customerRepositoryProvider);
+    final total = mapped.rows.length;
+    final progress = ValueNotifier<int>(0);
+    var imported = 0;
+    var skipped = 0;
+
+    if (mounted) {
+      unawaited(
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => _ImportProgressDialog(total: total, progress: progress),
+        ),
+      );
+    }
+    try {
+      for (var i = 0; i < mapped.rows.length; i++) {
+        final row = mapped.rows[i];
+        final name = (row['name'] ?? '').trim();
+        try {
+          if (name.isEmpty) {
+            skipped++;
+          } else if (kind == ImportKind.products) {
+            await coordinator.createInventoryItem(
+              name: name,
+              sellPrice: parseNum(row['price']).toDouble(),
+              openingStock: parseNum(row['stock']).toDouble(),
+              sku: (row['sku'] ?? row['barcode'] ?? '').trim(),
+              category: (row['category'] ?? '').trim().isEmpty
+                  ? 'General'
+                  : row['category']!.trim(),
+              hsnCode: (row['hsnCode'] ?? '').trim(),
+              gstRate: parseNum(row['gstRate']).toDouble(),
+              costPrice: parseNum(row['costPrice']) > 0
+                  ? parseNum(row['costPrice']).toDouble()
+                  : null,
+            );
+            imported++;
+          } else {
+            final created = await api.createCustomer(
+              user: session.user,
+              shopId: session.shopId!,
+              name: name,
+              phone: (row['phone'] ?? '').trim(),
+              email: (row['email'] ?? '').trim(),
+              notes: (row['notes'] ?? '').trim(),
+              openingBalance: parseNum(row['balance']).toDouble(),
+            );
+            await custRepo.mergeRemoteCustomerDocument(
+              created.id,
+              <String, dynamic>{
+                'name': created.name,
+                'phone': created.phone ?? (row['phone'] ?? '').trim(),
+                'status': 'active',
+                'balance': created.balance,
+                'total_spent': created.totalSpent,
+                'tombstone': false,
+                'updatedAt': DateTime.now().toIso8601String(),
+              },
+              updatedAt: DateTime.now().millisecondsSinceEpoch,
+            );
+            imported++;
+          }
+        } catch (_) {
+          skipped++;
+        }
+        progress.value = i + 1;
+      }
+    } finally {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+    }
+    if (kind == ImportKind.customers) ref.invalidate(customersProvider);
+    return ImportOutcome(imported: imported, skipped: skipped);
   }
 
   /// Import a specific data type (user picked the icon).
@@ -820,6 +913,48 @@ class _OpeningBalanceBackfillPanelState
             label: Text(_busy ? 'Writing…' : 'Add opening balances'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Live progress dialog shown while an import pushes rows to the server.
+class _ImportProgressDialog extends StatelessWidget {
+  const _ImportProgressDialog({required this.total, required this.progress});
+
+  final int total;
+  final ValueNotifier<int> progress;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      content: ValueListenableBuilder<int>(
+        valueListenable: progress,
+        builder: (context, done, _) {
+          final frac = total == 0 ? 0.0 : done / total;
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              const Text(
+                'Importing & syncing…',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Saving each row to your cloud so it never disappears.',
+                style: TextStyle(fontSize: 12.5),
+              ),
+              const SizedBox(height: 16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LinearProgressIndicator(value: frac, minHeight: 8),
+              ),
+              const SizedBox(height: 10),
+              Text('$done of $total', style: const TextStyle(fontWeight: FontWeight.w700)),
+            ],
+          );
+        },
       ),
     );
   }
