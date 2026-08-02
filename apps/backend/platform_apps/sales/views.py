@@ -91,6 +91,10 @@ class SaleListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
             queryset = queryset.filter(status=status_value)
         if customer_id:
             queryset = queryset.filter(customer_id=customer_id)
+        if not status_value:
+            # Hide voided (refunded) sales from the default History pull so a
+            # refunded receipt doesn't reappear when the client re-syncs.
+            queryset = queryset.exclude(status=Sale.Status.VOID)
         # Bound the unpaginated list so a huge shop never serializes every
         # sale in one response. Clients read the most-recent slice.
         return queryset[: bounded_list_limit(self.request.query_params.get("limit"))]
@@ -247,7 +251,11 @@ class SaleSummaryView(ShopScopedMixin, APIView):
 
     def get(self, request, shop_id):
         membership = self.get_membership()
-        queryset = Sale.objects.filter(shop=membership.shop, tombstone=False)
+        # Voided sales must not count toward gross / receipts — otherwise a
+        # refund never changes the backend totals.
+        queryset = Sale.objects.filter(shop=membership.shop, tombstone=False).exclude(
+            status=Sale.Status.VOID
+        )
         # Optional date window so Reports can ask the server for period totals
         # (accurate across ALL sales, not just the recent window on the phone).
         date_from = request.query_params.get("date_from", "").strip()
@@ -290,8 +298,10 @@ class SaleGstSummaryView(ShopScopedMixin, APIView):
 
     def get(self, request, shop_id):
         membership = self.get_membership()
-        queryset = Sale.objects.filter(shop=membership.shop, tombstone=False)
-        
+        queryset = Sale.objects.filter(shop=membership.shop, tombstone=False).exclude(
+            status=Sale.Status.VOID
+        )
+
         date_from = request.query_params.get("date_from", "").strip()
         date_to = request.query_params.get("date_to", "").strip()
         
