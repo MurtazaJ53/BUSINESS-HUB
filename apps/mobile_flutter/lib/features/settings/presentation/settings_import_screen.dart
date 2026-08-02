@@ -220,12 +220,16 @@ class _SettingsImportScreenState extends ConsumerState<SettingsImportScreen> {
               if (cost > 0) 'private_cost_price': cost.toStringAsFixed(2),
             });
           } else {
+            // Opening balance = amount owed minus any advance held. The mapper
+            // exposes these as 'amountDue' and 'advance' (NOT 'balance').
+            final due = parseNum(row['amountDue']);
+            final advance = parseNum(row['advance']);
             payload.add(<String, dynamic>{
               'name': name,
               'phone': (row['phone'] ?? '').trim(),
               'email': (row['email'] ?? '').trim(),
-              'notes': (row['notes'] ?? '').trim(),
-              'opening_balance': parseNum(row['balance']).toStringAsFixed(2),
+              'notes': (row['notes'] ?? row['address'] ?? '').trim(),
+              'opening_balance': (due - advance).toStringAsFixed(2),
             });
           }
         }

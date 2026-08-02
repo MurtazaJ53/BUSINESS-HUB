@@ -116,19 +116,43 @@ class CustomerBulkCreateView(ShopScopedMixin, APIView):
             raise exceptions.ValidationError({"customers": "Send at most 1000 customers per request."})
         context = {"shop": membership.shop, "actor": request.user}
         created = 0
+        updated = 0
         errors = []
         from django.db import transaction
 
         with transaction.atomic():
             for idx, raw in enumerate(rows):
                 serializer = CustomerSerializer(data=raw, context=context)
-                if serializer.is_valid():
+                if not serializer.is_valid():
+                    errors.append({"index": idx, "errors": serializer.errors})
+                    continue
+                data = serializer.validated_data
+                phone = str(raw.get("phone") or "").strip()
+                existing = None
+                if phone:
+                    existing = Customer.objects.filter(
+                        shop=membership.shop,
+                        phone_hash=generate_blind_index(phone),
+                        tombstone=False,
+                    ).first()
+                if existing is not None:
+                    # Re-import of a known customer (matched by phone): refresh
+                    # name + opening balance instead of creating a duplicate.
+                    existing.name = data.get("name", existing.name)
+                    if "opening_balance" in data:
+                        existing.balance = data["opening_balance"]
+                    existing.save(update_fields=["name", "balance", "updated_at"])
+                    updated += 1
+                else:
                     serializer.save()
                     created += 1
-                else:
-                    errors.append({"index": idx, "errors": serializer.errors})
         return Response(
-            {"created": created, "skipped": len(errors), "errors": errors[:20]},
+            {
+                "created": created,
+                "updated": updated,
+                "skipped": len(errors),
+                "errors": errors[:20],
+            },
             status=201,
         )
 
