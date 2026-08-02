@@ -937,9 +937,21 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     );
     if (confirmed != true) return;
 
-    final shopId = ref.read(mobileSessionProvider).asData?.value?.shopId;
-    if (shopId == null || shopId.isEmpty) return;
+    final session = ref.read(mobileSessionProvider).asData?.value;
+    final shopId = session?.shopId;
+    if (session == null || shopId == null || shopId.isEmpty) return;
     try {
+      // Void on the server first (reverses stock + customer ledger + marks the
+      // sale VOID). Then remove it locally + restock. A sale that never synced
+      // has no backend id, so we just void it locally.
+      final backendId = detail.backendSaleId;
+      if (backendId != null && backendId.trim().isNotEmpty) {
+        await ref.read(backendApiClientProvider).voidSale(
+              user: session.user,
+              shopId: shopId,
+              saleId: backendId.trim(),
+            );
+      }
       await salesRepository.recordReturn(
         shopId: shopId,
         original: detail,

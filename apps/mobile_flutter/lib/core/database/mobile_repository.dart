@@ -2048,55 +2048,21 @@ class SalesRepository {
   /// Record a full return/refund of a past sale: a reversing (negative) sale
   /// for history + reporting, and — if [restock] — put the items back on the
   /// shelf (matched by SKU, else name). All in one transaction.
+  /// Void/refund a sale. The server void (called by the caller) reverses the
+  /// sale + stock + customer ledger there; here we remove the original sale
+  /// locally so it drops out of History and revenue (instead of the old buggy
+  /// negative-"sale" record that the backend rejected and left stuck in queue),
+  /// and put the items back in local stock.
   Future<void> recordReturn({
     required String shopId,
     required SaleRecordDetail original,
     required bool restock,
   }) async {
     final now = DateTime.now();
-    final saleId = 'return-${now.millisecondsSinceEpoch}';
-    final commandId = 'return-cmd-${now.microsecondsSinceEpoch}';
-
-    final encodedItems = original.items
-        .map(
-          (it) => <String, dynamic>{
-            'name': it.name,
-            'quantity': -it.quantity,
-            'unitPrice': it.unitPrice,
-            'lineTotal': -(it.unitPrice * it.quantity),
-            'sku': it.sku,
-            'gstRate': it.gstRate,
-            'priceIncludesTax': it.priceIncludesTax,
-          },
-        )
-        .toList(growable: false);
-    final encodedPayments = <Map<String, dynamic>>[
-      <String, dynamic>{'mode': 'REFUND', 'amount': -original.amountReceived},
-    ];
-
     await _db.transaction(() async {
-      await _db
-          .into(_db.salesEntries)
-          .insert(
-            SalesEntriesCompanion.insert(
-              id: saleId,
-              total: -original.total,
-              discount: const Value(0),
-              discountType: const Value('fixed'),
-              paymentMode: const Value('REFUND'),
-              date: now.toIso8601String().split('T').first,
-              createdAt: now.millisecondsSinceEpoch,
-              updatedAt: Value(now.millisecondsSinceEpoch),
-              customerName: Value(original.customerName),
-              customerPhone: Value(original.customerPhone),
-              footerNote: Value('RETURN of receipt ${original.id}'),
-              itemsJson: jsonEncode(encodedItems),
-              paymentsJson: jsonEncode(encodedPayments),
-              commandId: Value(commandId),
-              syncStatus: const Value('queued'),
-              backendSaleId: const Value(null),
-            ),
-          );
+      await (_db.delete(
+        _db.salesEntries,
+      )..where((t) => t.id.equals(original.id))).go();
 
       if (restock) {
         for (final it in original.items) {
@@ -2126,7 +2092,7 @@ class SalesRepository {
               delta: it.quantity,
               reason: 'RETURN',
               balanceAfter: row.stock + it.quantity,
-              refId: saleId,
+              refId: 'return-${original.id}',
             );
           }
         }

@@ -503,6 +503,20 @@ class BackendApiClient {
     );
   }
 
+  /// Void (refund) a sale on the server — reverses stock + customer ledger and
+  /// marks the sale VOID, so it drops out of totals.
+  Future<void> voidSale({
+    required User user,
+    required String shopId,
+    required String saleId,
+  }) async {
+    await _request(
+      user: user,
+      method: 'PATCH',
+      path: '/shops/$shopId/sales/$saleId/void/',
+    );
+  }
+
   Future<void> deleteCustomer({
     required User user,
     required String shopId,
