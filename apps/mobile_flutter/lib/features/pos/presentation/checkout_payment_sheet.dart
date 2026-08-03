@@ -79,6 +79,15 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
   );
 
   double get _paid => _resolution.totalCollected;
+
+  /// Total tendered on UPI lines — what the collect-QR should ask for.
+  double get _upiAmount {
+    var sum = 0.0;
+    for (final line in _lines) {
+      if (line.mode == 'UPI' && line.value > 0) sum += line.value;
+    }
+    return sum;
+  }
   double get _due => _resolution.dueFor(widget.cartTotal);
   double get _change => _resolution.change;
 
@@ -286,7 +295,17 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
                     ],
                   ),
                 ),
-                if (widget.upiVpa.trim().isNotEmpty) ...<Widget>[
+                // Picking UPI shows the collect-QR straight away for the exact
+                // amount on that line — the cashier shouldn't have to hunt for
+                // a button before the customer can scan.
+                if (_upiAmount > 0 && widget.upiVpa.trim().isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 12),
+                  _UpiCollectCard(
+                    vpa: widget.upiVpa.trim(),
+                    shopName: widget.shopName,
+                    amount: _upiAmount,
+                  ),
+                ] else if (widget.upiVpa.trim().isNotEmpty) ...<Widget>[
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     onPressed: () => _showPaymentQr(context),
@@ -333,6 +352,95 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Inline collect-QR shown as soon as UPI is chosen, so the customer can scan
+/// while the cashier is still on the checkout sheet.
+class _UpiCollectCard extends StatelessWidget {
+  const _UpiCollectCard({
+    required this.vpa,
+    required this.shopName,
+    required this.amount,
+  });
+
+  final String vpa;
+  final String shopName;
+  final double amount;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    String? uri;
+    try {
+      uri = buildUpiUri(
+        payeeVpa: vpa,
+        payeeName: shopName,
+        amount: amount,
+        note: 'Bill $shopName',
+      );
+    } on UpiRequestError {
+      uri = null;
+    }
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.borderSoft),
+      ),
+      child: Column(
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              const Icon(Icons.qr_code_2_rounded, color: AppPalette.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Scan to pay',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                formatCurrency(amount),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: AppPalette.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (uri == null)
+            Text(
+              'Add a valid UPI ID in Business settings to show a payment QR.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colors.textTertiary,
+              ),
+            )
+          else ...<Widget>[
+            UpiQrView(data: uri, size: 190),
+            const SizedBox(height: 8),
+            Text(
+              vpa,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colors.textTertiary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Confirm the payment in your UPI app, then complete the sale.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: colors.textTertiary,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

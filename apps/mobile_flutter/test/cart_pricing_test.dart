@@ -11,7 +11,7 @@ PosCartItem _item({double price = 100, double qty = 1}) => PosCartItem(
   category: 'c',
 );
 
-void main() {
+void _originalTests() {
   group('subtotal', () {
     test('sums line totals', () {
       expect(
@@ -107,4 +107,51 @@ void main() {
     expect(CartPricing.due(net: net, paid: paid), 200);
     expect(CartPricing.change(net: net, paid: paid), 0);
   });
+}
+
+/// Regression for the reported bug: 3 x Rs.100 with Rs.100 off one line showed
+/// Rs.200 at checkout, but the sale recorded total Rs.300 with a Rs.100 "due".
+/// The cart must net the per-item discount out of the subtotal so the phone and
+/// the server agree on what the customer owes.
+void _perItemDiscountTests() {
+  group('per-item discount', () {
+    PosCartItem line({double discount = 0}) => PosCartItem(
+      id: 'w',
+      name: 'Woolen Caps Kids',
+      price: 100,
+      quantity: 1,
+      stock: 100,
+      category: 'c',
+      discount: discount,
+    );
+
+    test('reduces the cart subtotal', () {
+      expect(
+        CartPricing.subtotal([line(discount: 100), line(), line()]),
+        200,
+      );
+    });
+
+    test('is capped at the line total and never goes negative', () {
+      final capped = line(discount: 500);
+      expect(capped.effectiveDiscount, 100);
+      expect(capped.lineTotal, 0);
+      expect(CartPricing.subtotal([capped]), 0);
+    });
+
+    test('a negative discount is ignored', () {
+      expect(line(discount: -50).lineTotal, 100);
+    });
+
+    test('travels to the backend payload so the server nets the same total', () {
+      final json = line(discount: 100).toSaleJson();
+      expect(json['discount'], 100);
+      expect(json['price'], 100);
+    });
+  });
+}
+
+void main() {
+  _originalTests();
+  _perItemDiscountTests();
 }

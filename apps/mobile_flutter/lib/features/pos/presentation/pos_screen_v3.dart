@@ -1036,6 +1036,10 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
       if (paymentMode == 'CASH') {
         unawaited(ref.read(receiptPrinterProvider).openCashDrawer());
       }
+      // Auto-print the receipt when a printer is paired. printTaxInvoice throws
+      // if nothing is connected, so this is best-effort: no printer simply means
+      // the on-screen receipt sheet below is the confirmation.
+      unawaited(_autoPrintReceipt(commit.saleId, shop));
       if (!mounted) return;
       // Local-first: the sale is committed to the device now, so confirm and
       // reset immediately. Backend sync runs in the background (its result is
@@ -1067,6 +1071,20 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
           backgroundColor: AppPalette.error,
         ),
       );
+    }
+  }
+
+  /// Best-effort receipt print straight after a sale. Never surfaces an error
+  /// when no printer is paired — that's the normal case for most shops.
+  Future<void> _autoPrintReceipt(String saleId, ShopInfo shop) async {
+    try {
+      final detail = await ref
+          .read(salesRepositoryProvider)
+          .getSaleDetail(saleId);
+      if (detail == null) return;
+      await ref.read(receiptPrinterProvider).printTaxInvoice(detail, shop);
+    } catch (_) {
+      // No printer connected (or it failed) — the receipt sheet still shows.
     }
   }
 
@@ -2594,44 +2612,78 @@ class _CartSheetState extends State<_CartSheet> {
           ? line.effectiveDiscount.toStringAsFixed(2)
           : '',
     );
+    // Cashiers think in both "Rs.50 off" and "10% off", so support each and
+    // resolve the percent to rupees against this line's gross before applying.
+    var isPercent = false;
     final result = await showDialog<double>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Discount / ${line.name}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text('Line total ${formatCurrency(line.grossLineTotal)}'),
-            const SizedBox(height: 10),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Discount on this item',
-                prefixText: '₹ ',
-                hintText: 'e.g. 50',
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final entered = double.tryParse(controller.text.trim()) ?? 0;
+          final resolved = isPercent
+              ? line.grossLineTotal * (entered.clamp(0, 100) / 100)
+              : entered;
+          final capped =
+              resolved > line.grossLineTotal ? line.grossLineTotal : resolved;
+          return AlertDialog(
+            title: Text('Discount / ${line.name}'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text('Line total ${formatCurrency(line.grossLineTotal)}'),
+                const SizedBox(height: 10),
+                SegmentedButton<bool>(
+                  segments: const <ButtonSegment<bool>>[
+                    ButtonSegment<bool>(value: false, label: Text('₹')),
+                    ButtonSegment<bool>(value: true, label: Text('%')),
+                  ],
+                  selected: <bool>{isPercent},
+                  onSelectionChanged: (selection) =>
+                      setDialogState(() => isPercent = selection.first),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  onChanged: (_) => setDialogState(() {}),
+                  decoration: InputDecoration(
+                    labelText: isPercent
+                        ? 'Discount %'
+                        : 'Discount on this item',
+                    prefixText: isPercent ? null : '₹ ',
+                    suffixText: isPercent ? '%' : null,
+                    hintText: isPercent ? 'e.g. 10' : 'e.g. 50',
+                  ),
+                ),
+                if (capped > 0) ...<Widget>[
+                  const SizedBox(height: 8),
+                  Text(
+                    '-${formatCurrency(capped)}  ->  pays '
+                    '${formatCurrency(line.grossLineTotal - capped)}',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ],
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, 0.0),
+                child: const Text('Clear'),
               ),
-            ),
-          ],
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, 0.0),
-            child: const Text('Clear'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(
-              dialogContext,
-              double.tryParse(controller.text.trim()) ?? 0.0,
-            ),
-            child: const Text('Apply'),
-          ),
-        ],
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, capped),
+                child: const Text('Apply'),
+              ),
+            ],
+          );
+        },
       ),
     );
     controller.dispose();

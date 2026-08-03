@@ -213,6 +213,7 @@ class SaleSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"payments": "At least one payment is required."})
 
         computed_subtotal = Decimal("0.00")
+        item_discount_total = Decimal("0.00")
         total_paid = Decimal("0.00")
 
         for item in items:
@@ -220,7 +221,17 @@ class SaleSerializer(serializers.ModelSerializer):
             if quantity <= 0:
                 raise serializers.ValidationError({"items": "Each sale item must have a positive quantity."})
             unit_price = item.get("unit_price") or Decimal("0.00")
-            computed_subtotal += Decimal(quantity) * unit_price
+            line_gross = Decimal(quantity) * unit_price
+            computed_subtotal += line_gross
+            # Per-item discounts reduce what the customer owes, exactly like the
+            # sale-level discount. Missing this made an item discount look like
+            # an unpaid balance instead of money off the bill.
+            line_discount = Decimal(str(item.get("discount") or "0.00"))
+            if line_discount < Decimal("0.00"):
+                line_discount = Decimal("0.00")
+            if line_discount > line_gross:
+                line_discount = line_gross
+            item_discount_total += line_discount
 
         for payment in payments:
             amount = payment.get("amount") or Decimal("0.00")
@@ -233,7 +244,7 @@ class SaleSerializer(serializers.ModelSerializer):
                 {"subtotal_amount": f"Subtotal must match item totals ({computed_subtotal})."}
             )
 
-        expected_total = computed_subtotal - discount_amount
+        expected_total = computed_subtotal - item_discount_total - discount_amount
         if expected_total < Decimal("0.00"):
             raise serializers.ValidationError({"discount_amount": "Discount cannot exceed subtotal."})
 
@@ -244,6 +255,7 @@ class SaleSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"payments": "Payments cannot exceed the sale total in phase 1."})
 
         attrs["_computed_subtotal"] = computed_subtotal
+        attrs["_item_discount_total"] = item_discount_total
         attrs["_computed_total"] = expected_total
         attrs["_computed_paid"] = total_paid
         attrs["_computed_due"] = expected_total - total_paid
@@ -275,9 +287,16 @@ class SaleSerializer(serializers.ModelSerializer):
         item_payloads = validated_data.pop("items")
         payment_payloads = validated_data.pop("payments")
         computed_subtotal = validated_data.pop("_computed_subtotal")
+        item_discount_total = validated_data.pop("_item_discount_total", Decimal("0.00"))
         computed_total = validated_data.pop("_computed_total")
         computed_paid = validated_data.pop("_computed_paid")
         computed_due = validated_data.pop("_computed_due")
+
+        # The bill-level discount is what gets apportioned across lines; the
+        # stored discount_amount is the total the customer actually saved
+        # (per-item + bill-level), so receipts and History report one figure.
+        bill_discount = validated_data.get("discount_amount") or Decimal("0.00")
+        validated_data["discount_amount"] = bill_discount + item_discount_total
 
         shop = self.context["shop"]
         actor = self.context["actor"]
@@ -327,7 +346,9 @@ class SaleSerializer(serializers.ModelSerializer):
         # --- Discount apportionment ---
         # Distribute the sale-level discount proportionally across lines so
         # GST is computed on the post-discount value per line.
-        discount_amount = validated_data.get("discount_amount", Decimal("0.00")) or Decimal("0.00")
+        # Only the bill-level portion is spread across lines — the per-item part
+        # is already attributed to its own line below.
+        discount_amount = bill_discount
         raw_line_totals = [
             Decimal(str(ip["quantity"])) * ip["unit_price"] for ip in item_payloads
         ]

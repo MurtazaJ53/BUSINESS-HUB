@@ -673,6 +673,8 @@ class PerItemDiscountTests(TestCase):
         self.assertEqual(b_item.line_discount, Decimal("0.00"))
 
     def test_per_item_discount_is_capped_at_the_line_total(self):
+        # Rs.500 off a Rs.100 line can only take Rs.100 — it must never spill
+        # over and discount the rest of the bill.
         response = self.client.post(
             f"/api/v1/shops/{self.shop.id}/sales/",
             {
@@ -683,13 +685,23 @@ class PerItemDiscountTests(TestCase):
                         "unit_price": "100.00",
                         "discount": "500.00",
                     },
+                    {
+                        "inventory_item_id": str(self.b.id),
+                        "quantity": 1,
+                        "unit_price": "100.00",
+                    },
                 ],
-                "payments": [{"payment_method": "CASH", "amount": "10.00"}],
+                "payments": [{"payment_method": "CASH", "amount": "100.00"}],
             },
             format="json",
         )
         self.assertEqual(response.status_code, 201, response.content)
-        self.assertEqual(Sale.objects.get().items.get().line_discount, Decimal("100.00"))
+        sale = Sale.objects.get()
+        self.assertEqual(
+            sale.items.get(name_snapshot="Item A").line_discount, Decimal("100.00")
+        )
+        self.assertEqual(sale.total_amount, Decimal("100.00"))
+        self.assertEqual(sale.amount_due, Decimal("0.00"))
 
     def test_sale_discount_stacks_on_top_of_item_discount(self):
         response = self.client.post(
@@ -719,3 +731,86 @@ class PerItemDiscountTests(TestCase):
         # 20 item-level + 30 sale-level spread over the remaining 80/100.
         self.assertEqual(total_line_discount, Decimal("50.00"))
         self.assertGreater(sale.items.get(name_snapshot="Item A").line_discount, Decimal("20.00"))
+
+
+class PerItemDiscountTotalsTests(TestCase):
+    """Regression: a per-item discount must reduce what the customer OWES.
+    It previously only tagged line_discount, so a Rs.100 item discount on a
+    Rs.300 bill left total=300 and turned the discount into a Rs.100 'due'."""
+
+    def setUp(self):
+        self.user = PlatformUser.objects.create_user(
+            email="tot@example.com", password="secret", full_name="Owner"
+        )
+        self.shop = Shop.objects.create(name="Tot Shop", slug="tot-shop")
+        ShopMembership.objects.create(
+            user=self.user,
+            shop=self.shop,
+            role=ShopMembership.Role.OWNER,
+            status=ShopMembership.Status.ACTIVE,
+        )
+        self.item = InventoryItem.objects.create(
+            shop=self.shop, name="Woolen Caps Kids", sku="W1", sell_price=Decimal("100.00")
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def _line(self, discount=None):
+        line = {
+            "inventory_item_id": str(self.item.id),
+            "quantity": 1,
+            "unit_price": "100.00",
+        }
+        if discount is not None:
+            line["discount"] = discount
+        return line
+
+    def test_item_discount_reduces_total_and_leaves_no_due(self):
+        # 3 x Rs.100 = Rs.300, Rs.100 off one line, pay Rs.200 -> nothing due.
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/",
+            {
+                "items": [self._line("100.00"), self._line(), self._line()],
+                "payments": [{"payment_method": "UPI", "amount": "200.00"}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+        sale = Sale.objects.get()
+        self.assertEqual(sale.subtotal_amount, Decimal("300.00"))
+        self.assertEqual(sale.total_amount, Decimal("200.00"))
+        self.assertEqual(sale.discount_amount, Decimal("100.00"))
+        self.assertEqual(sale.amount_received, Decimal("200.00"))
+        self.assertEqual(sale.amount_due, Decimal("0.00"))
+
+    def test_paying_full_gross_over_an_item_discount_is_rejected(self):
+        # Rs.300 tendered on a Rs.200 bill must not be silently accepted.
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/",
+            {
+                "items": [self._line("100.00"), self._line(), self._line()],
+                "payments": [{"payment_method": "UPI", "amount": "300.00"}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.content)
+
+    def test_item_and_bill_discount_combine_into_stored_discount(self):
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/",
+            {
+                "discount_amount": "50.00",
+                "items": [self._line("100.00"), self._line(), self._line()],
+                "payments": [{"payment_method": "CASH", "amount": "150.00"}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+        sale = Sale.objects.get()
+        self.assertEqual(sale.total_amount, Decimal("150.00"))
+        self.assertEqual(sale.discount_amount, Decimal("150.00"))
+        self.assertEqual(sale.amount_due, Decimal("0.00"))
+        # Stored discount must equal what the lines actually absorbed.
+        self.assertEqual(
+            sum(i.line_discount for i in sale.items.all()), Decimal("150.00")
+        )
