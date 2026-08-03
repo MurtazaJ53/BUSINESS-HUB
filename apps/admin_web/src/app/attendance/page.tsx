@@ -1,6 +1,6 @@
 import { TeamAttendance } from "@/components/team-attendance";
-import { AppLayout } from "@/components/app-layout";
-import { getSafeSession } from "@/lib/session-helper";
+import { AdminShell } from "@/components/admin-shell";
+import { getSession, resolveActiveShop } from "@/lib/admin-api";
 
 export const metadata = {
   title: "Staff Attendance & Timesheet | Business Hub",
@@ -8,31 +8,18 @@ export const metadata = {
 };
 
 export default async function AttendancePage() {
-  const { user, currentShopId, currentShopName, planTier, memberships } =
-    await getSafeSession();
+  const session = await getSession();
+  const activeShop = resolveActiveShop(session);
 
   return (
-    <AppLayout
-      user={user}
-      currentShopId={currentShopId}
-      currentShopName={currentShopName}
-      planTier={planTier}
-      memberships={memberships}
+    <AdminShell
+      session={session}
+      activeShop={activeShop}
+      activeRoute="attendance"
+      title="Shift Attendance & Punch Logs"
+      subtitle="Daily staff check-in, overtime logs, attendance calendar, and timesheet reports"
     >
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h1 className="text-xl font-bold text-white tracking-tight">
-              Shift Attendance & Punch Logs
-            </h1>
-            <p className="text-xs text-[var(--text-tertiary)]">
-              Daily staff check-in, overtime logs, attendance calendar, and timesheet reports
-            </p>
-          </div>
-        </div>
-
-        <TeamAttendance />
-      </div>
-    </AppLayout>
+      <TeamAttendance />
+    </AdminShell>
   );
 }

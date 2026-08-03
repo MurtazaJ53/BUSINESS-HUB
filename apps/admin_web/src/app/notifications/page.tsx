@@ -1,6 +1,6 @@
 import { NotificationsFeed } from "@/components/notifications-feed";
-import { AppLayout } from "@/components/app-layout";
-import { getSafeSession } from "@/lib/session-helper";
+import { AdminShell } from "@/components/admin-shell";
+import { getSession, resolveActiveShop } from "@/lib/admin-api";
 
 export const metadata = {
   title: "Notifications & System Alerts | Business Hub",
@@ -8,31 +8,18 @@ export const metadata = {
 };
 
 export default async function NotificationsPage() {
-  const { user, currentShopId, currentShopName, planTier, memberships } =
-    await getSafeSession();
+  const session = await getSession();
+  const activeShop = resolveActiveShop(session);
 
   return (
-    <AppLayout
-      user={user}
-      currentShopId={currentShopId}
-      currentShopName={currentShopName}
-      planTier={planTier}
-      memberships={memberships}
+    <AdminShell
+      session={session}
+      activeShop={activeShop}
+      activeRoute="notifications"
+      title="Activity Alerts & Notifications"
+      subtitle="Real-time events: stock shortages, high-value orders, payment collections, and security updates"
     >
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h1 className="text-xl font-bold text-white tracking-tight">
-              Activity Alerts & Notifications
-            </h1>
-            <p className="text-xs text-[var(--text-tertiary)]">
-              Real-time events: stock shortages, high-value orders, payment collections, and security updates
-            </p>
-          </div>
-        </div>
-
-        <NotificationsFeed />
-      </div>
-    </AppLayout>
+      <NotificationsFeed />
+    </AdminShell>
   );
 }

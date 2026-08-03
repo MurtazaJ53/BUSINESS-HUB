@@ -1,38 +1,25 @@
 import { ExpensesManager } from "@/components/expenses-manager";
-import { AppLayout } from "@/components/app-layout";
-import { getSafeSession } from "@/lib/session-helper";
+import { AdminShell } from "@/components/admin-shell";
+import { getSession, resolveActiveShop } from "@/lib/admin-api";
 
 export const metadata = {
-  title: "Expenses & Petty Cash | Business Hub",
-  description: "Track store operational expenses, rent, utilities, staff chai, and vendor payouts",
+  title: "Shop Expenses Manager | Business Hub",
+  description: "Track store expenses, utility bills, inventory costs, and miscellaneous cash outflows",
 };
 
 export default async function ExpensesPage() {
-  const { user, currentShopId, currentShopName, planTier, memberships } =
-    await getSafeSession();
+  const session = await getSession();
+  const activeShop = resolveActiveShop(session);
 
   return (
-    <AppLayout
-      user={user}
-      currentShopId={currentShopId}
-      currentShopName={currentShopName}
-      planTier={planTier}
-      memberships={memberships}
+    <AdminShell
+      session={session}
+      activeShop={activeShop}
+      activeRoute="expenses"
+      title="Shop Expenses Manager"
+      subtitle="Track store expenses, utility bills, inventory costs, and miscellaneous cash outflows"
     >
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h1 className="text-xl font-bold text-white tracking-tight">
-              Operational Expenses & Petty Cash
-            </h1>
-            <p className="text-xs text-[var(--text-tertiary)]">
-              Daily overhead tracking, recurring bills, rent, utility payouts & expense category analytics
-            </p>
-          </div>
-        </div>
-
-        <ExpensesManager />
-      </div>
-    </AppLayout>
+      <ExpensesManager />
+    </AdminShell>
   );
 }

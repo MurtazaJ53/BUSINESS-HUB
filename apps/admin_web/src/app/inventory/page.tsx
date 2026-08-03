@@ -1,6 +1,6 @@
 import { InventoryManager } from "@/components/inventory-manager";
-import { AppLayout } from "@/components/app-layout";
-import { getSafeSession } from "@/lib/session-helper";
+import { AdminShell } from "@/components/admin-shell";
+import { getSession, resolveActiveShop } from "@/lib/admin-api";
 
 export const metadata = {
   title: "Inventory Management | Business Hub",
@@ -8,31 +8,18 @@ export const metadata = {
 };
 
 export default async function InventoryPage() {
-  const { user, currentShopId, currentShopName, planTier, memberships } =
-    await getSafeSession();
+  const session = await getSession();
+  const activeShop = resolveActiveShop(session);
 
   return (
-    <AppLayout
-      user={user}
-      currentShopId={currentShopId}
-      currentShopName={currentShopName}
-      planTier={planTier}
-      memberships={memberships}
+    <AdminShell
+      session={session}
+      activeShop={activeShop}
+      activeRoute="inventory"
+      title="Inventory & Catalog"
+      subtitle="Real-time stock valuation, barcode registry, low-stock threshold triggers & batch adjustments"
     >
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h1 className="text-xl font-bold text-white tracking-tight">
-              Inventory & Catalog
-            </h1>
-            <p className="text-xs text-[var(--text-tertiary)]">
-              Real-time stock valuation, barcode registry, low-stock threshold triggers & batch adjustments
-            </p>
-          </div>
-        </div>
-
-        <InventoryManager />
-      </div>
-    </AppLayout>
+      <InventoryManager />
+    </AdminShell>
   );
 }

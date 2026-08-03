@@ -1,6 +1,6 @@
 import { StoreSettings } from "@/components/store-settings";
-import { AppLayout } from "@/components/app-layout";
-import { getSafeSession } from "@/lib/session-helper";
+import { AdminShell } from "@/components/admin-shell";
+import { getSession, resolveActiveShop } from "@/lib/admin-api";
 
 export const metadata = {
   title: "Store Settings & Preferences | Business Hub",
@@ -8,34 +8,23 @@ export const metadata = {
 };
 
 export default async function SettingsPage() {
-  const { user, currentShopId, currentShopName, planTier, memberships } =
-    await getSafeSession();
+  const session = await getSession();
+  const activeShop = resolveActiveShop(session);
+  const rawTier = activeShop?.shop?.plan_tier;
+  const planTier = rawTier === "growth" || rawTier === "pro" ? rawTier : "starter";
 
   return (
-    <AppLayout
-      user={user}
-      currentShopId={currentShopId}
-      currentShopName={currentShopName}
-      planTier={planTier}
-      memberships={memberships}
+    <AdminShell
+      session={session}
+      activeShop={activeShop}
+      activeRoute="settings"
+      title="Store Configuration & Hardware"
+      subtitle="Business profile, GSTIN configuration, thermal ESC/POS printers, and plan tiers"
     >
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h1 className="text-xl font-bold text-white tracking-tight">
-              Store Configuration & Hardware
-            </h1>
-            <p className="text-xs text-[var(--text-tertiary)]">
-              Business profile, GSTIN configuration, thermal ESC/POS printers, and plan tiers
-            </p>
-          </div>
-        </div>
-
-        <StoreSettings
-          currentShopName={currentShopName}
-          planTier={planTier}
-        />
-      </div>
-    </AppLayout>
+      <StoreSettings
+        currentShopName={activeShop?.shop.name || "Business Hub Store"}
+        planTier={planTier}
+      />
+    </AdminShell>
   );
 }

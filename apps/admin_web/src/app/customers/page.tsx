@@ -1,6 +1,6 @@
 import { CustomersKhata } from "@/components/customers-khata";
-import { AppLayout } from "@/components/app-layout";
-import { getSafeSession } from "@/lib/session-helper";
+import { AdminShell } from "@/components/admin-shell";
+import { getSession, resolveActiveShop } from "@/lib/admin-api";
 
 export const metadata = {
   title: "Customers & Khata Ledger | Business Hub",
@@ -8,31 +8,18 @@ export const metadata = {
 };
 
 export default async function CustomersPage() {
-  const { user, currentShopId, currentShopName, planTier, memberships } =
-    await getSafeSession();
+  const session = await getSession();
+  const activeShop = resolveActiveShop(session);
 
   return (
-    <AppLayout
-      user={user}
-      currentShopId={currentShopId}
-      currentShopName={currentShopName}
-      planTier={planTier}
-      memberships={memberships}
+    <AdminShell
+      session={session}
+      activeShop={activeShop}
+      activeRoute="customers"
+      title="Customer CRM & Udhaar Khata"
+      subtitle="Store credit ledger, balance reminders, customer loyalty, and repayment logging"
     >
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h1 className="text-xl font-bold text-white tracking-tight">
-              Customer CRM & Udhaar Khata
-            </h1>
-            <p className="text-xs text-[var(--text-tertiary)]">
-              Store credit ledger, balance reminders, customer loyalty, and repayment logging
-            </p>
-          </div>
-        </div>
-
-        <CustomersKhata />
-      </div>
-    </AppLayout>
+      <CustomersKhata />
+    </AdminShell>
   );
 }

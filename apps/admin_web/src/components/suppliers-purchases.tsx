@@ -96,10 +96,10 @@ const SEED_PURCHASES: PurchaseOrderRecord[] = [
   },
 ];
 
-export function SuppliersPurchases() {
+export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: "purchases" | "suppliers" } = {}) {
   const [suppliers, setSuppliers] = useState<SupplierRecord[]>(SEED_SUPPLIERS);
   const [purchases, setPurchases] = useState<PurchaseOrderRecord[]>(SEED_PURCHASES);
-  const [activeTab, setActiveTab] = useState<"purchases" | "suppliers">("purchases");
+  const [activeTab, setActiveTab] = useState<"purchases" | "suppliers">(initialTab);
   const [search, setSearch] = useState("");
 
   // Modals

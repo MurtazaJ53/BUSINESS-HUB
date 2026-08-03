@@ -37,6 +37,7 @@ type AdminShellProps = {
   session: SessionPayload;
   activeShop: ShopMembership | null;
   activeRoute:
+    | "notifications"
     | "overview"
     | "pos"
     | "inventory"
