@@ -126,6 +126,7 @@ class _SettingsBusinessScreenState
                 ),
                 const SizedBox(height: 14),
                 TextField(
+      textCapitalization: TextCapitalization.sentences,
                   controller: _tagline,
                   decoration: const InputDecoration(
                     labelText: 'Tagline / subtitle',
@@ -194,6 +195,7 @@ class _SettingsBusinessScreenState
               children: <Widget>[
                 const SizedBox(height: 4),
                 TextField(
+      textCapitalization: TextCapitalization.sentences,
                   controller: _footer,
                   maxLines: 3,
                   decoration: const InputDecoration(

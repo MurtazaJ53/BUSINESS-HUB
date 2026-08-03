@@ -34,6 +34,11 @@ class InventoryItem(SourceTrackedModel):
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
     tombstone = models.BooleanField(default=False)
     source_meta_json = models.JSONField(default=dict, blank=True)
+    # Product photo as a base64 data URI. Stored in the DB (not MEDIA_ROOT)
+    # because the single-node Docker deploy only persists the database volume —
+    # files written into the container are lost on every redeploy. Clients send
+    # a downscaled/compressed copy, so rows stay small.
+    image_data = models.TextField(blank=True)
 
     class Meta:
         indexes = [

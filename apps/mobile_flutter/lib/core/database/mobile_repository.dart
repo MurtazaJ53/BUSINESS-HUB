@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../images/product_image_store.dart';
 import '../models/mobile_models.dart';
 import '../runtime/pilot_evidence_tracker.dart';
 import 'local_database.dart';
@@ -858,8 +860,27 @@ class InventoryRepository {
         _asEpoch(row['updated_at'] ?? row['created_at']) ??
         DateTime.now().millisecondsSinceEpoch;
 
+    // Rehydrate the product photo pulled from the server into a local file so
+    // the existing file-based display code works and images survive a data
+    // clear. Only when we don't already have a local copy.
+    String? hydratedImagePath;
+    final remoteImage = _asStringOrNull(row['image_data']);
+    if (remoteImage != null) {
+      final existing = await (_db.select(_db.inventoryEntries)
+            ..where((t) => t.id.equals(id)))
+          .getSingleOrNull();
+      final hasLocal = existing?.imagePath != null &&
+          existing!.imagePath!.isNotEmpty &&
+          File(existing.imagePath!).existsSync();
+      if (!hasLocal) {
+        hydratedImagePath =
+            await ProductImageStore().storeFromDataUri(remoteImage);
+      }
+    }
+
     await mergeInventoryDocument(id, <String, dynamic>{
       'name': row['name'],
+      'imagePath': ?hydratedImagePath,
       'price': row['sell_price'] ?? row['price'],
       'sku': row['sku'],
       'category': row['category'],
@@ -2654,6 +2675,9 @@ List<SaleDetailItem> _parseSaleItems(String raw) {
               item['hsnCode'] ?? item['hsn_code'] ?? item['hsn_snapshot'],
             ),
             gstRate: _asDouble(item['gstRate'] ?? item['gst_rate']),
+            lineDiscount: _asDouble(
+              item['discount'] ?? item['lineDiscount'] ?? item['line_discount'],
+            ),
             taxableAmount: _asDouble(
               item['taxableAmount'] ?? item['taxable_amount'],
             ),
@@ -2733,6 +2757,38 @@ class ExpenseRepository {
         );
   }
 
+  /// Insert-or-replace an expense with an explicit id — used to store the
+  /// server's copy (its UUID) after a push, and to hydrate expenses pulled from
+  /// the backend on login so they survive a data clear.
+  Future<void> upsertExpense({
+    required String id,
+    required String category,
+    required double amount,
+    required DateTime expenseDate,
+    String description = '',
+    String paymentMethod = 'CASH',
+    String paymentReference = '',
+    String? actorName,
+    bool tombstone = false,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await _db.into(_db.expenseEntries).insertOnConflictUpdate(
+          ExpenseEntriesCompanion.insert(
+            id: id,
+            category: Value(category.trim().isEmpty ? 'General' : category.trim()),
+            amount: Value(amount),
+            description: Value(description.trim()),
+            paymentMethod: Value(paymentMethod),
+            paymentReference: Value(paymentReference.trim()),
+            expenseDate: expenseDate.toIso8601String().split('T').first,
+            actorName: Value(actorName),
+            createdAt: now,
+            updatedAt: Value(now),
+            tombstone: Value(tombstone),
+          ),
+        );
+  }
+
   Stream<List<ExpenseRecord>> watchExpenses({
     String query = '',
     String category = '',
@@ -2760,19 +2816,22 @@ class ExpenseRepository {
           (rows) => rows
               .map(
                 (row) => ExpenseRecord(
-                  id: row.read<String>('id'),
-                  category: row.read<String>('category'),
-                  amount: row.read<double>('amount'),
-                  description: row.read<String>('description'),
-                  paymentMethod: row.read<String>('payment_method'),
-                  paymentReference: row.read<String>('payment_reference'),
-                  expenseDate:
-                      DateTime.tryParse(row.read<String>('expense_date')) ??
+                  id: row.readNullable<String>('id') ?? '',
+                  category: row.readNullable<String>('category') ?? 'General',
+                  amount: row.readNullable<double>('amount') ?? 0,
+                  description: row.readNullable<String>('description') ?? '',
+                  paymentMethod:
+                      row.readNullable<String>('payment_method') ?? 'CASH',
+                  paymentReference:
+                      row.readNullable<String>('payment_reference') ?? '',
+                  expenseDate: DateTime.tryParse(
+                        row.readNullable<String>('expense_date') ?? '',
+                      ) ??
                       DateTime.now(),
                   actorName: _asStringOrNull(
                     row.readNullable<String>('actor_name'),
                   ),
-                  tombstone: row.read<int>('tombstone') == 1,
+                  tombstone: (row.readNullable<int>('tombstone') ?? 0) == 1,
                 ),
               )
               .toList(growable: false),
@@ -2856,6 +2915,49 @@ class PurchaseRepository {
           ),
         );
     return id;
+  }
+
+  /// Insert-or-replace a purchase with an explicit id — used to store the
+  /// server's copy after a push, and to hydrate purchases pulled from the
+  /// backend on login so they (and the suppliers rolled up from them) survive a
+  /// data clear.
+  Future<void> upsertPurchase({
+    required String id,
+    required String supplierName,
+    required double total,
+    required DateTime purchaseDate,
+    double amountPaid = 0,
+    String supplierPhone = '',
+    String reference = '',
+    String paymentMethod = 'CASH',
+    String notes = '',
+    String? actorName,
+    bool tombstone = false,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final safeTotal = total < 0 ? 0.0 : total;
+    final safePaid = amountPaid < 0
+        ? 0.0
+        : (amountPaid > safeTotal ? safeTotal : amountPaid);
+    await _db.into(_db.purchaseEntries).insertOnConflictUpdate(
+          PurchaseEntriesCompanion.insert(
+            id: id,
+            supplierName: supplierName.trim().isEmpty
+                ? 'Unnamed supplier'
+                : supplierName.trim(),
+            supplierPhone: Value(supplierPhone.trim()),
+            reference: Value(reference.trim()),
+            total: Value(safeTotal),
+            amountPaid: Value(safePaid),
+            paymentMethod: Value(paymentMethod),
+            notes: Value(notes.trim()),
+            purchaseDate: purchaseDate.toIso8601String().split('T').first,
+            actorName: Value(actorName),
+            createdAt: now,
+            updatedAt: Value(now),
+            tombstone: Value(tombstone),
+          ),
+        );
   }
 
   /// Add a payment against an existing purchase, capped at its outstanding
@@ -2974,19 +3076,21 @@ class PurchaseRepository {
 
   PurchaseRecord _mapPurchaseRow(QueryRow row) {
     return PurchaseRecord(
-      id: row.read<String>('id'),
-      supplierName: row.read<String>('supplier_name'),
-      supplierPhone: row.read<String>('supplier_phone'),
-      reference: row.read<String>('reference'),
-      total: row.read<double>('total'),
-      amountPaid: row.read<double>('amount_paid'),
-      paymentMethod: row.read<String>('payment_method'),
-      notes: row.read<String>('notes'),
-      purchaseDate:
-          DateTime.tryParse(row.read<String>('purchase_date')) ??
+      id: row.readNullable<String>('id') ?? '',
+      supplierName:
+          row.readNullable<String>('supplier_name') ?? 'Unnamed supplier',
+      supplierPhone: row.readNullable<String>('supplier_phone') ?? '',
+      reference: row.readNullable<String>('reference') ?? '',
+      total: row.readNullable<double>('total') ?? 0,
+      amountPaid: row.readNullable<double>('amount_paid') ?? 0,
+      paymentMethod: row.readNullable<String>('payment_method') ?? 'CASH',
+      notes: row.readNullable<String>('notes') ?? '',
+      purchaseDate: DateTime.tryParse(
+            row.readNullable<String>('purchase_date') ?? '',
+          ) ??
           DateTime.now(),
       actorName: _asStringOrNull(row.readNullable<String>('actor_name')),
-      tombstone: row.read<int>('tombstone') == 1,
+      tombstone: (row.readNullable<int>('tombstone') ?? 0) == 1,
     );
   }
 }

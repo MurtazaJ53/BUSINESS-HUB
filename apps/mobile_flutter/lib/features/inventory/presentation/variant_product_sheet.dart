@@ -167,6 +167,7 @@ class _VariantProductSheetState extends ConsumerState<VariantProductSheet> {
                 children: <Widget>[
                   Expanded(
                     child: TextFormField(
+      textCapitalization: TextCapitalization.sentences,
                       controller: _categoryController,
                       decoration: const InputDecoration(labelText: 'Category'),
                     ),
@@ -280,6 +281,7 @@ class _VariantProductSheetState extends ConsumerState<VariantProductSheet> {
             children: <Widget>[
               Expanded(
                 child: TextFormField(
+      textCapitalization: TextCapitalization.sentences,
                   controller: row.label,
                   decoration: const InputDecoration(
                     labelText: 'Variant (e.g. S / Red)',
@@ -332,6 +334,7 @@ class _VariantProductSheetState extends ConsumerState<VariantProductSheet> {
             children: <Widget>[
               Expanded(
                 child: TextFormField(
+      textCapitalization: TextCapitalization.sentences,
                   controller: row.sku,
                   decoration: const InputDecoration(
                     labelText: 'SKU / barcode',

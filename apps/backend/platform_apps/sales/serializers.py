@@ -54,6 +54,12 @@ class SaleItemSerializer(serializers.ModelSerializer):
     sku = serializers.CharField(source="sku_snapshot", required=False, allow_blank=True)
     size = serializers.CharField(source="size_snapshot", required=False, allow_blank=True)
     line_total = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    # Per-item discount entered by the cashier (e.g. money off one line in a
+    # multi-item bill). Applied before the sale-level discount is apportioned;
+    # the stored line_discount is the sum of the two.
+    discount = serializers.DecimalField(
+        max_digits=12, decimal_places=2, required=False, write_only=True, default=Decimal("0.00")
+    )
 
     class Meta:
         model = SaleItem
@@ -68,6 +74,7 @@ class SaleItemSerializer(serializers.ModelSerializer):
             "unit_cost",
             "line_total",
             "line_discount",
+            "discount",
             "hsn_snapshot",
             "gst_rate",
             "taxable_amount",
@@ -324,7 +331,24 @@ class SaleSerializer(serializers.ModelSerializer):
         raw_line_totals = [
             Decimal(str(ip["quantity"])) * ip["unit_price"] for ip in item_payloads
         ]
-        line_discounts = apportion_discount(raw_line_totals, discount_amount)
+        # Per-item discounts come off first (never more than the line itself),
+        # then the sale-level discount is apportioned over what remains.
+        item_level_discounts = []
+        for idx, ip in enumerate(item_payloads):
+            requested = ip.get("discount") or Decimal("0.00")
+            requested = Decimal(str(requested))
+            if requested < Decimal("0.00"):
+                requested = Decimal("0.00")
+            if requested > raw_line_totals[idx]:
+                requested = raw_line_totals[idx]
+            item_level_discounts.append(requested)
+        net_line_totals = [
+            raw_line_totals[i] - item_level_discounts[i] for i in range(len(raw_line_totals))
+        ]
+        apportioned = apportion_discount(net_line_totals, discount_amount)
+        line_discounts = [
+            item_level_discounts[i] + apportioned[i] for i in range(len(apportioned))
+        ]
 
         sale_taxable = Decimal("0.00")
         sale_tax = Decimal("0.00")

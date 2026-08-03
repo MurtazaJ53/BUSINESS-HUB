@@ -1514,6 +1514,7 @@ class PosCartItem {
     this.hsnCode,
     this.gstRate = 0,
     this.priceIncludesTax = true,
+    this.discount = 0,
   });
 
   final String id;
@@ -1529,7 +1530,20 @@ class PosCartItem {
   final double gstRate;
   final bool priceIncludesTax;
 
-  double get lineTotal => price * quantity;
+  /// Money off this line only (per-item discount), entered by the cashier.
+  /// Never more than the line itself.
+  final double discount;
+
+  double get grossLineTotal => price * quantity;
+
+  /// Effective discount, clamped so a line can never go negative.
+  double get effectiveDiscount {
+    if (discount <= 0) return 0;
+    final gross = grossLineTotal;
+    return discount > gross ? gross : discount;
+  }
+
+  double get lineTotal => grossLineTotal - effectiveDiscount;
 
   PosCartItem copyWith({
     String? id,
@@ -1544,6 +1558,7 @@ class PosCartItem {
     String? hsnCode,
     double? gstRate,
     bool? priceIncludesTax,
+    double? discount,
   }) {
     return PosCartItem(
       id: id ?? this.id,
@@ -1558,6 +1573,7 @@ class PosCartItem {
       hsnCode: hsnCode ?? this.hsnCode,
       gstRate: gstRate ?? this.gstRate,
       priceIncludesTax: priceIncludesTax ?? this.priceIncludesTax,
+      discount: discount ?? this.discount,
     );
   }
 
@@ -1571,6 +1587,7 @@ class PosCartItem {
     'hsnCode': hsnCode,
     'gstRate': gstRate,
     'priceIncludesTax': priceIncludesTax,
+    'discount': effectiveDiscount,
   };
 }
 
@@ -1639,11 +1656,16 @@ class SaleDetailItem {
     this.sgstAmount = 0,
     this.igstAmount = 0,
     this.priceIncludesTax = true,
+    this.lineDiscount = 0,
   });
 
   final String name;
   final double quantity;
   final double unitPrice;
+
+  /// Money taken off this line (per-item discount + its share of any
+  /// bill-level discount), so the receipt can show it.
+  final double lineDiscount;
   final String? size;
   final String? sku;
   final double? unitCost;
@@ -1896,6 +1918,9 @@ class LocalSaleCommit {
               'unit_cost': item['costPrice'] == null
                   ? null
                   : (item['costPrice'] as num).toStringAsFixed(2),
+              // Per-item discount (money off just this line). The server caps it
+              // at the line total and applies the bill discount on top.
+              'discount': ((item['discount'] as num?) ?? 0).toStringAsFixed(2),
             },
           )
           .toList(growable: false),

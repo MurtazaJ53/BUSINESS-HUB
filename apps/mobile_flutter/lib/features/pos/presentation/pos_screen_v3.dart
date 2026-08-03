@@ -300,6 +300,20 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
     });
   }
 
+  /// Set a per-item discount (money off just this line). Clamped to the line
+  /// total so a line can never go negative.
+  void _setLineDiscount(String id, double discount) {
+    final index = _cart.indexWhere((c) => c.id == id);
+    if (index < 0) return;
+    setState(() {
+      final line = _cart[index];
+      final safe = discount < 0 ? 0.0 : discount;
+      _cart[index] = line.copyWith(
+        discount: safe > line.grossLineTotal ? line.grossLineTotal : safe,
+      );
+    });
+  }
+
   double _qtyInCart(String id) {
     final index = _cart.indexWhere((c) => c.id == id);
     return index < 0 ? 0 : _cart[index].quantity;
@@ -605,6 +619,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
         cart: _cart,
         onChangeQty: _changeQtyById,
         onSetQty: _setLineQuantity,
+        onSetLineDiscount: _setLineDiscount,
         gstSummary: () => _gstSummary,
         grossTotal: () => _cartTotal,
         discountAmount: () => _discountAmount,
@@ -873,6 +888,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
                       ),
                       const SizedBox(height: 12),
                       TextField(
+      textCapitalization: TextCapitalization.sentences,
                         controller: searchController,
                         onChanged: (_) => setSheetState(() {}),
                         decoration: const InputDecoration(
@@ -1374,6 +1390,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
             children: <Widget>[
               Expanded(
                 child: TextField(
+      textCapitalization: TextCapitalization.sentences,
                   controller: _searchController,
                   onChanged: _onSearchChanged,
                   textInputAction: TextInputAction.search,
@@ -1581,6 +1598,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
                   ],
                   const SizedBox(height: 12),
                   TextField(
+      textCapitalization: TextCapitalization.sentences,
                     controller: vpaController,
                     decoration: const InputDecoration(
                       labelText: 'Merchant UPI ID',
@@ -2495,6 +2513,7 @@ class _CartSheet extends StatefulWidget {
     required this.cart,
     required this.onChangeQty,
     required this.onSetQty,
+    required this.onSetLineDiscount,
     required this.gstSummary,
     required this.grossTotal,
     required this.discountAmount,
@@ -2512,6 +2531,7 @@ class _CartSheet extends StatefulWidget {
   final List<PosCartItem> cart;
   final void Function(String id, int delta) onChangeQty;
   final void Function(String id, double qty) onSetQty;
+  final void Function(String id, double discount) onSetLineDiscount;
   final GstCartSummary Function() gstSummary;
   final double Function() grossTotal;
   final double Function() discountAmount;
@@ -2557,6 +2577,59 @@ class _CartSheetState extends State<_CartSheet> {
               double.tryParse(controller.text.trim()),
             ),
             child: const Text('Set'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
+  }
+
+  Future<double?> _promptLineDiscount(
+    BuildContext context,
+    PosCartItem line,
+  ) async {
+    final controller = TextEditingController(
+      text: line.effectiveDiscount > 0
+          ? line.effectiveDiscount.toStringAsFixed(2)
+          : '',
+    );
+    final result = await showDialog<double>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Discount / ${line.name}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text('Line total ${formatCurrency(line.grossLineTotal)}'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Discount on this item',
+                prefixText: '₹ ',
+                hintText: 'e.g. 50',
+              ),
+            ),
+          ],
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, 0.0),
+            child: const Text('Clear'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(
+              dialogContext,
+              double.tryParse(controller.text.trim()) ?? 0.0,
+            ),
+            child: const Text('Apply'),
           ),
         ],
       ),
@@ -2645,6 +2718,16 @@ class _CartSheetState extends State<_CartSheet> {
                                 );
                                 if (qty != null) {
                                   widget.onSetQty(line.id, qty);
+                                  setState(() {});
+                                }
+                              },
+                              onEditDiscount: () async {
+                                final value = await _promptLineDiscount(
+                                  context,
+                                  line,
+                                );
+                                if (value != null) {
+                                  widget.onSetLineDiscount(line.id, value);
                                   setState(() {});
                                 }
                               },
@@ -2939,12 +3022,14 @@ class _CartLine extends StatelessWidget {
     required this.onInc,
     required this.onDec,
     this.onEditQty,
+    this.onEditDiscount,
   });
 
   final PosCartItem line;
   final VoidCallback onInc;
   final VoidCallback onDec;
   final VoidCallback? onEditQty;
+  final VoidCallback? onEditDiscount;
 
   @override
   Widget build(BuildContext context) {
@@ -2981,11 +3066,56 @@ class _CartLine extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  formatCurrency(line.lineTotal),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: AppPalette.primary,
+                Row(
+                  children: <Widget>[
+                    if (line.effectiveDiscount > 0) ...<Widget>[
+                      Text(
+                        formatCurrency(line.grossLineTotal),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.textTertiary,
+                          decoration: TextDecoration.lineThrough,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Text(
+                      formatCurrency(line.lineTotal),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: AppPalette.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                InkWell(
+                  onTap: onEditDiscount,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Icon(
+                          Icons.local_offer_outlined,
+                          size: 14,
+                          color: line.effectiveDiscount > 0
+                              ? AppPalette.success
+                              : colors.textTertiary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          line.effectiveDiscount > 0
+                              ? '-${formatCurrency(line.effectiveDiscount)} off'
+                              : 'Add discount',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: line.effectiveDiscount > 0
+                                ? AppPalette.success
+                                : colors.textTertiary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],

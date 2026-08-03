@@ -10,12 +10,13 @@ import '../models/mobile_models.dart';
 class CartPricing {
   const CartPricing._();
 
-  /// Sum of line totals (price * qty) before any discount.
+  /// Sum of line totals after any per-item discount, but before the
+  /// sale-level discount.
   static double subtotal(Iterable<PosCartItem> items) {
     var total = Money.zero;
     for (final item in items) {
       // price * qty may be fractional (weighed goods); round to paise via Money.
-      total = total + Money.rupees(item.price * item.quantity);
+      total = total + Money.rupees(item.lineTotal);
     }
     return total.rupees;
   }

@@ -2461,6 +2461,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                         }),
                         const SizedBox(height: 6),
                         TextField(
+      textCapitalization: TextCapitalization.sentences,
                           controller: notesController,
                           minLines: 2,
                           maxLines: 4,
@@ -2650,6 +2651,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                         ),
                         const SizedBox(height: 14),
                         TextField(
+      textCapitalization: TextCapitalization.sentences,
                           controller: notesController,
                           minLines: 2,
                           maxLines: 4,
@@ -2845,6 +2847,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                         ),
                         const SizedBox(height: 12),
                         TextField(
+      textCapitalization: TextCapitalization.sentences,
                           controller: smokeNotesController,
                           minLines: 2,
                           maxLines: 3,
@@ -2892,6 +2895,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                         ),
                         const SizedBox(height: 12),
                         TextField(
+      textCapitalization: TextCapitalization.sentences,
                           controller: closeoutNotesController,
                           minLines: 2,
                           maxLines: 3,
@@ -2937,6 +2941,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                         ),
                         const SizedBox(height: 12),
                         TextField(
+      textCapitalization: TextCapitalization.sentences,
                           controller: rolloutNotesController,
                           minLines: 2,
                           maxLines: 4,
@@ -3183,6 +3188,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                         ),
                         const SizedBox(height: 14),
                         TextField(
+      textCapitalization: TextCapitalization.sentences,
                           controller: notesController,
                           minLines: 2,
                           maxLines: 4,
@@ -3355,6 +3361,7 @@ class _SettingsOpsScreenState extends ConsumerState<SettingsOpsScreen> {
                       ),
                       const SizedBox(height: 12),
                       TextField(
+      textCapitalization: TextCapitalization.sentences,
                         controller: footerController,
                         minLines: 2,
                         maxLines: 3,

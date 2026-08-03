@@ -288,6 +288,7 @@ class SettingsTeamScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 12),
                           TextField(
+      textCapitalization: TextCapitalization.sentences,
                             controller: nameController,
                             decoration: const InputDecoration(
                               labelText: 'Full name',

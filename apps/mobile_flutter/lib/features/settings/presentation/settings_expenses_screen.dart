@@ -5,8 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/mobile_models.dart';
 import '../../../core/session/mobile_session_controller.dart';
-import '../../../core/database/mobile_repository.dart';
 import '../../../core/providers/mobile_data_providers.dart';
+import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/utils/formatters.dart';
 import '../../shell/presentation/mobile_surface.dart';
 
@@ -48,7 +48,7 @@ class _SettingsExpensesScreenState
     });
     try {
       await ref
-          .read(expenseRepositoryProvider)
+          .read(mobileSyncCoordinatorProvider)
           .recordExpense(
             category: category,
             amount: amount,
@@ -129,6 +129,7 @@ class _SettingsExpensesScreenState
                       child: Column(
                         children: <Widget>[
                           TextField(
+      textCapitalization: TextCapitalization.sentences,
                             controller: categoryController,
                             decoration: const InputDecoration(
                               labelText: 'Category',
@@ -185,6 +186,7 @@ class _SettingsExpensesScreenState
                           ),
                           const SizedBox(height: 12),
                           TextField(
+      textCapitalization: TextCapitalization.sentences,
                             controller: paymentReferenceController,
                             decoration: const InputDecoration(
                               labelText: 'Reference',
@@ -193,6 +195,7 @@ class _SettingsExpensesScreenState
                           ),
                           const SizedBox(height: 12),
                           TextField(
+      textCapitalization: TextCapitalization.sentences,
                             controller: descriptionController,
                             minLines: 2,
                             maxLines: 3,

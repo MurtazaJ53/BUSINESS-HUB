@@ -182,3 +182,64 @@ class PurchasesApiTests(TestCase):
         self.assertEqual(body["total_purchases"], 1)
         self.assertEqual(Decimal(str(body["total_spent"])), Decimal("90.00"))
         self.assertEqual(Decimal(str(body["outstanding_payable"])), Decimal("40.00"))
+
+
+class MobilePurchasePayloadTests(TestCase):
+    """The Flutter app posts a purchase without a supplier_id (it only knows the
+    typed supplier name) and as a single consolidated line item. Lock that exact
+    shape in so the mobile push can't silently fall back to local-only."""
+
+    def setUp(self):
+        self.user = PlatformUser.objects.create_user(
+            email="owner2@example.com", password="secret", full_name="Owner"
+        )
+        self.shop = Shop.objects.create(
+            name="Mobile Shop", slug="mobile-shop", settings_json={"plan_tier": "pro"}
+        )
+        ShopMembership.objects.create(
+            user=self.user,
+            shop=self.shop,
+            role=ShopMembership.Role.OWNER,
+            status=ShopMembership.Status.ACTIVE,
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_mobile_payload_creates_purchase_and_supplier_due(self):
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/purchases/",
+            {
+                "supplier_name": "Wholesale Traders",
+                "reference": "BILL-77",
+                "amount_paid": "100.00",
+                "payment_mode": "CASH",
+                "note": "Monthly stock",
+                "purchase_date": "2026-08-02",
+                "items": [
+                    {"name": "BILL-77", "quantity": "1", "unit_cost": "500.00"}
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+        body = response.json()
+        self.assertEqual(Decimal(body["total_amount"]), Decimal("500.00"))
+        self.assertEqual(Decimal(body["amount_due"]), Decimal("400.00"))
+        self.assertEqual(body["supplier_name"], "Wholesale Traders")
+
+    def test_mobile_can_list_purchases_back(self):
+        self.client.post(
+            f"/api/v1/shops/{self.shop.id}/purchases/",
+            {
+                "supplier_name": "Wholesale Traders",
+                "amount_paid": "0.00",
+                "items": [{"name": "Stock purchase", "quantity": "1", "unit_cost": "250.00"}],
+            },
+            format="json",
+        )
+        listing = self.client.get(f"/api/v1/shops/{self.shop.id}/purchases/")
+        self.assertEqual(listing.status_code, 200, listing.content)
+        rows = listing.json()
+        rows = rows["results"] if isinstance(rows, dict) else rows
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["supplier_name"], "Wholesale Traders")

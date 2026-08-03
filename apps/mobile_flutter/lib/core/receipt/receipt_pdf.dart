@@ -128,6 +128,22 @@ Future<Uint8List> buildReceiptPdf(SaleRecordDetail detail, ShopInfo shop) async 
                       ),
                     ],
                   ),
+                  // Per-item discount, so the customer sees what came off this
+                  // line rather than only a lump sum at the bottom.
+                  if (it.lineDiscount > 0.009)
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: <pw.Widget>[
+                        pw.Text(
+                          '  Item discount',
+                          style: const pw.TextStyle(fontSize: 8),
+                        ),
+                        pw.Text(
+                          '- ${_money(it.lineDiscount)}',
+                          style: const pw.TextStyle(fontSize: 8),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             pw.Divider(),

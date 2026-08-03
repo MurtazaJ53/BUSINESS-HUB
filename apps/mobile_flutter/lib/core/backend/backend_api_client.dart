@@ -368,6 +368,57 @@ class BackendApiClient {
     return _mapExpense(decoded);
   }
 
+  /// Purchases (stock buying + supplier dues). The mobile app rolls suppliers
+  /// up from their purchases, so syncing purchases also restores the supplier
+  /// list and outstanding payables after a data clear.
+  Future<List<PurchaseRecord>> getPurchases({
+    required User user,
+    required String shopId,
+    String query = '',
+  }) async {
+    final path = query.trim().isEmpty
+        ? '/shops/$shopId/purchases/'
+        : '/shops/$shopId/purchases/?q=${Uri.encodeQueryComponent(query.trim())}';
+    final decoded = await _requestList(user: user, method: 'GET', path: path);
+    return decoded.map(_mapPurchase).toList(growable: false);
+  }
+
+  Future<PurchaseRecord> createPurchase({
+    required User user,
+    required String shopId,
+    required String supplierName,
+    required double total,
+    required DateTime purchaseDate,
+    double amountPaid = 0,
+    String reference = '',
+    String paymentMode = 'CASH',
+    String note = '',
+  }) async {
+    final decoded = await _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/purchases/',
+      body: <String, dynamic>{
+        'supplier_name': supplierName,
+        'reference': reference,
+        'amount_paid': amountPaid.toStringAsFixed(2),
+        'payment_mode': paymentMode,
+        'note': note,
+        'purchase_date': purchaseDate.toIso8601String().split('T').first,
+        // The server derives subtotal/total from the line items, so send the
+        // purchase as a single consolidated line matching the entered total.
+        'items': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'name': reference.trim().isEmpty ? 'Stock purchase' : reference.trim(),
+            'quantity': '1',
+            'unit_cost': total.toStringAsFixed(2),
+          },
+        ],
+      },
+    );
+    return _mapPurchase(decoded);
+  }
+
   Future<Map<String, dynamic>> createInventoryItem({
     required User user,
     required String shopId,
@@ -384,11 +435,14 @@ class BackendApiClient {
     String hsnCode = '',
     double gstRate = 0,
     bool priceIncludesTax = true,
+    String? imageData,
   }) async {
     final body = <String, dynamic>{
       'name': name,
       'sell_price': sellPrice.toStringAsFixed(2),
       'opening_stock': openingStock,
+      // Product photo travels as a base64 data URI so it survives a reinstall.
+      'image_data': imageData ?? '',
       'sku': sku,
       'barcode': barcode,
       'category': category.trim().isEmpty ? 'General' : category.trim(),
@@ -469,6 +523,7 @@ class BackendApiClient {
     bool priceIncludesTax = true,
     double? costPrice,
     String description = '',
+    String? imageData,
   }) async {
     final body = <String, dynamic>{
       'name': name,
@@ -482,6 +537,11 @@ class BackendApiClient {
     };
     if (costPrice != null) {
       body['private_cost_price'] = costPrice.toStringAsFixed(2);
+    }
+    // Only send the photo when the caller resolved one, so an edit that didn't
+    // touch the image never blanks the stored copy.
+    if (imageData != null) {
+      body['image_data'] = imageData;
     }
     return _request(
       user: user,
@@ -1503,6 +1563,23 @@ class BackendApiClient {
       paymentMethod: (row['payment_method'] ?? 'CASH').toString(),
       paymentReference: (row['payment_reference'] ?? '').toString(),
       expenseDate: _asDateTime(row['expense_date']),
+      actorName: _nullableText(row['actor_name']),
+      tombstone: row['tombstone'] == true,
+    );
+  }
+
+  PurchaseRecord _mapPurchase(Map<String, dynamic> row) {
+    return PurchaseRecord(
+      id: (row['id'] ?? '').toString(),
+      supplierName: (row['supplier_name'] ?? 'Unnamed supplier').toString(),
+      // The server keeps the phone on the Supplier record, not the purchase.
+      supplierPhone: (row['supplier_phone'] ?? '').toString(),
+      reference: (row['reference'] ?? row['invoice_number'] ?? '').toString(),
+      total: _asDouble(row['total_amount'] ?? row['total']),
+      amountPaid: _asDouble(row['amount_paid']),
+      paymentMethod: (row['payment_mode'] ?? 'CASH').toString(),
+      notes: (row['note'] ?? '').toString(),
+      purchaseDate: _asDateTime(row['purchase_date']),
       actorName: _nullableText(row['actor_name']),
       tombstone: row['tombstone'] == true,
     );

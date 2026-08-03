@@ -205,6 +205,7 @@ class _SettingsAttendanceScreenState
                           ),
                           const SizedBox(height: 12),
                           TextField(
+      textCapitalization: TextCapitalization.sentences,
                             controller: noteController,
                             minLines: 2,
                             maxLines: 3,

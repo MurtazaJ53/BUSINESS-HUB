@@ -440,6 +440,7 @@ class PremiumSearchBar extends StatelessWidget {
         ],
       ),
       child: TextField(
+      textCapitalization: TextCapitalization.sentences,
         controller: controller,
         onChanged: onChanged,
         style: GoogleFonts.outfit(

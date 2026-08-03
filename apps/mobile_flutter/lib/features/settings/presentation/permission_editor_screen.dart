@@ -250,6 +250,7 @@ class _PermissionEditorScreenState
                     ),
                     const SizedBox(height: 12),
                     TextField(
+      textCapitalization: TextCapitalization.sentences,
                       onChanged: (v) => setState(() => _search = v),
                       decoration: InputDecoration(
                         hintText: 'Search modules…',

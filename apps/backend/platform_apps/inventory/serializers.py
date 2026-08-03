@@ -48,6 +48,7 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             "status",
             "tombstone",
             "source_meta_json",
+            "image_data",
             "stock_on_hand",
             "cost_price",
             "supplier_id",

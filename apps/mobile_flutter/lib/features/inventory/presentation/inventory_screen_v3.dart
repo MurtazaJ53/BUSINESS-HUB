@@ -896,6 +896,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                           ),
                           const SizedBox(height: 20),
                           TextFormField(
+      textCapitalization: TextCapitalization.sentences,
                             controller: nameController,
                             decoration: const InputDecoration(
                               labelText: 'Item name',
@@ -1008,6 +1009,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                           ),
                           const SizedBox(height: 12),
                           TextFormField(
+      textCapitalization: TextCapitalization.sentences,
                             controller: categoryController,
                             decoration: const InputDecoration(
                               labelText: 'Category',
@@ -1015,6 +1017,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                           ),
                           const SizedBox(height: 12),
                           TextFormField(
+      textCapitalization: TextCapitalization.sentences,
                             controller: skuController,
                             decoration: InputDecoration(
                               labelText: 'SKU / barcode (optional)',
@@ -1048,6 +1051,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                           ),
                           const SizedBox(height: 12),
                           TextFormField(
+      textCapitalization: TextCapitalization.sentences,
                             controller: hsnController,
                             decoration: const InputDecoration(
                               labelText: 'HSN/SAC optional',
@@ -1411,6 +1415,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                                 Expanded(
                                   flex: 4,
                                   child: TextField(
+      textCapitalization: TextCapitalization.sentences,
                                     controller: r.name,
                                     decoration: const InputDecoration(
                                       isDense: true,

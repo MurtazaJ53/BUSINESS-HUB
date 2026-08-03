@@ -816,6 +816,7 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
                       ),
                       const SizedBox(height: 12),
                       TextField(
+      textCapitalization: TextCapitalization.sentences,
                         controller: notesController,
                         decoration: const InputDecoration(
                           labelText: 'Notes (optional)',

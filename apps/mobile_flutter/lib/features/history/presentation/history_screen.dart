@@ -219,6 +219,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               TextField(
+      textCapitalization: TextCapitalization.sentences,
                 controller: _searchController,
                 onChanged: (value) {
                   setState(() {

@@ -618,3 +618,104 @@ class SalesApiTests(TestCase):
         self.assertEqual(sale.place_of_supply_state, "29")
         self.assertEqual(sale.igst_amount, Decimal("18.00"))
         self.assertEqual(sale.cgst_amount, Decimal("0.00"))
+
+
+class PerItemDiscountTests(TestCase):
+    """A cashier can discount one line of a multi-item bill; the sale-level
+    discount still applies on top of what remains."""
+
+    def setUp(self):
+        self.user = PlatformUser.objects.create_user(
+            email="disc@example.com", password="secret", full_name="Owner"
+        )
+        self.shop = Shop.objects.create(name="Disc Shop", slug="disc-shop")
+        ShopMembership.objects.create(
+            user=self.user,
+            shop=self.shop,
+            role=ShopMembership.Role.OWNER,
+            status=ShopMembership.Status.ACTIVE,
+        )
+        self.a = InventoryItem.objects.create(
+            shop=self.shop, name="Item A", sku="A1", sell_price=Decimal("100.00")
+        )
+        self.b = InventoryItem.objects.create(
+            shop=self.shop, name="Item B", sku="B1", sell_price=Decimal("100.00")
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_per_item_discount_applies_only_to_that_line(self):
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/",
+            {
+                "items": [
+                    {
+                        "inventory_item_id": str(self.a.id),
+                        "quantity": 1,
+                        "unit_price": "100.00",
+                        "discount": "20.00",
+                    },
+                    {
+                        "inventory_item_id": str(self.b.id),
+                        "quantity": 1,
+                        "unit_price": "100.00",
+                    },
+                ],
+                "payments": [{"payment_method": "CASH", "amount": "10.00"}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+        sale = Sale.objects.get()
+        a_item = sale.items.get(name_snapshot="Item A")
+        b_item = sale.items.get(name_snapshot="Item B")
+        self.assertEqual(a_item.line_discount, Decimal("20.00"))
+        self.assertEqual(b_item.line_discount, Decimal("0.00"))
+
+    def test_per_item_discount_is_capped_at_the_line_total(self):
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/",
+            {
+                "items": [
+                    {
+                        "inventory_item_id": str(self.a.id),
+                        "quantity": 1,
+                        "unit_price": "100.00",
+                        "discount": "500.00",
+                    },
+                ],
+                "payments": [{"payment_method": "CASH", "amount": "10.00"}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(Sale.objects.get().items.get().line_discount, Decimal("100.00"))
+
+    def test_sale_discount_stacks_on_top_of_item_discount(self):
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/",
+            {
+                "discount_amount": "30.00",
+                "items": [
+                    {
+                        "inventory_item_id": str(self.a.id),
+                        "quantity": 1,
+                        "unit_price": "100.00",
+                        "discount": "20.00",
+                    },
+                    {
+                        "inventory_item_id": str(self.b.id),
+                        "quantity": 1,
+                        "unit_price": "100.00",
+                    },
+                ],
+                "payments": [{"payment_method": "CASH", "amount": "10.00"}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+        sale = Sale.objects.get()
+        total_line_discount = sum(i.line_discount for i in sale.items.all())
+        # 20 item-level + 30 sale-level spread over the remaining 80/100.
+        self.assertEqual(total_line_discount, Decimal("50.00"))
+        self.assertGreater(sale.items.get(name_snapshot="Item A").line_discount, Decimal("20.00"))

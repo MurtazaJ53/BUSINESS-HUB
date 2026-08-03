@@ -491,6 +491,7 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen>
           ),
           const SizedBox(height: 12),
           TextField(
+      textCapitalization: TextCapitalization.sentences,
             controller: _joinCodeController,
             autocorrect: false,
             decoration: _fieldDecoration('Invite code *'),

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../backend/backend_api_client.dart';
 import '../database/mobile_repository.dart';
+import '../images/product_image_store.dart';
 import '../models/mobile_models.dart';
 import '../models/mobile_session.dart';
 import '../runtime/app_runtime_info.dart';
@@ -38,6 +39,8 @@ final mobileSyncCoordinatorProvider = Provider<MobileSyncCoordinator>((ref) {
     inventoryRepository: ref.read(inventoryRepositoryProvider),
     customerRepository: ref.read(customerRepositoryProvider),
     salesRepository: ref.read(salesRepositoryProvider),
+    expenseRepository: ref.read(expenseRepositoryProvider),
+    purchaseRepository: ref.read(purchaseRepositoryProvider),
     setStatus: ref.read(syncStatusProvider.notifier).setStatus,
   );
 
@@ -60,18 +63,24 @@ class MobileSyncCoordinator {
     required InventoryRepository inventoryRepository,
     required CustomerRepository customerRepository,
     required SalesRepository salesRepository,
+    required ExpenseRepository expenseRepository,
+    required PurchaseRepository purchaseRepository,
     required this.setStatus,
   }) : _backendApiClient = backendApiClient,
        _shopRepository = shopRepository,
        _inventoryRepository = inventoryRepository,
        _customerRepository = customerRepository,
-       _salesRepository = salesRepository;
+       _salesRepository = salesRepository,
+       _expenseRepository = expenseRepository,
+       _purchaseRepository = purchaseRepository;
 
   final BackendApiClient _backendApiClient;
   final ShopRepository _shopRepository;
   final InventoryRepository _inventoryRepository;
   final CustomerRepository _customerRepository;
   final SalesRepository _salesRepository;
+  final ExpenseRepository _expenseRepository;
+  final PurchaseRepository _purchaseRepository;
   final void Function(MobileSyncStatus status) setStatus;
 
   MobileSession? _session;
@@ -143,6 +152,10 @@ class MobileSyncCoordinator {
     // login (which clears the cache) showed zero customers until the user hit
     // refresh. Pull them on login too.
     await _syncBackendCustomersSnapshot(session, shopId);
+    // Expenses and purchases (and the suppliers rolled up from purchases) were
+    // local-only, so they vanished on every clear+login. Pull them too.
+    await _syncBackendExpensesSnapshot(session, shopId);
+    await _syncBackendPurchasesSnapshot(session, shopId);
 
     setStatus(MobileSyncStatus.idle);
     _startOutboxRetryLoop();
@@ -265,6 +278,7 @@ class MobileSyncCoordinator {
       final created = await _backendApiClient.createInventoryItem(
         user: session.user,
         shopId: session.shopId!,
+        imageData: await ProductImageStore.encodeForUpload(imagePath),
         name: name.trim(),
         sellPrice: sellPrice,
         openingStock: openingStock,
@@ -471,6 +485,7 @@ class MobileSyncCoordinator {
           user: session.user,
           shopId: session.shopId!,
           itemId: itemId,
+          imageData: await ProductImageStore.encodeForUpload(imagePath),
           name: name.trim(),
           sellPrice: sellPrice,
           category: category,
@@ -1182,6 +1197,214 @@ class MobileSyncCoordinator {
     } catch (error) {
       debugPrint('Backend customers snapshot sync failed: $error');
       if (updateStatus) setStatus(MobileSyncStatus.error);
+    }
+  }
+
+  Future<void> _syncBackendExpensesSnapshot(
+    MobileSession session,
+    String shopId, {
+    bool updateStatus = false,
+  }) async {
+    try {
+      final expenses = await _backendApiClient.getExpenses(
+        user: session.user,
+        shopId: shopId,
+      );
+      for (final e in expenses) {
+        if (e.id.isEmpty) continue;
+        await _expenseRepository.upsertExpense(
+          id: e.id,
+          category: e.category,
+          amount: e.amount,
+          expenseDate: e.expenseDate,
+          description: e.description,
+          paymentMethod: e.paymentMethod,
+          paymentReference: e.paymentReference,
+          actorName: e.actorName,
+          tombstone: e.tombstone,
+        );
+      }
+      if (updateStatus) setStatus(MobileSyncStatus.idle);
+    } catch (error) {
+      debugPrint('Backend expenses snapshot sync failed: $error');
+      if (updateStatus) setStatus(MobileSyncStatus.error);
+    }
+  }
+
+  Future<void> _syncBackendPurchasesSnapshot(
+    MobileSession session,
+    String shopId, {
+    bool updateStatus = false,
+  }) async {
+    try {
+      final purchases = await _backendApiClient.getPurchases(
+        user: session.user,
+        shopId: shopId,
+      );
+      for (final p in purchases) {
+        if (p.id.isEmpty) continue;
+        await _purchaseRepository.upsertPurchase(
+          id: p.id,
+          supplierName: p.supplierName,
+          total: p.total,
+          purchaseDate: p.purchaseDate,
+          amountPaid: p.amountPaid,
+          supplierPhone: p.supplierPhone,
+          reference: p.reference,
+          paymentMethod: p.paymentMethod,
+          notes: p.notes,
+          actorName: p.actorName,
+          tombstone: p.tombstone,
+        );
+      }
+      if (updateStatus) setStatus(MobileSyncStatus.idle);
+    } catch (error) {
+      debugPrint('Backend purchases snapshot sync failed: $error');
+      if (updateStatus) setStatus(MobileSyncStatus.error);
+    }
+  }
+
+  /// Record an expense: push to the server first so it survives a data clear,
+  /// then store the server's copy locally (keyed by its id). Falls back to a
+  /// local-only row when the backend is unreachable.
+  Future<void> recordExpense({
+    required String category,
+    required double amount,
+    required DateTime expenseDate,
+    String description = '',
+    String paymentMethod = 'CASH',
+    String paymentReference = '',
+    String? actorName,
+  }) async {
+    final session = _session;
+    if (session == null || !session.hasShop) {
+      throw StateError('Sign in to a workspace before adding expenses.');
+    }
+    if (session.isReadOnly) {
+      throw StateError('Viewer access cannot add expenses.');
+    }
+
+    setStatus(MobileSyncStatus.syncing);
+    try {
+      if (MobileRuntimeConfig.backendSyncEnabled) {
+        try {
+          final created = await _backendApiClient.createExpense(
+            user: session.user,
+            shopId: session.shopId!,
+            category: category,
+            amount: amount,
+            expenseDate: expenseDate,
+            description: description,
+            paymentMethod: paymentMethod,
+            paymentReference: paymentReference,
+          );
+          if (created.id.isNotEmpty) {
+            await _expenseRepository.upsertExpense(
+              id: created.id,
+              category: created.category,
+              amount: created.amount,
+              expenseDate: created.expenseDate,
+              description: created.description,
+              paymentMethod: created.paymentMethod,
+              paymentReference: created.paymentReference,
+              actorName: created.actorName ?? actorName,
+            );
+            setStatus(MobileSyncStatus.idle);
+            return;
+          }
+        } catch (error) {
+          debugPrint('Backend expense push failed, saving locally: $error');
+        }
+      }
+      await _expenseRepository.recordExpense(
+        category: category,
+        amount: amount,
+        expenseDate: expenseDate,
+        description: description,
+        paymentMethod: paymentMethod,
+        paymentReference: paymentReference,
+        actorName: actorName,
+      );
+      setStatus(MobileSyncStatus.idle);
+    } catch (error) {
+      setStatus(MobileSyncStatus.error);
+      rethrow;
+    }
+  }
+
+  /// Record a purchase (and its supplier due) on the server, then locally.
+  /// Returns the local row id so callers can link stock-in movements to it.
+  Future<String> recordPurchase({
+    required String supplierName,
+    required double total,
+    required DateTime purchaseDate,
+    double amountPaid = 0,
+    String supplierPhone = '',
+    String reference = '',
+    String paymentMethod = 'CASH',
+    String notes = '',
+    String? actorName,
+  }) async {
+    final session = _session;
+    if (session == null || !session.hasShop) {
+      throw StateError('Sign in to a workspace before adding purchases.');
+    }
+    if (session.isReadOnly) {
+      throw StateError('Viewer access cannot add purchases.');
+    }
+
+    setStatus(MobileSyncStatus.syncing);
+    try {
+      if (MobileRuntimeConfig.backendSyncEnabled) {
+        try {
+          final created = await _backendApiClient.createPurchase(
+            user: session.user,
+            shopId: session.shopId!,
+            supplierName: supplierName,
+            total: total,
+            purchaseDate: purchaseDate,
+            amountPaid: amountPaid,
+            reference: reference,
+            paymentMode: paymentMethod,
+            note: notes,
+          );
+          if (created.id.isNotEmpty) {
+            await _purchaseRepository.upsertPurchase(
+              id: created.id,
+              supplierName: created.supplierName,
+              total: created.total,
+              purchaseDate: created.purchaseDate,
+              amountPaid: created.amountPaid,
+              // The server has no phone on a purchase; keep what was entered.
+              supplierPhone: supplierPhone,
+              reference: created.reference,
+              paymentMethod: created.paymentMethod,
+              notes: created.notes,
+              actorName: created.actorName ?? actorName,
+            );
+            setStatus(MobileSyncStatus.idle);
+            return created.id;
+          }
+        } catch (error) {
+          debugPrint('Backend purchase push failed, saving locally: $error');
+        }
+      }
+      final localId = await _purchaseRepository.recordPurchase(
+        supplierName: supplierName,
+        total: total,
+        purchaseDate: purchaseDate,
+        amountPaid: amountPaid,
+        supplierPhone: supplierPhone,
+        reference: reference,
+        paymentMethod: paymentMethod,
+        notes: notes,
+        actorName: actorName,
+      );
+      setStatus(MobileSyncStatus.idle);
+      return localId;
+    } catch (error) {
+      setStatus(MobileSyncStatus.error);
+      rethrow;
     }
   }
 

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:image_picker/image_picker.dart';
@@ -45,6 +46,58 @@ class ProductImageStore {
     final bytes = await picked.readAsBytes();
     await File(dest).writeAsBytes(bytes, flush: true);
     return dest;
+  }
+
+  /// Read a stored photo back as a base64 data URI for upload. The server keeps
+  /// product photos in the database (the container filesystem isn't persisted),
+  /// so images survive a data clear / reinstall. Returns null when there's no
+  /// readable file, or when the image is too large to be worth syncing.
+  static Future<String?> encodeForUpload(String? path) async {
+    if (path == null || path.trim().isEmpty) return null;
+    try {
+      final file = File(path);
+      if (!file.existsSync()) return null;
+      final bytes = await file.readAsBytes();
+      // Guard the payload: pickAndStore already caps at 1024px/q80, but skip
+      // anything unexpectedly large rather than bloating every sync.
+      if (bytes.length > 800 * 1024) return null;
+      final ext = p.extension(path).toLowerCase();
+      final mime = (ext == '.png')
+          ? 'image/png'
+          : (ext == '.webp')
+              ? 'image/webp'
+              : 'image/jpeg';
+      return 'data:$mime;base64,${base64Encode(bytes)}';
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Write a base64 data URI pulled from the server into local storage and
+  /// return the file path, so the existing file-based display code just works.
+  Future<String?> storeFromDataUri(String? dataUri) async {
+    if (dataUri == null || dataUri.trim().isEmpty) return null;
+    try {
+      final marker = dataUri.indexOf('base64,');
+      final payload =
+          marker >= 0 ? dataUri.substring(marker + 7) : dataUri;
+      final bytes = base64Decode(payload.trim());
+      if (bytes.isEmpty) return null;
+      final ext = dataUri.contains('image/png')
+          ? '.png'
+          : dataUri.contains('image/webp')
+              ? '.webp'
+              : '.jpg';
+      final dir = await _dir();
+      final dest = p.join(
+        dir.path,
+        'img_${DateTime.now().microsecondsSinceEpoch}$ext',
+      );
+      await File(dest).writeAsBytes(bytes, flush: true);
+      return dest;
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Best-effort delete of a stored photo. Safe to call with a null/empty path
