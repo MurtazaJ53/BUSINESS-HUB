@@ -93,18 +93,27 @@ export function AdminShell({
 
   // APK Core navigation items
   const mainNav = [
-    { key: "overview", label: "Dashboard", href: "/", icon: LayoutDashboard },
-    { key: "pos", label: "POS Terminal", href: "/pos", icon: ShoppingCart, highlight: true },
-    { key: "inventory", label: "Inventory", href: "/inventory", icon: Package },
-    { key: "customers", label: "Customers (Khata)", href: "/customers", icon: Users },
-    { key: "sales", label: "Sales & Invoices", href: "/sales", icon: Receipt },
-    { key: "reports", label: "P&L Reports", href: "/reports", icon: BarChart3 },
+    { key: "overview", label: "Home", href: "/", icon: LayoutDashboard },
+    { key: "inventory", label: "Stock", href: "/inventory", icon: Package },
+    { key: "customers", label: "Clients", href: "/customers", icon: Users },
+    { key: "sales", label: "History", href: "/sales", icon: Receipt },
+    { key: "pos", label: "POS", href: "/pos", icon: ShoppingCart, highlight: true },
   ];
 
   const adminNav = [
-    { key: "settings", label: "Shop Settings", href: "/settings", icon: Settings },
-    { key: "team", label: "Team & Staff", href: "/team", icon: Users },
-    { key: "security", label: "Security & 2FA", href: "/security", icon: ShieldCheck },
+    { key: "settings", label: "Business details", href: "/settings", icon: Settings },
+    { key: "team", label: "Staff & PINs", href: "/team", icon: Users },
+    { key: "attendance", label: "Attendance", href: "/attendance", icon: Clock },
+    { key: "expenses", label: "Expenses", href: "/expenses", icon: TrendingDown },
+    { key: "suppliers", label: "Suppliers & purchases", href: "/suppliers", icon: Truck },
+    { key: "migration", label: "Import & migration", href: "/migration", icon: Layers },
+    { key: "security", label: "Security", href: "/security", icon: ShieldCheck },
+  ];
+
+  const advancedNav = [
+    ...(isPlatformAdmin
+      ? [{ key: "platform", label: "Admin tools", href: "/platform/shops", icon: Shield }]
+      : []),
   ];
 
   return (
@@ -196,10 +205,10 @@ export function AdminShell({
         {/* Left Sidebar Navigation matching APK tabs */}
         <aside className="hidden lg:flex flex-col gap-6">
           
-          {/* Main App Navigation Panel */}
+          {/* Main App Navigation Panel (Core Workflows) */}
           <div className="bg-white border border-[#E2E8F0] rounded-[24px] p-3.5 shadow-sm space-y-1">
             <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8]">
-              Main Workflows
+              Core Workflows
             </div>
             {mainNav.map((item) => {
               const Icon = item.icon;
@@ -223,10 +232,10 @@ export function AdminShell({
             })}
           </div>
 
-          {/* Shop Administration Panel */}
+          {/* Shop Administration Panel (Manage) */}
           <div className="bg-white border border-[#E2E8F0] rounded-[24px] p-3.5 shadow-sm space-y-1">
             <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8]">
-              Store Controls
+              Manage
             </div>
             {adminNav.map((item) => {
               const Icon = item.icon;
@@ -247,6 +256,33 @@ export function AdminShell({
               );
             })}
           </div>
+
+          {/* Advanced Panel (Pulse, devices, operations) */}
+          {advancedNav.length > 0 && (
+            <div className="bg-white border border-[#E2E8F0] rounded-[24px] p-3.5 shadow-sm space-y-1">
+              <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8]">
+                Advanced
+              </div>
+              {advancedNav.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeRoute === item.key;
+                return (
+                  <Link
+                    key={item.key}
+                    href={item.href}
+                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                      isActive
+                        ? "bg-[#0EA5E9] text-white shadow-[0_4px_12px_rgba(14,165,233,0.3)]"
+                        : "text-[#475569] hover:bg-[#F8FAFC] hover:text-[#0F172A]"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
 
           {/* Connected Server Card */}
           <div className="bg-gradient-to-br from-white to-[#F0F9FF] border border-[#BAE6FD] rounded-[24px] p-4 text-xs">
