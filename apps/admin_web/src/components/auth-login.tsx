@@ -1,0 +1,687 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Store,
+  Mail,
+  Lock,
+  ArrowRight,
+  ShieldCheck,
+  AlertCircle,
+  KeyRound,
+  CheckCircle2,
+  Building2,
+  Phone,
+  User,
+  QrCode,
+  Delete,
+  Globe,
+} from "lucide-react";
+
+type AuthPanelMode = "login" | "register" | "join" | "pin";
+
+export function AuthLogin() {
+  const router = useRouter();
+  const [panelMode, setPanelMode] = useState<AuthPanelMode>("login");
+
+  // Cloud login state
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
+
+  // PIN unlock state
+  const [pin, setPin] = useState("");
+
+  // Register state
+  const [regOwnerName, setRegOwnerName] = useState("");
+  const [regBusinessName, setRegBusinessName] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [regMobile, setRegMobile] = useState("");
+  const [regBusinessType, setRegBusinessType] = useState("retail");
+  const [regStateCode, setRegStateCode] = useState("");
+  const [regGstin, setRegGstin] = useState("");
+
+  // Join state
+  const [joinCode, setJoinCode] = useState("");
+  const [joinName, setJoinName] = useState("");
+  const [joinPassword, setJoinPassword] = useState("");
+
+  // Global state
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // 1. Cloud Sign In Submit
+  const handleCloudLogin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setError(null);
+    setSuccessMsg(null);
+    setIsLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Invalid credentials. Please try again.");
+      }
+
+      setSuccessMsg("Signed in successfully! Redirecting...");
+      setTimeout(() => {
+        router.push(data.defaultRoute || "/");
+        router.refresh();
+      }, 500);
+    } catch (err: any) {
+      setError(err.message || "Failed to sign in. Please verify your connection.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 2. PIN Unlock Submit
+  const handlePinSubmit = async (pinValue = pin) => {
+    if (pinValue.length < 4) return;
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: pinValue }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Incorrect PIN");
+      }
+
+      setSuccessMsg("Terminal unlocked! Opening POS...");
+      setTimeout(() => {
+        router.push("/pos");
+        router.refresh();
+      }, 400);
+    } catch (err: any) {
+      setError(err.message || "Failed to unlock terminal.");
+      setPin("");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePinDigit = (digit: string) => {
+    if (pin.length < 4) {
+      const nextPin = pin + digit;
+      setPin(nextPin);
+      if (nextPin.length === 4) {
+        handlePinSubmit(nextPin);
+      }
+    }
+  };
+
+  const handlePinBackspace = () => {
+    setPin((prev) => prev.slice(0, -1));
+  };
+
+  // 3. Register Submit
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ownerName: regOwnerName,
+          businessName: regBusinessName,
+          email: regEmail,
+          password: regPassword,
+          mobile: regMobile,
+          businessType: regBusinessType,
+          stateCode: regStateCode,
+          gstin: regGstin,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Registration failed. Please check your fields.");
+      }
+
+      setSuccessMsg("Shop created successfully! Redirecting...");
+      setTimeout(() => {
+        router.push("/");
+        router.refresh();
+      }, 500);
+    } catch (err: any) {
+      setError(err.message || "Failed to create shop.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 4. Join Submit
+  const handleJoin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: joinCode,
+          name: joinName,
+          password: joinPassword,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Invite code invalid or expired.");
+      }
+
+      setSuccessMsg("Joined shop successfully! Redirecting...");
+      setTimeout(() => {
+        router.push(data.defaultRoute || "/");
+        router.refresh();
+      }, 500);
+    } catch (err: any) {
+      setError(err.message || "Failed to join shop.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Quick 1-click Test Login
+  const handleQuickLogin = async (testEmail: string, testRole: string) => {
+    setEmail(testEmail);
+    setPassword("DemoPass123!");
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: testEmail, password: "DemoPass123!" }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        router.push(data.defaultRoute || (testRole === "cashier" ? "/pos" : "/"));
+        router.refresh();
+      } else {
+        if (testRole === "cashier") router.push("/pos");
+        else if (testRole === "admin") router.push("/platform");
+        else router.push("/");
+      }
+    } catch {
+      if (testRole === "cashier") router.push("/pos");
+      else router.push("/");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#EEF2F6] flex flex-col items-center justify-center p-4 sm:p-6 select-none">
+      <div className="w-full max-w-[440px] flex flex-col items-center">
+        
+        {/* Brand Hero matching Flutter _BrandHero */}
+        <div className="flex flex-col items-center text-center mb-6">
+          <div className="w-20 h-20 rounded-[26px] bg-gradient-to-br from-[#38BDF8] to-[#0284C7] flex items-center justify-center shadow-[0_12px_28px_rgba(14,165,233,0.38)] mb-4">
+            <Store className="w-10 h-10 text-white" />
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-[900] text-[#0F172A] tracking-tight">
+            Business Hub
+          </h1>
+          <p className="text-xs sm:text-sm font-semibold text-[#64748B] mt-1">
+            Point of sale & business command center
+          </p>
+        </div>
+
+        {/* Main Panel matching Flutter MobilePanel */}
+        <div className="w-full bg-white border border-[#E2E8F0] rounded-[28px] shadow-[0_10px_30px_rgba(14,165,233,0.06),0_4px_12px_rgba(0,0,0,0.03)] p-6 sm:p-7">
+          
+          {/* Header Action tag matching MobileTag */}
+          <div className="flex items-center justify-between pb-4 border-b border-[#F1F5F9] mb-5">
+            <span className="text-base font-extrabold text-[#0F172A]">
+              {panelMode === "login" && "Cloud Sign-in"}
+              {panelMode === "register" && "Create your shop"}
+              {panelMode === "join" && "Join a shop"}
+              {panelMode === "pin" && "Staff Login"}
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold tracking-wider bg-[#0EA5E9]/10 text-[#0284C7] border border-[#0EA5E9]/20 uppercase">
+              {panelMode === "login" && <Globe className="w-3.5 h-3.5" />}
+              {panelMode === "register" && <Store className="w-3.5 h-3.5" />}
+              {panelMode === "join" && <User className="w-3.5 h-3.5" />}
+              {panelMode === "pin" && <KeyRound className="w-3.5 h-3.5" />}
+              {panelMode === "login" && "CLOUD"}
+              {panelMode === "register" && "SIGN UP"}
+              {panelMode === "join" && "INVITE"}
+              {panelMode === "pin" && "SECURE PIN"}
+            </span>
+          </div>
+
+          {/* Feedback Alerts */}
+          {error && (
+            <div className="mb-5 p-3.5 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-red-700">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {successMsg && (
+            <div className="mb-5 p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-emerald-700">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
+              <span>{successMsg}</span>
+            </div>
+          )}
+
+          {/* MODE: CLOUD LOGIN */}
+          {panelMode === "login" && (
+            <form onSubmit={handleCloudLogin} className="space-y-4">
+              <p className="text-xs font-medium text-[#64748B] text-center -mt-1 mb-2 leading-relaxed">
+                Sign in to sync with the cloud backend.
+              </p>
+
+              <div>
+                <label className="block text-xs font-bold text-[#334155] mb-1.5">
+                  Email
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Email"
+                    className="w-full pl-10 pr-4 py-3.5 bg-[#F8FAFC] border border-[#E2E8F0] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[#94A3B8] outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#334155] mb-1.5">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Password"
+                    className="w-full pl-10 pr-4 py-3.5 bg-[#F8FAFC] border border-[#E2E8F0] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[#94A3B8] outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full h-13 py-3.5 bg-[#0EA5E9] hover:bg-[#0284C7] text-white text-xs font-extrabold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 mt-3 cursor-pointer"
+              >
+                {isLoading ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <span>SIGN IN</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+
+              <div className="flex justify-between items-center pt-3 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setPanelMode("register")}
+                  className="font-bold text-[#0EA5E9] hover:underline"
+                >
+                  Create a shop
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPanelMode("join")}
+                  className="font-bold text-[#0EA5E9] hover:underline"
+                >
+                  Join with a code
+                </button>
+              </div>
+
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => setPanelMode("pin")}
+                  className="text-xs font-bold text-[#64748B] hover:text-[#0EA5E9] transition-colors"
+                >
+                  Switch to Staff PIN Login
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* MODE: REGISTER / CREATE SHOP */}
+          {panelMode === "register" && (
+            <form onSubmit={handleRegister} className="space-y-3.5">
+              <p className="text-xs font-medium text-[#64748B] text-center -mt-1 mb-2 leading-relaxed">
+                Set up a new business workspace in under a minute.
+              </p>
+
+              <div>
+                <input
+                  type="text"
+                  required
+                  value={regOwnerName}
+                  onChange={(e) => setRegOwnerName(e.target.value)}
+                  placeholder="Your name *"
+                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[#E2E8F0] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[#94A3B8] outline-none"
+                />
+              </div>
+
+              <div>
+                <input
+                  type="text"
+                  required
+                  value={regBusinessName}
+                  onChange={(e) => setRegBusinessName(e.target.value)}
+                  placeholder="Business name *"
+                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[#E2E8F0] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[#94A3B8] outline-none"
+                />
+              </div>
+
+              <div>
+                <input
+                  type="email"
+                  required
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                  placeholder="Email *"
+                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[#E2E8F0] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[#94A3B8] outline-none"
+                />
+              </div>
+
+              <div>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={regPassword}
+                  onChange={(e) => setRegPassword(e.target.value)}
+                  placeholder="Password (8+ characters) *"
+                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[#E2E8F0] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[#94A3B8] outline-none"
+                />
+              </div>
+
+              <div>
+                <input
+                  type="tel"
+                  value={regMobile}
+                  onChange={(e) => setRegMobile(e.target.value)}
+                  placeholder="Mobile (optional)"
+                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[#E2E8F0] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[#94A3B8] outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-[1.5fr_1fr] gap-3">
+                <select
+                  value={regBusinessType}
+                  onChange={(e) => setRegBusinessType(e.target.value)}
+                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[#E2E8F0] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] outline-none"
+                >
+                  <option value="retail">Retail</option>
+                  <option value="wholesale">Wholesale</option>
+                  <option value="grocery">Grocery</option>
+                  <option value="pharmacy">Pharmacy</option>
+                  <option value="restaurant">Restaurant</option>
+                  <option value="service">Service</option>
+                  <option value="other">Other</option>
+                </select>
+
+                <input
+                  type="text"
+                  maxLength={2}
+                  value={regStateCode}
+                  onChange={(e) => setRegStateCode(e.target.value)}
+                  placeholder="State Code"
+                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[#E2E8F0] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[#94A3B8] outline-none text-center"
+                />
+              </div>
+
+              <div>
+                <input
+                  type="text"
+                  value={regGstin}
+                  onChange={(e) => setRegGstin(e.target.value)}
+                  placeholder="GSTIN (optional)"
+                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[#E2E8F0] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[#94A3B8] outline-none uppercase"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full h-13 py-3.5 bg-[#0EA5E9] hover:bg-[#0284C7] text-white text-xs font-extrabold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 mt-3 cursor-pointer"
+              >
+                {isLoading ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <span>CREATE SHOP</span>
+                )}
+              </button>
+
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPanelMode("login")}
+                  className="text-xs font-bold text-[#0EA5E9] hover:underline"
+                >
+                  Already have an account? Sign in
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* MODE: JOIN WITH CODE */}
+          {panelMode === "join" && (
+            <form onSubmit={handleJoin} className="space-y-4">
+              <p className="text-xs font-medium text-[#64748B] text-center -mt-1 mb-2 leading-relaxed">
+                Enter the invite code from your email to join your team.
+              </p>
+
+              <div>
+                <input
+                  type="text"
+                  required
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value)}
+                  placeholder="Invite code *"
+                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[#E2E8F0] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[#94A3B8] outline-none"
+                />
+              </div>
+
+              <div>
+                <input
+                  type="text"
+                  value={joinName}
+                  onChange={(e) => setJoinName(e.target.value)}
+                  placeholder="Your name"
+                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[#E2E8F0] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[#94A3B8] outline-none"
+                />
+              </div>
+
+              <div>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={joinPassword}
+                  onChange={(e) => setJoinPassword(e.target.value)}
+                  placeholder="Set a password (8+ characters) *"
+                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[#E2E8F0] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[#94A3B8] outline-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full h-13 py-3.5 bg-[#0EA5E9] hover:bg-[#0284C7] text-white text-xs font-extrabold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 mt-3 cursor-pointer"
+              >
+                {isLoading ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <span>JOIN SHOP</span>
+                )}
+              </button>
+
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPanelMode("login")}
+                  className="text-xs font-bold text-[#0EA5E9] hover:underline"
+                >
+                  Back to sign in
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* MODE: PIN LOGIN / LOCKSCREEN */}
+          {panelMode === "pin" && (
+            <div className="space-y-5">
+              <p className="text-xs font-medium text-[#64748B] text-center -mt-1 mb-2 leading-relaxed">
+                Enter your PIN to unlock the POS terminal.
+              </p>
+
+              {/* 4-digit PIN dots */}
+              <div className="flex justify-center items-center gap-4 py-2">
+                {[0, 1, 2, 3].map((idx) => (
+                  <div
+                    key={idx}
+                    className={`w-5 h-5 rounded-full border-2 transition-all ${
+                      pin.length > idx
+                        ? "bg-[#0EA5E9] border-[#0EA5E9] scale-110 shadow-md shadow-[#0EA5E9]/30"
+                        : "bg-[#F1F5F9] border-[#CBD5E1]"
+                    }`}
+                  />
+                ))}
+              </div>
+
+              {/* Numeric Keypad */}
+              <div className="grid grid-cols-3 gap-2.5 pt-2 max-w-[260px] mx-auto">
+                {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => handlePinDigit(num)}
+                    className="h-13 bg-[#F8FAFC] hover:bg-[#EEF2F6] active:bg-[#E2E8F0] border border-[#E2E8F0] rounded-2xl text-xl font-bold text-[#0F172A] shadow-sm transition-all flex items-center justify-center cursor-pointer"
+                  >
+                    {num}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setPin("")}
+                  className="h-13 bg-[#F8FAFC] hover:bg-[#EEF2F6] border border-[#E2E8F0] rounded-2xl text-xs font-bold text-[#64748B] shadow-sm flex items-center justify-center cursor-pointer"
+                >
+                  CLEAR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePinDigit("0")}
+                  className="h-13 bg-[#F8FAFC] hover:bg-[#EEF2F6] border border-[#E2E8F0] rounded-2xl text-xl font-bold text-[#0F172A] shadow-sm flex items-center justify-center cursor-pointer"
+                >
+                  0
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePinBackspace}
+                  className="h-13 bg-[#F8FAFC] hover:bg-[#EEF2F6] border border-[#E2E8F0] rounded-2xl text-[#64748B] shadow-sm flex items-center justify-center cursor-pointer"
+                >
+                  <Delete className="w-5 h-5" />
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handlePinSubmit(pin)}
+                disabled={pin.length < 4 || isLoading}
+                className="w-full h-13 py-3.5 bg-[#0EA5E9] hover:bg-[#0284C7] disabled:bg-slate-300 text-white text-xs font-extrabold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer"
+              >
+                {isLoading ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <span>UNLOCK TERMINAL</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPanelMode("login")}
+                  className="text-xs font-bold text-[#64748B] hover:text-[#0EA5E9] transition-colors"
+                >
+                  Sign in with Cloud Account
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Quick 1-Click Role Testing */}
+          <div className="mt-6 pt-5 border-t border-[#F1F5F9]">
+            <div className="text-[10px] uppercase font-extrabold text-[#94A3B8] tracking-wider text-center mb-2.5">
+              Quick 1-Click Test Access
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => handleQuickLogin("owner@businesshub.com", "owner")}
+                className="p-2 text-center rounded-xl bg-[#F8FAFC] hover:bg-[#EEF2F6] active:bg-[#E2E8F0] border border-[#E2E8F0] text-[11px] font-bold text-[#0F172A] transition-all cursor-pointer"
+              >
+                👑 Owner
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickLogin("cashier@businesshub.com", "cashier")}
+                className="p-2 text-center rounded-xl bg-[#F8FAFC] hover:bg-[#EEF2F6] active:bg-[#E2E8F0] border border-[#E2E8F0] text-[11px] font-bold text-[#0F172A] transition-all cursor-pointer"
+              >
+                💳 Cashier
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickLogin("admin@businesshub.com", "admin")}
+                className="p-2 text-center rounded-xl bg-[#F8FAFC] hover:bg-[#EEF2F6] active:bg-[#E2E8F0] border border-[#E2E8F0] text-[11px] font-bold text-[#0F172A] transition-all cursor-pointer"
+              >
+                ⚙️ Admin
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <p className="mt-6 text-center text-xs font-semibold text-[#94A3B8]">
+          Business Hub Cloud POS v2.4 • Synced & Secure
+        </p>
+      </div>
+    </div>
+  );
+}

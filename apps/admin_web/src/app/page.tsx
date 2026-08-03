@@ -1,491 +1,250 @@
 import Link from "next/link";
-
+import { ShoppingCart, Package, AlertCircle, CircleEllipsis, TrendingUp, TrendingDown, Receipt } from "lucide-react";
 import { AdminShell } from "@/components/admin-shell";
 import { EmptyState } from "@/components/empty-state";
-import { MetricCard } from "@/components/metric-card";
-import { WorkspacePlanCard } from "@/components/workspace-plan-card";
-import {
-  getDashboardSnapshot,
-  getSession,
-  getWorkspacePulse,
-  resolveActiveShop,
-} from "@/lib/admin-api";
+import { getDashboardSnapshot, getSession, getSales, resolveActiveShop } from "@/lib/admin-api";
 import { formatCurrency } from "@/lib/formatters";
-import {
-  canAccessAdvancedReports,
-  canAccessAttendance,
-  canAccessExpenses,
-  canAccessFinanceSummary,
-  formatPlanTier,
-} from "@/lib/plans";
-import { canManageWorkspace } from "@/lib/roles";
-import type { DashboardSnapshot, ShopMembership, WorkspacePulseSnapshot } from "@/lib/types";
-
-type QuickAction = {
-  label: string;
-  body: string;
-  href: string;
-};
-
-function buildQuickActions(activeShop: ShopMembership | null): QuickAction[] {
-  const role = activeShop?.role ?? null;
-  const actions: QuickAction[] = [
-    {
-      label: "Review stock",
-      body: "Open the catalog and check low-stock items before they affect the floor.",
-      href: "/inventory",
-    },
-    {
-      label: "Check customers",
-      body: "Review due balances, customer activity, and collection follow-up.",
-      href: "/customers",
-    },
-    {
-      label: "See sales",
-      body: "Open receipts and payment activity without leaving the Business Hub flow.",
-      href: "/sales",
-    },
-  ];
-
-  if (canManageWorkspace(role)) {
-    if (canAccessExpenses(activeShop)) {
-      actions.push({
-        label: "Track expenses",
-        body: "Keep daily spend visible without opening a heavy back-office tool.",
-        href: "/expenses",
-      });
-    }
-
-    if (canAccessAttendance(activeShop)) {
-      actions.push({
-        label: "Review attendance",
-        body: "Check who clocked in and whether the shift is staffed correctly.",
-        href: "/attendance",
-      });
-    }
-  }
-
-  return actions.slice(0, 4);
-}
-
-function buildAttentionCard(
-  snapshot: DashboardSnapshot | null,
-  options: {
-    currencyCode?: string;
-    canUseFinanceSummary?: boolean;
-  } = {},
-) {
-  const currencyCode = options.currencyCode ?? "INR";
-  const canUseFinanceSummary = options.canUseFinanceSummary ?? false;
-
-  if (!snapshot) {
-    return {
-      title: "Connect a workspace to begin",
-      body: "Once a shop is active, this page will highlight the next thing that needs action.",
-      ctaLabel: "View settings",
-      href: "/",
-      tone: "text-[var(--primary)] border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)]",
-    };
-  }
-
-  if (snapshot.low_stock_items_count > 0) {
-    return {
-      title: "Low-stock items need review",
-      body: `${snapshot.low_stock_items_count} products are running low. Review stock before the next rush.`,
-      ctaLabel: "Open inventory",
-      href: "/inventory",
-      tone: "text-[var(--warning)] border-[rgba(245,158,11,0.2)] bg-[rgba(245,158,11,0.08)]",
-    };
-  }
-
-  if (canUseFinanceSummary && Number(snapshot.total_outstanding_balance ?? 0) > 0) {
-    return {
-      title: "Customer dues need follow-up",
-      body: `Outstanding balances are now at ${formatCurrency(Number(snapshot.total_outstanding_balance), currencyCode)}.`,
-      ctaLabel: "Open customers",
-      href: "/customers",
-      tone: "text-[var(--info)] border-[rgba(6,182,212,0.2)] bg-[rgba(6,182,212,0.08)]",
-    };
-  }
-
-  if (!canUseFinanceSummary && snapshot.active_credit_customers_count > 0) {
-    return {
-      title: "Customer follow-up is waiting",
-      body: `${snapshot.active_credit_customers_count} customer accounts still need balance follow-up.`,
-      ctaLabel: "Open customers",
-      href: "/customers",
-      tone: "text-[var(--info)] border-[rgba(6,182,212,0.2)] bg-[rgba(6,182,212,0.08)]",
-    };
-  }
-
-  if (snapshot.sales_count === 0) {
-    return {
-      title: "No sales recorded yet",
-      body: "Open sales and confirm the shop has started recording today's activity.",
-      ctaLabel: "Open sales",
-      href: "/sales",
-      tone: "text-[var(--primary)] border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)]",
-    };
-  }
-
-  return {
-    title: "Store is moving normally",
-    body: "Stock, dues, and sales are all within a healthy range right now.",
-    ctaLabel: "Review receipts",
-    href: "/sales",
-    tone: "text-[var(--success)] border-[rgba(16,185,129,0.2)] bg-[rgba(16,185,129,0.08)]",
-  };
-}
-
-function buildAttentionCardFromPulse(pulse: WorkspacePulseSnapshot | null) {
-  if (!pulse) {
-    return null;
-  }
-
-  const tone =
-    pulse.headline.tone === "critical" || pulse.headline.tone === "danger"
-      ? "text-[var(--error)] border-[rgba(239,68,68,0.2)] bg-[rgba(239,68,68,0.08)]"
-      : pulse.headline.tone === "warning"
-      ? "text-[var(--warning)] border-[rgba(245,158,11,0.2)] bg-[rgba(245,158,11,0.08)]"
-      : pulse.headline.tone === "healthy"
-      ? "text-[var(--success)] border-[rgba(16,185,129,0.2)] bg-[rgba(16,185,129,0.08)]"
-      : "text-[var(--primary)] border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)]";
-
-  return {
-    title: pulse.headline.title,
-    body: pulse.headline.body,
-    ctaLabel: pulse.headline.cta_label,
-    href: pulse.headline.route,
-    tone,
-  };
-}
-
-function buildPlanGuidance(activeShop: ShopMembership | null) {
-  if (!activeShop) {
-    return null;
-  }
-
-  if (activeShop.shop.plan_tier === "starter") {
-    return {
-      title: "Starter keeps the workspace lean",
-      body: "This plan focuses on selling, stock, customers, and receipts. Expenses and attendance stay hidden until the shop upgrades.",
-      tone: "text-[var(--primary)] border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)]",
-    };
-  }
-
-  if (activeShop.shop.plan_tier === "growth") {
-    return {
-      title: "Growth adds store operations",
-      body: "This workspace includes daily operations like expenses and attendance while still avoiding heavier back-office clutter.",
-      tone: "text-[var(--success)] border-[rgba(16,185,129,0.2)] bg-[rgba(16,185,129,0.08)]",
-    };
-  }
-
-  return {
-    title: "Pro unlocks deeper control",
-    body: "This workspace can open stronger operations and support paths while still keeping ERP internals out of normal store flows.",
-    tone: "text-[var(--warning)] border-[rgba(245,158,11,0.2)] bg-[rgba(245,158,11,0.08)]",
-  };
-}
 
 export default async function HomePage() {
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
   const dashboardSnapshot = activeShop ? await getDashboardSnapshot(activeShop.shop.id) : null;
-  const pulseSnapshot = activeShop ? await getWorkspacePulse(activeShop.shop.id) : null;
-  const quickActions = buildQuickActions(activeShop);
-  const canUseAdvancedReports = canAccessAdvancedReports(activeShop);
-  const canUseFinanceSummary = canAccessFinanceSummary(activeShop);
-  const attentionCard =
-    buildAttentionCardFromPulse(pulseSnapshot) ??
-    buildAttentionCard(dashboardSnapshot, {
-      currencyCode: activeShop?.shop.currency_code ?? "INR",
-      canUseFinanceSummary,
-    });
-  const planGuidance = buildPlanGuidance(activeShop);
-  const lowStockPreview = dashboardSnapshot?.low_stock_preview ?? [];
+  const recentSales = activeShop ? await getSales(activeShop.shop.id) : [];
+
   const totalOutstanding = Number(dashboardSnapshot?.total_outstanding_balance ?? 0);
   const grossRevenue = Number(dashboardSnapshot?.gross_revenue ?? 0);
+  const stockValue = Number(dashboardSnapshot?.projected_sell_value ?? 0);
+
+  const currencyCode = activeShop?.shop.currency_code ?? "INR";
 
   return (
     <AdminShell
       session={session}
       activeShop={activeShop}
       activeRoute="overview"
-      title="Business overview"
-      subtitle="See what needs attention, move into the right workflow quickly, and keep the store running without admin clutter."
+      title="Dashboard"
+      subtitle="Today's takings, key stats, recent sales, and low stock warnings."
     >
       {!activeShop ? (
         <EmptyState
           title="No shop membership found"
-          body="This account is signed in, but there is no active shop membership yet. Add a shop membership in Business Hub before using the curated admin workspace."
+          body="This account is signed in, but there is no active shop membership yet. Please add a shop membership in Business Hub before using the curated workspace."
         />
       ) : (
-        <div className="space-y-8">
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <MetricCard
-              label="Products live"
-              value={(dashboardSnapshot?.inventory_items_count ?? 0).toString()}
-              detail={`${
-                dashboardSnapshot?.active_inventory_items_count ?? 0
-              } active products across ${
-                dashboardSnapshot?.category_count ?? 0
-              } categories`}
-              icon="INV"
-            />
-            <MetricCard
-              label="Stock at risk"
-              value={(dashboardSnapshot?.low_stock_items_count ?? 0).toString()}
-              detail="Items at five units or lower that need a restock decision"
-              accent="rose"
-              icon="RST"
-            />
-            <MetricCard
-              label="Customer dues"
-              value={
-                canUseFinanceSummary
-                  ? formatCurrency(totalOutstanding, activeShop.shop.currency_code)
-                  : `${dashboardSnapshot?.active_credit_customers_count ?? 0}`
-              }
-              detail={
-                canUseFinanceSummary
-                  ? `${dashboardSnapshot?.active_credit_customers_count ?? 0} active credit accounts`
-                  : "Accounts that still need balance follow-up"
-              }
-              accent="blue"
-              icon="DUE"
-            />
-            <MetricCard
-              label="Sales recorded"
-              value={(dashboardSnapshot?.sales_count ?? 0).toString()}
-              detail={
-                canUseAdvancedReports
-                  ? `${formatCurrency(grossRevenue, activeShop.shop.currency_code)} gross revenue`
-                  : "Receipt flow stays simple on lighter plans"
-              }
-              accent="green"
-              icon="SAL"
-            />
-          </section>
+        <div className="space-y-6">
+          {/* Today's takings hero matching HeroMetricCard */}
+          <div className="bg-gradient-to-br from-[#38BDF8] to-[#0284C7] text-white rounded-[24px] p-6 sm:p-8 shadow-md animate-fade-in-up">
+            <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-sky-100">
+              Today&apos;s Sales
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-[900] tracking-tight mt-1">
+              {formatCurrency(grossRevenue, currencyCode)}
+            </h2>
+            <div className="flex items-center gap-3 mt-4 text-xs font-bold text-sky-50">
+              <span>{dashboardSnapshot?.sales_count ?? 0} sales today</span>
+              {totalOutstanding > 0 && (
+                <>
+                  <span>•</span>
+                  <span className="bg-white/15 px-2.5 py-0.5 rounded-full">
+                    {formatCurrency(totalOutstanding, currencyCode)} outstanding due
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
 
-          <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.88fr)]">
-            <div className="space-y-6">
-              <div className={`panel-soft rounded-[28px] border px-6 py-6 ${attentionCard.tone}`}>
-                <p className="eyebrow text-current/70">Next move</p>
-                <h2 className="mt-3 text-2xl font-bold text-[var(--text-primary)]">
-                  {attentionCard.title}
-                </h2>
-                <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-secondary)]">
-                  {attentionCard.body}
-                </p>
-                <div className="mt-5">
+          {/* Key Stats Grid matching _StatCard / Row of metrics */}
+          <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+            {/* Stat: Items */}
+            <Link
+              href="/inventory"
+              className="bg-white border border-[#E2E8F0] hover:border-[#0EA5E9] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-1 hover-lift"
+            >
+              <div className="w-10 h-10 rounded-xl bg-[#0EA5E9]/10 text-[#0284C7] flex items-center justify-center transition-colors group-hover:bg-[#0EA5E9]/20">
+                <Package className="w-5 h-5" />
+              </div>
+              <span className="block text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8] mt-3.5">
+                ITEMS
+              </span>
+              <h3 className="text-xl font-black text-[#0F172A] mt-1">
+                {dashboardSnapshot?.inventory_items_count ?? 0}
+              </h3>
+              <span className="block text-[11px] font-semibold text-[#64748B] mt-0.5">
+                {dashboardSnapshot?.active_inventory_items_count ?? 0} live items
+              </span>
+            </Link>
+
+            {/* Stat: Low Stock */}
+            <Link
+              href="/inventory"
+              className="bg-white border border-[#E2E8F0] hover:border-[#0EA5E9] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-2 hover-lift"
+            >
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                (dashboardSnapshot?.low_stock_items_count ?? 0) > 0
+                  ? "bg-rose-50 text-rose-600 group-hover:bg-rose-100"
+                  : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100"
+              }`}>
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <span className="block text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8] mt-3.5">
+                LOW STOCK
+              </span>
+              <h3 className="text-xl font-black text-[#0F172A] mt-1">
+                {dashboardSnapshot?.low_stock_items_count ?? 0}
+              </h3>
+              <span className={`block text-[11px] font-semibold mt-0.5 ${
+                (dashboardSnapshot?.low_stock_items_count ?? 0) > 0 ? "text-rose-600" : "text-emerald-600"
+              }`}>
+                {(dashboardSnapshot?.low_stock_items_count ?? 0) > 0 ? "Needs restock" : "All good"}
+              </span>
+            </Link>
+
+            {/* Stat: Total Sales */}
+            <Link
+              href="/sales"
+              className="bg-white border border-[#E2E8F0] hover:border-[#0EA5E9] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-3 hover-lift"
+            >
+              <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center transition-colors group-hover:bg-violet-100">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <span className="block text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8] mt-3.5">
+                TOTAL SALES
+              </span>
+              <h3 className="text-xl font-black text-[#0F172A] mt-1">
+                {formatCurrency(grossRevenue, currencyCode)}
+              </h3>
+              <span className="block text-[11px] font-semibold text-[#64748B] mt-0.5">
+                View detailed history
+              </span>
+            </Link>
+
+            {/* Stat: Stock Value */}
+            <Link
+              href="/inventory"
+              className="bg-white border border-[#E2E8F0] hover:border-[#0EA5E9] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-4 hover-lift"
+            >
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center transition-colors group-hover:bg-emerald-100">
+                <TrendingDown className="w-5 h-5" />
+              </div>
+              <span className="block text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8] mt-3.5">
+                STOCK VALUE
+              </span>
+              <h3 className="text-xl font-black text-[#0F172A] mt-1">
+                {formatCurrency(stockValue, currencyCode)}
+              </h3>
+              <span className="block text-[11px] font-semibold text-[#64748B] mt-0.5">
+                At selling price
+              </span>
+            </Link>
+          </div>
+
+          {/* Primary Action: Start New Sale */}
+          <Link
+            href="/pos"
+            className="w-full flex items-center justify-center gap-2.5 py-4 px-6 bg-gradient-to-r from-[#38BDF8] to-[#0284C7] hover:from-[#0EA5E9] hover:to-[#0369A1] text-white rounded-[20px] text-sm font-extrabold shadow-md shadow-[#0EA5E9]/20 transition-all hover:scale-[1.005] animate-fade-in-up delay-5 hover-lift"
+          >
+            <ShoppingCart className="w-5 h-5" />
+            <span>START NEW SALE</span>
+          </Link>
+
+          {/* 2-Column Grid: Recent Sales & Low Stock watch lists */}
+          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            
+            {/* Column 1: Recent Sales */}
+            <div className="bg-white border border-[#E2E8F0] rounded-[24px] p-5 sm:p-6 shadow-sm animate-fade-in-up delay-6">
+              <div className="flex items-center justify-between gap-4 mb-4">
+                <h3 className="text-base font-extrabold text-[#0F172A]">
+                  Recent sales
+                </h3>
+                {recentSales.length > 0 && (
                   <Link
-                    href={attentionCard.href}
-                    className="inline-flex items-center rounded-full border border-current/20 bg-[rgba(255,255,255,0.06)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[rgba(255,255,255,0.1)]"
+                    href="/sales"
+                    className="text-xs font-bold text-[#0EA5E9] hover:underline animate-fade-in"
                   >
-                    {attentionCard.ctaLabel}
+                    View all
                   </Link>
-                </div>
+                )}
               </div>
 
-              {planGuidance ? (
-                <div className={`panel-soft rounded-[28px] border px-6 py-6 ${planGuidance.tone}`}>
-                  <p className="eyebrow text-current/70">{formatPlanTier(activeShop.shop.plan_tier)} plan</p>
-                  <h2 className="mt-3 text-2xl font-bold text-[var(--text-primary)]">
-                    {planGuidance.title}
-                  </h2>
-                  <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-secondary)]">
-                    {planGuidance.body}
-                  </p>
+              {recentSales.length === 0 ? (
+                <div className="py-12 text-center text-[#94A3B8] text-xs font-bold border border-dashed border-[#E2E8F0] rounded-2xl bg-[#F8FAFC]">
+                  No sales yet. Tap Start New Sale to begin.
                 </div>
-              ) : null}
-
-              {activeShop ? (
-                <WorkspacePlanCard
-                  shopName={activeShop.shop.name}
-                  planTier={activeShop.shop.plan_tier}
-                  detailHref={canManageWorkspace(activeShop.role) ? "/plan" : undefined}
-                />
-              ) : null}
-
-              <div className="panel-soft rounded-[28px] px-6 py-6">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="eyebrow">Quick actions</p>
-                    <h2 className="mt-3 text-2xl font-bold">Go straight to the task</h2>
-                  </div>
-                  <span className="rounded-full border border-[rgba(71,176,255,0.14)] bg-[rgba(71,176,255,0.08)] px-3 py-1 text-xs font-medium text-[var(--accent)]">
-                    {quickActions.length} shortcuts
-                  </span>
-                </div>
-
-                <div className="mt-6 grid gap-3 md:grid-cols-2">
-                  {quickActions.map((action) => (
-                    <Link
-                      key={action.href}
-                      href={action.href}
-                      className="surface-muted rounded-[22px] px-4 py-4 transition hover:border-[rgba(71,176,255,0.18)] hover:bg-[rgba(14,22,34,0.72)]"
+              ) : (
+                <div className="space-y-3.5">
+                  {recentSales.slice(0, 5).map((sale, index) => (
+                    <div
+                      key={sale.id}
+                      className="flex items-center justify-between p-3.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl hover-lift"
+                      style={{ animationDelay: `${240 + index * 40}ms` }}
                     >
-                      <p className="text-base font-semibold">{action.label}</p>
-                      <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-                        {action.body}
-                      </p>
-                    </Link>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#0EA5E9]/10 text-[#0284C7] flex items-center justify-center shrink-0">
+                          <Receipt className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-extrabold text-[#0F172A]">
+                            {sale.customer_name || "Walk-in Guest"}
+                          </h4>
+                          <span className="block text-[10px] font-bold text-[#64748B] mt-0.5">
+                            {sale.payment_mode} • {new Date(sale.sale_date).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="block text-sm font-black text-[#0F172A]">
+                          {formatCurrency(Number(sale.total_amount), currencyCode)}
+                        </span>
+                        {Number(sale.amount_due) > 0 && (
+                          <span className="block text-[10px] font-extrabold text-amber-600 mt-0.5">
+                            Due {formatCurrency(Number(sale.amount_due), currencyCode)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   ))}
                 </div>
-              </div>
-
-              {pulseSnapshot ? (
-                <div className="panel-soft rounded-[28px] px-6 py-6">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="eyebrow">Pulse queue</p>
-                      <h2 className="mt-3 text-2xl font-bold">What needs owner/admin attention</h2>
-                    </div>
-                    <Link
-                      href="/pulse"
-                      className="rounded-full border border-[rgba(71,176,255,0.14)] bg-[rgba(71,176,255,0.08)] px-3 py-1 text-xs font-medium text-[var(--accent)]"
-                    >
-                      Open pulse
-                    </Link>
-                  </div>
-
-                  <div className="mt-5 space-y-3">
-                    {pulseSnapshot.tasks.length ? (
-                      pulseSnapshot.tasks.slice(0, 3).map((task) => (
-                        <Link
-                          key={task.code}
-                          href={task.route}
-                          className="surface-muted block rounded-[22px] px-4 py-4 transition hover:border-[rgba(71,176,255,0.18)] hover:bg-[rgba(14,22,34,0.72)]"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <p className="text-base font-semibold">{task.title}</p>
-                            <span className="rounded-full border border-[rgba(152,164,189,0.12)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
-                              {task.priority}
-                            </span>
-                          </div>
-                          <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-                            {task.body}
-                          </p>
-                        </Link>
-                      ))
-                    ) : (
-                      <p className="text-sm text-[var(--text-secondary)]">
-                        No open pulse tasks right now.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ) : null}
+              )}
             </div>
 
-            <div className="space-y-6">
-              <div className="panel-soft rounded-[28px] px-6 py-6">
-                <p className="eyebrow">Stock watch</p>
-                <h2 className="mt-3 text-2xl font-bold">Products needing attention</h2>
-                <div className="mt-5 space-y-3">
-                  {lowStockPreview.length ? (
-                    lowStockPreview.map((item) => (
-                      <div
-                        key={item.id}
-                        className="surface-muted flex items-center justify-between rounded-[20px] px-4 py-4"
-                      >
-                        <div>
-                          <p className="font-semibold">{item.item_name}</p>
-                          <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                            {item.category || "Uncategorized"} | {item.sku || "No SKU"}
-                          </p>
-                        </div>
-                        <span className="rounded-full border border-[rgba(255,138,106,0.18)] px-3 py-1 text-sm font-semibold text-[var(--warning)]">
-                          {item.stock_on_hand} left
+            {/* Column 2: Low Stock */}
+            <div className="bg-white border border-[#E2E8F0] rounded-[24px] p-5 sm:p-6 shadow-sm animate-fade-in-up delay-7">
+              <div className="flex items-center justify-between gap-4 mb-4">
+                <h3 className="text-base font-extrabold text-[#0F172A]">
+                  Low stock watch
+                </h3>
+              </div>
+
+              {!dashboardSnapshot?.low_stock_preview || dashboardSnapshot.low_stock_preview.length === 0 ? (
+                <div className="py-12 text-center text-[#94A3B8] text-xs font-bold border border-dashed border-[#E2E8F0] rounded-2xl bg-[#F8FAFC]">
+                  No urgent low-stock items.
+                </div>
+              ) : (
+                <div className="space-y-3.5">
+                  {dashboardSnapshot.low_stock_preview.slice(0, 5).map((item, index) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between p-3.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl hover-lift"
+                      style={{ animationDelay: `${280 + index * 40}ms` }}
+                    >
+                      <div>
+                        <h4 className="text-xs font-extrabold text-[#0F172A]">
+                          {item.item_name}
+                        </h4>
+                        <span className="block text-[10px] font-bold text-[#64748B] mt-0.5">
+                          {item.category || "Uncategorized"}
                         </span>
                       </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-[var(--text-secondary)]">
-                      No urgent low-stock items in the current store snapshot.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {pulseSnapshot ? (
-                <div className="panel-soft rounded-[28px] px-6 py-6">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="eyebrow">Anomaly watch</p>
-                      <h2 className="mt-3 text-2xl font-bold">Unusual store signals</h2>
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-50 text-rose-600 border border-rose-100">
+                        {item.stock_on_hand} left
+                      </span>
                     </div>
-                    <span className="rounded-full border border-[rgba(245,158,11,0.18)] bg-[rgba(77,49,9,0.34)] px-3 py-1 text-xs font-medium text-[var(--warning)]">
-                      {pulseSnapshot.stats.critical_anomaly_count + pulseSnapshot.stats.warning_anomaly_count} live
-                    </span>
-                  </div>
-                  <div className="mt-5 space-y-3">
-                    {pulseSnapshot.anomalies.length ? (
-                      pulseSnapshot.anomalies.slice(0, 3).map((anomaly) => (
-                        <Link
-                          key={anomaly.code}
-                          href={anomaly.route}
-                          className="surface-muted block rounded-[22px] px-4 py-4 transition hover:border-[rgba(245,158,11,0.18)] hover:bg-[rgba(21,18,12,0.72)]"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <p className="text-base font-semibold">{anomaly.title}</p>
-                            <span className="rounded-full border border-[rgba(245,158,11,0.18)] px-3 py-1 text-xs font-semibold text-[var(--warning)]">
-                              {anomaly.metric_value}
-                            </span>
-                          </div>
-                          <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-                            {anomaly.body}
-                          </p>
-                        </Link>
-                      ))
-                    ) : (
-                      <p className="text-sm text-[var(--text-secondary)]">
-                        No anomaly signals are active right now.
-                      </p>
-                    )}
-                  </div>
+                  ))}
                 </div>
-              ) : null}
-
-              <div className="panel-soft rounded-[28px] px-6 py-6">
-                <p className="eyebrow">Workspace access</p>
-                <h2 className="mt-3 text-2xl font-bold">Available shop memberships</h2>
-                <div className="mt-5 space-y-3">
-                  {session.memberships.map((membership) => {
-                    const isCurrent = membership.shop.id === activeShop.shop.id;
-                    return (
-                      <div
-                        key={membership.id}
-                        className={`rounded-[20px] border px-4 py-4 ${
-                          isCurrent
-                            ? "border-[rgba(71,176,255,0.18)] bg-[rgba(11,24,41,0.72)]"
-                            : "surface-muted"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="font-semibold">{membership.shop.name}</p>
-                            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                              {membership.role_label} | {membership.status}
-                            </p>
-                            <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-                              {membership.role_summary}
-                            </p>
-                          </div>
-                          {isCurrent ? (
-                            <span className="rounded-full border border-[rgba(71,176,255,0.16)] bg-[rgba(71,176,255,0.08)] px-3 py-1 text-xs font-medium text-[var(--accent)]">
-                              Active
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              )}
             </div>
-          </section>
+
+          </div>
         </div>
       )}
     </AdminShell>

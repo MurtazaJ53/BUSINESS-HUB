@@ -1,0 +1,441 @@
+"use client";
+
+import React, { useState, useEffect, useMemo } from "react";
+import {
+  X,
+  CreditCard,
+  Banknote,
+  QrCode,
+  Users,
+  CheckCircle,
+  Copy,
+  Sparkles,
+  ArrowRight,
+} from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
+import type { SplitPaymentTender, Customer } from "@/lib/types";
+
+type PosCheckoutModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  totalAmount: number;
+  selectedCustomer: Customer | null;
+  shopUpiVpa?: string;
+  shopName?: string;
+  onCompleteSale: (payments: SplitPaymentTender, changeDue: number) => void;
+};
+
+export function PosCheckoutModal({
+  isOpen,
+  onClose,
+  totalAmount,
+  selectedCustomer,
+  shopUpiVpa = "merchant@upi",
+  shopName = "Business Hub Store",
+  onCompleteSale,
+}: PosCheckoutModalProps) {
+  const [cashAmount, setCashAmount] = useState<string>("");
+  const [cashReceived, setCashReceived] = useState<string>("");
+  const [cardAmount, setCardAmount] = useState<string>("");
+  const [cardRef, setCardRef] = useState<string>("");
+  const [upiAmount, setUpiAmount] = useState<string>("");
+  const [upiRef, setUpiRef] = useState<string>("");
+  const [khataAmount, setKhataAmount] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<"cash" | "card" | "upi" | "khata">("cash");
+  const [copiedUpi, setCopiedUpi] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setCashAmount(totalAmount.toString());
+      setCashReceived(totalAmount.toString());
+      setCardAmount("");
+      setCardRef("");
+      setUpiAmount("");
+      setUpiRef("");
+      setKhataAmount("");
+      setActiveTab("cash");
+      setCopiedUpi(false);
+    }
+  }, [isOpen, totalAmount]);
+
+  const numCash = parseFloat(cashAmount) || 0;
+  const numCashReceived = parseFloat(cashReceived) || numCash;
+  const numCard = parseFloat(cardAmount) || 0;
+  const numUpi = parseFloat(upiAmount) || 0;
+  const numKhata = parseFloat(khataAmount) || 0;
+
+  const totalAllocated = useMemo(() => {
+    return numCash + numCard + numUpi + numKhata;
+  }, [numCash, numCard, numUpi, numKhata]);
+
+  const remaining = useMemo(() => {
+    return Math.max(0, totalAmount - totalAllocated);
+  }, [totalAmount, totalAllocated]);
+
+  const changeDue = useMemo(() => {
+    if (numCash > 0 && numCashReceived > numCash) {
+      return numCashReceived - numCash;
+    }
+    return 0;
+  }, [numCash, numCashReceived]);
+
+  const isValid = Math.abs(totalAllocated - totalAmount) < 0.01;
+
+  const upiIntentUri = useMemo(() => {
+    const amt = numUpi > 0 ? numUpi.toFixed(2) : totalAmount.toFixed(2);
+    const encShop = encodeURIComponent(shopName);
+    return `upi://pay?pa=${shopUpiVpa}&pn=${encShop}&am=${amt}&cu=INR&tn=Invoice+Payment`;
+  }, [shopUpiVpa, shopName, numUpi, totalAmount]);
+
+  const handleCopyUpi = () => {
+    navigator.clipboard.writeText(upiIntentUri);
+    setCopiedUpi(true);
+    setTimeout(() => setCopiedUpi(false), 2000);
+  };
+
+  const handleExactPayment = (mode: "cash" | "card" | "upi" | "khata") => {
+    setCashAmount("");
+    setCardAmount("");
+    setUpiAmount("");
+    setKhataAmount("");
+
+    if (mode === "cash") {
+      setCashAmount(totalAmount.toString());
+      setCashReceived(totalAmount.toString());
+    } else if (mode === "card") {
+      setCardAmount(totalAmount.toString());
+    } else if (mode === "upi") {
+      setUpiAmount(totalAmount.toString());
+    } else if (mode === "khata") {
+      setKhataAmount(totalAmount.toString());
+    }
+    setActiveTab(mode);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isValid) return;
+
+    onCompleteSale(
+      {
+        cash: numCash,
+        card: numCard,
+        upi: numUpi,
+        khata_due: numKhata,
+        card_ref: cardRef.trim() || undefined,
+        upi_ref: upiRef.trim() || undefined,
+      },
+      changeDue
+    );
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl bg-white border border-[#E2E8F0] rounded-[28px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="p-5 border-b border-[#F1F5F9] flex items-center justify-between bg-[#F8FAFC]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-[#0EA5E9]/10 text-[#0284C7] flex items-center justify-center">
+              <CreditCard className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="font-[900] text-base text-[#0F172A]">
+                Checkout & Payment
+              </span>
+              <div className="text-xs font-bold text-[#64748B]">
+                Total Payable: <strong className="text-[#0284C7]">{formatCurrency(totalAmount)}</strong>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl text-[#94A3B8] hover:text-[#0F172A] hover:bg-[#EEF2F6]"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Quick 1-Click Fill Buttons */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <button
+              type="button"
+              onClick={() => handleExactPayment("cash")}
+              className={`p-3.5 rounded-2xl border flex flex-col items-center gap-1.5 transition-all ${
+                activeTab === "cash" && numCash === totalAmount
+                  ? "border-[#0EA5E9] bg-[#0EA5E9]/10 text-[#0284C7] shadow-sm font-extrabold"
+                  : "border-[#E2E8F0] bg-[#F8FAFC] text-[#64748B] hover:border-[#CBD5E1]"
+              }`}
+            >
+              <Banknote className="w-5 h-5 text-emerald-600" />
+              <span className="text-xs font-bold">100% Cash</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleExactPayment("upi")}
+              className={`p-3.5 rounded-2xl border flex flex-col items-center gap-1.5 transition-all ${
+                activeTab === "upi" && numUpi === totalAmount
+                  ? "border-[#0EA5E9] bg-[#0EA5E9]/10 text-[#0284C7] shadow-sm font-extrabold"
+                  : "border-[#E2E8F0] bg-[#F8FAFC] text-[#64748B] hover:border-[#CBD5E1]"
+              }`}
+            >
+              <QrCode className="w-5 h-5 text-[#0284C7]" />
+              <span className="text-xs font-bold">100% UPI QR</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleExactPayment("card")}
+              className={`p-3.5 rounded-2xl border flex flex-col items-center gap-1.5 transition-all ${
+                activeTab === "card" && numCard === totalAmount
+                  ? "border-[#0EA5E9] bg-[#0EA5E9]/10 text-[#0284C7] shadow-sm font-extrabold"
+                  : "border-[#E2E8F0] bg-[#F8FAFC] text-[#64748B] hover:border-[#CBD5E1]"
+              }`}
+            >
+              <CreditCard className="w-5 h-5 text-purple-600" />
+              <span className="text-xs font-bold">100% Card</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={!selectedCustomer}
+              onClick={() => handleExactPayment("khata")}
+              className={`p-3.5 rounded-2xl border flex flex-col items-center gap-1.5 transition-all ${
+                !selectedCustomer
+                  ? "opacity-40 cursor-not-allowed border-[#E2E8F0] bg-[#F8FAFC] text-[#94A3B8]"
+                  : activeTab === "khata" && numKhata === totalAmount
+                  ? "border-[#0EA5E9] bg-[#0EA5E9]/10 text-[#0284C7] shadow-sm font-extrabold"
+                  : "border-[#E2E8F0] bg-[#F8FAFC] text-[#64748B] hover:border-[#CBD5E1]"
+              }`}
+            >
+              <Users className="w-5 h-5 text-amber-600" />
+              <span className="text-xs font-bold">100% Khata Due</span>
+            </button>
+          </div>
+
+          {/* Payment Method Split Rows */}
+          <div className="space-y-3.5 bg-[#F8FAFC] p-5 rounded-2xl border border-[#E2E8F0]">
+            <h4 className="text-[11px] font-extrabold text-[#94A3B8] uppercase tracking-wider">
+              Split Tender Allocation
+            </h4>
+
+            {/* Cash Input */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-1">
+              <div className="w-32 flex items-center gap-2 text-xs font-bold text-[#0F172A]">
+                <Banknote className="w-4 h-4 text-emerald-600" />
+                <span>Cash:</span>
+              </div>
+              <div className="flex-1 flex gap-2">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={cashAmount}
+                  onChange={(e) => {
+                    setCashAmount(e.target.value);
+                    if (!cashReceived || parseFloat(cashReceived) < parseFloat(e.target.value)) {
+                      setCashReceived(e.target.value);
+                    }
+                  }}
+                  placeholder="₹0.00"
+                  className="flex-1 px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-bold text-[#0F172A] focus:outline-none focus:border-[#0EA5E9]"
+                />
+                {numCash > 0 && (
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={numCash}
+                    value={cashReceived}
+                    onChange={(e) => setCashReceived(e.target.value)}
+                    placeholder="Tendered"
+                    title="Physical cash received from customer"
+                    className="w-32 px-3.5 py-2.5 bg-white border border-emerald-400 rounded-xl text-xs font-bold text-emerald-700 focus:outline-none"
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Change Due Indicator */}
+            {changeDue > 0 && (
+              <div className="sm:ml-34 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-700 flex justify-between items-center">
+                <span>Return Change to Customer:</span>
+                <strong className="text-base font-black">{formatCurrency(changeDue)}</strong>
+              </div>
+            )}
+
+            {/* Card Input */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <div className="w-32 flex items-center gap-2 text-xs font-bold text-[#0F172A]">
+                <CreditCard className="w-4 h-4 text-purple-600" />
+                <span>Card:</span>
+              </div>
+              <div className="flex-1 flex gap-2">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={cardAmount}
+                  onChange={(e) => setCardAmount(e.target.value)}
+                  placeholder="₹0.00"
+                  className="flex-1 px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-bold text-[#0F172A] focus:outline-none focus:border-[#0EA5E9]"
+                />
+                <input
+                  type="text"
+                  value={cardRef}
+                  onChange={(e) => setCardRef(e.target.value)}
+                  placeholder="Auth/Ref # (optional)"
+                  className="w-36 px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-medium text-[#0F172A] focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* UPI QR Input & QR Code Box */}
+            <div className="flex flex-col sm:flex-row sm:items-start gap-2">
+              <div className="w-32 flex items-center gap-2 text-xs font-bold text-[#0F172A] pt-2.5">
+                <QrCode className="w-4 h-4 text-[#0284C7]" />
+                <span>UPI / QR:</span>
+              </div>
+              <div className="flex-1 space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={upiAmount}
+                    onChange={(e) => setUpiAmount(e.target.value)}
+                    placeholder="₹0.00"
+                    className="flex-1 px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-bold text-[#0F172A] focus:outline-none focus:border-[#0EA5E9]"
+                  />
+                  <input
+                    type="text"
+                    value={upiRef}
+                    onChange={(e) => setUpiRef(e.target.value)}
+                    placeholder="UTR/Txn # (optional)"
+                    className="w-36 px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-medium text-[#0F172A] focus:outline-none"
+                  />
+                </div>
+
+                {numUpi > 0 && (
+                  <div className="p-4 bg-white border border-[#BAE6FD] rounded-2xl flex items-center gap-4 shadow-sm">
+                    <div className="w-20 h-20 bg-slate-900 p-2 rounded-xl flex flex-col items-center justify-center text-white text-[8px] text-center font-mono">
+                      <QrCode className="w-8 h-8 text-[#38BDF8] mb-0.5" />
+                      <span>UPI SCAN</span>
+                    </div>
+                    <div className="flex-1 text-xs space-y-1">
+                      <div className="font-extrabold text-[#0F172A]">
+                        Scan to Pay {formatCurrency(numUpi)}
+                      </div>
+                      <div className="text-[11px] text-[#64748B] font-mono truncate">
+                        VPA: {shopUpiVpa}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCopyUpi}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0284C7] hover:underline"
+                      >
+                        {copiedUpi ? (
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                        <span>{copiedUpi ? "Copied UPI link" : "Copy Payment Link"}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Khata Credit Due Input */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <div className="w-32 flex items-center gap-2 text-xs font-bold text-[#0F172A]">
+                <Users className="w-4 h-4 text-amber-600" />
+                <span>Khata Due:</span>
+              </div>
+              <div className="flex-1">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  disabled={!selectedCustomer}
+                  value={khataAmount}
+                  onChange={(e) => setKhataAmount(e.target.value)}
+                  placeholder={
+                    selectedCustomer ? "₹0.00" : "Select a customer to allow Khata credit"
+                  }
+                  className="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-bold text-[#0F172A] focus:outline-none focus:border-[#0EA5E9] disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                {selectedCustomer && (
+                  <div className="text-[10px] font-bold text-[#64748B] mt-1">
+                    Customer Khata: <strong>{selectedCustomer.name}</strong> (Current Due:{" "}
+                    {formatCurrency(selectedCustomer.balance_amount ?? 0)})
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Allocation Validation & Remaining Counter */}
+          <div className="p-4 rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] flex items-center justify-between">
+            <div>
+              <div className="text-[11px] font-bold text-[#64748B]">Total Allocated:</div>
+              <div className="text-sm font-extrabold text-[#0F172A]">
+                {formatCurrency(totalAllocated)} / {formatCurrency(totalAmount)}
+              </div>
+            </div>
+            {remaining > 0 ? (
+              <div className="text-right">
+                <div className="text-xs text-amber-600 font-bold">Remaining to allocate:</div>
+                <div className="text-sm font-black text-amber-700">
+                  {formatCurrency(remaining)}
+                </div>
+              </div>
+            ) : totalAllocated > totalAmount ? (
+              <div className="text-right text-xs text-rose-600 font-bold">
+                Exceeds total by {formatCurrency(totalAllocated - totalAmount)}
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-extrabold">
+                <CheckCircle className="w-4 h-4" />
+                <span>Ready to Charge</span>
+              </div>
+            )}
+          </div>
+        </form>
+
+        {/* Actions Footer */}
+        <div className="p-5 border-t border-[#F1F5F9] bg-[#F8FAFC] flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="py-3 px-5 bg-white hover:bg-[#F1F5F9] border border-[#E2E8F0] text-[#64748B] hover:text-[#0F172A] rounded-2xl font-bold text-xs transition-colors"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            disabled={!isValid}
+            onClick={handleSubmit}
+            className="flex-1 flex items-center justify-center gap-2 py-3 px-5 bg-gradient-to-r from-[#38BDF8] to-[#0284C7] hover:from-[#0EA5E9] hover:to-[#0369A1] disabled:opacity-40 text-white rounded-2xl font-extrabold text-xs shadow-[0_8px_20px_rgba(14,165,233,0.35)] transition-all cursor-pointer"
+          >
+            <span>CONFIRM & PRINT RECEIPT</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

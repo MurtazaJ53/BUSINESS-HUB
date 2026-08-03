@@ -1482,7 +1482,7 @@ class PosPayment {
 
 enum CommerceCommandType { saleCreate, paymentCreate }
 
-enum CommerceSyncState { localOnly, queued, syncing, synced, failed }
+enum CommerceSyncState { localOnly, queued, syncing, synced, failed, refunded }
 
 class CommerceSyncResult {
   const CommerceSyncResult({
@@ -1592,6 +1592,7 @@ class RecentSaleSummary {
     required this.paymentMode,
     required this.syncState,
     this.customerName,
+    this.itemSummary,
   });
 
   final String id;
@@ -1603,7 +1604,23 @@ class RecentSaleSummary {
   final CommerceSyncState syncState;
   final String? customerName;
 
+  /// Short summary of line items (e.g. "Rice + 2 more") used as the receipt
+  /// title when there's no customer name (walk-in sale).
+  final String? itemSummary;
+
   bool get hasOutstandingDue => amountDue > 0.009;
+
+  /// The main line shown in the History list: customer name if present, else a
+  /// readable item summary, else a generic fallback.
+  String get displayTitle {
+    if (customerName != null && customerName!.trim().isNotEmpty) {
+      return customerName!.trim();
+    }
+    if (itemSummary != null && itemSummary!.trim().isNotEmpty) {
+      return itemSummary!.trim();
+    }
+    return 'Walk-in customer';
+  }
 }
 
 class SaleDetailItem {

@@ -849,6 +849,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                         ),
                       ),
                       if (detail.total >= 0 &&
+                          detail.syncState != CommerceSyncState.refunded &&
                           !(detail.footerNote ?? '').contains('RETURN') &&
                           _canRefund()) ...<Widget>[
                         const SizedBox(height: 12),
@@ -1234,7 +1235,7 @@ class _HistorySaleRow extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${sale.customerName?.isNotEmpty == true ? sale.customerName : 'Walk-in customer'} | ${sale.date}',
+                        '${sale.displayTitle} | ${sale.date}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Colors.black.withValues(alpha: 0.58),
                           fontWeight: FontWeight.w600,
@@ -1250,7 +1251,8 @@ class _HistorySaleRow extends StatelessWidget {
                             icon: Icons.payments_rounded,
                             accent: AppPalette.primary,
                           ),
-                          if (sale.hasOutstandingDue)
+                          if (sale.hasOutstandingDue &&
+                              sale.syncState != CommerceSyncState.refunded)
                             MobileTag(
                               label: 'Due ${formatCurrency(sale.amountDue)}',
                               icon: Icons.warning_amber_rounded,
@@ -1541,6 +1543,7 @@ String _syncLabel(CommerceSyncState state) {
     CommerceSyncState.synced => 'SYNCED',
     // Transient: the outbox re-picks these up automatically.
     CommerceSyncState.failed => 'RETRYING',
+    CommerceSyncState.refunded => 'REFUNDED',
   };
 }
 
@@ -1562,6 +1565,7 @@ Color _syncTone(CommerceSyncState state) {
     CommerceSyncState.syncing => AppPalette.primary,
     CommerceSyncState.failed => AppPalette.warning,
     CommerceSyncState.localOnly => AppPalette.textTertiary,
+    CommerceSyncState.refunded => AppPalette.error,
   };
 }
 

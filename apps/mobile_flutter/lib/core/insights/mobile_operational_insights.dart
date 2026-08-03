@@ -90,6 +90,7 @@ class HistoryReportSnapshot {
           break;
         case CommerceSyncState.localOnly:
         case CommerceSyncState.syncing:
+        case CommerceSyncState.refunded:
           break;
       }
       paymentModeCounts.update(

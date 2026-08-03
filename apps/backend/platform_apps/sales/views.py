@@ -91,10 +91,8 @@ class SaleListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
             queryset = queryset.filter(status=status_value)
         if customer_id:
             queryset = queryset.filter(customer_id=customer_id)
-        if not status_value:
-            # Hide voided (refunded) sales from the default History pull so a
-            # refunded receipt doesn't reappear when the client re-syncs.
-            queryset = queryset.exclude(status=Sale.Status.VOID)
+        # Voided (refunded) sales stay in the list so History can show them with
+        # a REFUNDED badge (they're already excluded from gross/summary totals).
         # Bound the unpaginated list so a huge shop never serializes every
         # sale in one response. Clients read the most-recent slice.
         return queryset[: bounded_list_limit(self.request.query_params.get("limit"))]

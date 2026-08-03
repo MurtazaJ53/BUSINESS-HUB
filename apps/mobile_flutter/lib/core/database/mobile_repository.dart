@@ -1342,7 +1342,7 @@ class SalesRepository {
               COALESCE(SUM(CASE WHEN sync_status = 'rejected' THEN 1 ELSE 0 END), 0) AS rejected_sales,
               MAX(last_synced_at) AS last_synced_at
             FROM sales
-            WHERE tombstone = 0;
+            WHERE tombstone = 0 AND sync_status NOT IN ('refunded', 'void');
           ''',
           readsFrom: {_db.salesEntries},
         )
@@ -1399,6 +1399,7 @@ class SalesRepository {
         CommerceSyncState.syncing => const ['syncing'],
         CommerceSyncState.synced => const ['synced_backend', 'synced'],
         CommerceSyncState.failed => const ['failed_backend', 'failed'],
+        CommerceSyncState.refunded => const ['refunded', 'void'],
       };
       query.where((tbl) => tbl.syncStatus.isIn(statuses));
     }
@@ -1433,6 +1434,7 @@ class SalesRepository {
               date: row.date,
               paymentMode: row.paymentMode,
               customerName: row.customerName,
+              itemSummary: _summariseItems(row.itemsJson),
               syncState: _parseSyncState(row.syncStatus),
             );
           })
@@ -1844,7 +1846,13 @@ class SalesRepository {
             itemsJson: items,
             paymentsJson: payments,
             commandId: Value(commandId),
-            syncStatus: const Value('synced_backend'),
+            // A voided (refunded) sale from the server keeps its REFUNDED marker
+            // so it doesn't reappear in revenue/counts after a re-sync.
+            syncStatus: Value(
+              (data['status'] ?? '').toString().toLowerCase() == 'void'
+                  ? 'refunded'
+                  : 'synced_backend',
+            ),
             backendSaleId: Value(backendSaleId),
             lastSyncError: const Value(null),
             lastSyncedAt: Value(updatedAt),
@@ -2049,10 +2057,9 @@ class SalesRepository {
   /// for history + reporting, and — if [restock] — put the items back on the
   /// shelf (matched by SKU, else name). All in one transaction.
   /// Void/refund a sale. The server void (called by the caller) reverses the
-  /// sale + stock + customer ledger there; here we remove the original sale
-  /// locally so it drops out of History and revenue (instead of the old buggy
-  /// negative-"sale" record that the backend rejected and left stuck in queue),
-  /// and put the items back in local stock.
+  /// sale + stock + customer ledger there; here we mark the original sale
+  /// REFUNDED locally (so it stays visible in History with a badge but drops
+  /// out of revenue/counts), and put the items back in local stock.
   Future<void> recordReturn({
     required String shopId,
     required SaleRecordDetail original,
@@ -2060,9 +2067,14 @@ class SalesRepository {
   }) async {
     final now = DateTime.now();
     await _db.transaction(() async {
-      await (_db.delete(
+      await (_db.update(
         _db.salesEntries,
-      )..where((t) => t.id.equals(original.id))).go();
+      )..where((t) => t.id.equals(original.id))).write(
+        SalesEntriesCompanion(
+          syncStatus: const Value('refunded'),
+          updatedAt: Value(now.millisecondsSinceEpoch),
+        ),
+      );
 
       if (restock) {
         for (final it in original.items) {
@@ -2433,6 +2445,9 @@ CommerceSyncState _parseSyncState(String raw) {
     case 'failed_backend':
     case 'failed':
       return CommerceSyncState.failed;
+    case 'refunded':
+    case 'void':
+      return CommerceSyncState.refunded;
     default:
       return CommerceSyncState.localOnly;
   }
@@ -2581,6 +2596,31 @@ String? _encodeNullableJson(Object? value) {
   if (value == null) return null;
   try {
     return jsonEncode(value);
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Build a short, human-friendly line-item summary for a receipt title, e.g.
+/// "Rice" or "Rice + 2 more". Cheap: only reads item names, no full parse.
+String? _summariseItems(String raw) {
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is! List || decoded.isEmpty) {
+      return null;
+    }
+    final names = decoded
+        .whereType<Map>()
+        .map((item) => (item['name'] ?? '').toString().trim())
+        .where((name) => name.isNotEmpty)
+        .toList(growable: false);
+    if (names.isEmpty) {
+      return null;
+    }
+    if (names.length == 1) {
+      return names.first;
+    }
+    return '${names.first} + ${names.length - 1} more';
   } catch (_) {
     return null;
   }

@@ -18,15 +18,15 @@ type MetricCardProps = {
   icon?: ReactNode;
 };
 
-const accentMap: Record<MetricAccent, string> = {
-  primary: "text-[var(--primary)] border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)]",
-  success: "text-[var(--success)] border-[rgba(16,185,129,0.2)] bg-[rgba(16,185,129,0.08)]",
-  warning: "text-[var(--warning)] border-[rgba(245,158,11,0.2)] bg-[rgba(245,158,11,0.08)]",
-  error: "text-[var(--error)] border-[rgba(239,68,68,0.2)] bg-[rgba(239,68,68,0.08)]",
-  info: "text-[var(--info)] border-[rgba(6,182,212,0.2)] bg-[rgba(6,182,212,0.08)]",
-  blue: "text-[var(--primary)] border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)]",
-  green: "text-[var(--success)] border-[rgba(16,185,129,0.2)] bg-[rgba(16,185,129,0.08)]",
-  rose: "text-[var(--error)] border-[rgba(239,68,68,0.2)] bg-[rgba(239,68,68,0.08)]",
+const accentMap: Record<MetricAccent, { bg: string; text: string; border: string }> = {
+  primary: { bg: "bg-[#0EA5E9]/10", text: "text-[#0284C7]", border: "border-[#0EA5E9]/20" },
+  blue: { bg: "bg-[#0EA5E9]/10", text: "text-[#0284C7]", border: "border-[#0EA5E9]/20" },
+  success: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
+  green: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
+  warning: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" },
+  error: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" },
+  rose: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" },
+  info: { bg: "bg-sky-50", text: "text-sky-700", border: "border-sky-200" },
 };
 
 export function MetricCard({
@@ -36,17 +36,25 @@ export function MetricCard({
   accent = "primary",
   icon,
 }: MetricCardProps) {
+  const styles = accentMap[accent] || accentMap.primary;
+
   return (
-    <div className="panel rounded-xl px-6 py-5">
-      <div className="flex items-start justify-between gap-4">
+    <div className="bg-white border border-[#E2E8F0] rounded-[24px] p-5 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
-          <p className="eyebrow mb-3">{label}</p>
-          <p className="metric-value">{value}</p>
-          <p className="mt-2 text-sm text-[var(--text-secondary)] leading-relaxed">{detail}</p>
+          <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#94A3B8] mb-1">
+            {label}
+          </p>
+          <p className="text-2xl sm:text-3xl font-[900] text-[#0F172A] tracking-tight">
+            {value}
+          </p>
+          <p className="mt-2 text-xs font-semibold text-[#64748B] leading-relaxed">
+            {detail}
+          </p>
         </div>
         {icon && (
           <div
-            className={`rounded-lg border px-3 py-2.5 text-sm font-semibold flex items-center justify-center ${accentMap[accent]}`}
+            className={`w-11 h-11 rounded-2xl border flex items-center justify-center text-xs font-black shadow-sm ${styles.bg} ${styles.text} ${styles.border}`}
           >
             {icon}
           </div>

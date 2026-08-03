@@ -1,0 +1,482 @@
+"use client";
+
+import React, { useState, useMemo, useEffect } from "react";
+import {
+  Receipt,
+  Search,
+  Filter,
+  Calendar,
+  Eye,
+  RotateCcw,
+  Download,
+  DollarSign,
+  TrendingUp,
+  CheckCircle2,
+  Lock,
+  ArrowRight,
+} from "lucide-react";
+import { formatCurrency, formatDate } from "@/lib/utils";
+import { ThermalReceiptModal } from "@/components/thermal-receipt-modal";
+import type { CartItem, SplitPaymentTender } from "@/lib/types";
+
+export interface SaleOrder {
+  id: string;
+  receipt_number: string;
+  shop: string;
+  cashier_name: string;
+  customer_name?: string;
+  customer_phone?: string;
+  subtotal: number;
+  tax_amount: number;
+  discount_amount: number;
+  total_amount: number;
+  payment_mode: "cash" | "upi" | "card" | "khata" | string;
+  payment_breakdown: SplitPaymentTender;
+  status: string;
+  items_count: number;
+  created_at: string;
+}
+
+export function SalesManager() {
+  const [sales, setSales] = useState<SaleOrder[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  const [search, setSearch] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState("all");
+  const [activeView, setActiveView] = useState<"history" | "dayclose">("history");
+
+  // Receipt Modal state
+  const [viewingReceipt, setViewingReceipt] = useState<SaleOrder | null>(null);
+
+  // Day Close Form state
+  const [openingCash] = useState(5000);
+  const [actualCountedCash, setActualCountedCash] = useState("6450");
+  const [dayCloseNotes, setDayCloseNotes] = useState("");
+  const [isDayClosed, setIsDayClosed] = useState(false);
+
+  useEffect(() => {
+    async function fetchSales() {
+      try {
+        setIsLoading(true);
+        const res = await fetch("/api/sales");
+        if (!res.ok) throw new Error("Failed to load sales history");
+        const data = await res.json();
+        
+        const mappedSales: SaleOrder[] = data.map((item: any) => {
+          const payments = item.payments || [];
+          const cash = payments.filter((p: any) => p.payment_method === "CASH").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+          const card = payments.filter((p: any) => p.payment_method === "CARD").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+          const upi = payments.filter((p: any) => p.payment_method === "UPI").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+          const khata_due = payments.filter((p: any) => p.payment_method === "CREDIT").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+          
+          return {
+            id: item.id,
+            receipt_number: item.receipt_number || `INV-${item.id.replace(/-/g, "").slice(0, 6).toUpperCase()}`,
+            shop: item.shop || "",
+            cashier_name: item.actor_name || "Cashier",
+            customer_name: item.customer_name || "Walk-in Guest",
+            customer_phone: item.customer_phone || "",
+            subtotal: parseFloat(item.subtotal_amount || "0"),
+            tax_amount: parseFloat(item.tax_amount || "0"),
+            discount_amount: parseFloat(item.discount_amount || "0"),
+            total_amount: parseFloat(item.total_amount || "0"),
+            payment_mode: (item.payment_mode || "cash").toLowerCase(),
+            payment_breakdown: { cash, card, upi, khata_due },
+            status: item.status || "completed",
+            items_count: item.item_count || 1,
+            created_at: item.occurred_at || new Date().toISOString(),
+          };
+        });
+        setSales(mappedSales);
+      } catch (err: any) {
+        setError(err.message || "Failed to load sales");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchSales();
+  }, []);
+
+  // Filtered sales
+  const filteredSales = useMemo(() => {
+    return sales.filter((s) => {
+      if (paymentFilter !== "all" && s.payment_mode !== paymentFilter) return false;
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        return (
+          s.receipt_number.toLowerCase().includes(q) ||
+          (s.customer_name && s.customer_name.toLowerCase().includes(q))
+        );
+      }
+      return true;
+    });
+  }, [sales, paymentFilter, search]);
+
+  // Aggregate metrics
+  const metrics = useMemo(() => {
+    const totalRev = sales.reduce((sum, s) => sum + s.total_amount, 0);
+    const count = sales.length;
+    const aov = count > 0 ? totalRev / count : 0;
+    const cashTotal = sales
+      .filter((s) => s.payment_mode === "cash")
+      .reduce((sum, s) => sum + s.total_amount, 0);
+    const upiTotal = sales
+      .filter((s) => s.payment_mode === "upi")
+      .reduce((sum, s) => sum + s.total_amount, 0);
+    const cardTotal = sales
+      .filter((s) => s.payment_mode === "card")
+      .reduce((sum, s) => sum + s.total_amount, 0);
+
+    return { totalRev, count, aov, cashTotal, upiTotal, cardTotal };
+  }, [sales]);
+
+  // Day close calculations
+  const expectedCashInDrawer = openingCash + metrics.cashTotal;
+  const countedNum = parseFloat(actualCountedCash) || 0;
+  const cashDifference = countedNum - expectedCashInDrawer;
+
+  const mockReceiptItems: CartItem[] = [
+    {
+      id: "item-1",
+      product_id: "prod-1",
+      name: "Aashirvaad Superior MP Atta 5kg",
+      sku: "ATTA-5KG",
+      barcode: "8901234567892",
+      unit_price: 260.0,
+      cost_price: 220.0,
+      quantity: 1,
+      tax_rate: 0,
+      discount_amount: 0,
+      total_price: 260.0,
+      available_stock: 35,
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Top Header & View Tabs */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-bold text-[var(--text-primary)] tracking-tight">
+            Sales Orders & Register Reconciliation
+          </h2>
+          <p className="text-xs text-[var(--text-tertiary)]">
+            Review past transactions, print tax invoices, and complete daily register close
+          </p>
+        </div>
+
+        <div className="flex items-center p-1 bg-[var(--surface)] border border-[var(--border-soft)] rounded-xl">
+          <button
+            onClick={() => setActiveView("history")}
+            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              activeView === "history"
+                ? "bg-[var(--primary)] text-white shadow-sm"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            }`}
+          >
+            Sales History
+          </button>
+          <button
+            onClick={() => setActiveView("dayclose")}
+            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              activeView === "dayclose"
+                ? "bg-[var(--primary)] text-white shadow-sm"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            }`}
+          >
+            Day Close Register
+          </button>
+        </div>
+      </div>
+
+      {activeView === "history" ? (
+        <>
+          {/* Metrics Summary Strip */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-4 bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl">
+              <div className="text-xs text-[var(--text-tertiary)] font-medium">
+                Today&apos;s Gross Sales
+              </div>
+              <div className="text-2xl font-black text-[var(--text-primary)] font-mono mt-1">
+                {formatCurrency(metrics.totalRev)}
+              </div>
+              <div className="text-[11px] text-[var(--success-dark)] font-semibold mt-1">
+                {metrics.count} completed orders
+              </div>
+            </div>
+
+            <div className="p-4 bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl">
+              <div className="text-xs text-[var(--text-tertiary)] font-medium">
+                Average Order Value (AOV)
+              </div>
+              <div className="text-2xl font-black text-[var(--text-primary)] font-mono mt-1">
+                {formatCurrency(metrics.aov)}
+              </div>
+              <div className="text-[11px] text-[var(--text-tertiary)] mt-1">
+                Basket size per checkout
+              </div>
+            </div>
+
+            <div className="p-4 bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl">
+              <div className="text-xs text-[var(--text-tertiary)] font-medium">
+                UPI vs Cash Collection
+              </div>
+              <div className="text-lg font-bold text-sky-600 font-mono mt-1">
+                UPI: {formatCurrency(metrics.upiTotal)} | Cash: {formatCurrency(metrics.cashTotal)}
+              </div>
+              <div className="text-[11px] text-[var(--text-tertiary)] mt-1">
+                Card: {formatCurrency(metrics.cardTotal)}
+              </div>
+            </div>
+          </div>
+
+          {/* Filter Bar */}
+          <div className="p-4 bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl flex flex-col md:flex-row items-center gap-3">
+            <div className="relative flex-1 w-full">
+              <Search className="w-4 h-4 text-[var(--text-tertiary)] absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by invoice # or customer name..."
+                className="w-full pl-10 pr-4 py-2 bg-[var(--surface-muted)] border border-[var(--border-soft)] focus:border-[var(--primary)] rounded-xl text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] outline-none"
+              />
+            </div>
+
+            <select
+              value={paymentFilter}
+              onChange={(e) => setPaymentFilter(e.target.value)}
+              className="px-3 py-2 bg-[var(--surface-muted)] border border-[var(--border-soft)] text-xs text-[var(--text-primary)] rounded-xl outline-none"
+            >
+              <option value="all">All Payment Methods</option>
+              <option value="cash">Cash Only</option>
+              <option value="upi">UPI / QR Only</option>
+              <option value="card">Card Only</option>
+              <option value="khata">Khata Credit Only</option>
+            </select>
+          </div>
+
+          {/* Sales History Data Table */}
+          <div className="bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl overflow-hidden shadow-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-[var(--bg-soft)] border-b border-[var(--border-soft)] text-[var(--text-tertiary)] font-semibold uppercase tracking-wider text-[10px]">
+                    <th className="py-3 px-4">Invoice #</th>
+                    <th className="py-3 px-4">Date & Time</th>
+                    <th className="py-3 px-4">Customer</th>
+                    <th className="py-3 px-4 text-center">Items</th>
+                    <th className="py-3 px-4 text-center">Payment Mode</th>
+                    <th className="py-3 px-4 text-right">GST Tax</th>
+                    <th className="py-3 px-4 text-right">Grand Total</th>
+                    <th className="py-3 px-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-soft)] text-[var(--text-primary)]">
+                   {isLoading ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-[var(--text-tertiary)]">
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+                          <span>Loading transaction ledger...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : filteredSales.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-[var(--text-tertiary)]">
+                        No sales found matching your criteria.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredSales.map((sale) => (
+                      <tr key={sale.id} className="hover:bg-[var(--surface-strong)] transition-colors">
+                        <td className="py-3 px-4 font-mono font-semibold text-[var(--text-primary)]">
+                          {sale.receipt_number}
+                        </td>
+                        <td className="py-3 px-4 text-[var(--text-tertiary)]">
+                          {formatDate(sale.created_at, true)}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="font-semibold text-[var(--text-primary)]">{sale.customer_name}</div>
+                          {sale.customer_phone && (
+                            <div className="text-[10px] text-[var(--text-tertiary)]">
+                              {sale.customer_phone}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-center font-mono text-[var(--text-secondary)]">
+                          {sale.items_count}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              sale.payment_mode === "upi"
+                                ? "bg-sky-100 text-sky-800 border border-sky-200"
+                                : sale.payment_mode === "cash"
+                                ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                : "bg-purple-100 text-purple-800 border border-purple-200"
+                            }`}
+                          >
+                            {sale.payment_mode}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono text-[var(--text-tertiary)]">
+                          {formatCurrency(sale.tax_amount)}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-[var(--text-primary)]">
+                          {formatCurrency(sale.total_amount)}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            onClick={() => setViewingReceipt(sale)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-[var(--surface-muted)] hover:bg-[var(--surface-strong)] text-[var(--primary)] hover:text-[var(--primary-hover)] rounded-lg text-xs transition-colors border border-[var(--border-soft)]"
+                          >
+                            <Receipt className="w-3.5 h-3.5" />
+                            <span>Invoice</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      ) : (
+        /* ========================================================= */
+        /* DAY CLOSE REGISTER AUDIT                                  */
+        /* ========================================================= */
+        <div className="max-w-2xl mx-auto bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl p-6 shadow-2xl space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-[var(--border-soft)]">
+            <div className="flex items-center gap-2">
+              <Lock className="w-5 h-5 text-amber-500" />
+              <div>
+                <h3 className="font-bold text-sm text-[var(--text-primary)]">End of Day Register Close</h3>
+                <div className="text-[11px] text-[var(--text-tertiary)]">
+                  Session Date: {new Date().toLocaleDateString("en-IN", { dateStyle: "full" })}
+                </div>
+              </div>
+            </div>
+            {isDayClosed && (
+              <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-full text-xs font-bold">
+                Day Closed & Locked
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-3 bg-[var(--surface-muted)] p-4 rounded-xl border border-[var(--border-soft)] text-xs">
+            <div className="flex justify-between py-1">
+              <span className="text-[var(--text-tertiary)]">Opening Cash Float:</span>
+              <span className="font-mono font-semibold text-[var(--text-primary)]">
+                {formatCurrency(openingCash)}
+              </span>
+            </div>
+            <div className="flex justify-between py-1 border-t border-[var(--border-soft)]">
+              <span className="text-[var(--text-tertiary)]">+ Cash Sales Received:</span>
+              <span className="font-mono font-semibold text-emerald-600">
+                +{formatCurrency(metrics.cashTotal)}
+              </span>
+            </div>
+            <div className="flex justify-between py-1 border-t border-[var(--border-soft)]">
+              <span className="text-[var(--text-tertiary)]">Digital UPI / QR Collections:</span>
+              <span className="font-mono font-semibold text-sky-600">
+                {formatCurrency(metrics.upiTotal)}
+              </span>
+            </div>
+            <div className="flex justify-between py-1 border-t border-[var(--border-soft)]">
+              <span className="text-[var(--text-tertiary)]">Card POS Collections:</span>
+              <span className="font-mono font-semibold text-purple-600">
+                {formatCurrency(metrics.cardTotal)}
+              </span>
+            </div>
+            <div className="flex justify-between py-2 border-t border-[var(--border-soft)] font-bold text-sm text-[var(--text-primary)]">
+              <span>Calculated Cash Expected in Till:</span>
+              <span className="font-mono">{formatCurrency(expectedCashInDrawer)}</span>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
+                Actual Physical Cash Counted (₹) *
+              </label>
+              <input
+                type="number"
+                disabled={isDayClosed}
+                value={actualCountedCash}
+                onChange={(e) => setActualCountedCash(e.target.value)}
+                className="w-full px-4 py-2.5 bg-[var(--surface-muted)] border border-[var(--border-soft)] rounded-xl text-base font-mono font-bold text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)]"
+              />
+            </div>
+
+            {/* Discrepancy Flag */}
+            <div
+              className={`p-3 rounded-xl border flex items-center justify-between text-xs ${
+                cashDifference === 0
+                  ? "bg-emerald-100 border-emerald-200 text-emerald-800"
+                  : cashDifference > 0
+                  ? "bg-sky-100 border-sky-200 text-sky-800"
+                  : "bg-red-100 border-red-200 text-red-800"
+              }`}
+            >
+              <span>Cash Discrepancy (Over / Short):</span>
+              <strong className="font-mono text-sm">
+                {cashDifference === 0
+                  ? "Exact Match (₹0.00)"
+                  : cashDifference > 0
+                  ? `+${formatCurrency(cashDifference)} (Cash Over)`
+                  : `${formatCurrency(cashDifference)} (Cash Short)`}
+              </strong>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
+                Closing Manager Notes
+              </label>
+              <textarea
+                rows={3}
+                disabled={isDayClosed}
+                value={dayCloseNotes}
+                onChange={(e) => setDayCloseNotes(e.target.value)}
+                placeholder="Add any notes regarding cash variance, till handover, or exceptional refunds..."
+                className="w-full px-3 py-2 bg-[var(--surface-muted)] border border-[var(--border-soft)] rounded-xl text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none"
+              />
+            </div>
+
+            {!isDayClosed && (
+              <button
+                onClick={() => setIsDayClosed(true)}
+                className="w-full py-3 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-500/25 transition-all active:scale-98"
+              >
+                Submit & Lock Day Close Register
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Viewing Receipt Modal */}
+      {viewingReceipt && (
+        <ThermalReceiptModal
+          isOpen={true}
+          onClose={() => setViewingReceipt(null)}
+          shopName="Business Hub Superstore"
+          receiptNumber={viewingReceipt.receipt_number}
+          cashierName={viewingReceipt.cashier_name}
+          customerName={viewingReceipt.customer_name}
+          customerPhone={viewingReceipt.customer_phone}
+          items={mockReceiptItems}
+          subtotal={viewingReceipt.subtotal}
+          taxAmount={viewingReceipt.tax_amount}
+          discountAmount={viewingReceipt.discount_amount}
+          totalAmount={viewingReceipt.total_amount}
+          payments={viewingReceipt.payment_breakdown}
+          createdDate={viewingReceipt.created_at}
+        />
+      )}
+    </div>
+  );
+}

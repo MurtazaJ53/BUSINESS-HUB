@@ -947,8 +947,12 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) =>
-          CheckoutPaymentSheet(cartTotal: _netTotal, gstSummary: _gstSummary),
+      builder: (_) => CheckoutPaymentSheet(
+        cartTotal: _netTotal,
+        gstSummary: _gstSummary,
+        upiVpa: shop.upiVpa.trim(),
+        shopName: shop.name,
+      ),
     );
     if (result == null || !mounted) return;
 

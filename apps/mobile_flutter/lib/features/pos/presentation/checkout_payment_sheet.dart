@@ -33,10 +33,14 @@ class CheckoutPaymentSheet extends StatefulWidget {
     super.key,
     required this.cartTotal,
     required this.gstSummary,
+    this.upiVpa = '',
+    this.shopName = '',
   });
 
   final double cartTotal;
   final GstCartSummary gstSummary;
+  final String upiVpa;
+  final String shopName;
 
   @override
   State<CheckoutPaymentSheet> createState() => _CheckoutPaymentSheetState();

@@ -397,13 +397,20 @@ export type Customer = {
   id: string;
   name: string;
   phone: string;
-  email: string;
-  total_spent: string;
-  balance: string;
-  notes: string;
-  status: string;
-  tombstone: boolean;
-  source_meta_json: Record<string, unknown>;
+  email?: string;
+  total_spent?: string;
+  balance?: string;
+  notes?: string;
+  status?: string;
+  tombstone?: boolean;
+  source_meta_json?: Record<string, unknown>;
+  address?: string;
+  credit_limit?: number;
+  balance_amount?: number;
+  total_spend?: number;
+  last_order_at?: string;
+  created_at?: string;
+  is_active?: boolean;
 };
 
 export type CustomerSummaryPayload = {
@@ -1407,4 +1414,182 @@ export type PlatformMetricsPayload = {
   pro_shops: number;
   shops_created_last_30d: number;
   open_plan_requests: number;
+};
+
+/* ------------------------------------------------------------------ */
+/*  Day Close & Cash Reconciliation Types                              */
+/* ------------------------------------------------------------------ */
+
+export type DayCloseDenomination = {
+  count2000: number;
+  count500: number;
+  count200: number;
+  count100: number;
+  count50: number;
+  count20: number;
+  count10: number;
+  coins: number;
+};
+
+export type DayCloseRecord = {
+  id: string;
+  shop_id: string;
+  cashier_user_id: string;
+  cashier_name: string;
+  opened_at: string;
+  closed_at: string;
+  opening_float: number;
+  system_cash_sales: number;
+  system_cash_expenses: number;
+  system_cash_withdrawals: number;
+  expected_cash_in_drawer: number;
+  actual_physical_cash: number;
+  variance_amount: number;
+  variance_reason: string;
+  denominations: DayCloseDenomination;
+  status: "open" | "reconciled" | "audited";
+  notes: string;
+};
+
+/* ------------------------------------------------------------------ */
+/*  Suppliers & Inward Purchases Types                                */
+/* ------------------------------------------------------------------ */
+
+export type Supplier = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+  gstin: string;
+  outstanding_balance: number;
+  payment_terms: string;
+  created_at: string;
+};
+
+export type PurchaseOrderItem = {
+  id: string;
+  product_id: string;
+  product_name: string;
+  sku: string;
+  quantity: number;
+  unit_cost: number;
+  gst_rate: number;
+  total_amount: number;
+};
+
+export type PurchaseOrder = {
+  id: string;
+  order_number: string;
+  supplier_id: string;
+  supplier_name: string;
+  status: "draft" | "ordered" | "received" | "cancelled";
+  items: PurchaseOrderItem[];
+  subtotal: number;
+  tax_amount: number;
+  total_amount: number;
+  paid_amount: number;
+  notes: string;
+  created_at: string;
+  received_at: string | null;
+};
+
+/* ------------------------------------------------------------------ */
+/*  In-Shop Team Chat & Messaging Types                               */
+/* ------------------------------------------------------------------ */
+
+export type ChatChannel = {
+  id: string;
+  name: string;
+  description: string;
+  is_private: boolean;
+  unread_count: number;
+  last_message_at: string | null;
+};
+
+export type ChatAttachment = {
+  id: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  file_url: string;
+  thumbnail_url?: string;
+};
+
+export type ChatMessage = {
+  id: string;
+  channel_id: string;
+  sender_id: string;
+  sender_name: string;
+  sender_email: string;
+  content: string;
+  attachments?: ChatAttachment[];
+  created_at: string;
+};
+
+/* ------------------------------------------------------------------ */
+/*  Web POS Cart & Payment Engine Types                               */
+/* ------------------------------------------------------------------ */
+
+export type CartItem = {
+  id: string;
+  product_id: string;
+  name: string;
+  sku: string;
+  barcode: string;
+  unit_price: number;
+  cost_price: number;
+  tax_rate: number;
+  quantity: number;
+  discount_amount: number;
+  total_price: number;
+  available_stock: number;
+};
+
+export type SplitPaymentTender = {
+  cash: number;
+  card: number;
+  upi: number;
+  khata_due: number;
+  card_ref?: string;
+  upi_ref?: string;
+};
+
+export type UpiQrConfig = {
+  vpa: string;
+  payee_name: string;
+  amount: number;
+  transaction_note: string;
+  transaction_ref: string;
+};
+
+/* ------------------------------------------------------------------ */
+/*  Reports & Financial Analytics Types                               */
+/* ------------------------------------------------------------------ */
+
+export type ProfitLossReportPayload = {
+  period_start: string;
+  period_end: string;
+  gross_sales: number;
+  discounts: number;
+  net_sales: number;
+  cogs: number;
+  gross_profit: number;
+  gross_margin_percent: number;
+  operating_expenses: {
+    rent: number;
+    salaries: number;
+    utilities: number;
+    supplies: number;
+    other: number;
+    total: number;
+  };
+  net_profit: number;
+  net_margin_percent: number;
+  taxes_collected: {
+    cgst: number;
+    sgst: number;
+    igst: number;
+    total: number;
+  };
 };

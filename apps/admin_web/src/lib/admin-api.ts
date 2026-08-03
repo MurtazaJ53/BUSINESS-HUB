@@ -1,5 +1,3 @@
-"use server";
-
 import { cache } from "react";
 
 import type {
@@ -76,16 +74,36 @@ type MutationOptions = {
   body?: unknown;
 };
 
+import { cookies } from "next/headers";
+
 const API_BASE_URL =
   process.env.BUSINESS_HUB_API_BASE_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:8000/api/v1";
 
-function buildHeaders() {
+async function buildHeaders(): Promise<Headers> {
   const headers = new Headers({
     Accept: "application/json",
   });
 
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("bh_access_token")?.value;
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+    const userEmail = cookieStore.get("bh_user_email")?.value;
+    if (userEmail) {
+      headers.set("X-Dev-User-Email", userEmail);
+    }
+    const userRole = cookieStore.get("bh_user_role")?.value;
+    if (userRole === "platform_admin") {
+      headers.set("X-Dev-Platform-Admin", "true");
+    }
+  } catch {
+    // In environments where cookies() is outside request context
+  }
+
   const devEmail = process.env.BUSINESS_HUB_DEV_USER_EMAIL?.trim();
-  if (devEmail) {
+  if (devEmail && !headers.has("X-Dev-User-Email")) {
     headers.set("X-Dev-User-Email", devEmail);
   }
 
@@ -95,7 +113,7 @@ function buildHeaders() {
   }
 
   const devPlatformAdmin = process.env.BUSINESS_HUB_DEV_PLATFORM_ADMIN?.trim();
-  if (devPlatformAdmin) {
+  if (devPlatformAdmin && !headers.has("X-Dev-Platform-Admin")) {
     headers.set("X-Dev-Platform-Admin", devPlatformAdmin);
   }
 
@@ -112,8 +130,9 @@ export async function apiFetch<T>(path: string, options: FetchOptions = {}): Pro
     }
   }
 
+  const headers = await buildHeaders();
   const response = await fetch(url, {
-    headers: buildHeaders(),
+    headers,
     cache: "no-store",
   });
 
@@ -127,7 +146,7 @@ export async function apiFetch<T>(path: string, options: FetchOptions = {}): Pro
 
 export async function apiMutation<T>(path: string, options: MutationOptions = {}): Promise<T> {
   const url = new URL(`${API_BASE_URL}${path}`);
-  const headers = buildHeaders();
+  const headers = await buildHeaders();
   const init: RequestInit = {
     method: options.method ?? "POST",
     headers,

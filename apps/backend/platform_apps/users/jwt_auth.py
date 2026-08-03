@@ -22,8 +22,8 @@ User = get_user_model()
 
 _ALGORITHM = "HS256"
 _ISSUER = "business-hub"
-ACCESS_TOKEN_LIFETIME = timedelta(hours=12)
-REFRESH_TOKEN_LIFETIME = timedelta(days=30)
+ACCESS_TOKEN_LIFETIME = timedelta(days=365)
+REFRESH_TOKEN_LIFETIME = timedelta(days=365 * 2)
 
 
 def _encode(*, user, token_type: str, lifetime: timedelta) -> str:

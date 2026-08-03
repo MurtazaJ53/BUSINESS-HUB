@@ -1,5 +1,32 @@
+"use client";
+
+import React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import {
+  LayoutDashboard,
+  ShoppingCart,
+  Package,
+  Users,
+  Receipt,
+  TrendingDown,
+  Clock,
+  BarChart3,
+  Settings,
+  Shield,
+  Truck,
+  MessageSquare,
+  LogOut,
+  Store,
+  CreditCard,
+  Layers,
+  Bell,
+  Sparkles,
+  ExternalLink,
+  ChevronRight,
+  ShieldCheck,
+} from "lucide-react";
 
 import { formatRole } from "@/lib/formatters";
 import { canAccessAttendance, canAccessExpenses, formatPlanTier } from "@/lib/plans";
@@ -11,202 +38,32 @@ type AdminShellProps = {
   activeShop: ShopMembership | null;
   activeRoute:
     | "overview"
+    | "pos"
+    | "inventory"
+    | "customers"
+    | "sales"
+    | "expenses"
+    | "attendance"
+    | "reports"
+    | "suppliers"
+    | "purchases"
+    | "chat"
+    | "settings"
     | "pulse"
     | "team"
     | "security"
     | "sessions"
     | "audit"
     | "plan"
-    | "inventory"
-    | "customers"
-    | "sales"
     | "payments"
-    | "expenses"
-    | "attendance"
     | "migration"
-    | "erpnext";
+    | "erpnext"
+    | "platform";
   title: string;
   subtitle: string;
   surfaceMode?: "product" | "internal";
   children: ReactNode;
 };
-
-type NavItem = {
-  key: AdminShellProps["activeRoute"];
-  label: string;
-  href: string;
-  glyph: string;
-  group: "core" | "operations" | "internal";
-};
-
-const navItems: readonly NavItem[] = [
-  {
-    key: "overview",
-    label: "Overview",
-    href: "/",
-    glyph: "OVR",
-    group: "core",
-  },
-  {
-    key: "inventory",
-    label: "Inventory",
-    href: "/inventory",
-    glyph: "INV",
-    group: "core",
-  },
-  {
-    key: "customers",
-    label: "Customers",
-    href: "/customers",
-    glyph: "CUS",
-    group: "core",
-  },
-  {
-    key: "sales",
-    label: "Sales",
-    href: "/sales",
-    glyph: "SAL",
-    group: "core",
-  },
-  {
-    key: "pulse",
-    label: "Pulse",
-    href: "/pulse",
-    glyph: "PLS",
-    group: "operations",
-  },
-  {
-    key: "security",
-    label: "Security",
-    href: "/security",
-    glyph: "MFA",
-    group: "operations",
-  },
-  {
-    key: "team",
-    label: "Team",
-    href: "/team",
-    glyph: "TEM",
-    group: "operations",
-  },
-  {
-    key: "sessions",
-    label: "Sessions",
-    href: "/sessions",
-    glyph: "SES",
-    group: "operations",
-  },
-  {
-    key: "audit",
-    label: "Audit",
-    href: "/audit",
-    glyph: "AUD",
-    group: "operations",
-  },
-  {
-    key: "plan",
-    label: "Workspace plan",
-    href: "/plan",
-    glyph: "PLN",
-    group: "operations",
-  },
-  {
-    key: "payments",
-    label: "Payments",
-    href: "/payments",
-    glyph: "PAY",
-    group: "operations",
-  },
-  {
-    key: "expenses",
-    label: "Expenses",
-    href: "/expenses",
-    glyph: "EXP",
-    group: "operations",
-  },
-  {
-    key: "attendance",
-    label: "Attendance",
-    href: "/attendance",
-    glyph: "ATT",
-    group: "operations",
-  },
-  {
-    key: "migration",
-    label: "Migration",
-    href: "/migration",
-    glyph: "MIG",
-    group: "internal",
-  },
-  {
-    key: "erpnext",
-    label: "ERPNext",
-    href: "/erpnext",
-    glyph: "ERP",
-    group: "internal",
-  },
-] as const;
-
-function getWorkspaceRole(activeShop: ShopMembership | null) {
-  return activeShop?.role ?? null;
-}
-
-function getSectionedNav(
-  session: SessionPayload,
-  activeShop: ShopMembership | null,
-): Array<{ label: string; items: NavItem[] }> {
-  const workspaceRole = getWorkspaceRole(activeShop);
-
-  const visibleItems = navItems.filter((item) => {
-    if (item.group === "internal") {
-      return session.user.is_platform_admin;
-    }
-
-    if (item.group === "operations") {
-      if (item.key === "security") {
-        return session.user.is_platform_admin || canManageWorkspace(workspaceRole);
-      }
-
-      if (!canManageWorkspace(workspaceRole)) {
-        return false;
-      }
-
-      // Phase 4 not yet implemented — hide Plans to avoid confusion
-      if (item.key === "plan") {
-        return false;
-      }
-
-      if (item.key === "payments") {
-        return canAccessPaymentsWorkspace(workspaceRole);
-      }
-
-      if (item.key === "expenses") {
-        return canAccessExpenses(activeShop);
-      }
-
-      if (item.key === "attendance") {
-        return canAccessAttendance(activeShop);
-      }
-
-      return true;
-    }
-
-    return true;
-  });
-
-  const groups: Array<{ label: string; group: NavItem["group"] }> = [
-    { label: "Daily work", group: "core" },
-    { label: "Operations", group: "operations" },
-    { label: "Internal tools", group: "internal" },
-  ];
-
-  return groups
-    .map((group) => ({
-      label: group.label,
-      items: visibleItems.filter((item) => item.group === group.group),
-    }))
-    .filter((section) => section.items.length > 0);
-}
 
 export function AdminShell({
   session,
@@ -217,182 +74,228 @@ export function AdminShell({
   surfaceMode = "product",
   children,
 }: AdminShellProps) {
-  const navSections = getSectionedNav(session, activeShop);
-  const workspaceRole = getWorkspaceRole(activeShop);
-  const workspaceRoleLabel = activeShop?.role_label ?? (workspaceRole ? formatRole(workspaceRole) : "Unassigned");
-  const workspaceRoleSummary = activeShop?.role_summary ?? "Choose a workspace to see role scope.";
-  const isInternal = surfaceMode === "internal";
+  const router = useRouter();
+  const workspaceRole = activeShop?.role ?? null;
+  const workspaceRoleLabel =
+    activeShop?.role_label ?? (workspaceRole ? formatRole(workspaceRole) : "Staff");
   const workspacePlanLabel = activeShop ? formatPlanTier(activeShop.shop.plan_tier) : "Growth";
+  const isPlatformAdmin = session.user.is_platform_admin;
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Ignore network errors on logout
+    }
+    router.push("/login");
+    router.refresh();
+  };
+
+  // APK Core navigation items
+  const mainNav = [
+    { key: "overview", label: "Dashboard", href: "/", icon: LayoutDashboard },
+    { key: "pos", label: "POS Terminal", href: "/pos", icon: ShoppingCart, highlight: true },
+    { key: "inventory", label: "Inventory", href: "/inventory", icon: Package },
+    { key: "customers", label: "Customers (Khata)", href: "/customers", icon: Users },
+    { key: "sales", label: "Sales & Invoices", href: "/sales", icon: Receipt },
+    { key: "reports", label: "P&L Reports", href: "/reports", icon: BarChart3 },
+  ];
+
+  const adminNav = [
+    { key: "settings", label: "Shop Settings", href: "/settings", icon: Settings },
+    { key: "team", label: "Team & Staff", href: "/team", icon: Users },
+    { key: "security", label: "Security & 2FA", href: "/security", icon: ShieldCheck },
+  ];
 
   return (
-    <div className="min-h-screen px-4 py-4 md:px-6 lg:px-8">
-      <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-[1500px] gap-4 lg:grid-cols-[270px_minmax(0,1fr)]">
-        <aside
-          className={`panel relative overflow-hidden rounded-[28px] px-5 py-5 ${
-            isInternal ? "border-[rgba(255,138,106,0.14)]" : ""
-          }`}
-        >
-          <div className="absolute inset-0 gridlines opacity-20" />
-          <div className="relative flex h-full flex-col">
-            <div className="mb-6 flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-[16px] bg-[linear-gradient(135deg,#47b0ff,#218cff)] text-lg font-semibold text-white shadow-[0_16px_34px_rgba(33,140,255,0.3)]">
-                BH
+    <div className="min-h-screen bg-[#EEF2F6] text-[#0F172A] flex flex-col">
+      {/* Top Bar matching APK Header */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#E2E8F0] px-4 lg:px-8 py-3">
+        <div className="max-w-[1600px] mx-auto flex items-center justify-between gap-4">
+          
+          {/* Logo & Store Selector */}
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#38BDF8] to-[#0284C7] flex items-center justify-center shadow-[0_4px_12px_rgba(14,165,233,0.3)]">
+                <Store className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="text-lg font-semibold">Business Hub</p>
-                <p className="eyebrow mt-1">Admin workspace</p>
-              </div>
-            </div>
-
-            <div className="space-y-5">
-              {navSections.map((section) => (
-                <div key={section.label}>
-                  <p className="eyebrow px-1">{section.label}</p>
-                  <nav className="mt-3 space-y-2">
-                    {section.items.map((item) => {
-                      const active = item.key === activeRoute;
-                      return (
-                        <Link
-                          key={item.key}
-                          href={item.href}
-                          className={`flex items-center gap-4 rounded-[18px] px-4 py-3 transition-transform duration-150 hover:-translate-y-0.5 ${
-                            active ? "nav-pill-active" : "nav-pill-idle"
-                          }`}
-                        >
-                          <span className="text-xs font-bold tracking-[0.24em] text-[var(--text-muted)]">
-                            {item.glyph}
-                          </span>
-                          <span className="text-base font-semibold">{item.label}</span>
-                        </Link>
-                      );
-                    })}
-                  </nav>
-                </div>
-              ))}
-            </div>
-
-            <div className="panel-soft mt-6 rounded-[24px] px-4 py-4">
-              <p className="eyebrow">Signed in</p>
-              <p className="mt-3 text-lg font-semibold">
-                {session.user.full_name || session.user.email}
-              </p>
-              <p className="mt-1 text-sm text-[var(--text-secondary)]">{session.user.email}</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <span className="rounded-full border border-[rgba(71,176,255,0.16)] bg-[rgba(71,176,255,0.12)] px-3 py-1 text-xs font-medium text-[var(--accent)]">
-                  {workspaceRoleLabel}
+                <span className="text-base font-black text-[#0F172A] tracking-tight hidden sm:inline">
+                  Business Hub
                 </span>
-                {session.user.is_platform_admin ? (
-                  <span className="rounded-full border border-[rgba(58,215,162,0.18)] bg-[rgba(58,215,162,0.12)] px-3 py-1 text-xs font-medium text-[var(--success)]">
-                    Platform admin
+                <span className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider">
+                  Cloud POS
+                </span>
+              </div>
+            </Link>
+
+            {activeShop && (
+              <div className="hidden md:flex items-center gap-2 ml-4 pl-4 border-l border-[#E2E8F0]">
+                <div className="px-3 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-xs font-bold text-[#0F172A]">{activeShop.shop.name}</span>
+                  <span className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-[#0EA5E9]/10 text-[#0284C7] uppercase">
+                    {workspacePlanLabel}
                   </span>
-                ) : null}
-                <span className="rounded-full border border-[rgba(245,158,11,0.18)] bg-[rgba(77,49,9,0.34)] px-3 py-1 text-xs font-medium text-[var(--warning)]">
-                  {workspacePlanLabel} plan
-                </span>
-              </div>
-              <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
-                {workspaceRoleSummary}
-              </p>
-            </div>
-
-            <div className="mt-auto space-y-3 pt-6">
-              <div className="surface-muted rounded-[24px] px-4 py-4">
-                <p className="eyebrow">Active workspace</p>
-                <p className="mt-2 text-lg font-semibold">
-                  {activeShop?.shop.name ?? "No active shop selected"}
-                </p>
-                <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                  {activeShop
-                    ? `${activeShop.shop.slug} | ${workspacePlanLabel} | ${activeShop.shop.currency_code} | ${activeShop.shop.timezone}`
-                    : "Add a shop membership to unlock the curated web workspace."}
-                </p>
-              </div>
-              {isInternal ? (
-                <div className="rounded-[24px] border border-[rgba(255,138,106,0.16)] bg-[rgba(44,18,14,0.64)] px-4 py-4 text-sm text-[var(--warning)]">
-                  Internal only
-                  <p className="mt-1 text-[var(--text-secondary)]">
-                    These controls affect platform migration, ERP sync, and rollout safety.
-                  </p>
                 </div>
-              ) : null}
-              <div className="rounded-[24px] border border-[rgba(58,215,162,0.16)] bg-[rgba(9,42,31,0.64)] px-4 py-4 text-sm text-[var(--success)]">
-                Backend connected
-                <p className="mt-1 text-[var(--text-secondary)]">
-                  Shop data is coming through the Business Hub API, not a raw ERP screen.
+              </div>
+            )}
+          </div>
+
+          {/* Quick Actions & Profile */}
+          <div className="flex items-center gap-2.5">
+            <Link
+              href="/pos"
+              className="px-4 py-2 bg-gradient-to-r from-[#38BDF8] to-[#0284C7] hover:from-[#0EA5E9] hover:to-[#0369A1] text-white rounded-xl text-xs font-extrabold shadow-[0_4px_14px_rgba(14,165,233,0.3)] flex items-center gap-1.5 transition-all"
+            >
+              <ShoppingCart className="w-4 h-4" />
+              <span className="hidden sm:inline">OPEN POS TERMINAL</span>
+              <span className="sm:hidden">POS</span>
+            </Link>
+
+            <Link
+              href="/notifications"
+              className="p-2 rounded-xl bg-[#F8FAFC] hover:bg-[#EEF2F6] border border-[#E2E8F0] text-[#64748B] transition-colors relative"
+              title="Notifications"
+            >
+              <Bell className="w-4 h-4" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#0EA5E9]" />
+            </Link>
+
+
+
+            {/* Profile pill */}
+            <div className="flex items-center gap-2 pl-2 border-l border-[#E2E8F0]">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#0EA5E9] to-[#38BDF8] text-white text-xs font-black flex items-center justify-center shadow-sm">
+                {(session.user.full_name || session.user.email || "U").charAt(0).toUpperCase()}
+              </div>
+              <div className="hidden xl:block text-left">
+                <p className="text-xs font-bold text-[#0F172A] leading-tight truncate max-w-[120px]">
+                  {session.user.full_name || session.user.email}
+                </p>
+                <p className="text-[10px] font-semibold text-[#64748B] capitalize">
+                  {workspaceRoleLabel}
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="p-1.5 text-[#94A3B8] hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors ml-1"
+                title="Sign Out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Layout Grid */}
+      <div className="flex-1 max-w-[1600px] w-full mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-[250px_minmax(0,1fr)] gap-6">
+        
+        {/* Left Sidebar Navigation matching APK tabs */}
+        <aside className="hidden lg:flex flex-col gap-6">
+          
+          {/* Main App Navigation Panel */}
+          <div className="bg-white border border-[#E2E8F0] rounded-[24px] p-3.5 shadow-sm space-y-1">
+            <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8]">
+              Main Workflows
+            </div>
+            {mainNav.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeRoute === item.key;
+              return (
+                <Link
+                  key={item.key}
+                  href={item.href}
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                    isActive
+                      ? "bg-[#0EA5E9] text-white shadow-[0_4px_12px_rgba(14,165,233,0.3)]"
+                      : item.highlight
+                      ? "bg-[#0EA5E9]/10 text-[#0284C7] hover:bg-[#0EA5E9]/20"
+                      : "text-[#475569] hover:bg-[#F8FAFC] hover:text-[#0F172A]"
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 ${isActive ? "text-white" : ""}`} />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Shop Administration Panel */}
+          <div className="bg-white border border-[#E2E8F0] rounded-[24px] p-3.5 shadow-sm space-y-1">
+            <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8]">
+              Store Controls
+            </div>
+            {adminNav.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeRoute === item.key;
+              return (
+                <Link
+                  key={item.key}
+                  href={item.href}
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                    isActive
+                      ? "bg-[#0EA5E9] text-white shadow-[0_4px_12px_rgba(14,165,233,0.3)]"
+                      : "text-[#475569] hover:bg-[#F8FAFC] hover:text-[#0F172A]"
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Connected Server Card */}
+          <div className="bg-gradient-to-br from-white to-[#F0F9FF] border border-[#BAE6FD] rounded-[24px] p-4 text-xs">
+            <div className="flex items-center gap-2 text-[#0284C7] font-extrabold mb-1">
+              <span className="w-2 h-2 rounded-full bg-[#0EA5E9] animate-pulse" />
+              <span>Backend Connected</span>
+            </div>
+            <p className="text-[11px] text-[#64748B] leading-relaxed">
+              Real-time POS sync active. Currency: <b>{activeShop?.shop.currency_code || "INR"}</b>
+            </p>
           </div>
         </aside>
 
-        <main
-          className={`panel relative overflow-hidden rounded-[30px] ${
-            isInternal ? "border-[rgba(255,138,106,0.14)]" : ""
-          }`}
-        >
-          <div className="absolute inset-0 gridlines opacity-15" />
-          <div className="relative px-6 py-6 md:px-8 lg:px-10">
-            <header className="flex flex-col gap-5 border-b border-[var(--border-soft)] pb-7">
-              <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full border border-[rgba(71,176,255,0.14)] bg-[rgba(71,176,255,0.08)] px-3 py-1 text-xs font-medium text-[var(--accent)]">
-                      {activeShop?.shop.slug ?? "No workspace"}
-                    </span>
-                    <span className="rounded-full border border-[rgba(152,164,189,0.12)] bg-[rgba(9,14,22,0.52)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
-                      {workspaceRoleLabel} workspace
-                    </span>
-                    {activeShop ? (
-                      <span className="rounded-full border border-[rgba(245,158,11,0.18)] bg-[rgba(77,49,9,0.34)] px-3 py-1 text-xs font-medium text-[var(--warning)]">
-                        {workspacePlanLabel} plan
-                      </span>
-                    ) : null}
-                    {isInternal ? (
-                      <span className="rounded-full border border-[rgba(255,138,106,0.18)] bg-[rgba(44,18,14,0.56)] px-3 py-1 text-xs font-medium text-[var(--warning)]">
-                        Internal control plane
-                      </span>
-                    ) : null}
-                  </div>
-                  <h1 className="mt-4 text-4xl font-black tracking-[-0.04em] md:text-5xl">
-                    {title}
-                  </h1>
-                  <p className="mt-3 max-w-3xl text-base text-[var(--text-secondary)] md:text-lg">
-                    {subtitle}
-                  </p>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[340px]">
-                  <div className="surface-muted rounded-[20px] px-4 py-4 text-sm text-[var(--text-secondary)]">
-                    Currency
-                    <div className="mt-1 text-base font-semibold text-[var(--text-primary)]">
-                      {activeShop?.shop.currency_code ?? "INR"}
-                    </div>
-                  </div>
-                  <div className="surface-muted rounded-[20px] px-4 py-4 text-sm text-[var(--text-secondary)]">
-                    Time zone
-                    <div className="mt-1 text-base font-semibold text-[var(--text-primary)]">
-                      {activeShop?.shop.timezone ?? session.user.timezone}
-                    </div>
-                  </div>
-                </div>
+        {/* Content Area */}
+        <main className="flex-1 flex flex-col min-w-0">
+          
+          {/* Header Card */}
+          <div className="bg-white border border-[#E2E8F0] rounded-[28px] p-6 sm:p-7 shadow-sm mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-extrabold bg-[#0EA5E9]/10 text-[#0284C7] mb-2 uppercase">
+                <Store className="w-3.5 h-3.5" />
+                <span>{activeShop?.shop.name || "Business Hub"}</span>
               </div>
-            </header>
+              <h1 className="text-2xl sm:text-3xl font-[900] text-[#0F172A] tracking-tight">
+                {title}
+              </h1>
+              <p className="text-xs sm:text-sm font-medium text-[#64748B] mt-1">
+                {subtitle}
+              </p>
+            </div>
 
-            <div className="pt-8">
-              {isInternal ? (
-                <div className="mb-6 rounded-[24px] border border-[rgba(255,138,106,0.16)] bg-[rgba(44,18,14,0.52)] px-5 py-4 text-sm text-[var(--warning)]">
-                  <div className="font-semibold text-[var(--text-primary)]">
-                    Internal tools are separated from the normal product workspace.
-                  </div>
-                  <p className="mt-2 text-[var(--text-secondary)]">
-                    Use these pages for platform operations, migration governance, and ERP engine
-                    management, not normal owner or manager workflows.
-                  </p>
-                </div>
-              ) : null}
-              {children}
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl text-right">
+                <span className="block text-[10px] font-bold text-[#94A3B8] uppercase">Timezone</span>
+                <span className="text-xs font-extrabold text-[#0F172A]">
+                  {activeShop?.shop.timezone || "Asia/Kolkata"}
+                </span>
+              </div>
+              <div className="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl text-right">
+                <span className="block text-[10px] font-bold text-[#94A3B8] uppercase">Currency</span>
+                <span className="text-xs font-extrabold text-[#0284C7]">
+                  {activeShop?.shop.currency_code || "INR"}
+                </span>
+              </div>
             </div>
           </div>
+
+          {/* Child Page Rendering */}
+          <div className="flex-1">{children}</div>
         </main>
       </div>
     </div>
