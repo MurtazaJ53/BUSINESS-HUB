@@ -84,6 +84,9 @@ class MobileSyncCoordinator {
   final void Function(MobileSyncStatus status) setStatus;
 
   MobileSession? _session;
+  /// Set when the server rejected our token (401). Sync stays paused — and no
+  /// local data is touched — until the user signs in again.
+  bool _needsReauth = false;
   bool _salesReadsUseBackend = false;
   bool _isFlushingOutbox = false;
   Timer? _outboxRetryTimer;
@@ -103,13 +106,19 @@ class MobileSyncCoordinator {
 
     await _cancelSubscriptions();
 
-    final isSigningOut = session == null;
     final isSwitchingWorkspace =
         previousShopId != null &&
         session != null &&
         previousShopId != session.shopId;
 
-    if (isSigningOut || isSwitchingWorkspace) {
+    // Only a real workspace switch clears the cache. A null session is NOT a
+    // reliable sign-out signal: the session provider emits AsyncLoading (and so
+    // a null value) on every login / staff-PIN / shop-switch transition, and
+    // wiping there destroyed the local shop — including unsynced outbox work —
+    // on a transient state change. Cross-tenant isolation is already enforced
+    // by _wipeIfShopChanged() in the session controller, which wipes whenever
+    // the device attaches to a different shop.
+    if (isSwitchingWorkspace) {
       await _clearWorkspaceCache(clearSales: true);
     }
 
@@ -120,6 +129,8 @@ class MobileSyncCoordinator {
       setStatus(MobileSyncStatus.idle);
       return;
     }
+    // A fresh signed-in session clears any earlier "token rejected" pause.
+    _needsReauth = false;
 
     setStatus(MobileSyncStatus.syncing);
     final shopId = session.shopId!;
@@ -983,8 +994,14 @@ class MobileSyncCoordinator {
       await _enforceWorkspaceSessionInstruction(session, heartbeat: heartbeat);
       return false;
     } on BackendApiException catch (error) {
-      if (error.statusCode == 401 || error.statusCode == 403) {
-        await _forceWorkspaceSignOut();
+      // An auth failure means "we can't talk to the server right now" — it must
+      // never destroy local data. Previously a single 401/403 on the background
+      // heartbeat wiped the whole local workspace while the UI stayed signed in,
+      // so the shop silently emptied mid-session and only came back on re-login.
+      // A 403 is a permission/plan gate, not an expired session, so it doesn't
+      // even stop syncing.
+      if (error.statusCode == 401) {
+        await _pauseSyncForReauth();
         return false;
       }
       debugPrint('Workspace session heartbeat skipped: $error');
@@ -1000,7 +1017,12 @@ class MobileSyncCoordinator {
     required WorkspaceAccessSessionHeartbeatResult heartbeat,
   }) async {
     await _cancelSubscriptions();
-    await _clearWorkspaceCache(clearSales: true);
+    // Only destroy local data when the server explicitly asks for a remote wipe
+    // (the lost/stolen-device feature). A plain "sign out" instruction should
+    // end the session, not erase the shop's records from this device.
+    if (heartbeat.shouldWipeLocalData) {
+      await _clearWorkspaceCache(clearSales: true);
+    }
 
     if (heartbeat.shouldWipeLocalData) {
       try {
@@ -1017,10 +1039,16 @@ class MobileSyncCoordinator {
     await _finalizeLocalSignOut();
   }
 
-  Future<void> _forceWorkspaceSignOut() async {
+  /// The access token is no longer accepted. Stop background syncing and flag
+  /// the session as needing re-authentication, but keep every local record —
+  /// re-signing in re-attaches to the same shop and the data is still there
+  /// (and any unsynced local work isn't thrown away).
+  Future<void> _pauseSyncForReauth() async {
     await _cancelSubscriptions();
-    await _clearWorkspaceCache(clearSales: true);
-    await _finalizeLocalSignOut();
+    _outboxRetryTimer?.cancel();
+    _outboxRetryTimer = null;
+    _needsReauth = true;
+    setStatus(MobileSyncStatus.error);
   }
 
   Future<void> _finalizeLocalSignOut() async {
@@ -1084,7 +1112,7 @@ class MobileSyncCoordinator {
     _outboxRetryTimer?.cancel();
     _outboxRetryTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       final session = _session;
-      if (session == null || !session.hasShop) {
+      if (session == null || !session.hasShop || _needsReauth) {
         return;
       }
       unawaited(_runBackgroundSyncTick(session));
