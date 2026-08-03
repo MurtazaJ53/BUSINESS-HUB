@@ -36,6 +36,9 @@ type PosTerminalProps = {
   shopGstin?: string;
   shopPhone?: string;
   cashierName?: string;
+  initialInventory: any[];
+  initialCustomers: any[];
+  shopId: string;
 };
 
 export function PosTerminal({
@@ -44,10 +47,30 @@ export function PosTerminal({
   shopGstin = "27AABCU9603R1ZM",
   shopPhone = "+91 98765 43210",
   cashierName = "Rashi (Cashier #1)",
+  initialInventory,
+  initialCustomers,
+  shopId,
 }: PosTerminalProps) {
-  const [products, setProducts] = useState<ProductItem[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const mappedInitialProducts = React.useMemo(() => {
+    return (initialInventory ?? []).map((item: any) => ({
+      id: item.id,
+      name: item.name,
+      sku: item.sku,
+      barcode: item.barcode,
+      category: item.category || "General",
+      cost_price: parseFloat(item.cost_price || "0"),
+      selling_price: parseFloat(item.sell_price || "0"),
+      current_stock: item.stock_on_hand || 0,
+      reorder_level: 0,
+      tax_rate: parseFloat(item.gst_rate || "0"),
+      is_low_stock: false,
+      status: item.status,
+    }));
+  }, [initialInventory]);
+
+  const [products, setProducts] = useState<ProductItem[]>(mappedInitialProducts);
+  const [customers, setCustomers] = useState<Customer[]>(initialCustomers ?? []);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   const [searchQuery, setSearchQuery] = useState("");
@@ -60,7 +83,6 @@ export function PosTerminal({
   useEffect(() => {
     async function loadData() {
       try {
-        setIsLoading(true);
         // Load inventory
         const invRes = await fetch("/api/inventory");
         if (!invRes.ok) throw new Error("Failed to load inventory");
@@ -90,11 +112,9 @@ export function PosTerminal({
         setCustomers(custData);
       } catch (err: any) {
         setError(err.message || "Failed to load POS data");
-      } finally {
-        setIsLoading(false);
       }
     }
-    loadData();
+    // We already loaded initial data server-side, but keep this to pull fresh updates if needed
   }, []);
 
   // Modals state

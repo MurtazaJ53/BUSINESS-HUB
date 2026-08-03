@@ -36,9 +36,34 @@ export interface ProductItem {
   updated_at?: string;
 }
 
-export function InventoryManager() {
-  const [items, setItems] = useState<ProductItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+interface InventoryManagerProps {
+  initialInventory: any[];
+  initialSummary: any;
+  shopId: string;
+}
+
+export function InventoryManager({ initialInventory, initialSummary, shopId }: InventoryManagerProps) {
+  const mappedInitial = React.useMemo(() => {
+    return (initialInventory ?? []).map((item: any) => ({
+      id: item.id,
+      name: item.name,
+      sku: item.sku,
+      barcode: item.barcode || "",
+      category: item.category || "General",
+      cost_price: parseFloat(item.cost_price || "0"),
+      selling_price: parseFloat(item.sell_price || "0"),
+      current_stock: item.stock_on_hand || 0,
+      reorder_level: 10,
+      is_low_stock: (item.stock_on_hand || 0) <= 10,
+      tax_rate: parseFloat(item.gst_rate || "5"),
+      status: item.status,
+      created_at: item.created_at || new Date().toISOString(),
+      updated_at: item.updated_at || new Date().toISOString(),
+    }));
+  }, [initialInventory]);
+
+  const [items, setItems] = useState<ProductItem[]>(mappedInitial);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
@@ -95,10 +120,6 @@ export function InventoryManager() {
       setIsLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchItems();
-  }, []);
 
   const categories = useMemo(() => {
     const list = Array.from(new Set(items.map((i) => i.category).filter((c): c is string => Boolean(c))));
@@ -207,29 +228,33 @@ export function InventoryManager() {
     }
   };
 
-  const handleApplyStockAdjustment = (e: React.FormEvent) => {
+  const handleApplyStockAdjustment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!adjustItem) return;
     const delta = parseInt(adjustQty) || 0;
     const factor = adjustType === "inward" ? 1 : -1;
-    const newStock = Math.max(0, adjustItem.current_stock + delta * factor);
+    const quantityDelta = delta * factor;
 
-    setItems((prev) =>
-      prev.map((i) =>
-        i.id === adjustItem.id
-          ? {
-              ...i,
-              current_stock: newStock,
-              is_low_stock: newStock <= i.reorder_level,
-              updated_at: new Date().toISOString(),
-            }
-          : i
-      )
-    );
-
-    setAdjustItem(null);
-    setAdjustQty("");
-    setAdjustReason("");
+    try {
+      const res = await fetch(`/api/inventory/${adjustItem.id}/adjust-stock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quantity_delta: quantityDelta,
+          note: adjustReason || `Manual stock adjustment: ${adjustType}`,
+        }),
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || "Failed to adjust stock on backend");
+      }
+      setAdjustItem(null);
+      setAdjustQty("");
+      setAdjustReason("");
+      await fetchItems();
+    } catch (err: any) {
+      alert(err.message || "An error occurred while adjusting the stock level.");
+    }
   };
 
   // Export CSV

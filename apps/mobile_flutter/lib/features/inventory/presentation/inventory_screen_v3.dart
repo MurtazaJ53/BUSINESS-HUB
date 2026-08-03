@@ -734,8 +734,9 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
 
               setSheetState(() => isSaving = true);
               try {
-                final price = double.parse(priceController.text.trim());
-                final openingStock = double.parse(stockController.text.trim());
+                final price = double.tryParse(priceController.text.trim()) ?? 0;
+                final openingStock =
+                    double.tryParse(stockController.text.trim()) ?? 0;
                 final gstRate =
                     double.tryParse(gstController.text.trim()) ?? 0;
                 final costText = costController.text.trim();

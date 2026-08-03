@@ -81,7 +81,7 @@ export function AdminShell({
   const workspaceRoleLabel =
     activeShop?.role_label ?? (workspaceRole ? formatRole(workspaceRole) : "Staff");
   const workspacePlanLabel = activeShop ? formatPlanTier(activeShop.shop.plan_tier) : "Growth";
-  const isPlatformAdmin = session.user.is_platform_admin;
+  const isPlatformAdmin = session?.user?.is_platform_admin ?? false;
 
   const handleLogout = async () => {
     try {
@@ -180,11 +180,11 @@ export function AdminShell({
             {/* Profile pill */}
             <div className="flex items-center gap-2 pl-2 border-l border-border-soft">
               <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#0EA5E9] to-[#38BDF8] text-white text-xs font-black flex items-center justify-center shadow-sm">
-                {(session.user.full_name || session.user.email || "U").charAt(0).toUpperCase()}
+                {(session?.user?.full_name || session?.user?.email || "U").charAt(0).toUpperCase()}
               </div>
               <div className="hidden xl:block text-left">
                 <p className="text-xs font-bold text-text-primary leading-tight truncate max-w-[120px]">
-                  {session.user.full_name || session.user.email}
+                  {session?.user?.full_name || session?.user?.email || "User"}
                 </p>
                 <p className="text-[10px] font-semibold text-text-secondary capitalize">
                   {workspaceRoleLabel}

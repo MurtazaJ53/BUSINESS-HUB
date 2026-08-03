@@ -1,6 +1,7 @@
 import { InventoryManager } from "@/components/inventory-manager";
 import { AdminShell } from "@/components/admin-shell";
-import { getSession, resolveActiveShop } from "@/lib/admin-api";
+import { getSession, resolveActiveShop, getInventory, getInventorySummary } from "@/lib/admin-api";
+import type { InventoryItem, InventorySummaryPayload } from "@/lib/types";
 
 export const metadata = {
   title: "Inventory Management | Business Hub",
@@ -10,6 +11,32 @@ export const metadata = {
 export default async function InventoryPage() {
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
+  const shopId = activeShop?.shop.id || "";
+
+  let inventory: InventoryItem[] = [];
+  let summary: InventorySummaryPayload = {
+    total_items: 0,
+    available_items: 0,
+    low_stock_items: 0,
+    out_of_stock_items: 0,
+    categories: 0,
+    projected_sell_value: null,
+  };
+  let errorMsg = "";
+
+  if (shopId) {
+    try {
+      const [resInventory, resSummary] = await Promise.all([
+        getInventory(shopId),
+        getInventorySummary(shopId),
+      ]);
+      inventory = resInventory;
+      summary = resSummary;
+    } catch (err: any) {
+      errorMsg = err.message || "Failed to load inventory data from backend";
+      console.error("InventoryPage fetch error:", err);
+    }
+  }
 
   return (
     <AdminShell
@@ -19,7 +46,24 @@ export default async function InventoryPage() {
       title="Inventory & Catalog"
       subtitle="Real-time stock valuation, barcode registry, low-stock threshold triggers & batch adjustments"
     >
-      <InventoryManager />
+      {!shopId ? (
+        <div className="panel p-8 text-center text-[var(--text-secondary)]">
+          <p className="font-semibold text-lg text-text-primary mb-2">No Active Shop</p>
+          <p className="text-sm">Please select or create a shop first to view and manage inventory.</p>
+        </div>
+      ) : errorMsg ? (
+        <div className="panel p-8 border-red-500/20 bg-red-500/5 rounded-xl">
+          <p className="text-red-400 font-semibold text-lg mb-2">Backend Connection Error</p>
+          <p className="text-sm text-[var(--text-secondary)] mb-4">
+            Next.js Server Component failed to fetch data from the Django backend.
+          </p>
+          <pre className="text-xs text-red-300 font-mono bg-black/40 p-4 rounded overflow-x-auto max-w-full text-left whitespace-pre-wrap">
+            {errorMsg}
+          </pre>
+        </div>
+      ) : (
+        <InventoryManager initialInventory={inventory} initialSummary={summary} shopId={shopId} />
+      )}
     </AdminShell>
   );
 }

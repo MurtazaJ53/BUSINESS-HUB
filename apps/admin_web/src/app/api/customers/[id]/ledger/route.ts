@@ -3,8 +3,12 @@ import { cookies } from "next/headers";
 
 const API_BASE_URL = process.env.BUSINESS_HUB_API_BASE_URL || "http://127.0.0.1:8000/api/v1";
 
-export async function GET() {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
+    const { id } = await params;
     const cookieStore = await cookies();
     const token = cookieStore.get("bh_access_token")?.value;
     const shopId = cookieStore.get("bh_active_shop")?.value;
@@ -13,7 +17,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const res = await fetch(`${API_BASE_URL}/shops/${shopId}/customers/`, {
+    const res = await fetch(`${API_BASE_URL}/shops/${shopId}/customers/${id}/ledger/`, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/json",
@@ -32,8 +36,12 @@ export async function GET() {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
+    const { id } = await params;
     const cookieStore = await cookies();
     const token = cookieStore.get("bh_access_token")?.value;
     const shopId = cookieStore.get("bh_active_shop")?.value;
@@ -42,9 +50,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json();
+    const body = await request.json();
 
-    const res = await fetch(`${API_BASE_URL}/shops/${shopId}/customers/`, {
+    const res = await fetch(`${API_BASE_URL}/shops/${shopId}/customers/${id}/ledger/`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,

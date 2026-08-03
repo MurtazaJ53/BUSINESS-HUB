@@ -165,6 +165,9 @@ Future<Uint8List> buildReceiptPdf(SaleRecordDetail detail, ShopInfo shop) async 
               ),
               pw.SizedBox(height: 10),
             ],
+            // Single footer line: the sale captured its footer message at sale
+            // time (from Business Settings). Printing shop.footer again here
+            // duplicated it and re-showed a message the user had since cleared.
             if (footer.isNotEmpty)
               pw.Center(
                 child: pw.Text(
@@ -173,14 +176,6 @@ Future<Uint8List> buildReceiptPdf(SaleRecordDetail detail, ShopInfo shop) async 
                   style: const pw.TextStyle(fontSize: 8),
                 ),
               ),
-            pw.SizedBox(height: 4),
-            pw.Center(
-              child: pw.Text(
-                shop.footer,
-                textAlign: pw.TextAlign.center,
-                style: const pw.TextStyle(fontSize: 8),
-              ),
-            ),
           ],
         );
       },

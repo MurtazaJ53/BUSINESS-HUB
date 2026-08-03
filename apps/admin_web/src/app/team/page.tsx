@@ -1,6 +1,7 @@
 import { TeamAttendance } from "@/components/team-attendance";
 import { AdminShell } from "@/components/admin-shell";
-import { getSession, resolveActiveShop } from "@/lib/admin-api";
+import { getSession, resolveActiveShop, getWorkspaceTeamMembers, getAttendanceSessions, getAttendanceSummary } from "@/lib/admin-api";
+import type { WorkspaceTeamMemberPayload, AttendanceSession, AttendanceSummaryPayload } from "@/lib/types";
 
 export const metadata = {
   title: "Team & Staff Management | Business Hub",
@@ -10,6 +11,33 @@ export const metadata = {
 export default async function TeamPage() {
   const session = await getSession();
   const activeShop = resolveActiveShop(session);
+  const shopId = activeShop?.shop.id || "";
+
+  let team: WorkspaceTeamMemberPayload[] = [];
+  let sessions: AttendanceSession[] = [];
+  let summary: AttendanceSummaryPayload = {
+    total_sessions: 0,
+    present_count: 0,
+    leave_count: 0,
+    active_workers_today: 0,
+  };
+  let errorMsg = "";
+
+  if (shopId) {
+    try {
+      const [resTeam, resSessions, resSummary] = await Promise.all([
+        getWorkspaceTeamMembers(shopId),
+        getAttendanceSessions(shopId),
+        getAttendanceSummary(shopId),
+      ]);
+      team = resTeam;
+      sessions = resSessions;
+      summary = resSummary;
+    } catch (err: any) {
+      errorMsg = err.message || "Failed to load team data from backend";
+      console.error("TeamPage fetch error:", err);
+    }
+  }
 
   return (
     <AdminShell
@@ -19,7 +47,24 @@ export default async function TeamPage() {
       title="Team Roster & Staff Permissions"
       subtitle="Role-based access control, cashier invites, salary tracking, and active shift monitoring"
     >
-      <TeamAttendance />
+      {!shopId ? (
+        <div className="panel p-8 text-center text-[var(--text-secondary)]">
+          <p className="font-semibold text-lg text-text-primary mb-2">No Active Shop</p>
+          <p className="text-sm">Please select or create a shop first to view and manage team members.</p>
+        </div>
+      ) : errorMsg ? (
+        <div className="panel p-8 border-red-500/20 bg-red-500/5 rounded-xl">
+          <p className="text-red-400 font-semibold text-lg mb-2">Backend Connection Error</p>
+          <p className="text-sm text-[var(--text-secondary)] mb-4">
+            Next.js Server Component failed to fetch team data from the Django backend.
+          </p>
+          <pre className="text-xs text-red-300 font-mono bg-black/40 p-4 rounded overflow-x-auto max-w-full text-left whitespace-pre-wrap">
+            {errorMsg}
+          </pre>
+        </div>
+      ) : (
+        <TeamAttendance initialTeam={team} initialSessions={sessions} initialSummary={summary} shopId={shopId} />
+      )}
     </AdminShell>
   );
 }

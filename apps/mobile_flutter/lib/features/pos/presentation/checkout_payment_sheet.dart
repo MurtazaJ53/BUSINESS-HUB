@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/checkout/checkout_policy.dart';
+import '../../../core/pos/upi_qr.dart';
 import '../../../core/tax/gst.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
+import 'upi_qr_view.dart';
 
 const List<String> _paymentModes = <String>['CASH', 'CARD', 'UPI'];
 
@@ -91,6 +93,57 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
         _lines.add(_PayLine('CASH', 0));
       }
     });
+  }
+
+  /// Show a scannable UPI QR for the amount due (or full bill), using the
+  /// shop's saved UPI ID. Any UPI app pre-fills the merchant and exact amount.
+  void _showPaymentQr(BuildContext context) {
+    final amount = _due > 0 ? _due : widget.cartTotal;
+    final String uri;
+    try {
+      uri = buildUpiUri(
+        payeeVpa: widget.upiVpa,
+        payeeName: widget.shopName,
+        amount: amount,
+        note: 'Bill ${widget.shopName}',
+      );
+    } on UpiRequestError catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+      return;
+    }
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Scan to pay'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            UpiQrView(data: uri),
+            const SizedBox(height: 12),
+            Text(
+              formatCurrency(amount),
+              style: Theme.of(dialogContext).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: AppPalette.primary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              widget.upiVpa,
+              style: Theme.of(dialogContext).textTheme.bodySmall,
+            ),
+          ],
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _completeSale() {
@@ -233,6 +286,24 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
                     ],
                   ),
                 ),
+                if (widget.upiVpa.trim().isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () => _showPaymentQr(context),
+                    icon: const Icon(Icons.qr_code_2_rounded),
+                    label: Text(
+                      'Show UPI QR (${formatCurrency(_due > 0 ? _due : widget.cartTotal)})',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppPalette.primary,
+                      side: const BorderSide(color: AppPalette.primary),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 TextField(
                   controller: _buyerGstin,

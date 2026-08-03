@@ -37,9 +37,43 @@ export interface SaleOrder {
   created_at: string;
 }
 
-export function SalesManager() {
-  const [sales, setSales] = useState<SaleOrder[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+interface SalesManagerProps {
+  initialSales: any[];
+  initialSummary: any;
+  shopId: string;
+}
+
+export function SalesManager({ initialSales, initialSummary, shopId }: SalesManagerProps) {
+  const mappedInitial = React.useMemo(() => {
+    return (initialSales ?? []).map((item: any) => {
+      const payments = item.payments || [];
+      const cash = payments.filter((p: any) => p.payment_method === "CASH").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+      const card = payments.filter((p: any) => p.payment_method === "CARD").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+      const upi = payments.filter((p: any) => p.payment_method === "UPI").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+      const khata_due = payments.filter((p: any) => p.payment_method === "CREDIT").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+
+      return {
+        id: item.id,
+        receipt_number: item.receipt_number || `INV-${item.id.replace(/-/g, "").slice(0, 6).toUpperCase()}`,
+        shop: item.shop || "",
+        cashier_name: item.actor_name || "Cashier",
+        customer_name: item.customer_name || "Walk-in Guest",
+        customer_phone: item.customer_phone || "",
+        subtotal: parseFloat(item.subtotal_amount || "0"),
+        tax_amount: parseFloat(item.tax_amount || "0"),
+        discount_amount: parseFloat(item.discount_amount || "0"),
+        total_amount: parseFloat(item.total_amount || "0"),
+        payment_mode: (item.payment_mode || "cash").toLowerCase(),
+        payment_breakdown: { cash, card, upi, khata_due },
+        status: item.status || "completed",
+        items_count: item.item_count || 1,
+        created_at: item.occurred_at || new Date().toISOString(),
+      };
+    });
+  }, [initialSales]);
+
+  const [sales, setSales] = useState<SaleOrder[]>(mappedInitial);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   const [search, setSearch] = useState("");
@@ -55,48 +89,59 @@ export function SalesManager() {
   const [dayCloseNotes, setDayCloseNotes] = useState("");
   const [isDayClosed, setIsDayClosed] = useState(false);
 
-  useEffect(() => {
-    async function fetchSales() {
-      try {
-        setIsLoading(true);
-        const res = await fetch("/api/sales");
-        if (!res.ok) throw new Error("Failed to load sales history");
-        const data = await res.json();
+  async function fetchSales() {
+    try {
+      setIsLoading(true);
+      const res = await fetch("/api/sales");
+      if (!res.ok) throw new Error("Failed to load sales history");
+      const data = await res.json();
+      
+      const mappedSales: SaleOrder[] = data.map((item: any) => {
+        const payments = item.payments || [];
+        const cash = payments.filter((p: any) => p.payment_method === "CASH").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+        const card = payments.filter((p: any) => p.payment_method === "CARD").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+        const upi = payments.filter((p: any) => p.payment_method === "UPI").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+        const khata_due = payments.filter((p: any) => p.payment_method === "CREDIT").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
         
-        const mappedSales: SaleOrder[] = data.map((item: any) => {
-          const payments = item.payments || [];
-          const cash = payments.filter((p: any) => p.payment_method === "CASH").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-          const card = payments.filter((p: any) => p.payment_method === "CARD").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-          const upi = payments.filter((p: any) => p.payment_method === "UPI").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-          const khata_due = payments.filter((p: any) => p.payment_method === "CREDIT").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-          
-          return {
-            id: item.id,
-            receipt_number: item.receipt_number || `INV-${item.id.replace(/-/g, "").slice(0, 6).toUpperCase()}`,
-            shop: item.shop || "",
-            cashier_name: item.actor_name || "Cashier",
-            customer_name: item.customer_name || "Walk-in Guest",
-            customer_phone: item.customer_phone || "",
-            subtotal: parseFloat(item.subtotal_amount || "0"),
-            tax_amount: parseFloat(item.tax_amount || "0"),
-            discount_amount: parseFloat(item.discount_amount || "0"),
-            total_amount: parseFloat(item.total_amount || "0"),
-            payment_mode: (item.payment_mode || "cash").toLowerCase(),
-            payment_breakdown: { cash, card, upi, khata_due },
-            status: item.status || "completed",
-            items_count: item.item_count || 1,
-            created_at: item.occurred_at || new Date().toISOString(),
-          };
-        });
-        setSales(mappedSales);
-      } catch (err: any) {
-        setError(err.message || "Failed to load sales");
-      } finally {
-        setIsLoading(false);
-      }
+        return {
+          id: item.id,
+          receipt_number: item.receipt_number || `INV-${item.id.replace(/-/g, "").slice(0, 6).toUpperCase()}`,
+          shop: item.shop || "",
+          cashier_name: item.actor_name || "Cashier",
+          customer_name: item.customer_name || "Walk-in Guest",
+          customer_phone: item.customer_phone || "",
+          subtotal: parseFloat(item.subtotal_amount || "0"),
+          tax_amount: parseFloat(item.tax_amount || "0"),
+          discount_amount: parseFloat(item.discount_amount || "0"),
+          total_amount: parseFloat(item.total_amount || "0"),
+          payment_mode: (item.payment_mode || "cash").toLowerCase(),
+          payment_breakdown: { cash, card, upi, khata_due },
+          status: item.status || "completed",
+          items_count: item.item_count || 1,
+          created_at: item.occurred_at || new Date().toISOString(),
+        };
+      });
+      setSales(mappedSales);
+    } catch (err: any) {
+      setError(err.message || "Failed to load sales");
+    } finally {
+      setIsLoading(false);
     }
-    fetchSales();
-  }, []);
+  }
+
+  const handleVoidSale = async (saleId: string) => {
+    if (!confirm("Are you sure you want to void this sale? This will reverse the transaction and restock inventory.")) return;
+    try {
+      const res = await fetch(`/api/sales/${saleId}/void`, { method: "POST" });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Failed to void transaction");
+      }
+      await fetchSales();
+    } catch (err: any) {
+      alert(err.message || "An error occurred while voiding sale.");
+    }
+  };
 
   // Filtered sales
   const filteredSales = useMemo(() => {
@@ -329,13 +374,29 @@ export function SalesManager() {
                           {formatCurrency(sale.total_amount)}
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <button
-                            onClick={() => setViewingReceipt(sale)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-[var(--surface-muted)] hover:bg-bg-base text-[var(--primary)] hover:text-[var(--primary-hover)] rounded-lg text-xs transition-colors border border-[var(--border-soft)]"
-                          >
-                            <Receipt className="w-3.5 h-3.5" />
-                            <span>Invoice</span>
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => setViewingReceipt(sale)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-[var(--surface-muted)] hover:bg-bg-base text-[var(--primary)] hover:text-[var(--primary-hover)] rounded-lg text-[11px] transition-colors border border-[var(--border-soft)]"
+                            >
+                              <Receipt className="w-3 h-3" />
+                              <span>Invoice</span>
+                            </button>
+
+                            {sale.status === "voided" ? (
+                              <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-red-500/20 text-red-300 border border-red-500/30">
+                                Voided
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => handleVoidSale(sale.id)}
+                                className="inline-flex items-center gap-1 px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-lg text-[11px] transition-colors border border-red-500/20"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                <span>Void</span>
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))

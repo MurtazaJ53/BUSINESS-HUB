@@ -1,86 +1,39 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Wallet,
   Plus,
   Search,
-  Calendar,
-  Tag,
   DollarSign,
-  Receipt,
-  FileSpreadsheet,
-  CheckCircle2,
   X,
-  PieChart,
+  Loader2,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import type { Expense, ExpenseSummaryPayload } from "@/lib/types";
 
-export interface ExpenseRecord {
-  id: string;
-  shop?: string;
-  title: string;
-  category: string;
-  amount: number;
-  payment_mode: "cash" | "bank" | "upi";
-  reference_number?: string;
-  created_at: string;
+interface ExpensesManagerProps {
+  initialExpenses: Expense[];
+  initialSummary: ExpenseSummaryPayload;
+  shopId: string;
 }
 
-const SEED_EXPENSES: ExpenseRecord[] = [
-  {
-    id: "exp-1",
-    shop: "shop-1",
-    title: "Store Electricity Bill (July)",
-    category: "Utilities",
-    amount: 4850.0,
-    payment_mode: "upi",
-    reference_number: "UPPCL-90218",
-    created_at: "2026-07-25T14:00:00Z",
-  },
-  {
-    id: "exp-2",
-    shop: "shop-1",
-    title: "Store Commercial Rent (July)",
-    category: "Rent",
-    amount: 35000.0,
-    payment_mode: "bank",
-    reference_number: "NEFT-889102",
-    created_at: "2026-08-01T10:00:00Z",
-  },
-  {
-    id: "exp-3",
-    shop: "shop-1",
-    title: "Staff Tea & Evening Refreshments",
-    category: "Tea & Refreshments",
-    amount: 320.0,
-    payment_mode: "cash",
-    created_at: "2026-08-02T16:00:00Z",
-  },
-  {
-    id: "exp-4",
-    shop: "shop-1",
-    title: "Eco-friendly Packaging Bags (500 pcs)",
-    category: "Packaging",
-    amount: 1400.0,
-    payment_mode: "cash",
-    reference_number: "BILL-PKG-44",
-    created_at: "2026-08-02T11:30:00Z",
-  },
-];
-
-export function ExpensesManager() {
-  const [expenses, setExpenses] = useState<ExpenseRecord[]>(SEED_EXPENSES);
+export function ExpensesManager({ initialExpenses, initialSummary, shopId }: ExpensesManagerProps) {
+  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses ?? []);
+  const [summary, setSummary] = useState<ExpenseSummaryPayload>(initialSummary ?? { total_expenses: 0, total_amount: "0.00", categories: {} });
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Add Expense form
+  // Add Expense form state
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Tea & Refreshments");
   const [amount, setAmount] = useState("");
-  const [paymentMode, setPaymentMode] = useState<"cash" | "bank" | "upi">("cash");
+  const [paymentMode, setPaymentMode] = useState<"CASH" | "BANK" | "UPI">("CASH");
   const [refNum, setRefNum] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const categories = [
     "Rent",
@@ -93,46 +46,97 @@ export function ExpensesManager() {
     "Municipal & Taxes",
   ];
 
-  const filteredExpenses = useMemo(() => {
-    return expenses.filter((e) => {
-      if (categoryFilter !== "all" && e.category !== categoryFilter) return false;
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        return (
-          e.title.toLowerCase().includes(q) ||
-          e.category.toLowerCase().includes(q) ||
-          (e.reference_number && e.reference_number.toLowerCase().includes(q))
-        );
+  // Debounced search and filter effect
+  useEffect(() => {
+    let active = true;
+    const fetchFilteredData = async () => {
+      setIsLoading(true);
+      try {
+        const catQuery = categoryFilter === "all" ? "" : categoryFilter;
+        const qUrl = `/api/expenses?q=${encodeURIComponent(search)}&category=${encodeURIComponent(catQuery)}`;
+        const sUrl = `/api/expenses/summary?q=${encodeURIComponent(search)}&category=${encodeURIComponent(catQuery)}`;
+
+        const [resList, resSum] = await Promise.all([
+          fetch(qUrl).then((r) => {
+            if (!r.ok) throw new Error("Failed to fetch expenses");
+            return r.json() as Promise<Expense[]>;
+          }),
+          fetch(sUrl).then((r) => {
+            if (!r.ok) throw new Error("Failed to fetch summary");
+            return r.json() as Promise<ExpenseSummaryPayload>;
+          }),
+        ]);
+
+        if (active) {
+          setExpenses(resList);
+          setSummary(resSum);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (active) setIsLoading(false);
       }
-      return true;
-    });
-  }, [expenses, categoryFilter, search]);
+    };
 
-  const metrics = useMemo(() => {
-    const total = expenses.reduce((s, e) => s + e.amount, 0);
+    const debounceTimer = setTimeout(fetchFilteredData, 300);
+    return () => {
+      active = false;
+      clearTimeout(debounceTimer);
+    };
+  }, [search, categoryFilter]);
+
+  const metrics = React.useMemo(() => {
+    const total = parseFloat(summary.total_amount || "0");
     const cashOutflow = expenses
-      .filter((e) => e.payment_mode === "cash")
-      .reduce((s, e) => s + e.amount, 0);
+      .filter((e) => e.payment_method === "CASH")
+      .reduce((s, e) => s + parseFloat(e.amount || "0"), 0);
     return { total, cashOutflow };
-  }, [expenses]);
+  }, [expenses, summary]);
 
-  const handleAddExpense = (e: React.FormEvent) => {
+  const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newExp: ExpenseRecord = {
-      id: `exp-${Date.now()}`,
-      shop: "shop-1",
-      title,
+    setIsSubmitting(true);
+    setSubmitError("");
+
+    const payload = {
       category,
       amount: parseFloat(amount) || 0,
-      payment_mode: paymentMode,
-      reference_number: refNum || undefined,
-      created_at: new Date().toISOString(),
+      description: title,
+      payment_method: paymentMode,
+      payment_reference: refNum,
+      expense_date: new Date().toISOString().split("T")[0],
     };
-    setExpenses((prev) => [newExp, ...prev]);
-    setIsAddOpen(false);
-    setTitle("");
-    setAmount("");
-    setRefNum("");
+
+    try {
+      const res = await fetch("/api/expenses", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Failed to save expense record.");
+      }
+
+      // Close modal and reset fields
+      setIsAddOpen(false);
+      setTitle("");
+      setAmount("");
+      setRefNum("");
+      
+      // Refresh list
+      const updatedList = await fetch("/api/expenses").then((r) => r.json());
+      const updatedSummary = await fetch("/api/expenses/summary").then((r) => r.json());
+      setExpenses(updatedList);
+      setSummary(updatedSummary);
+    } catch (err: any) {
+      setSubmitError(err.message || "An error occurred while saving the expense.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -156,7 +160,7 @@ export function ExpensesManager() {
 
           <button
             onClick={() => setIsAddOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-text-primary text-xs font-semibold rounded-xl shadow-md shadow-blue-500/20"
+            className="flex items-center gap-1.5 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-semibold rounded-xl shadow-md shadow-blue-500/20"
           >
             <Plus className="w-4 h-4" />
             <span>Record Expense</span>
@@ -171,7 +175,7 @@ export function ExpensesManager() {
             <div className="text-xs text-[var(--text-tertiary)] font-medium">
               Till Cash Outflows
             </div>
-            <div className="text-2xl font-black text-amber-400 font-mono mt-1">
+            <div className="text-2xl font-black text-amber-500 font-mono mt-1">
               {formatCurrency(metrics.cashOutflow)}
             </div>
             <div className="text-[10px] text-[var(--text-tertiary)] mt-0.5">
@@ -186,7 +190,7 @@ export function ExpensesManager() {
             <div className="text-xs text-[var(--text-tertiary)] font-medium">
               Digital / Bank Transfers
             </div>
-            <div className="text-2xl font-black text-blue-400 font-mono mt-1">
+            <div className="text-2xl font-black text-blue-500 font-mono mt-1">
               {formatCurrency(metrics.total - metrics.cashOutflow)}
             </div>
             <div className="text-[10px] text-[var(--text-tertiary)] mt-0.5">
@@ -225,11 +229,16 @@ export function ExpensesManager() {
       </div>
 
       {/* Expenses Table */}
-      <div className="bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl overflow-hidden shadow-xl">
+      <div className="bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl overflow-hidden shadow-xl relative">
+        {isLoading && (
+          <div className="absolute inset-0 bg-surface/50 backdrop-blur-[1px] flex items-center justify-center z-10">
+            <Loader2 className="w-6 h-6 text-primary animate-spin" />
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-[var(--bg-soft)] border-b border-[var(--border-soft)] text-[var(--text-tertiary)] font-semibold uppercase tracking-wider text-[10px]">
+              <tr className="bg-bg-soft border-b border-[var(--border-soft)] text-[var(--text-tertiary)] font-semibold uppercase tracking-wider text-[10px]">
                 <th className="py-3 px-4">Expense Title</th>
                 <th className="py-3 px-4">Category</th>
                 <th className="py-3 px-4">Date</th>
@@ -239,40 +248,42 @@ export function ExpensesManager() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-soft)]">
-              {filteredExpenses.length === 0 ? (
+              {expenses.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-10 text-center text-xs text-[var(--text-tertiary)]">
                     No expense entries found.
                   </td>
                 </tr>
               ) : (
-                filteredExpenses.map((exp) => (
+                expenses.map((exp) => (
                   <tr key={exp.id} className="hover:bg-bg-base transition-colors">
-                    <td className="py-3 px-4 font-semibold text-text-primary">{exp.title}</td>
+                    <td className="py-3 px-4 font-semibold text-text-primary">
+                      {exp.description || exp.category}
+                    </td>
                     <td className="py-3 px-4 text-[var(--text-secondary)]">
                       <span className="px-2 py-0.5 rounded-full bg-bg-base border border-[var(--border-soft)] text-[10px]">
                         {exp.category}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-[var(--text-tertiary)]">
-                      {formatDate(exp.created_at)}
+                      {formatDate(exp.expense_date)}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <span
                         className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                          exp.payment_mode === "cash"
-                            ? "bg-amber-500/20 text-amber-300"
-                            : "bg-blue-500/20 text-blue-300"
+                          exp.payment_method === "CASH"
+                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                            : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
                         }`}
                       >
-                        {exp.payment_mode}
+                        {exp.payment_method}
                       </span>
                     </td>
                     <td className="py-3 px-4 font-mono text-[var(--text-tertiary)]">
-                      {exp.reference_number || "—"}
+                      {exp.payment_reference || "—"}
                     </td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-red-400">
-                      {formatCurrency(exp.amount)}
+                    <td className="py-3 px-4 text-right font-mono font-bold text-red-500">
+                      {formatCurrency(parseFloat(exp.amount || "0"))}
                     </td>
                   </tr>
                 ))
@@ -287,16 +298,16 @@ export function ExpensesManager() {
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
           onClick={() => setIsAddOpen(false)}
         >
           <div
             className="w-full max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-4 border-b border-[var(--border-soft)] flex items-center justify-between bg-[var(--bg-soft)]">
+            <div className="p-4 border-b border-[var(--border-soft)] flex items-center justify-between bg-bg-soft">
               <div className="flex items-center gap-2">
-                <Wallet className="w-5 h-5 text-[var(--primary-light)]" />
+                <Wallet className="w-5 h-5 text-primary" />
                 <span className="font-semibold text-sm text-text-primary">Record Operating Expense</span>
               </div>
               <button
@@ -308,6 +319,12 @@ export function ExpensesManager() {
             </div>
 
             <form onSubmit={handleAddExpense} className="p-6 space-y-4">
+              {submitError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-xl font-bold">
+                  {submitError}
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
                   Expense Description *
@@ -349,7 +366,7 @@ export function ExpensesManager() {
                     required
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    placeholder="₹0.00"
+                    placeholder="0.00"
                     className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                   />
                 </div>
@@ -365,9 +382,9 @@ export function ExpensesManager() {
                     onChange={(e) => setPaymentMode(e.target.value as any)}
                     className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                   >
-                    <option value="cash">Cash (From Till Float)</option>
-                    <option value="upi">UPI / QR</option>
-                    <option value="bank">Bank Transfer (NEFT/RTGS)</option>
+                    <option value="CASH">Cash (From Till Float)</option>
+                    <option value="UPI">UPI / QR</option>
+                    <option value="BANK">Bank Transfer (NEFT/RTGS)</option>
                   </select>
                 </div>
                 <div>
@@ -387,16 +404,19 @@ export function ExpensesManager() {
               <div className="pt-3 border-t border-[var(--border-soft)] flex items-center justify-end gap-3">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={() => setIsAddOpen(false)}
-                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-text-primary bg-bg-base rounded-xl"
+                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-text-primary bg-bg-base rounded-xl disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-xs font-semibold text-white bg-[var(--primary)] hover:bg-[var(--primary-hover)] rounded-xl shadow-md"
+                  disabled={isSubmitting}
+                  className="px-5 py-2 text-xs font-semibold text-white bg-[var(--primary)] hover:bg-[var(--primary-hover)] rounded-xl shadow-md flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  Save Expense
+                  {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>Save Expense</span>
                 </button>
               </div>
             </form>
