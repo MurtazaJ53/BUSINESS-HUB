@@ -177,7 +177,16 @@ export async function apiMutation<T>(path: string, options: MutationOptions = {}
 /* ------------------------------------------------------------------ */
 
 export const getSession = cache(async (): Promise<SessionPayload> => {
-  return apiFetch<SessionPayload>("/session/");
+  try {
+    return await apiFetch<SessionPayload>("/session/");
+  } catch (error: any) {
+    const errMsg = error?.message || "";
+    if (errMsg.includes("(401)") || errMsg.toLowerCase().includes("unauthorized") || errMsg.toLowerCase().includes("expired")) {
+      const { redirect } = require("next/navigation");
+      redirect("/login");
+    }
+    throw error;
+  }
 });
 
 export const getUserMfaStatus = cache(async (): Promise<UserMfaStatusPayload> => {
