@@ -291,7 +291,7 @@ export function SalesManager() {
                     </tr>
                   ) : (
                     filteredSales.map((sale) => (
-                      <tr key={sale.id} className="hover:bg-[var(--surface-strong)] transition-colors">
+                      <tr key={sale.id} className="hover:bg-bg-base transition-colors">
                         <td className="py-3 px-4 font-mono font-semibold text-[var(--text-primary)]">
                           {sale.receipt_number}
                         </td>
@@ -331,7 +331,7 @@ export function SalesManager() {
                         <td className="py-3 px-4 text-right">
                           <button
                             onClick={() => setViewingReceipt(sale)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-[var(--surface-muted)] hover:bg-[var(--surface-strong)] text-[var(--primary)] hover:text-[var(--primary-hover)] rounded-lg text-xs transition-colors border border-[var(--border-soft)]"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-[var(--surface-muted)] hover:bg-bg-base text-[var(--primary)] hover:text-[var(--primary-hover)] rounded-lg text-xs transition-colors border border-[var(--border-soft)]"
                           >
                             <Receipt className="w-3.5 h-3.5" />
                             <span>Invoice</span>
@@ -449,7 +449,7 @@ export function SalesManager() {
             {!isDayClosed && (
               <button
                 onClick={() => setIsDayClosed(true)}
-                className="w-full py-3 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-500/25 transition-all active:scale-98"
+                className="w-full py-3 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-text-primary font-bold text-xs rounded-xl shadow-lg shadow-blue-500/25 transition-all active:scale-98"
               >
                 Submit & Lock Day Close Register
               </button>

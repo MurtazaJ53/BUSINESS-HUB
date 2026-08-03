@@ -55,7 +55,7 @@ export function StoreSettings({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-white tracking-tight">Store & POS Settings</h2>
+          <h2 className="text-lg font-bold text-text-primary tracking-tight">Store & POS Settings</h2>
           <p className="text-xs text-[var(--text-tertiary)]">
             Configure store profile, GSTIN parameters, thermal receipt layout, and hardware
           </p>
@@ -121,7 +121,7 @@ export function StoreSettings({
         {/* General Store Tab */}
         {activeTab === "general" && (
           <div className="bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl p-6 space-y-4 shadow-xl">
-            <h3 className="text-sm font-bold text-white mb-4 pb-2 border-b border-[var(--border-soft)]">
+            <h3 className="text-sm font-bold text-text-primary mb-4 pb-2 border-b border-[var(--border-soft)]">
               Store Identity & Contact Information
             </h3>
 
@@ -135,7 +135,7 @@ export function StoreSettings({
                   required
                   value={shopName}
                   onChange={(e) => setShopName(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none focus:border-[var(--primary)]"
                 />
               </div>
 
@@ -147,7 +147,7 @@ export function StoreSettings({
                   type="text"
                   value={legalName}
                   onChange={(e) => setLegalName(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none focus:border-[var(--primary)]"
                 />
               </div>
 
@@ -159,7 +159,7 @@ export function StoreSettings({
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none focus:border-[var(--primary)]"
                 />
               </div>
 
@@ -171,7 +171,7 @@ export function StoreSettings({
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none focus:border-[var(--primary)]"
                 />
               </div>
             </div>
@@ -184,7 +184,7 @@ export function StoreSettings({
                 rows={3}
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none focus:border-[var(--primary)] resize-none"
+                className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none focus:border-[var(--primary)] resize-none"
               />
             </div>
           </div>
@@ -193,7 +193,7 @@ export function StoreSettings({
         {/* Tax & Invoicing Tab */}
         {activeTab === "tax" && (
           <div className="bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl p-6 space-y-4 shadow-xl">
-            <h3 className="text-sm font-bold text-white mb-4 pb-2 border-b border-[var(--border-soft)]">
+            <h3 className="text-sm font-bold text-text-primary mb-4 pb-2 border-b border-[var(--border-soft)]">
               GSTIN & Invoice Numbering Rules
             </h3>
 
@@ -207,7 +207,7 @@ export function StoreSettings({
                   value={gstin}
                   onChange={(e) => setGstin(e.target.value)}
                   placeholder="27AAACB1234F1Z5"
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none focus:border-[var(--primary)] uppercase font-mono"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none focus:border-[var(--primary)] uppercase font-mono"
                 />
               </div>
 
@@ -220,7 +220,7 @@ export function StoreSettings({
                   value={invoicePrefix}
                   onChange={(e) => setInvoicePrefix(e.target.value)}
                   placeholder="INV-"
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none focus:border-[var(--primary)] font-mono"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none focus:border-[var(--primary)] font-mono"
                 />
               </div>
             </div>
@@ -233,7 +233,7 @@ export function StoreSettings({
                 rows={3}
                 value={footerNotes}
                 onChange={(e) => setFooterNotes(e.target.value)}
-                className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none focus:border-[var(--primary)] resize-none"
+                className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none focus:border-[var(--primary)] resize-none"
               />
             </div>
           </div>
@@ -242,7 +242,7 @@ export function StoreSettings({
         {/* Hardware & Printer Tab */}
         {activeTab === "hardware" && (
           <div className="bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl p-6 space-y-4 shadow-xl">
-            <h3 className="text-sm font-bold text-white mb-4 pb-2 border-b border-[var(--border-soft)]">
+            <h3 className="text-sm font-bold text-text-primary mb-4 pb-2 border-b border-[var(--border-soft)]">
               Thermal Receipt Printers & USB Scanners
             </h3>
 
@@ -254,7 +254,7 @@ export function StoreSettings({
                 <select
                   value={paperWidth}
                   onChange={(e) => setPaperWidth(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                 >
                   <option value="80mm">80mm Standard POS Thermal Roll</option>
                   <option value="58mm">58mm Compact Handheld Roll</option>
@@ -269,7 +269,7 @@ export function StoreSettings({
                   type="number"
                   value={scannerDelay}
                   onChange={(e) => setScannerDelay(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                 />
               </div>
             </div>
@@ -280,7 +280,7 @@ export function StoreSettings({
                   type="checkbox"
                   checked={autoPrint}
                   onChange={(e) => setAutoPrint(e.target.checked)}
-                  className="w-4 h-4 rounded text-[var(--primary)] focus:ring-0 bg-[var(--bg-deep)] border-[var(--border-soft)]"
+                  className="w-4 h-4 rounded text-[var(--primary)] focus:ring-0 bg-bg-soft border-[var(--border-soft)]"
                 />
                 <span className="text-xs text-white font-medium">
                   Auto-trigger browser print dialog on completing checkout
@@ -295,7 +295,7 @@ export function StoreSettings({
           <div className="bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl p-6 space-y-6 shadow-xl">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-white">Current Subscription Tier</h3>
+                <h3 className="text-sm font-bold text-text-primary">Current Subscription Tier</h3>
                 <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
                   Your store is currently running on the {planTier.toUpperCase()} tier
                 </p>
@@ -308,11 +308,11 @@ export function StoreSettings({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 rounded-xl bg-[var(--bg-soft)] border border-[var(--border-soft)]">
                 <div className="text-xs text-[var(--text-tertiary)]">Product Catalog</div>
-                <div className="text-xl font-bold text-white mt-1">Unlimited</div>
+                <div className="text-xl font-bold text-text-primary mt-1">Unlimited</div>
               </div>
               <div className="p-4 rounded-xl bg-[var(--bg-soft)] border border-[var(--border-soft)]">
                 <div className="text-xs text-[var(--text-tertiary)]">Staff Terminals</div>
-                <div className="text-xl font-bold text-white mt-1">5 POS Desks</div>
+                <div className="text-xl font-bold text-text-primary mt-1">5 POS Desks</div>
               </div>
               <div className="p-4 rounded-xl bg-[var(--bg-soft)] border border-[var(--border-soft)]">
                 <div className="text-xs text-[var(--text-tertiary)]">GST Invoicing</div>
@@ -325,7 +325,7 @@ export function StoreSettings({
         <div className="flex justify-end">
           <button
             type="submit"
-            className="flex items-center gap-2 px-6 py-2.5 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-semibold rounded-xl shadow-lg shadow-blue-500/25"
+            className="flex items-center gap-2 px-6 py-2.5 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-text-primary text-xs font-semibold rounded-xl shadow-lg shadow-blue-500/25"
           >
             <Save className="w-4 h-4" />
             <span>Save Store Preferences</span>

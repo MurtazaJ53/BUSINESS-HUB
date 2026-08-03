@@ -66,7 +66,7 @@ export function ReportsAnalytics() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-white tracking-tight">
+          <h2 className="text-lg font-bold text-text-primary tracking-tight">
             Financial Analytics & Tax Reports
           </h2>
           <p className="text-xs text-[var(--text-tertiary)]">
@@ -78,7 +78,7 @@ export function ReportsAnalytics() {
           <select
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value)}
-            className="px-3 py-2 bg-[var(--surface)] border border-[var(--border-soft)] text-xs text-white rounded-xl outline-none"
+            className="px-3 py-2 bg-[var(--surface)] border border-[var(--border-soft)] text-xs text-text-primary rounded-xl outline-none"
           >
             <option value="today">Today</option>
             <option value="this_week">This Week</option>
@@ -89,7 +89,7 @@ export function ReportsAnalytics() {
 
           <button
             onClick={handleExportGst}
-            className="flex items-center gap-1.5 px-3 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-semibold rounded-xl shadow-md shadow-blue-500/20"
+            className="flex items-center gap-1.5 px-3 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-text-primary text-xs font-semibold rounded-xl shadow-md shadow-blue-500/20"
           >
             <Download className="w-4 h-4" />
             <span>Export GSTR-1 CSV</span>
@@ -138,7 +138,7 @@ export function ReportsAnalytics() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-4 bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl">
               <div className="text-xs text-[var(--text-tertiary)]">Gross Revenue</div>
-              <div className="text-2xl font-black text-white font-mono mt-1">
+              <div className="text-2xl font-black text-text-primary font-mono mt-1">
                 {formatCurrency(financialData.grossRevenue)}
               </div>
               <div className="flex items-center gap-1 text-[11px] text-emerald-400 mt-1 font-semibold">
@@ -170,12 +170,12 @@ export function ReportsAnalytics() {
 
           {/* Structured P&L Table */}
           <div className="bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl overflow-hidden shadow-xl p-6">
-            <h3 className="text-sm font-bold text-white mb-4 pb-2 border-b border-[var(--border-soft)]">
+            <h3 className="text-sm font-bold text-text-primary mb-4 pb-2 border-b border-[var(--border-soft)]">
               Income Statement Breakdown (P&L)
             </h3>
 
             <div className="space-y-3 text-xs">
-              <div className="flex justify-between py-1.5 font-bold text-white">
+              <div className="flex justify-between py-1.5 font-bold text-text-primary">
                 <span>Gross Sales Revenue (A)</span>
                 <span className="font-mono text-sm">{formatCurrency(financialData.grossRevenue)}</span>
               </div>
@@ -183,7 +183,7 @@ export function ReportsAnalytics() {
                 <span>- Cost of Goods Sold (COGS)</span>
                 <span className="font-mono">-{formatCurrency(financialData.cogs)}</span>
               </div>
-              <div className="flex justify-between py-2 font-bold text-blue-400 pl-2 bg-[var(--bg-deep)] rounded-lg">
+              <div className="flex justify-between py-2 font-bold text-blue-400 pl-2 bg-bg-soft rounded-lg">
                 <span>Gross Profit (A - COGS)</span>
                 <span className="font-mono">{formatCurrency(financialData.grossProfit)}</span>
               </div>
@@ -227,8 +227,8 @@ export function ReportsAnalytics() {
               </thead>
               <tbody className="divide-y divide-[var(--border-soft)]">
                 {gstData.map((g) => (
-                  <tr key={g.slab} className="hover:bg-[var(--surface-strong)]">
-                    <td className="py-3 px-4 font-semibold text-white">{g.slab}</td>
+                  <tr key={g.slab} className="hover:bg-bg-base">
+                    <td className="py-3 px-4 font-semibold text-text-primary">{g.slab}</td>
                     <td className="py-3 px-4 text-right font-mono text-white">
                       {formatCurrency(g.taxable)}
                     </td>
@@ -245,7 +245,7 @@ export function ReportsAnalytics() {
                 ))}
               </tbody>
               <tfoot>
-                <tr className="bg-[var(--bg-deep)] font-bold text-white border-t border-[var(--border-soft)]">
+                <tr className="bg-bg-soft font-bold text-text-primary border-t border-[var(--border-soft)]">
                   <td className="py-3 px-4">TOTALS</td>
                   <td className="py-3 px-4 text-right font-mono">
                     {formatCurrency(gstData.reduce((s, g) => s + g.taxable, 0))}
@@ -281,12 +281,12 @@ export function ReportsAnalytics() {
               </thead>
               <tbody className="divide-y divide-[var(--border-soft)]">
                 {topProducts.map((p, idx) => (
-                  <tr key={p.name} className="hover:bg-[var(--surface-strong)]">
-                    <td className="py-3 px-4 font-semibold text-white">
+                  <tr key={p.name} className="hover:bg-bg-base">
+                    <td className="py-3 px-4 font-semibold text-text-primary">
                       <span className="text-[var(--text-tertiary)] font-mono mr-2">#{idx + 1}</span>
                       {p.name}
                     </td>
-                    <td className="py-3 px-4 text-center font-mono font-bold text-white">
+                    <td className="py-3 px-4 text-center font-mono font-bold text-text-primary">
                       {p.qty}
                     </td>
                     <td className="py-3 px-4 text-right font-mono font-bold text-emerald-400">

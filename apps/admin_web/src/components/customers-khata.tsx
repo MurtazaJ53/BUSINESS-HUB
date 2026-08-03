@@ -226,7 +226,7 @@ export function CustomersKhata() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-white tracking-tight">
+          <h2 className="text-lg font-bold text-text-primary tracking-tight">
             Customers & Khata Ledger (Udhaar Book)
           </h2>
           <p className="text-xs text-[var(--text-tertiary)]">
@@ -244,7 +244,7 @@ export function CustomersKhata() {
 
           <button
             onClick={() => setIsAddCustomerOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-semibold rounded-xl shadow-md shadow-blue-500/20"
+            className="flex items-center gap-1.5 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-text-primary text-xs font-semibold rounded-xl shadow-md shadow-blue-500/20"
           >
             <Plus className="w-4 h-4" />
             <span>New Customer</span>
@@ -264,7 +264,7 @@ export function CustomersKhata() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by name or phone..."
-                className="w-full pl-9 pr-3 py-2 bg-[var(--surface)] border border-[var(--border-soft)] focus:border-[var(--primary)] rounded-xl text-xs text-white placeholder-[var(--text-tertiary)] outline-none"
+                className="w-full pl-9 pr-3 py-2 bg-[var(--surface)] border border-[var(--border-soft)] focus:border-[var(--primary)] rounded-xl text-xs text-text-primary placeholder-[var(--text-tertiary)] outline-none"
               />
             </div>
           </div>
@@ -282,11 +282,11 @@ export function CustomersKhata() {
                   className={`w-full p-3.5 text-left flex items-start justify-between gap-3 transition-colors ${
                     selectedCustomerId === cust.id
                       ? "bg-blue-500/10 border-l-4 border-[var(--primary)]"
-                      : "hover:bg-[var(--surface-strong)]"
+                      : "hover:bg-bg-base"
                   }`}
                 >
                   <div className="min-w-0">
-                    <div className="font-semibold text-xs text-white truncate">{cust.name}</div>
+                    <div className="font-semibold text-xs text-text-primary truncate">{cust.name}</div>
                     <div className="text-[10px] text-[var(--text-tertiary)] mt-0.5">
                       {cust.phone || "No phone"}
                     </div>
@@ -319,7 +319,7 @@ export function CustomersKhata() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-base font-bold text-white">{selectedCustomer.name}</h3>
+                      <h3 className="text-base font-bold text-text-primary">{selectedCustomer.name}</h3>
                       <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/20 text-emerald-300">
                         Active Account
                       </span>
@@ -350,7 +350,7 @@ export function CustomersKhata() {
                   {(selectedCustomer.balance_amount || 0) > 0 && (
                     <button
                       onClick={handleSendWhatsAppReminder}
-                      className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold transition-all shadow-md active:scale-95"
+                      className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-text-primary rounded-xl text-xs font-semibold transition-all shadow-md active:scale-95"
                     >
                       <Send className="w-3.5 h-3.5" />
                       <span>Send WhatsApp Reminder</span>
@@ -360,7 +360,7 @@ export function CustomersKhata() {
 
                 {/* Financial Health Row */}
                 <div className="grid grid-cols-3 gap-3 pt-3 border-t border-[var(--border-soft)]">
-                  <div className="p-3 bg-[var(--bg-deep)] rounded-xl border border-[var(--border-soft)]">
+                  <div className="p-3 bg-bg-soft rounded-xl border border-[var(--border-soft)]">
                     <div className="text-[10px] uppercase font-bold text-[var(--text-tertiary)]">
                       Outstanding Due
                     </div>
@@ -375,16 +375,16 @@ export function CustomersKhata() {
                     </div>
                   </div>
 
-                  <div className="p-3 bg-[var(--bg-deep)] rounded-xl border border-[var(--border-soft)]">
+                  <div className="p-3 bg-bg-soft rounded-xl border border-[var(--border-soft)]">
                     <div className="text-[10px] uppercase font-bold text-[var(--text-tertiary)]">
                       Credit Limit
                     </div>
-                    <div className="text-base font-black font-mono text-white mt-0.5">
+                    <div className="text-base font-black font-mono text-text-primary mt-0.5">
                       {formatCurrency(selectedCustomer.credit_limit || 0)}
                     </div>
                   </div>
 
-                  <div className="p-3 bg-[var(--bg-deep)] rounded-xl border border-[var(--border-soft)]">
+                  <div className="p-3 bg-bg-soft rounded-xl border border-[var(--border-soft)]">
                     <div className="text-[10px] uppercase font-bold text-[var(--text-tertiary)]">
                       Lifetime Spend
                     </div>
@@ -425,7 +425,7 @@ export function CustomersKhata() {
                 <div className="p-4 border-b border-[var(--border-soft)] bg-[var(--bg-soft)] flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <FileText className="w-4 h-4 text-[var(--primary-light)]" />
-                    <span className="font-semibold text-xs text-white">Khata Ledger History</span>
+                    <span className="font-semibold text-xs text-text-primary">Khata Ledger History</span>
                   </div>
                 </div>
 
@@ -449,11 +449,11 @@ export function CustomersKhata() {
                         </tr>
                       ) : (
                         activeTransactions.map((txn) => (
-                          <tr key={txn.id} className="hover:bg-[var(--surface-strong)]">
+                          <tr key={txn.id} className="hover:bg-bg-base">
                             <td className="py-2.5 px-4 text-[var(--text-tertiary)]">
                               {formatDate(txn.created_at, true)}
                             </td>
-                            <td className="py-2.5 px-4 text-white font-medium">
+                            <td className="py-2.5 px-4 text-text-primary font-medium">
                               {txn.description}
                             </td>
                             <td className="py-2.5 px-4 text-center">
@@ -515,7 +515,7 @@ export function CustomersKhata() {
                 ) : (
                   <ArrowUpRight className="w-5 h-5 text-red-400" />
                 )}
-                <span className="font-semibold text-sm text-white">
+                <span className="font-semibold text-sm text-text-primary">
                   {txnType === "credit"
                     ? "Record Payment Received (Jama)"
                     : "Give Credit Sale (Udhaar)"}
@@ -530,7 +530,7 @@ export function CustomersKhata() {
             </div>
 
             <form onSubmit={handleRecordKhataTxn} className="p-6 space-y-4">
-              <div className="p-3 bg-[var(--bg-deep)] rounded-xl border border-[var(--border-soft)] text-xs">
+              <div className="p-3 bg-bg-soft rounded-xl border border-[var(--border-soft)] text-xs">
                 <span className="text-[var(--text-tertiary)]">Customer: </span>
                 <strong className="text-white">{selectedCustomer.name}</strong>
               </div>
@@ -547,7 +547,7 @@ export function CustomersKhata() {
                   value={txnAmount}
                   onChange={(e) => setTxnAmount(e.target.value)}
                   placeholder="₹0.00"
-                  className="w-full px-4 py-2.5 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-base font-mono font-bold text-white focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full px-4 py-2.5 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-base font-mono font-bold text-text-primary focus:outline-none focus:border-[var(--primary)]"
                 />
               </div>
 
@@ -564,7 +564,7 @@ export function CustomersKhata() {
                       ? "e.g. Cash payment or UPI UTR #8912"
                       : "e.g. Rice & Cooking Oil items"
                   }
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                 />
               </div>
 
@@ -572,13 +572,13 @@ export function CustomersKhata() {
                 <button
                   type="button"
                   onClick={() => setIsTxnModalOpen(false)}
-                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-white bg-[var(--surface-strong)] rounded-xl"
+                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-white bg-bg-base rounded-xl"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className={`px-5 py-2 text-xs font-semibold text-white rounded-xl shadow-md ${
+                  className={`px-5 py-2 text-xs font-semibold text-text-primary rounded-xl shadow-md ${
                     txnType === "credit"
                       ? "bg-emerald-600 hover:bg-emerald-500"
                       : "bg-red-600 hover:bg-red-500"
@@ -609,7 +609,7 @@ export function CustomersKhata() {
             <div className="p-4 border-b border-[var(--border-soft)] flex items-center justify-between bg-[var(--bg-soft)]">
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-[var(--primary-light)]" />
-                <span className="font-semibold text-sm text-white">Add New Customer</span>
+                <span className="font-semibold text-sm text-text-primary">Add New Customer</span>
               </div>
               <button
                 onClick={() => setIsAddCustomerOpen(false)}
@@ -630,7 +630,7 @@ export function CustomersKhata() {
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="e.g. Vikramaditya Singh"
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none focus:border-[var(--primary)]"
                 />
               </div>
 
@@ -645,7 +645,7 @@ export function CustomersKhata() {
                     value={newPhone}
                     onChange={(e) => setNewPhone(e.target.value)}
                     placeholder="+91 98765 00000"
-                    className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                    className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                   />
                 </div>
                 <div>
@@ -657,7 +657,7 @@ export function CustomersKhata() {
                     value={newCreditLimit}
                     onChange={(e) => setNewCreditLimit(e.target.value)}
                     placeholder="10000"
-                    className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                    className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                   />
                 </div>
               </div>
@@ -671,7 +671,7 @@ export function CustomersKhata() {
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
                   placeholder="customer@example.com"
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                 />
               </div>
 
@@ -684,7 +684,7 @@ export function CustomersKhata() {
                   value={newAddress}
                   onChange={(e) => setNewAddress(e.target.value)}
                   placeholder="Street / Flat / Colony"
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                 />
               </div>
 
@@ -692,7 +692,7 @@ export function CustomersKhata() {
                 <button
                   type="button"
                   onClick={() => setIsAddCustomerOpen(false)}
-                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-white bg-[var(--surface-strong)] rounded-xl"
+                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-white bg-bg-base rounded-xl"
                 >
                   Cancel
                 </button>

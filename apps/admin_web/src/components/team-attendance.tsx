@@ -134,7 +134,7 @@ export function TeamAttendance() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-white tracking-tight">
+          <h2 className="text-lg font-bold text-text-primary tracking-tight">
             Team Members & Staff Attendance
           </h2>
           <p className="text-xs text-[var(--text-tertiary)]">
@@ -166,7 +166,7 @@ export function TeamAttendance() {
 
           <button
             onClick={() => setIsInviteOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-semibold rounded-xl shadow-md shadow-blue-500/20"
+            className="flex items-center gap-1.5 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-text-primary text-xs font-semibold rounded-xl shadow-md shadow-blue-500/20"
           >
             <Plus className="w-4 h-4" />
             <span>Invite Team Member</span>
@@ -214,7 +214,7 @@ export function TeamAttendance() {
               </thead>
               <tbody className="divide-y divide-[var(--border-soft)]">
                 {staff.map((m) => (
-                  <tr key={m.id} className="hover:bg-[var(--surface-strong)] transition-colors">
+                  <tr key={m.id} className="hover:bg-bg-base transition-colors">
                     <td className="py-3 px-4">
                       <div className="font-semibold text-white">{m.full_name}</div>
                       {m.phone && (
@@ -266,8 +266,8 @@ export function TeamAttendance() {
               </thead>
               <tbody className="divide-y divide-[var(--border-soft)]">
                 {attendance.map((att) => (
-                  <tr key={att.id} className="hover:bg-[var(--surface-strong)] transition-colors">
-                    <td className="py-3 px-4 font-semibold text-white">{att.staff_name}</td>
+                  <tr key={att.id} className="hover:bg-bg-base transition-colors">
+                    <td className="py-3 px-4 font-semibold text-text-primary">{att.staff_name}</td>
                     <td className="py-3 px-4 text-emerald-400 font-mono">
                       {formatDate(att.check_in, true)}
                     </td>
@@ -302,7 +302,7 @@ export function TeamAttendance() {
             <div className="p-4 border-b border-[var(--border-soft)] flex items-center justify-between bg-[var(--bg-soft)]">
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-[var(--primary-light)]" />
-                <span className="font-semibold text-sm text-white">Invite Team Member</span>
+                <span className="font-semibold text-sm text-text-primary">Invite Team Member</span>
               </div>
               <button
                 onClick={() => setIsInviteOpen(false)}
@@ -323,7 +323,7 @@ export function TeamAttendance() {
                   value={inviteName}
                   onChange={(e) => setInviteName(e.target.value)}
                   placeholder="e.g. Sunil Mehra"
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none focus:border-[var(--primary)]"
                 />
               </div>
 
@@ -337,7 +337,7 @@ export function TeamAttendance() {
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   placeholder="staff@example.com"
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none focus:border-[var(--primary)]"
                 />
               </div>
 
@@ -348,7 +348,7 @@ export function TeamAttendance() {
                 <select
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                 >
                   <option value="cashier">Cashier (POS & Sales only)</option>
                   <option value="manager">Manager (POS, Inventory, Khata, Expenses)</option>
@@ -360,7 +360,7 @@ export function TeamAttendance() {
                 <button
                   type="button"
                   onClick={() => setIsInviteOpen(false)}
-                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-white bg-[var(--surface-strong)] rounded-xl"
+                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-white bg-bg-base rounded-xl"
                 >
                   Cancel
                 </button>

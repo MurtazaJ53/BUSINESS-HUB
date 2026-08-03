@@ -187,7 +187,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
       {/* Top Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-white tracking-tight">
+          <h2 className="text-lg font-bold text-text-primary tracking-tight">
             Suppliers & Inward Purchase Orders
           </h2>
           <p className="text-xs text-[var(--text-tertiary)]">
@@ -205,7 +205,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
 
           <button
             onClick={() => setIsNewPoOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-semibold rounded-xl shadow-md shadow-blue-500/20"
+            className="flex items-center gap-1.5 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-text-primary text-xs font-semibold rounded-xl shadow-md shadow-blue-500/20"
           >
             <Plus className="w-4 h-4" />
             <span>Record Inward PO</span>
@@ -257,20 +257,20 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
                 {purchases.map((po) => {
                   const due = po.total_amount - po.paid_amount;
                   return (
-                    <tr key={po.id} className="hover:bg-[var(--surface-strong)] transition-colors">
+                    <tr key={po.id} className="hover:bg-bg-base transition-colors">
                       <td className="py-3 px-4 font-mono font-semibold text-white">
                         {po.invoice_number}
                       </td>
                       <td className="py-3 px-4 text-[var(--text-tertiary)]">
                         {formatDate(po.created_at)}
                       </td>
-                      <td className="py-3 px-4 text-white font-medium">{po.supplier_name}</td>
+                      <td className="py-3 px-4 text-text-primary font-medium">{po.supplier_name}</td>
                       <td className="py-3 px-4 text-center">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-500/20 text-emerald-300">
                           {po.status}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-right font-mono text-white font-semibold">
+                      <td className="py-3 px-4 text-right font-mono text-text-primary font-semibold">
                         {formatCurrency(po.total_amount)}
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-emerald-400">
@@ -294,7 +294,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
           <div className="flex justify-end">
             <button
               onClick={() => setIsNewSupplierOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-strong)] hover:bg-[var(--surface)] border border-[var(--border-soft)] text-xs text-white rounded-xl"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-bg-base hover:bg-[var(--surface)] border border-[var(--border-soft)] text-xs text-text-primary rounded-xl"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Add Supplier</span>
@@ -309,7 +309,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <h4 className="text-sm font-bold text-white">{sup.name}</h4>
+                    <h4 className="text-sm font-bold text-text-primary">{sup.name}</h4>
                     <div className="text-[11px] text-[var(--text-tertiary)]">
                       Contact: {sup.contact_person || "—"}
                     </div>
@@ -350,7 +350,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
             <div className="p-4 border-b border-[var(--border-soft)] flex items-center justify-between bg-[var(--bg-soft)]">
               <div className="flex items-center gap-2">
                 <Truck className="w-5 h-5 text-[var(--primary-light)]" />
-                <span className="font-semibold text-sm text-white">Record Inward Delivery</span>
+                <span className="font-semibold text-sm text-text-primary">Record Inward Delivery</span>
               </div>
               <button
                 onClick={() => setIsNewPoOpen(false)}
@@ -368,7 +368,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
                 <select
                   value={poSupplierId}
                   onChange={(e) => setPoSupplierId(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                 >
                   {suppliers.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -388,7 +388,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
                   value={poInvoiceNo}
                   onChange={(e) => setPoInvoiceNo(e.target.value)}
                   placeholder="e.g. INV-2026-901"
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                 />
               </div>
 
@@ -404,7 +404,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
                     value={poTotalAmount}
                     onChange={(e) => setPoTotalAmount(e.target.value)}
                     placeholder="₹0.00"
-                    className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                    className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                   />
                 </div>
                 <div>
@@ -417,7 +417,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
                     value={poPaidAmount}
                     onChange={(e) => setPoPaidAmount(e.target.value)}
                     placeholder="₹0.00"
-                    className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                    className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                   />
                 </div>
               </div>
@@ -426,7 +426,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
                 <button
                   type="button"
                   onClick={() => setIsNewPoOpen(false)}
-                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-white bg-[var(--surface-strong)] rounded-xl"
+                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-white bg-bg-base rounded-xl"
                 >
                   Cancel
                 </button>
@@ -457,7 +457,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
             <div className="p-4 border-b border-[var(--border-soft)] flex items-center justify-between bg-[var(--bg-soft)]">
               <div className="flex items-center gap-2">
                 <Building className="w-5 h-5 text-[var(--primary-light)]" />
-                <span className="font-semibold text-sm text-white">Add New Supplier</span>
+                <span className="font-semibold text-sm text-text-primary">Add New Supplier</span>
               </div>
               <button
                 onClick={() => setIsNewSupplierOpen(false)}
@@ -478,7 +478,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
                   value={supName}
                   onChange={(e) => setSupName(e.target.value)}
                   placeholder="e.g. Royal Spices & Herbs"
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                 />
               </div>
 
@@ -492,7 +492,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
                     value={supContact}
                     onChange={(e) => setSupContact(e.target.value)}
                     placeholder="Manoj"
-                    className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                    className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                   />
                 </div>
                 <div>
@@ -504,7 +504,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
                     value={supPhone}
                     onChange={(e) => setSupPhone(e.target.value)}
                     placeholder="+91 98000 00000"
-                    className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                    className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                   />
                 </div>
               </div>
@@ -518,7 +518,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
                   value={supGstin}
                   onChange={(e) => setSupGstin(e.target.value)}
                   placeholder="27AABCR..."
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                 />
               </div>
 
@@ -531,7 +531,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
                   value={supAddress}
                   onChange={(e) => setSupAddress(e.target.value)}
                   placeholder="Market Godown Address"
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                 />
               </div>
 
@@ -539,7 +539,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
                 <button
                   type="button"
                   onClick={() => setIsNewSupplierOpen(false)}
-                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-white bg-[var(--surface-strong)] rounded-xl"
+                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-white bg-bg-base rounded-xl"
                 >
                   Cancel
                 </button>

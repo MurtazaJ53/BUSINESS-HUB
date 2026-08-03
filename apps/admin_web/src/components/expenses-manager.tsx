@@ -140,7 +140,7 @@ export function ExpensesManager() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-white tracking-tight">
+          <h2 className="text-lg font-bold text-text-primary tracking-tight">
             Expenses & Petty Cash Register
           </h2>
           <p className="text-xs text-[var(--text-tertiary)]">
@@ -151,12 +151,12 @@ export function ExpensesManager() {
         <div className="flex items-center gap-3">
           <div className="px-4 py-2 bg-[var(--surface)] border border-[var(--border-soft)] rounded-xl text-xs">
             <span className="text-[var(--text-secondary)]">Total Recorded Expenses: </span>
-            <strong className="text-white font-mono">{formatCurrency(metrics.total)}</strong>
+            <strong className="text-text-primary font-mono">{formatCurrency(metrics.total)}</strong>
           </div>
 
           <button
             onClick={() => setIsAddOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-semibold rounded-xl shadow-md shadow-blue-500/20"
+            className="flex items-center gap-1.5 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-text-primary text-xs font-semibold rounded-xl shadow-md shadow-blue-500/20"
           >
             <Plus className="w-4 h-4" />
             <span>Record Expense</span>
@@ -206,14 +206,14 @@ export function ExpensesManager() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search expense by description or receipt reference..."
-            className="w-full pl-10 pr-4 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] focus:border-[var(--primary)] rounded-xl text-xs text-white placeholder-[var(--text-tertiary)] outline-none"
+            className="w-full pl-10 pr-4 py-2 bg-bg-soft border border-[var(--border-soft)] focus:border-[var(--primary)] rounded-xl text-xs text-text-primary placeholder-[var(--text-tertiary)] outline-none"
           />
         </div>
 
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] text-xs text-white rounded-xl outline-none"
+          className="px-3 py-2 bg-bg-soft border border-[var(--border-soft)] text-xs text-text-primary rounded-xl outline-none"
         >
           <option value="all">All Expense Categories</option>
           {categories.map((c) => (
@@ -247,10 +247,10 @@ export function ExpensesManager() {
                 </tr>
               ) : (
                 filteredExpenses.map((exp) => (
-                  <tr key={exp.id} className="hover:bg-[var(--surface-strong)] transition-colors">
-                    <td className="py-3 px-4 font-semibold text-white">{exp.title}</td>
+                  <tr key={exp.id} className="hover:bg-bg-base transition-colors">
+                    <td className="py-3 px-4 font-semibold text-text-primary">{exp.title}</td>
                     <td className="py-3 px-4 text-[var(--text-secondary)]">
-                      <span className="px-2 py-0.5 rounded-full bg-[var(--surface-strong)] border border-[var(--border-soft)] text-[10px]">
+                      <span className="px-2 py-0.5 rounded-full bg-bg-base border border-[var(--border-soft)] text-[10px]">
                         {exp.category}
                       </span>
                     </td>
@@ -297,7 +297,7 @@ export function ExpensesManager() {
             <div className="p-4 border-b border-[var(--border-soft)] flex items-center justify-between bg-[var(--bg-soft)]">
               <div className="flex items-center gap-2">
                 <Wallet className="w-5 h-5 text-[var(--primary-light)]" />
-                <span className="font-semibold text-sm text-white">Record Operating Expense</span>
+                <span className="font-semibold text-sm text-text-primary">Record Operating Expense</span>
               </div>
               <button
                 onClick={() => setIsAddOpen(false)}
@@ -318,7 +318,7 @@ export function ExpensesManager() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. July Store Electricity Bill"
-                  className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none focus:border-[var(--primary)]"
                 />
               </div>
 
@@ -330,7 +330,7 @@ export function ExpensesManager() {
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                    className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                   >
                     {categories.map((c) => (
                       <option key={c} value={c}>
@@ -350,7 +350,7 @@ export function ExpensesManager() {
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="₹0.00"
-                    className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                    className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                   />
                 </div>
               </div>
@@ -363,7 +363,7 @@ export function ExpensesManager() {
                   <select
                     value={paymentMode}
                     onChange={(e) => setPaymentMode(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                    className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                   >
                     <option value="cash">Cash (From Till Float)</option>
                     <option value="upi">UPI / QR</option>
@@ -379,7 +379,7 @@ export function ExpensesManager() {
                     value={refNum}
                     onChange={(e) => setRefNum(e.target.value)}
                     placeholder="e.g. UTR-8910 or Inv #12"
-                    className="w-full px-3 py-2 bg-[var(--bg-deep)] border border-[var(--border-soft)] rounded-xl text-xs text-white focus:outline-none"
+                    className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                   />
                 </div>
               </div>
@@ -388,7 +388,7 @@ export function ExpensesManager() {
                 <button
                   type="button"
                   onClick={() => setIsAddOpen(false)}
-                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-white bg-[var(--surface-strong)] rounded-xl"
+                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-white bg-bg-base rounded-xl"
                 >
                   Cancel
                 </button>
