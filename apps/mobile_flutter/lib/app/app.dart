@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/database/local_database.dart';
 import '../core/router/app_router.dart';
+import '../core/security/app_lock.dart';
 import '../core/sync/mobile_sync_coordinator.dart';
 import '../core/theme/app_theme.dart';
 import '../core/theme/theme_mode_controller.dart';
@@ -50,6 +51,9 @@ class BusinessHubMobileApp extends ConsumerWidget {
           theme: AppTheme.light,
           darkTheme: AppTheme.light,
           routerConfig: router,
+          // Overlay the PIN lock above every route when one is configured.
+          builder: (context, child) =>
+              AppLockGate(child: child ?? const SizedBox.shrink()),
         );
       },
     );

@@ -890,19 +890,24 @@ class InventoryRepository {
   }
 
   InventoryCatalogItem _mapCatalogRow(QueryRow row) {
+    // Use nullable reads with defaults everywhere: Drift's read<T>() for a
+    // non-null column ends in a `!`, so a single NULL in any column (e.g. a
+    // legacy/imported row missing gst_rate or created_at) would crash the whole
+    // catalog stream with "Null check operator used on a null value" — which
+    // surfaced as "Add item failed" when the list rebuilt after an insert.
     return InventoryCatalogItem(
-      id: row.read<String>('id'),
-      name: row.read<String>('name'),
-      price: row.read<double>('price'),
+      id: row.readNullable<String>('id') ?? '',
+      name: row.readNullable<String>('name') ?? 'Unnamed item',
+      price: row.readNullable<double>('price') ?? 0,
       sku: row.readNullable<String>('sku'),
-      category: row.read<String>('category'),
+      category: row.readNullable<String>('category') ?? 'General',
       subcategory: row.readNullable<String>('subcategory'),
       size: row.readNullable<String>('size'),
       description: row.readNullable<String>('description'),
       hsnCode: row.readNullable<String>('hsn_code'),
-      gstRate: row.read<double>('gst_rate'),
-      priceIncludesTax: row.read<bool>('price_includes_tax'),
-      stock: row.read<double>('stock'),
+      gstRate: row.readNullable<double>('gst_rate') ?? 0,
+      priceIncludesTax: row.readNullable<bool>('price_includes_tax') ?? true,
+      stock: row.readNullable<double>('stock') ?? 0,
       sourceMeta: row.readNullable<String>('source_meta'),
       imagePath: row.readNullable<String>('image_path'),
       unit: row.readNullable<String>('unit'),
@@ -910,7 +915,8 @@ class InventoryRepository {
       variantGroupId: row.readNullable<String>('variant_group_id'),
       variantLabel: row.readNullable<String>('variant_label'),
       createdAt: DateTime.fromMillisecondsSinceEpoch(
-        row.read<int>('created_at'),
+        row.readNullable<int>('created_at') ??
+            DateTime.now().millisecondsSinceEpoch,
       ),
       costPrice: row.readNullable<double>('cost_price'),
       supplierId: row.readNullable<String>('supplier_id'),

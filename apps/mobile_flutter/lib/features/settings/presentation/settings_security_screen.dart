@@ -10,6 +10,7 @@ import '../../../core/database/mobile_repository.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
 import '../../../core/runtime/mobile_runtime_config.dart';
+import '../../../core/security/app_lock.dart';
 import '../../../core/session/mobile_session_controller.dart';
 import '../../shell/presentation/mobile_surface.dart';
 
@@ -245,6 +246,8 @@ class _SettingsSecurityScreenState
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
           children: const <Widget>[
+            AppLockPanel(),
+            SizedBox(height: 18),
             MobileScreenLead(
               title: 'Local owner mode is active',
               subtitle:
@@ -286,6 +289,8 @@ class _SettingsSecurityScreenState
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
           children: const <Widget>[
+            AppLockPanel(),
+            SizedBox(height: 18),
             MobilePanel(
               title: 'Security controls stay with elevated roles',
               child: MobileEmptyState(
@@ -331,6 +336,8 @@ class _SettingsSecurityScreenState
               accent: hasFreshWindow ? AppPalette.success : AppPalette.warning,
             ),
           ),
+          const SizedBox(height: 18),
+          const AppLockPanel(),
           const SizedBox(height: 18),
           if (_message != null)
             MobilePanel(
