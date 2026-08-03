@@ -1,14 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
-:root {
+:root,
+[data-theme="light"] {
   /* APK Light Theme Palette (AppPalette from mobile_flutter/lib/core/theme/app_theme.dart) */
   --bg-app: #EEF2F6;
   --bg-base: #F8FAFC;
   --bg-soft: #F1F5F9;
   --surface: #FFFFFF;
-  --surface-strong: #F8FAFC;
-  --surface-muted: #F1F5F9;
+  --surface-strong: #F4F4F5;
+  --surface-muted: #F8FAFC;
   --border-soft: #E2E8F0;
   --border: #CBD5E1;
   --border-strong: #94A3B8;
@@ -25,9 +26,9 @@
   --primary-light: #38BDF8;
   --primary-dark: #0369A1;
 
-  --accent: #8B5CF6;
-  --accent-hover: #7C3AED;
-  --accent-light: #A78BFA;
+  --accent: #0284C7;
+  --accent-hover: #0369A1;
+  --accent-light: #38BDF8;
 
   /* Semantic Colors */
   --success: #10B981;
@@ -50,8 +51,11 @@
   --revenue: #10B981;
   --expense: #EF4444;
   --inventory: #0EA5E9;
-  --customer: #8B5CF6;
+  --customer: #0284C7;
   --alert: #F59E0B;
+
+  /* Panel Background Soft with opacity */
+  --bg-panel-soft: rgba(255, 255, 255, 0.85);
 
   /* Shadows (Soft APK elevated card shadows) */
   --shadow-1: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
@@ -65,9 +69,92 @@
   --font-mono: "JetBrains Mono", Consolas, monospace;
 }
 
+[data-theme="dark"] {
+  /* Premium Dark Mode Palette */
+  --bg-app: #0B0F19;         /* Dark background */
+  --bg-base: #0B0F19;
+  --bg-soft: #151B2C;        /* Dark soft surface */
+  --surface: #1E293B;        /* Card surface */
+  --surface-strong: #0F172A; /* Deeper slate surface */
+  --surface-muted: #1E293B;
+  --border-soft: #2E3A52;    /* Dark border soft */
+  --border: #3F4E6B;         /* Dark border normal */
+  --border-strong: #64748B;
+
+  /* Text Hierarchy */
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-tertiary: #94A3B8;
+  --text-disabled: #475569;
+
+  /* Brand Colors - Sky Blue */
+  --primary: #38BDF8;
+  --primary-hover: #7DD3FC;
+  --primary-light: #93C5FD;
+  --primary-dark: #0EA5E9;
+
+  --accent: #38BDF8;
+  --accent-hover: #7DD3FC;
+  --accent-light: #BAE6FD;
+
+  /* Semantic Colors */
+  --success: #10B981;
+  --success-light: #34D399;
+  --success-dark: #059669;
+
+  --warning: #F59E0B;
+  --warning-light: #FBBF24;
+  --warning-dark: #D97706;
+
+  --error: #EF4444;
+  --error-light: #F87171;
+  --error-dark: #DC2626;
+
+  --info: #3B82F6;
+  --info-light: #60A5FA;
+  --info-dark: #2563EB;
+
+  /* Domain Colors */
+  --revenue: #10B981;
+  --expense: #EF4444;
+  --inventory: #38BDF8;
+  --customer: #38BDF8;
+  --alert: #F59E0B;
+
+  /* Panel Background Soft with opacity */
+  --bg-panel-soft: rgba(30, 41, 59, 0.85);
+
+  /* Shadows (Tuned dark mode shadows) */
+  --shadow-1: 0 1px 3px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.15);
+  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-3: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 16px -6px rgba(0, 0, 0, 0.3);
+  --shadow-4: 0 20px 35px -8px rgba(0, 0, 0, 0.5), 0 10px 20px -5px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 0 1px rgba(56, 189, 248, 0.25), 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
 @theme inline {
-  --color-background: var(--bg-app);
-  --color-foreground: var(--text-primary);
+  --color-bg-app: var(--bg-app);
+  --color-bg-base: var(--bg-base);
+  --color-bg-soft: var(--bg-soft);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-border-soft: var(--border-soft);
+  --color-border: var(--border);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-text-disabled: var(--text-disabled);
+  
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-light: var(--primary-light);
+  --color-primary-dark: var(--primary-dark);
+  
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+  
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 }
@@ -87,8 +174,8 @@ body {
   min-height: 100vh;
   background-color: var(--bg-app);
   background-image: 
-    radial-gradient(circle at 10% 20%, rgba(14, 165, 233, 0.05) 0%, transparent 40%),
-    radial-gradient(circle at 90% 80%, rgba(56, 189, 248, 0.05) 0%, transparent 40%);
+    radial-gradient(circle at 10% 20%, rgba(14, 165, 233, 0.04) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(56, 189, 248, 0.04) 0%, transparent 40%);
   color: var(--text-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -115,7 +202,7 @@ a {
 }
 
 .panel-soft {
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--bg-panel-soft);
   border: 1px solid var(--border-soft);
   backdrop-filter: blur(12px);
   border-radius: 20px;
@@ -145,8 +232,8 @@ a {
 }
 
 .gridlines {
-  background-image: linear-gradient(rgba(226, 232, 240, 0.8) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(226, 232, 240, 0.8) 1px, transparent 1px);
+  background-image: linear-gradient(var(--border-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-soft) 1px, transparent 1px);
   background-size: 28px 28px;
 }
 
@@ -167,12 +254,12 @@ a {
 }
 
 .nav-pill-idle:hover {
-  background: var(--surface-muted);
+  background: var(--bg-soft);
   color: var(--primary-dark);
 }
 
 .surface-muted {
-  background: var(--surface-muted);
+  background: var(--bg-soft);
   border: 1px solid var(--border-soft);
 }
 
@@ -302,25 +389,25 @@ a {
 
 .badge-primary {
   background: rgba(14, 165, 233, 0.12);
-  color: var(--primary-dark);
+  color: var(--primary);
   border: 1px solid rgba(14, 165, 233, 0.20);
 }
 
 .badge-success {
   background: rgba(16, 185, 129, 0.12);
-  color: var(--success-dark);
+  color: var(--success);
   border: 1px solid rgba(16, 185, 129, 0.20);
 }
 
 .badge-warning {
   background: rgba(245, 158, 11, 0.12);
-  color: var(--warning-dark);
+  color: var(--warning);
   border: 1px solid rgba(245, 158, 11, 0.20);
 }
 
 .badge-error {
   background: rgba(239, 68, 68, 0.12);
-  color: var(--error-dark);
+  color: var(--error);
   border: 1px solid rgba(239, 68, 68, 0.20);
 }
 
@@ -368,7 +455,7 @@ a {
 }
 
 .table tbody tr:hover {
-  background: #F8FAFC;
+  background: var(--bg-soft);
 }
 
 /* Custom Scrollbar */
@@ -496,4 +583,3 @@ a {
 .delay-6 { animation-delay: 240ms; }
 .delay-7 { animation-delay: 280ms; }
 .delay-8 { animation-delay: 320ms; }
-

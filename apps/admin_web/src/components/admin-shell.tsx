@@ -32,6 +32,7 @@ import { formatRole } from "@/lib/formatters";
 import { canAccessAttendance, canAccessExpenses, formatPlanTier } from "@/lib/plans";
 import { canAccessPaymentsWorkspace, canManageWorkspace } from "@/lib/roles";
 import type { SessionPayload, ShopMembership } from "@/lib/types";
+import { ThemeSwitcher } from "@/components/theme-switcher";
 
 type AdminShellProps = {
   session: SessionPayload;
@@ -118,9 +119,9 @@ export function AdminShell({
   ];
 
   return (
-    <div className="min-h-screen bg-[#EEF2F6] text-[#0F172A] flex flex-col">
+    <div className="min-h-screen bg-bg-app text-text-primary flex flex-col transition-colors duration-200">
       {/* Top Bar matching APK Header */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#E2E8F0] px-4 lg:px-8 py-3">
+      <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur-md border-b border-border-soft px-4 lg:px-8 py-3 transition-colors duration-200">
         <div className="max-w-[1600px] mx-auto flex items-center justify-between gap-4">
           
           {/* Logo & Store Selector */}
@@ -130,21 +131,21 @@ export function AdminShell({
                 <Store className="w-5 h-5 text-white" />
               </div>
               <div>
-                <span className="text-base font-black text-[#0F172A] tracking-tight hidden sm:inline">
+                <span className="text-base font-black text-text-primary tracking-tight hidden sm:inline">
                   Business Hub
                 </span>
-                <span className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider">
+                <span className="block text-[10px] font-bold text-text-secondary uppercase tracking-wider">
                   Cloud POS
                 </span>
               </div>
             </Link>
 
             {activeShop && (
-              <div className="hidden md:flex items-center gap-2 ml-4 pl-4 border-l border-[#E2E8F0]">
-                <div className="px-3 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl flex items-center gap-2">
+              <div className="hidden md:flex items-center gap-2 ml-4 pl-4 border-l border-border-soft">
+                <div className="px-3 py-1.5 bg-bg-base border border-border-soft rounded-xl flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs font-bold text-[#0F172A]">{activeShop.shop.name}</span>
-                  <span className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-[#0EA5E9]/10 text-[#0284C7] uppercase">
+                  <span className="text-xs font-bold text-text-primary">{activeShop.shop.name}</span>
+                  <span className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-[#0EA5E9]/10 text-primary uppercase">
                     {workspacePlanLabel}
                   </span>
                 </div>
@@ -165,32 +166,34 @@ export function AdminShell({
 
             <Link
               href="/notifications"
-              className="p-2 rounded-xl bg-[#F8FAFC] hover:bg-[#EEF2F6] border border-[#E2E8F0] text-[#64748B] transition-colors relative"
+              className="p-2 rounded-xl bg-bg-base hover:bg-bg-soft border border-border-soft text-text-secondary transition-colors relative"
               title="Notifications"
             >
               <Bell className="w-4 h-4" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#0EA5E9]" />
             </Link>
 
+            <ThemeSwitcher />
+
 
 
             {/* Profile pill */}
-            <div className="flex items-center gap-2 pl-2 border-l border-[#E2E8F0]">
+            <div className="flex items-center gap-2 pl-2 border-l border-border-soft">
               <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#0EA5E9] to-[#38BDF8] text-white text-xs font-black flex items-center justify-center shadow-sm">
                 {(session.user.full_name || session.user.email || "U").charAt(0).toUpperCase()}
               </div>
               <div className="hidden xl:block text-left">
-                <p className="text-xs font-bold text-[#0F172A] leading-tight truncate max-w-[120px]">
+                <p className="text-xs font-bold text-text-primary leading-tight truncate max-w-[120px]">
                   {session.user.full_name || session.user.email}
                 </p>
-                <p className="text-[10px] font-semibold text-[#64748B] capitalize">
+                <p className="text-[10px] font-semibold text-text-secondary capitalize">
                   {workspaceRoleLabel}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="p-1.5 text-[#94A3B8] hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors ml-1"
+                className="p-1.5 text-text-tertiary hover:text-red-500 rounded-lg hover:bg-red-50/10 transition-colors ml-1"
                 title="Sign Out"
               >
                 <LogOut className="w-4 h-4" />
@@ -207,8 +210,8 @@ export function AdminShell({
         <aside className="hidden lg:flex flex-col gap-6">
           
           {/* Main App Navigation Panel (Core Workflows) */}
-          <div className="bg-white border border-[#E2E8F0] rounded-[24px] p-3.5 shadow-sm space-y-1">
-            <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8]">
+          <div className="bg-surface border border-border-soft rounded-[24px] p-3.5 shadow-sm space-y-1 transition-colors duration-200">
+            <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-text-tertiary">
               Core Workflows
             </div>
             {mainNav.map((item) => {
@@ -222,8 +225,8 @@ export function AdminShell({
                     isActive
                       ? "bg-[#0EA5E9] text-white shadow-[0_4px_12px_rgba(14,165,233,0.3)]"
                       : item.highlight
-                      ? "bg-[#0EA5E9]/10 text-[#0284C7] hover:bg-[#0EA5E9]/20"
-                      : "text-[#475569] hover:bg-[#F8FAFC] hover:text-[#0F172A]"
+                      ? "bg-[#0EA5E9]/10 text-primary hover:bg-[#0EA5E9]/20"
+                      : "text-text-secondary hover:bg-bg-soft hover:text-text-primary"
                   }`}
                 >
                   <Icon className={`w-4 h-4 ${isActive ? "text-white" : ""}`} />
@@ -234,8 +237,8 @@ export function AdminShell({
           </div>
 
           {/* Shop Administration Panel (Manage) */}
-          <div className="bg-white border border-[#E2E8F0] rounded-[24px] p-3.5 shadow-sm space-y-1">
-            <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8]">
+          <div className="bg-surface border border-border-soft rounded-[24px] p-3.5 shadow-sm space-y-1 transition-colors duration-200">
+            <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-text-tertiary">
               Manage
             </div>
             {adminNav.map((item) => {
@@ -248,7 +251,7 @@ export function AdminShell({
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                     isActive
                       ? "bg-[#0EA5E9] text-white shadow-[0_4px_12px_rgba(14,165,233,0.3)]"
-                      : "text-[#475569] hover:bg-[#F8FAFC] hover:text-[#0F172A]"
+                      : "text-text-secondary hover:bg-bg-soft hover:text-text-primary"
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -260,8 +263,8 @@ export function AdminShell({
 
           {/* Advanced Panel (Pulse, devices, operations) */}
           {advancedNav.length > 0 && (
-            <div className="bg-white border border-[#E2E8F0] rounded-[24px] p-3.5 shadow-sm space-y-1">
-              <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8]">
+            <div className="bg-surface border border-border-soft rounded-[24px] p-3.5 shadow-sm space-y-1 transition-colors duration-200">
+              <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-text-tertiary">
                 Advanced
               </div>
               {advancedNav.map((item) => {
@@ -274,7 +277,7 @@ export function AdminShell({
                     className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                       isActive
                         ? "bg-[#0EA5E9] text-white shadow-[0_4px_12px_rgba(14,165,233,0.3)]"
-                        : "text-[#475569] hover:bg-[#F8FAFC] hover:text-[#0F172A]"
+                        : "text-text-secondary hover:bg-bg-soft hover:text-text-primary"
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -286,12 +289,12 @@ export function AdminShell({
           )}
 
           {/* Connected Server Card */}
-          <div className="bg-gradient-to-br from-white to-[#F0F9FF] border border-[#BAE6FD] rounded-[24px] p-4 text-xs">
-            <div className="flex items-center gap-2 text-[#0284C7] font-extrabold mb-1">
+          <div className="bg-gradient-to-br from-surface to-bg-soft border border-primary/20 rounded-[24px] p-4 text-xs transition-colors duration-200">
+            <div className="flex items-center gap-2 text-primary font-extrabold mb-1">
               <span className="w-2 h-2 rounded-full bg-[#0EA5E9] animate-pulse" />
               <span>Backend Connected</span>
             </div>
-            <p className="text-[11px] text-[#64748B] leading-relaxed">
+            <p className="text-[11px] text-text-secondary leading-relaxed">
               Real-time POS sync active. Currency: <b>{activeShop?.shop.currency_code || "INR"}</b>
             </p>
           </div>
@@ -301,30 +304,30 @@ export function AdminShell({
         <main className="flex-1 flex flex-col min-w-0">
           
           {/* Header Card */}
-          <div className="bg-white border border-[#E2E8F0] rounded-[28px] p-6 sm:p-7 shadow-sm mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="bg-surface border border-border-soft rounded-[28px] p-6 sm:p-7 shadow-sm mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 transition-colors duration-200">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-extrabold bg-[#0EA5E9]/10 text-[#0284C7] mb-2 uppercase">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-extrabold bg-primary/10 text-primary mb-2 uppercase">
                 <Store className="w-3.5 h-3.5" />
                 <span>{activeShop?.shop.name || "Business Hub"}</span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-[900] text-[#0F172A] tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-[900] text-text-primary tracking-tight">
                 {title}
               </h1>
-              <p className="text-xs sm:text-sm font-medium text-[#64748B] mt-1">
+              <p className="text-xs sm:text-sm font-medium text-text-secondary mt-1">
                 {subtitle}
               </p>
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl text-right">
-                <span className="block text-[10px] font-bold text-[#94A3B8] uppercase">Timezone</span>
-                <span className="text-xs font-extrabold text-[#0F172A]">
+              <div className="p-3 bg-bg-base border border-border-soft rounded-2xl text-right transition-colors duration-200">
+                <span className="block text-[10px] font-bold text-text-tertiary uppercase">Timezone</span>
+                <span className="text-xs font-extrabold text-text-primary">
                   {activeShop?.shop.timezone || "Asia/Kolkata"}
                 </span>
               </div>
-              <div className="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl text-right">
-                <span className="block text-[10px] font-bold text-[#94A3B8] uppercase">Currency</span>
-                <span className="text-xs font-extrabold text-[#0284C7]">
+              <div className="p-3 bg-bg-base border border-border-soft rounded-2xl text-right transition-colors duration-200">
+                <span className="block text-[10px] font-bold text-text-tertiary uppercase">Currency</span>
+                <span className="text-xs font-extrabold text-primary">
                   {activeShop?.shop.currency_code || "INR"}
                 </span>
               </div>
