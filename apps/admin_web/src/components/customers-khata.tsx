@@ -523,7 +523,7 @@ export function CustomersKhata() {
               </div>
               <button
                 onClick={() => setIsTxnModalOpen(false)}
-                className="p-1 text-[var(--text-tertiary)] hover:text-white"
+                className="p-1 text-[var(--text-tertiary)] hover:text-text-primary"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -532,7 +532,7 @@ export function CustomersKhata() {
             <form onSubmit={handleRecordKhataTxn} className="p-6 space-y-4">
               <div className="p-3 bg-bg-soft rounded-xl border border-[var(--border-soft)] text-xs">
                 <span className="text-[var(--text-tertiary)]">Customer: </span>
-                <strong className="text-white">{selectedCustomer.name}</strong>
+                <strong className="text-text-primary">{selectedCustomer.name}</strong>
               </div>
 
               <div>
@@ -572,7 +572,7 @@ export function CustomersKhata() {
                 <button
                   type="button"
                   onClick={() => setIsTxnModalOpen(false)}
-                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-white bg-bg-base rounded-xl"
+                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-text-primary bg-bg-base rounded-xl"
                 >
                   Cancel
                 </button>
@@ -613,7 +613,7 @@ export function CustomersKhata() {
               </div>
               <button
                 onClick={() => setIsAddCustomerOpen(false)}
-                className="p-1 text-[var(--text-tertiary)] hover:text-white"
+                className="p-1 text-[var(--text-tertiary)] hover:text-text-primary"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -692,7 +692,7 @@ export function CustomersKhata() {
                 <button
                   type="button"
                   onClick={() => setIsAddCustomerOpen(false)}
-                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-white bg-bg-base rounded-xl"
+                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-text-primary bg-bg-base rounded-xl"
                 >
                   Cancel
                 </button>

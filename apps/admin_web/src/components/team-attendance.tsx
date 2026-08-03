@@ -180,8 +180,8 @@ export function TeamAttendance() {
           onClick={() => setActiveTab("team")}
           className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-colors ${
             activeTab === "team"
-              ? "border-[var(--primary)] text-white"
-              : "border-transparent text-[var(--text-tertiary)] hover:text-white"
+              ? "border-[var(--primary)] text-text-primary"
+              : "border-transparent text-[var(--text-tertiary)] hover:text-text-primary"
           }`}
         >
           Team Roster ({staff.length})
@@ -190,8 +190,8 @@ export function TeamAttendance() {
           onClick={() => setActiveTab("attendance")}
           className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-colors ${
             activeTab === "attendance"
-              ? "border-[var(--primary)] text-white"
-              : "border-transparent text-[var(--text-tertiary)] hover:text-white"
+              ? "border-[var(--primary)] text-text-primary"
+              : "border-transparent text-[var(--text-tertiary)] hover:text-text-primary"
           }`}
         >
           Daily Shift Attendance ({attendance.length} Active)
@@ -216,7 +216,7 @@ export function TeamAttendance() {
                 {staff.map((m) => (
                   <tr key={m.id} className="hover:bg-bg-base transition-colors">
                     <td className="py-3 px-4">
-                      <div className="font-semibold text-white">{m.full_name}</div>
+                      <div className="font-semibold text-text-primary">{m.full_name}</div>
                       {m.phone && (
                         <div className="text-[10px] text-[var(--text-tertiary)]">{m.phone}</div>
                       )}
@@ -306,7 +306,7 @@ export function TeamAttendance() {
               </div>
               <button
                 onClick={() => setIsInviteOpen(false)}
-                className="p-1 text-[var(--text-tertiary)] hover:text-white"
+                className="p-1 text-[var(--text-tertiary)] hover:text-text-primary"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -360,7 +360,7 @@ export function TeamAttendance() {
                 <button
                   type="button"
                   onClick={() => setIsInviteOpen(false)}
-                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-white bg-bg-base rounded-xl"
+                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-text-primary bg-bg-base rounded-xl"
                 >
                   Cancel
                 </button>

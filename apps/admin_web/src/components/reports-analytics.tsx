@@ -103,8 +103,8 @@ export function ReportsAnalytics() {
           onClick={() => setActiveReportTab("pnl")}
           className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-colors ${
             activeReportTab === "pnl"
-              ? "border-[var(--primary)] text-white"
-              : "border-transparent text-[var(--text-tertiary)] hover:text-white"
+              ? "border-[var(--primary)] text-text-primary"
+              : "border-transparent text-[var(--text-tertiary)] hover:text-text-primary"
           }`}
         >
           Profit & Loss Statement
@@ -113,8 +113,8 @@ export function ReportsAnalytics() {
           onClick={() => setActiveReportTab("gst")}
           className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-colors ${
             activeReportTab === "gst"
-              ? "border-[var(--primary)] text-white"
-              : "border-transparent text-[var(--text-tertiary)] hover:text-white"
+              ? "border-[var(--primary)] text-text-primary"
+              : "border-transparent text-[var(--text-tertiary)] hover:text-text-primary"
           }`}
         >
           GSTR-1 Tax Breakup
@@ -123,8 +123,8 @@ export function ReportsAnalytics() {
           onClick={() => setActiveReportTab("products")}
           className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-colors ${
             activeReportTab === "products"
-              ? "border-[var(--primary)] text-white"
-              : "border-transparent text-[var(--text-tertiary)] hover:text-white"
+              ? "border-[var(--primary)] text-text-primary"
+              : "border-transparent text-[var(--text-tertiary)] hover:text-text-primary"
           }`}
         >
           Top Selling Products
@@ -207,7 +207,7 @@ export function ReportsAnalytics() {
         <div className="bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl overflow-hidden shadow-xl">
           <div className="p-4 border-b border-[var(--border-soft)] bg-[var(--bg-soft)] flex items-center justify-between">
             <div>
-              <h3 className="font-bold text-sm text-white">GSTR-1 Outward Supplies Summary</h3>
+              <h3 className="font-bold text-sm text-text-primary">GSTR-1 Outward Supplies Summary</h3>
               <p className="text-[11px] text-[var(--text-tertiary)]">
                 Taxable turnover and CGST/SGST/IGST liability categorized by tax rate
               </p>
@@ -229,7 +229,7 @@ export function ReportsAnalytics() {
                 {gstData.map((g) => (
                   <tr key={g.slab} className="hover:bg-bg-base">
                     <td className="py-3 px-4 font-semibold text-text-primary">{g.slab}</td>
-                    <td className="py-3 px-4 text-right font-mono text-white">
+                    <td className="py-3 px-4 text-right font-mono text-text-primary">
                       {formatCurrency(g.taxable)}
                     </td>
                     <td className="py-3 px-4 text-right font-mono text-[var(--text-secondary)]">

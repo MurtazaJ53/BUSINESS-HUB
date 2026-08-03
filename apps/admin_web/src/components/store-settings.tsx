@@ -75,8 +75,8 @@ export function StoreSettings({
           onClick={() => setActiveTab("general")}
           className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 ${
             activeTab === "general"
-              ? "border-[var(--primary)] text-white"
-              : "border-transparent text-[var(--text-tertiary)] hover:text-white"
+              ? "border-[var(--primary)] text-text-primary"
+              : "border-transparent text-[var(--text-tertiary)] hover:text-text-primary"
           }`}
         >
           <Building2 className="w-3.5 h-3.5" />
@@ -86,8 +86,8 @@ export function StoreSettings({
           onClick={() => setActiveTab("tax")}
           className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 ${
             activeTab === "tax"
-              ? "border-[var(--primary)] text-white"
-              : "border-transparent text-[var(--text-tertiary)] hover:text-white"
+              ? "border-[var(--primary)] text-text-primary"
+              : "border-transparent text-[var(--text-tertiary)] hover:text-text-primary"
           }`}
         >
           <Receipt className="w-3.5 h-3.5" />
@@ -97,8 +97,8 @@ export function StoreSettings({
           onClick={() => setActiveTab("hardware")}
           className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 ${
             activeTab === "hardware"
-              ? "border-[var(--primary)] text-white"
-              : "border-transparent text-[var(--text-tertiary)] hover:text-white"
+              ? "border-[var(--primary)] text-text-primary"
+              : "border-transparent text-[var(--text-tertiary)] hover:text-text-primary"
           }`}
         >
           <Printer className="w-3.5 h-3.5" />
@@ -108,8 +108,8 @@ export function StoreSettings({
           onClick={() => setActiveTab("plan")}
           className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 ${
             activeTab === "plan"
-              ? "border-[var(--primary)] text-white"
-              : "border-transparent text-[var(--text-tertiary)] hover:text-white"
+              ? "border-[var(--primary)] text-text-primary"
+              : "border-transparent text-[var(--text-tertiary)] hover:text-text-primary"
           }`}
         >
           <CreditCard className="w-3.5 h-3.5" />
@@ -282,7 +282,7 @@ export function StoreSettings({
                   onChange={(e) => setAutoPrint(e.target.checked)}
                   className="w-4 h-4 rounded text-[var(--primary)] focus:ring-0 bg-bg-soft border-[var(--border-soft)]"
                 />
-                <span className="text-xs text-white font-medium">
+                <span className="text-xs text-text-primary font-medium">
                   Auto-trigger browser print dialog on completing checkout
                 </span>
               </label>

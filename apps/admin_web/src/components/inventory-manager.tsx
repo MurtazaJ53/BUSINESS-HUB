@@ -314,7 +314,7 @@ export function InventoryManager() {
             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-colors shrink-0 ${
               onlyLowStock
                 ? "bg-red-500/20 text-red-300 border-red-500/30"
-                : "bg-bg-soft text-[var(--text-secondary)] border-[var(--border-soft)] hover:text-white"
+                : "bg-bg-soft text-[var(--text-secondary)] border-[var(--border-soft)] hover:text-text-primary"
             }`}
           >
             <AlertTriangle className="w-3.5 h-3.5" />
@@ -349,7 +349,7 @@ export function InventoryManager() {
                 filteredItems.map((item) => (
                   <tr key={item.id} className="hover:bg-bg-base transition-colors">
                     <td className="py-3 px-4">
-                      <div className="font-semibold text-white">{item.name}</div>
+                      <div className="font-semibold text-text-primary">{item.name}</div>
                       <div className="flex items-center gap-2 text-[10px] text-[var(--text-tertiary)] font-mono mt-0.5">
                         <span>SKU: {item.sku}</span>
                         {item.barcode && <span>• Barcode: {item.barcode}</span>}
@@ -363,7 +363,7 @@ export function InventoryManager() {
                     <td className="py-3 px-4 text-right font-mono text-[var(--text-tertiary)]">
                       {formatCurrency(item.cost_price)}
                     </td>
-                    <td className="py-3 px-4 text-right font-mono font-semibold text-white">
+                    <td className="py-3 px-4 text-right font-mono font-semibold text-text-primary">
                       {formatCurrency(item.selling_price)}
                     </td>
                     <td className="py-3 px-4 text-center">
@@ -401,7 +401,7 @@ export function InventoryManager() {
                         </button>
                         <button
                           onClick={() => openEditModal(item)}
-                          className="p-1.5 text-[var(--text-tertiary)] hover:text-white hover:bg-bg-base rounded-lg transition-colors"
+                          className="p-1.5 text-[var(--text-tertiary)] hover:text-text-primary hover:bg-bg-base rounded-lg transition-colors"
                           title="Edit product"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
@@ -439,7 +439,7 @@ export function InventoryManager() {
               </div>
               <button
                 onClick={() => setIsProductModalOpen(false)}
-                className="p-1 rounded-lg text-[var(--text-tertiary)] hover:text-white"
+                className="p-1 rounded-lg text-[var(--text-tertiary)] hover:text-text-primary"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -580,7 +580,7 @@ export function InventoryManager() {
                 <button
                   type="button"
                   onClick={() => setIsProductModalOpen(false)}
-                  className="px-4 py-2 text-xs font-medium text-[var(--text-secondary)] hover:text-white bg-bg-base rounded-xl"
+                  className="px-4 py-2 text-xs font-medium text-[var(--text-secondary)] hover:text-text-primary bg-bg-base rounded-xl"
                 >
                   Cancel
                 </button>
@@ -617,7 +617,7 @@ export function InventoryManager() {
               </div>
               <button
                 onClick={() => setAdjustItem(null)}
-                className="p-1 text-[var(--text-tertiary)] hover:text-white"
+                className="p-1 text-[var(--text-tertiary)] hover:text-text-primary"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -678,7 +678,7 @@ export function InventoryManager() {
                 <button
                   type="button"
                   onClick={() => setAdjustItem(null)}
-                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-white bg-bg-base rounded-xl"
+                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-text-primary bg-bg-base rounded-xl"
                 >
                   Cancel
                 </button>

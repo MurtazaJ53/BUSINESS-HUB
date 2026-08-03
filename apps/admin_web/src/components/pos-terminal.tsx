@@ -663,7 +663,7 @@ export function PosTerminal({
             <button
               disabled={cart.length === 0}
               onClick={() => setIsCheckoutOpen(true)}
-              className="flex items-center gap-2 px-6 py-3.5 bg-gradient-to-r from-[#38BDF8] to-[#0284C7] hover:from-[#0EA5E9] hover:to-[#0369A1] disabled:opacity-40 text-white font-extrabold text-xs rounded-2xl shadow-[0_8px_20px_rgba(14,165,233,0.35)] transition-all cursor-pointer"
+              className="flex items-center gap-2 px-6 py-3.5 bg-gradient-to-r from-[#38BDF8] to-[#0284C7] hover:from-[#0EA5E9] hover:to-[#0369A1] disabled:opacity-40 text-text-primary font-extrabold text-xs rounded-2xl shadow-[0_8px_20px_rgba(14,165,233,0.35)] transition-all cursor-pointer"
             >
               <CreditCard className="w-4 h-4" />
               <span>CHARGE (F2)</span>

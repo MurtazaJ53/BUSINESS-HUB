@@ -219,8 +219,8 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
           onClick={() => setActiveTab("purchases")}
           className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-colors ${
             activeTab === "purchases"
-              ? "border-[var(--primary)] text-white"
-              : "border-transparent text-[var(--text-tertiary)] hover:text-white"
+              ? "border-[var(--primary)] text-text-primary"
+              : "border-transparent text-[var(--text-tertiary)] hover:text-text-primary"
           }`}
         >
           Purchase Inwards ({purchases.length})
@@ -229,8 +229,8 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
           onClick={() => setActiveTab("suppliers")}
           className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-colors ${
             activeTab === "suppliers"
-              ? "border-[var(--primary)] text-white"
-              : "border-transparent text-[var(--text-tertiary)] hover:text-white"
+              ? "border-[var(--primary)] text-text-primary"
+              : "border-transparent text-[var(--text-tertiary)] hover:text-text-primary"
           }`}
         >
           Supplier Directory ({suppliers.length})
@@ -258,7 +258,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
                   const due = po.total_amount - po.paid_amount;
                   return (
                     <tr key={po.id} className="hover:bg-bg-base transition-colors">
-                      <td className="py-3 px-4 font-mono font-semibold text-white">
+                      <td className="py-3 px-4 font-mono font-semibold text-text-primary">
                         {po.invoice_number}
                       </td>
                       <td className="py-3 px-4 text-[var(--text-tertiary)]">
@@ -354,7 +354,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
               </div>
               <button
                 onClick={() => setIsNewPoOpen(false)}
-                className="p-1 text-[var(--text-tertiary)] hover:text-white"
+                className="p-1 text-[var(--text-tertiary)] hover:text-text-primary"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -426,7 +426,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
                 <button
                   type="button"
                   onClick={() => setIsNewPoOpen(false)}
-                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-white bg-bg-base rounded-xl"
+                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-text-primary bg-bg-base rounded-xl"
                 >
                   Cancel
                 </button>
@@ -461,7 +461,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
               </div>
               <button
                 onClick={() => setIsNewSupplierOpen(false)}
-                className="p-1 text-[var(--text-tertiary)] hover:text-white"
+                className="p-1 text-[var(--text-tertiary)] hover:text-text-primary"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -539,7 +539,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
                 <button
                   type="button"
                   onClick={() => setIsNewSupplierOpen(false)}
-                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-white bg-bg-base rounded-xl"
+                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-text-primary bg-bg-base rounded-xl"
                 >
                   Cancel
                 </button>

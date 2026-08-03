@@ -301,7 +301,7 @@ export function ExpensesManager() {
               </div>
               <button
                 onClick={() => setIsAddOpen(false)}
-                className="p-1 text-[var(--text-tertiary)] hover:text-white"
+                className="p-1 text-[var(--text-tertiary)] hover:text-text-primary"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -388,7 +388,7 @@ export function ExpensesManager() {
                 <button
                   type="button"
                   onClick={() => setIsAddOpen(false)}
-                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-white bg-bg-base rounded-xl"
+                  className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-text-primary bg-bg-base rounded-xl"
                 >
                   Cancel
                 </button>
