@@ -149,6 +149,12 @@ class SettingsScreen extends ConsumerWidget {
             ),
 
           MobileListTile(
+            title: 'Data health',
+            subtitle: 'Find and fix duplicates and bad counts',
+            leadingIcon: Icons.healing_rounded,
+            onTap: () => context.push('/settings/data-health'),
+          ),
+          MobileListTile(
             title: l.settingsBackup,
             subtitle: l.settingsBackupSub,
             leadingIcon: Icons.backup_rounded,
