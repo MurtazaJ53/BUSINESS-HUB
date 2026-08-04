@@ -54,9 +54,13 @@ compose exec -T db pg_isready -U "$PG_USER" >/dev/null 2>&1 \
   || fail "database is not ready; refusing to write a bogus backup"
 
 # -Fc  custom format: compressed, and supports selective/parallel restore.
-# nice/ionice keep the dump from starving the API or the other site on this box.
-if ! nice -n 10 ionice -c2 -n7 \
-     compose exec -T db pg_dump -U "$PG_USER" -d "$PG_DB" -Fc --no-owner > "$TMP"; then
+#
+# Deliberately NOT wrapped in nice/ionice: pg_dump runs inside the db container,
+# so niceness applied to the docker client on the host would not reach it (and
+# nice/ionice cannot invoke a shell function anyway). The dump is compressed and
+# short-lived; if this database ever grows enough to disturb the box, throttle
+# the container itself with cpus/blkio limits in compose instead.
+if ! compose exec -T db pg_dump -U "$PG_USER" -d "$PG_DB" -Fc --no-owner > "$TMP"; then
   rm -f "$TMP"
   fail "pg_dump failed"
 fi
