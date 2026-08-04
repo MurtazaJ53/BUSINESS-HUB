@@ -1560,6 +1560,7 @@ class BackendApiClient {
     return BackendCustomerSummary(
       id: (row['id'] ?? '').toString(),
       name: (row['name'] ?? 'Unnamed customer').toString(),
+      loyaltyPoints: _asInt(row['loyalty_points']),
       phone: _nullableText(row['phone']),
       email: _nullableText(row['email']),
       totalSpent: _asDouble(row['total_spent']),

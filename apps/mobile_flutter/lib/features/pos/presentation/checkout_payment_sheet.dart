@@ -37,12 +37,16 @@ class CheckoutPaymentSheet extends StatefulWidget {
     required this.gstSummary,
     this.upiVpa = '',
     this.shopName = '',
+    this.availablePoints = 0,
   });
 
   final double cartTotal;
   final GstCartSummary gstSummary;
   final String upiVpa;
   final String shopName;
+
+  /// Loyalty points the selected customer holds. Zero hides the whole control.
+  final int availablePoints;
 
   @override
   State<CheckoutPaymentSheet> createState() => _CheckoutPaymentSheetState();
@@ -51,6 +55,17 @@ class CheckoutPaymentSheet extends StatefulWidget {
 class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
   final TextEditingController _buyerGstin = TextEditingController();
   final List<_PayLine> _lines = <_PayLine>[];
+  int _redeemPoints = 0;
+
+  /// Points are worth Rs.1 each by default. The SERVER re-decides and clamps
+  /// this, so a shop on a different point value can never be short-changed by
+  /// what the till displays — the bill it saves is the server's figure.
+  double get _redeemValue => _redeemPoints.toDouble();
+
+  int get _maxRedeemable {
+    final byBill = widget.cartTotal.floor();
+    return widget.availablePoints < byBill ? widget.availablePoints : byBill;
+  }
 
   @override
   void initState() {
@@ -171,6 +186,7 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
     Navigator.pop(context, <String, dynamic>{
       'payments': resolution.payments,
       'paymentMode': paymentModeFor(resolution.payments),
+      'redeemPoints': _redeemPoints,
       'buyerGstin': _buyerGstin.text.trim().isEmpty
           ? null
           : _buyerGstin.text.trim(),
@@ -256,6 +272,16 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
                     label: const Text('Add split'),
                   ),
                 ),
+                if (_maxRedeemable > 0) ...<Widget>[
+                  const SizedBox(height: 12),
+                  _LoyaltyRedeemCard(
+                    available: widget.availablePoints,
+                    maxRedeemable: _maxRedeemable,
+                    redeeming: _redeemPoints,
+                    onChanged: (points) =>
+                        setState(() => _redeemPoints = points),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 // Live summary
                 Container(
@@ -268,6 +294,14 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
                   child: Column(
                     children: <Widget>[
                       _SummaryLine(label: 'Total', value: widget.cartTotal),
+                      if (_redeemPoints > 0) ...<Widget>[
+                        const SizedBox(height: 6),
+                        _SummaryLine(
+                          label: '$_redeemPoints points',
+                          value: -_redeemValue,
+                          valueColor: AppPalette.success,
+                        ),
+                      ],
                       const SizedBox(height: 6),
                       _SummaryLine(
                         label: 'Paid',
@@ -359,6 +393,83 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
 
 /// Inline collect-QR shown as soon as UPI is chosen, so the customer can scan
 /// while the cashier is still on the checkout sheet.
+/// Spend a customer's loyalty points on this bill.
+class _LoyaltyRedeemCard extends StatelessWidget {
+  const _LoyaltyRedeemCard({
+    required this.available,
+    required this.maxRedeemable,
+    required this.redeeming,
+    required this.onChanged,
+  });
+
+  final int available;
+  final int maxRedeemable;
+  final int redeeming;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppPalette.success.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppPalette.success.withValues(alpha: 0.30)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              const Icon(Icons.card_giftcard_rounded,
+                  color: AppPalette.success, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '$available points available',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              if (redeeming > 0)
+                TextButton(
+                  onPressed: () => onChanged(0),
+                  child: const Text('Clear'),
+                ),
+            ],
+          ),
+          if (redeeming > 0)
+            Text(
+              'Using $redeeming points - ${formatCurrency(redeeming.toDouble())} off',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppPalette.success,
+                fontWeight: FontWeight.w700,
+              ),
+            )
+          else
+            Text(
+              // Be explicit that the bill caps it, so a cashier isn't confused
+              // when a big balance only knocks off part of a small bill.
+              'Up to $maxRedeemable can be used on this bill',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colors.textSecondary,
+              ),
+            ),
+          Slider(
+            value: redeeming.toDouble().clamp(0, maxRedeemable.toDouble()),
+            max: maxRedeemable.toDouble(),
+            divisions: maxRedeemable > 0 ? maxRedeemable : null,
+            label: '$redeeming',
+            onChanged: (value) => onChanged(value.round()),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _UpiCollectCard extends StatelessWidget {
   const _UpiCollectCard({
     required this.vpa,

@@ -2032,6 +2032,7 @@ class SalesRepository {
     String? customerPhone,
     String? buyerGstin,
     double discount = 0,
+    int redeemPoints = 0,
     DateTime? saleDate,
   }) async {
     if (shopId.trim().isEmpty) {
@@ -2122,6 +2123,7 @@ class SalesRepository {
                   customerPhone: customerPhone,
                   footerNote: footerNote,
                   buyerGstin: buyerGstin,
+                  redeemPoints: redeemPoints,
                   inventoryDeltas: inventoryDeltas,
                 ).toBackendCommandPayload(),
               ),

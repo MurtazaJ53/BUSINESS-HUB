@@ -44,6 +44,8 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
   final TextEditingController _customerNameController = TextEditingController();
   final TextEditingController _customerPhoneController = TextEditingController();
   final List<PosCartItem> _cart = <PosCartItem>[];
+  /// Loyalty points held by the customer attached to this bill.
+  int _customerPoints = 0;
 
   String _search = '';
   String? _selectedCategory;
@@ -960,6 +962,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
     if (selected != null) {
       _customerNameController.text = selected.name;
       _customerPhoneController.text = selected.phone ?? '';
+      _customerPoints = selected.loyaltyPoints;
       if (mounted) setState(() {});
     }
   }
@@ -988,6 +991,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
         gstSummary: _gstSummary,
         upiVpa: shop.upiVpa.trim(),
         shopName: shop.name,
+        availablePoints: _customerPoints,
       ),
     );
     if (result == null || !mounted) return;
@@ -1069,8 +1073,10 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
         customerPhone: customerPhone,
         customerAddress: customerAddress,
       );
+      final redeemPoints = (result['redeemPoints'] as int?) ?? 0;
       final commit = await salesRepository.recordLocalSale(
         shopId: activeShopId,
+        redeemPoints: redeemPoints,
         items: List<PosCartItem>.from(_cart),
         payments: payments,
         paymentMode: paymentMode,
@@ -1106,6 +1112,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
       _customerPhoneController.clear();
       setState(() {
         _cart.clear();
+        _customerPoints = 0;
         _discountIsPercent = false;
         _saleDate = null;
         _saving = false;

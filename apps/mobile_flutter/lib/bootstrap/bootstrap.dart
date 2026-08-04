@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -8,9 +9,18 @@ import '../app/app.dart';
 import '../core/diagnostics/crash_logger.dart';
 import '../core/theme/app_theme.dart';
 
-/// Cloud crash reporting is enabled only when a DSN is supplied at build time:
-///   --dart-define SENTRY_DSN=https://...ingest.sentry.io/...
-const String _sentryDsn = String.fromEnvironment('SENTRY_DSN', defaultValue: '');
+/// Cloud crash reporting.
+///
+/// A Sentry DSN is a write-only ingest endpoint — it is designed to ship inside
+/// the client and cannot read data back — so it lives here as the default
+/// rather than being passed at every build, which is how it ended up unset (and
+/// crash reporting silently off) in the first place. Override per build with
+///   --dart-define SENTRY_DSN=...
+const String _sentryDsn = String.fromEnvironment(
+  'SENTRY_DSN',
+  defaultValue:
+      'https://1a090a583f745386a58e8513d4b6e549@o4511852648202240.ingest.de.sentry.io/4511852669894736',
+);
 
 Future<void> bootstrapApplication() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -48,7 +58,13 @@ Future<void> bootstrapApplication() async {
   await SentryFlutter.init(
     (options) {
       options.dsn = _sentryDsn;
+      // No performance tracing: this is a POS on cheap phones and metered
+      // data. We want crashes, not a stream of spans.
       options.tracesSampleRate = 0.0;
+      options.environment = kReleaseMode ? 'production' : 'debug';
+      // A shop's bills and customer names must never leave the device, so
+      // don't let the SDK attach user/request data automatically.
+      options.sendDefaultPii = false;
     },
     appRunner: runTheApp,
   );

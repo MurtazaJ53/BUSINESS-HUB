@@ -357,7 +357,8 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
       title: customer.name,
       subtitle: (customer.phone ?? '').isEmpty
           ? (hasDues ? 'Due: ${formatCurrency(customer.balance)}' : 'No dues')
-          : '${customer.phone}${hasDues ? ' • Due: ${formatCurrency(customer.balance)}' : ''}',
+          : '${customer.phone}${hasDues ? ' • Due: ${formatCurrency(customer.balance)}' : ''}'
+              '${customer.loyaltyPoints > 0 ? ' • ${customer.loyaltyPoints} pts' : ''}',
       leadingIcon: Icons.person_rounded,
       leadingColor: hasDues ? AppPalette.warning : AppPalette.customer,
       trailing: hasDues

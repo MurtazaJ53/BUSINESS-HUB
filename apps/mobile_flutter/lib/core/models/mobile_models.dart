@@ -1573,10 +1573,14 @@ class BackendCustomerSummary {
     this.phone,
     this.email,
     this.notes,
+    this.loyaltyPoints = 0,
   });
 
   final String id;
   final String name;
+
+  /// Loyalty points available to redeem. Whole points only.
+  final int loyaltyPoints;
   final String? phone;
   final String? email;
   final double totalSpent;
@@ -1999,6 +2003,7 @@ class LocalSaleCommit {
     required this.customerPhone,
     required this.footerNote,
     this.buyerGstin,
+    this.redeemPoints = 0,
     required this.inventoryDeltas,
   });
 
@@ -2019,6 +2024,10 @@ class LocalSaleCommit {
   final String? customerPhone;
   final String? footerNote;
   final String? buyerGstin;
+
+  /// Loyalty points the customer is spending on this bill. The server decides
+  /// what is actually allowed and converts it to a discount.
+  final int redeemPoints;
   // Signed stock change per item id (negative = sold). Fractional for weighed
   // goods. NOTE: the backend sale serializer must accept fractional quantity
   // before cloud sync is enabled for weighed items.
@@ -2034,6 +2043,7 @@ class LocalSaleCommit {
       'customer_phone': customerPhone ?? '',
       'buyer_gstin': buyerGstin ?? '',
       'discount_amount': discount.toStringAsFixed(2),
+      'redeem_points': redeemPoints,
       'payment_mode': paymentMode,
       'footer_note': footerNote ?? '',
       'sale_date': date,
