@@ -422,7 +422,7 @@ Future<Uint8List> buildReceiptPdf(SaleRecordDetail detail, ShopInfo shop) async 
                     ),
                   pw.SizedBox(height: 6),
                   pw.Text(
-                    'Powered by Business Hub',
+                    'Powered by Amburax',
                     style: const pw.TextStyle(fontSize: 6.5, color: _muted),
                   ),
                 ],

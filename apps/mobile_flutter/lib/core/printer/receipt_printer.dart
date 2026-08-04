@@ -145,8 +145,17 @@ class ReceiptPrinterService {
     }
 
     bytes += generator.emptyLines(1);
+    // Use the shop's own closing message (Business settings) so paper and PDF
+    // receipts say the same thing, instead of a hardcoded line.
+    final closing = shop.footer.trim();
+    if (closing.isNotEmpty) {
+      bytes += generator.text(
+        closing,
+        styles: const PosStyles(align: PosAlign.center),
+      );
+    }
     bytes += generator.text(
-      'Thank you for your business!',
+      'Powered by Amburax',
       styles: const PosStyles(align: PosAlign.center),
     );
     bytes += generator.emptyLines(2);
