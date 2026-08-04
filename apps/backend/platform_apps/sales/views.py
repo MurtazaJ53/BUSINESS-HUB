@@ -63,7 +63,7 @@ class SaleListCreateView(ShopScopedMixin, generics.ListCreateAPIView):
             Sale.objects.filter(shop=membership.shop, tombstone=False)
             .select_related("actor_user", "customer")
             .prefetch_related(
-                Prefetch("items", queryset=SaleItem.objects.select_related("inventory_item").order_by("created_at")),
+                Prefetch("items", queryset=SaleItem.objects.select_related("inventory_item").order_by("position", "created_at")),
                 Prefetch("payments", queryset=SalePayment.objects.order_by("created_at")),
             )
         )
@@ -148,7 +148,7 @@ class SaleDetailView(ShopScopedMixin, generics.RetrieveAPIView):
             Sale.objects.filter(shop=membership.shop, tombstone=False)
             .select_related("actor_user", "customer")
             .prefetch_related(
-                Prefetch("items", queryset=SaleItem.objects.select_related("inventory_item").order_by("created_at")),
+                Prefetch("items", queryset=SaleItem.objects.select_related("inventory_item").order_by("position", "created_at")),
                 Prefetch("payments", queryset=SalePayment.objects.order_by("created_at")),
             )
         )
@@ -355,7 +355,7 @@ def _get_sale_queryset_for_shop(*, shop_id: str):
         Sale.objects.filter(shop_id=shop_id, tombstone=False)
         .select_related("actor_user", "customer")
         .prefetch_related(
-            Prefetch("items", queryset=SaleItem.objects.select_related("inventory_item").order_by("created_at")),
+            Prefetch("items", queryset=SaleItem.objects.select_related("inventory_item").order_by("position", "created_at")),
             Prefetch("payments", queryset=SalePayment.objects.order_by("created_at")),
         )
     )

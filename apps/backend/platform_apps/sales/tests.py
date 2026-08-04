@@ -814,3 +814,65 @@ class PerItemDiscountTotalsTests(TestCase):
         self.assertEqual(
             sum(i.line_discount for i in sale.items.all()), Decimal("150.00")
         )
+
+
+class SaleItemOrderingTests(TestCase):
+    """Receipt lines must come back in the order the cashier rang them up.
+
+    Regression: every line of a sale is inserted in one tight loop, so
+    auto_now_add gave them the same created_at and ordering by it returned an
+    arbitrary order — receipts listed items in neither entry nor alphabetical
+    order.
+    """
+
+    def setUp(self):
+        self.user = PlatformUser.objects.create_user(
+            email="order@example.com", password="secret", full_name="Owner"
+        )
+        self.shop = Shop.objects.create(name="Order Shop", slug="order-shop")
+        ShopMembership.objects.create(
+            user=self.user,
+            shop=self.shop,
+            role=ShopMembership.Role.OWNER,
+            status=ShopMembership.Status.ACTIVE,
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+        # Deliberately NOT alphabetical, so alphabetical ordering would fail.
+        self.names = ["Zeta", "Alpha", "Mango", "Beta", "Kiwi", "Delta", "Omega"]
+
+    def _create_sale(self):
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/",
+            {
+                "items": [
+                    {"name": n, "quantity": 1, "unit_price": "10.00"}
+                    for n in self.names
+                ],
+                "payments": [{"payment_method": "CASH", "amount": "70.00"}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+        return response
+
+    def test_items_are_stored_with_their_entry_position(self):
+        self._create_sale()
+        sale = Sale.objects.get()
+        ordered = list(sale.items.order_by("position").values_list("name_snapshot", flat=True))
+        self.assertEqual(ordered, self.names)
+
+    def test_sale_detail_returns_items_in_entry_order(self):
+        self._create_sale()
+        sale = Sale.objects.get()
+        detail = self.client.get(f"/api/v1/shops/{self.shop.id}/sales/{sale.id}/")
+        self.assertEqual(detail.status_code, 200, detail.content)
+        self.assertEqual([i["name"] for i in detail.json()["items"]], self.names)
+
+    def test_sale_list_returns_items_in_entry_order(self):
+        self._create_sale()
+        listing = self.client.get(f"/api/v1/shops/{self.shop.id}/sales/")
+        self.assertEqual(listing.status_code, 200, listing.content)
+        rows = listing.json()
+        rows = rows["results"] if isinstance(rows, dict) else rows
+        self.assertEqual([i["name"] for i in rows[0]["items"]], self.names)

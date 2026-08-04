@@ -89,6 +89,10 @@ class Sale(SourceTrackedModel):
 
 class SaleItem(SourceTrackedModel):
     sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name="items")
+    # Line order as the cashier rang it up. created_at can't be used for this:
+    # every line of a sale is inserted in one tight loop, so auto_now_add gives
+    # them the same timestamp and ordering by it returns an arbitrary order.
+    position = models.PositiveIntegerField(default=0)
     inventory_item = models.ForeignKey(
         InventoryItem,
         on_delete=models.SET_NULL,

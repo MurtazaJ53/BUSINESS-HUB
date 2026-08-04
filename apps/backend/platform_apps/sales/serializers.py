@@ -430,6 +430,7 @@ class SaleSerializer(serializers.ModelSerializer):
 
             sale_item = SaleItem.objects.create(
                 sale=sale,
+                position=idx,
                 inventory_item=inventory_item,
                 name_snapshot=item_name,
                 sku_snapshot=sku_snapshot,
