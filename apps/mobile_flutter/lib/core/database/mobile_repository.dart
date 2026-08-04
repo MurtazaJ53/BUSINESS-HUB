@@ -3242,6 +3242,91 @@ class ReportsRepository {
 
   final BusinessHubDatabase _db;
 
+  /// Best sellers over the last [days], by quantity moved.
+  ///
+  /// Reads the stock-movement log rather than parsing every bill's item JSON:
+  /// with tens of thousands of sales, JSON parsing would make this unusable.
+  Future<List<BestSellerItem>> bestSellers({int days = 30, int limit = 20}) async {
+    final cutoff =
+        DateTime.now().subtract(Duration(days: days)).millisecondsSinceEpoch;
+    final rows = await _db.customSelect(
+      """
+        SELECT m.item_name AS name,
+               SUM(-m.delta) AS qty,
+               SUM(-m.delta * COALESCE(i.price, 0)) AS revenue,
+               SUM(-m.delta * (COALESCE(i.price, 0) - COALESCE(p.cost_price, 0)))
+                 AS profit,
+               MAX(CASE WHEN p.cost_price IS NULL THEN 1 ELSE 0 END) AS cost_missing
+        FROM stock_movements m
+        LEFT JOIN inventory i ON i.id = m.item_id
+        LEFT JOIN inventory_private p ON p.id = m.item_id
+        WHERE m.reason = 'SALE' AND m.created_at >= ? AND m.delta < 0
+        GROUP BY LOWER(m.item_name)
+        ORDER BY qty DESC
+        LIMIT ?;
+      """,
+      variables: [Variable<int>(cutoff), Variable<int>(limit)],
+      readsFrom: {
+        _db.stockMovementEntries,
+        _db.inventoryEntries,
+        _db.inventoryPrivateEntries,
+      },
+    ).get();
+
+    return rows
+        .map(
+          (row) => BestSellerItem(
+            name: row.readNullable<String>('name') ?? 'Unknown item',
+            quantitySold: row.readNullable<double>('qty') ?? 0,
+            revenue: row.readNullable<double>('revenue') ?? 0,
+            // Don't report a profit we can't stand behind.
+            profit: (row.readNullable<int>('cost_missing') ?? 1) == 1
+                ? null
+                : row.readNullable<double>('profit'),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  /// Money in vs money out over the last [days].
+  Future<CashFlowSnapshot> cashFlow({int days = 30}) async {
+    final since = DateTime.now()
+        .subtract(Duration(days: days))
+        .toIso8601String()
+        .split('T')
+        .first;
+
+    final row = await _db.customSelect(
+      """
+        SELECT
+          (SELECT COALESCE(SUM(total), 0) FROM sales
+            WHERE tombstone = 0
+              AND sync_status NOT IN ('refunded', 'void')
+              AND date >= ?) AS sales_total,
+          (SELECT COALESCE(SUM(amount_paid), 0) FROM purchases
+            WHERE tombstone = 0 AND purchase_date >= ?) AS purchases_paid,
+          (SELECT COALESCE(SUM(amount), 0) FROM expenses
+            WHERE tombstone = 0 AND expense_date >= ?) AS expenses_total;
+      """,
+      variables: [
+        Variable<String>(since),
+        Variable<String>(since),
+        Variable<String>(since),
+      ],
+      readsFrom: {
+        _db.salesEntries,
+        _db.purchaseEntries,
+        _db.expenseEntries,
+      },
+    ).getSingle();
+
+    return CashFlowSnapshot(
+      salesCollected: row.readNullable<double>('sales_total') ?? 0,
+      purchases: row.readNullable<double>('purchases_paid') ?? 0,
+      expenses: row.readNullable<double>('expenses_total') ?? 0,
+    );
+  }
+
   Stream<List<ReportSale>> watchReportSales(HistoryDateWindow window) {
     final exactDate = _historyExactDate(window);
     final sinceDate = _historySinceDate(window);

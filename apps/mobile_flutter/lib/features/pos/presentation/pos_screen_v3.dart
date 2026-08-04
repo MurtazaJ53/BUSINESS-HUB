@@ -1526,9 +1526,15 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
   /// Horizontal strip of favourite (quick-key) items above the catalog.
   /// Long-press any product to pin/unpin it here.
   Widget _buildFavouritesStrip() {
-    final favourites =
+    final pinned =
         ref.watch(favouriteItemsProvider).asData?.value ??
         const <InventoryCatalogItem>[];
+    // Fall back to what the shop actually sells most, so the quick-add row is
+    // useful before anyone discovers the long-press-to-pin gesture.
+    final favourites = pinned.isNotEmpty
+        ? pinned
+        : (ref.watch(autoTopSellersProvider).asData?.value ??
+            const <InventoryCatalogItem>[]);
     if (favourites.isEmpty) return const SizedBox.shrink();
     return SizedBox(
       height: 44,

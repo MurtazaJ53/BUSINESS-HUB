@@ -494,4 +494,112 @@ class LGu extends L {
 
   @override
   String get reorderSupplierPhone => 'સપ્લાયરનો મોબાઇલ નંબર';
+
+  @override
+  String get expAdd => 'ખર્ચ ઉમેરો';
+
+  @override
+  String get expDetails => 'ખર્ચની વિગત';
+
+  @override
+  String get expTotal => 'કુલ ખર્ચ';
+
+  @override
+  String get purSuppliers => 'સપ્લાયર અને ખરીદી';
+
+  @override
+  String get purOutstanding => 'સપ્લાયરને બાકી';
+
+  @override
+  String get purRecent => 'તાજેતરની ખરીદી';
+
+  @override
+  String get purAdd => 'ખરીદી ઉમેરો';
+
+  @override
+  String get backupTitle => 'બેકઅપ અને રિસ્ટોર';
+
+  @override
+  String get backupSaved => 'સેવ કરેલા બેકઅપ';
+
+  @override
+  String get teamTitle => 'ટીમ';
+
+  @override
+  String get teamInvite => 'સભ્ય ઉમેરો';
+
+  @override
+  String get billingTitle => 'પ્લાન અને ચુકવણી';
+
+  @override
+  String get billingChoosePlan => 'પ્લાન પસંદ કરો';
+
+  @override
+  String get billingPaid => 'મેં ચુકવણી કરી - રિફ્રેશ';
+
+  @override
+  String get healthTitle => 'ડેટા તપાસ';
+
+  @override
+  String get healthNothing => 'કંઈ સુધારવાનું નથી';
+
+  @override
+  String get healthDuplicates => 'ડુપ્લિકેટ વસ્તુઓ';
+
+  @override
+  String get healthMerge => 'ભેગું કરો';
+
+  @override
+  String get healthMergeAll => 'બધું ભેગું કરો';
+
+  @override
+  String get deadStockTitle => 'વેચાયા વગરનો સ્ટોક';
+
+  @override
+  String get deadStockMoney => 'ફસાયેલા પૈસા';
+
+  @override
+  String get deadNeverSold => 'ક્યારેય વેચાયું નથી';
+
+  @override
+  String get reportsTitle => 'રિપોર્ટ';
+
+  @override
+  String get reportsProfit => 'નફો';
+
+  @override
+  String get reportsBestSellers => 'સૌથી વધુ વેચાતા';
+
+  @override
+  String get reportsCashFlow => 'રોકડ પ્રવાહ';
+
+  @override
+  String get reportsMoneyIn => 'આવક';
+
+  @override
+  String get reportsMoneyOut => 'જાવક';
+
+  @override
+  String get reportsNet => 'બચત';
+
+  @override
+  String get staffPerformance => 'સ્ટાફનું કામ';
+
+  @override
+  String get staffSoldBy => 'વેચ્યું';
+
+  @override
+  String get welcomeTitle => 'Business Hub માં સ્વાગત છે';
+
+  @override
+  String get welcomeSetup => 'તમારી દુકાન સેટ કરો';
+
+  @override
+  String get welcomeSkip => 'અત્યારે છોડો';
+
+  @override
+  String get welcomeFinish => 'સેટઅપ પૂરું કરો';
+
+  @override
+  String get posFavourites => 'પસંદીદા';
 }

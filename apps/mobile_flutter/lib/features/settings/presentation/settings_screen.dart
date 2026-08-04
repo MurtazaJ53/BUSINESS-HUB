@@ -149,6 +149,12 @@ class SettingsScreen extends ConsumerWidget {
             ),
 
           MobileListTile(
+            title: 'Business pulse',
+            subtitle: 'Best sellers and cash flow',
+            leadingIcon: Icons.insights_rounded,
+            onTap: () => context.push('/settings/pulse'),
+          ),
+          MobileListTile(
             title: 'Dead stock',
             subtitle: 'Money sitting in items that are not selling',
             leadingIcon: Icons.inventory_rounded,

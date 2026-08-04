@@ -324,6 +324,35 @@ final favouriteItemsProvider = StreamProvider<List<InventoryCatalogItem>>((ref) 
   return ref.watch(inventoryRepositoryProvider).watchItemsByIds(ids);
 });
 
+/// The shop's actual top sellers, used to fill the POS quick-add strip when the
+/// cashier hasn't pinned anything. A favourites row that starts empty stays
+/// empty — nobody discovers a long-press — so it earns its space from day one.
+final autoTopSellersProvider =
+    FutureProvider.autoDispose<List<InventoryCatalogItem>>((ref) async {
+  final pinned = ref.watch(favouriteIdsProvider).asData?.value ?? const <String>[];
+  if (pinned.isNotEmpty) return const <InventoryCatalogItem>[];
+
+  final top = await ref.watch(reportsRepositoryProvider).bestSellers(
+        days: 30,
+        limit: 8,
+      );
+  if (top.isEmpty) return const <InventoryCatalogItem>[];
+
+  // bestSellers groups by name (movements record a name snapshot), so map back
+  // to live catalog rows to get current price and stock.
+  final catalog = await ref.watch(inventoryRepositoryProvider).watchCatalogPage(
+        page: 1,
+        pageSize: 500,
+      ).first;
+  final byName = <String, InventoryCatalogItem>{
+    for (final item in catalog) item.name.toLowerCase(): item,
+  };
+  return top
+      .map((t) => byName[t.name.toLowerCase()])
+      .whereType<InventoryCatalogItem>()
+      .toList(growable: false);
+});
+
 // Customer khata timeline (credit sales + payments).
 final customerLedgerProvider =
     StreamProvider.family<List<CustomerLedgerRecord>, String>((ref, customerId) {

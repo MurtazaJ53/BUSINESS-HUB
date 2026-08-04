@@ -494,4 +494,112 @@ class LEn extends L {
 
   @override
   String get reorderSupplierPhone => 'Supplier mobile number';
+
+  @override
+  String get expAdd => 'Add expense';
+
+  @override
+  String get expDetails => 'Expense details';
+
+  @override
+  String get expTotal => 'Total spent';
+
+  @override
+  String get purSuppliers => 'Suppliers & purchases';
+
+  @override
+  String get purOutstanding => 'Outstanding to suppliers';
+
+  @override
+  String get purRecent => 'Recent purchases';
+
+  @override
+  String get purAdd => 'Add purchase';
+
+  @override
+  String get backupTitle => 'Backup & restore';
+
+  @override
+  String get backupSaved => 'Saved backups';
+
+  @override
+  String get teamTitle => 'Workspace team';
+
+  @override
+  String get teamInvite => 'Invite member';
+
+  @override
+  String get billingTitle => 'Plan & billing';
+
+  @override
+  String get billingChoosePlan => 'CHOOSE A PLAN';
+
+  @override
+  String get billingPaid => 'I have paid - Refresh';
+
+  @override
+  String get healthTitle => 'Data health';
+
+  @override
+  String get healthNothing => 'Nothing to fix';
+
+  @override
+  String get healthDuplicates => 'Duplicate products';
+
+  @override
+  String get healthMerge => 'Merge';
+
+  @override
+  String get healthMergeAll => 'Merge all';
+
+  @override
+  String get deadStockTitle => 'Dead stock';
+
+  @override
+  String get deadStockMoney => 'MONEY SITTING ON THE SHELF';
+
+  @override
+  String get deadNeverSold => 'Never sold';
+
+  @override
+  String get reportsTitle => 'Reports';
+
+  @override
+  String get reportsProfit => 'Profit';
+
+  @override
+  String get reportsBestSellers => 'Best sellers';
+
+  @override
+  String get reportsCashFlow => 'Cash flow';
+
+  @override
+  String get reportsMoneyIn => 'Money in';
+
+  @override
+  String get reportsMoneyOut => 'Money out';
+
+  @override
+  String get reportsNet => 'Net';
+
+  @override
+  String get staffPerformance => 'Staff performance';
+
+  @override
+  String get staffSoldBy => 'Sold by';
+
+  @override
+  String get welcomeTitle => 'Welcome to Business Hub';
+
+  @override
+  String get welcomeSetup => 'Set up your shop';
+
+  @override
+  String get welcomeSkip => 'Skip for now';
+
+  @override
+  String get welcomeFinish => 'Finish setup';
+
+  @override
+  String get posFavourites => 'Favourites';
 }

@@ -1052,6 +1052,222 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Supplier mobile number'**
   String get reorderSupplierPhone;
+
+  /// No description provided for @expAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add expense'**
+  String get expAdd;
+
+  /// No description provided for @expDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Expense details'**
+  String get expDetails;
+
+  /// No description provided for @expTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total spent'**
+  String get expTotal;
+
+  /// No description provided for @purSuppliers.
+  ///
+  /// In en, this message translates to:
+  /// **'Suppliers & purchases'**
+  String get purSuppliers;
+
+  /// No description provided for @purOutstanding.
+  ///
+  /// In en, this message translates to:
+  /// **'Outstanding to suppliers'**
+  String get purOutstanding;
+
+  /// No description provided for @purRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent purchases'**
+  String get purRecent;
+
+  /// No description provided for @purAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add purchase'**
+  String get purAdd;
+
+  /// No description provided for @backupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup & restore'**
+  String get backupTitle;
+
+  /// No description provided for @backupSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved backups'**
+  String get backupSaved;
+
+  /// No description provided for @teamTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace team'**
+  String get teamTitle;
+
+  /// No description provided for @teamInvite.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite member'**
+  String get teamInvite;
+
+  /// No description provided for @billingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan & billing'**
+  String get billingTitle;
+
+  /// No description provided for @billingChoosePlan.
+  ///
+  /// In en, this message translates to:
+  /// **'CHOOSE A PLAN'**
+  String get billingChoosePlan;
+
+  /// No description provided for @billingPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'I have paid - Refresh'**
+  String get billingPaid;
+
+  /// No description provided for @healthTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Data health'**
+  String get healthTitle;
+
+  /// No description provided for @healthNothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to fix'**
+  String get healthNothing;
+
+  /// No description provided for @healthDuplicates.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate products'**
+  String get healthDuplicates;
+
+  /// No description provided for @healthMerge.
+  ///
+  /// In en, this message translates to:
+  /// **'Merge'**
+  String get healthMerge;
+
+  /// No description provided for @healthMergeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Merge all'**
+  String get healthMergeAll;
+
+  /// No description provided for @deadStockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Dead stock'**
+  String get deadStockTitle;
+
+  /// No description provided for @deadStockMoney.
+  ///
+  /// In en, this message translates to:
+  /// **'MONEY SITTING ON THE SHELF'**
+  String get deadStockMoney;
+
+  /// No description provided for @deadNeverSold.
+  ///
+  /// In en, this message translates to:
+  /// **'Never sold'**
+  String get deadNeverSold;
+
+  /// No description provided for @reportsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reports'**
+  String get reportsTitle;
+
+  /// No description provided for @reportsProfit.
+  ///
+  /// In en, this message translates to:
+  /// **'Profit'**
+  String get reportsProfit;
+
+  /// No description provided for @reportsBestSellers.
+  ///
+  /// In en, this message translates to:
+  /// **'Best sellers'**
+  String get reportsBestSellers;
+
+  /// No description provided for @reportsCashFlow.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash flow'**
+  String get reportsCashFlow;
+
+  /// No description provided for @reportsMoneyIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Money in'**
+  String get reportsMoneyIn;
+
+  /// No description provided for @reportsMoneyOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Money out'**
+  String get reportsMoneyOut;
+
+  /// No description provided for @reportsNet.
+  ///
+  /// In en, this message translates to:
+  /// **'Net'**
+  String get reportsNet;
+
+  /// No description provided for @staffPerformance.
+  ///
+  /// In en, this message translates to:
+  /// **'Staff performance'**
+  String get staffPerformance;
+
+  /// No description provided for @staffSoldBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Sold by'**
+  String get staffSoldBy;
+
+  /// No description provided for @welcomeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to Business Hub'**
+  String get welcomeTitle;
+
+  /// No description provided for @welcomeSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up your shop'**
+  String get welcomeSetup;
+
+  /// No description provided for @welcomeSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip for now'**
+  String get welcomeSkip;
+
+  /// No description provided for @welcomeFinish.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish setup'**
+  String get welcomeFinish;
+
+  /// No description provided for @posFavourites.
+  ///
+  /// In en, this message translates to:
+  /// **'Favourites'**
+  String get posFavourites;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

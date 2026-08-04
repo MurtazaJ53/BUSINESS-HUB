@@ -494,4 +494,112 @@ class LHi extends L {
 
   @override
   String get reorderSupplierPhone => 'सप्लायर का मोबाइल नंबर';
+
+  @override
+  String get expAdd => 'खर्च जोड़ें';
+
+  @override
+  String get expDetails => 'खर्च का विवरण';
+
+  @override
+  String get expTotal => 'कुल खर्च';
+
+  @override
+  String get purSuppliers => 'सप्लायर और खरीद';
+
+  @override
+  String get purOutstanding => 'सप्लायर को बकाया';
+
+  @override
+  String get purRecent => 'हाल की खरीद';
+
+  @override
+  String get purAdd => 'खरीद जोड़ें';
+
+  @override
+  String get backupTitle => 'बैकअप और रिस्टोर';
+
+  @override
+  String get backupSaved => 'सेव किए बैकअप';
+
+  @override
+  String get teamTitle => 'टीम';
+
+  @override
+  String get teamInvite => 'सदस्य जोड़ें';
+
+  @override
+  String get billingTitle => 'प्लान और भुगतान';
+
+  @override
+  String get billingChoosePlan => 'प्लान चुनें';
+
+  @override
+  String get billingPaid => 'मैंने भुगतान किया - रिफ्रेश';
+
+  @override
+  String get healthTitle => 'डेटा जाँच';
+
+  @override
+  String get healthNothing => 'कुछ ठीक करने को नहीं';
+
+  @override
+  String get healthDuplicates => 'दोहरी वस्तुएँ';
+
+  @override
+  String get healthMerge => 'मिलाएँ';
+
+  @override
+  String get healthMergeAll => 'सब मिलाएँ';
+
+  @override
+  String get deadStockTitle => 'बिना बिका स्टॉक';
+
+  @override
+  String get deadStockMoney => 'फँसा हुआ पैसा';
+
+  @override
+  String get deadNeverSold => 'कभी नहीं बिका';
+
+  @override
+  String get reportsTitle => 'रिपोर्ट';
+
+  @override
+  String get reportsProfit => 'मुनाफा';
+
+  @override
+  String get reportsBestSellers => 'सबसे ज्यादा बिकने वाले';
+
+  @override
+  String get reportsCashFlow => 'नकदी प्रवाह';
+
+  @override
+  String get reportsMoneyIn => 'आया';
+
+  @override
+  String get reportsMoneyOut => 'गया';
+
+  @override
+  String get reportsNet => 'बचत';
+
+  @override
+  String get staffPerformance => 'स्टाफ का काम';
+
+  @override
+  String get staffSoldBy => 'बेचा';
+
+  @override
+  String get welcomeTitle => 'Business Hub में स्वागत है';
+
+  @override
+  String get welcomeSetup => 'अपनी दुकान सेट करें';
+
+  @override
+  String get welcomeSkip => 'अभी छोड़ें';
+
+  @override
+  String get welcomeFinish => 'सेटअप पूरा करें';
+
+  @override
+  String get posFavourites => 'पसंदीदा';
 }

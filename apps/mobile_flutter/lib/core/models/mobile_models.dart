@@ -1400,6 +1400,44 @@ class InventoryCatalogFilter {
 /// An item that has fallen to or below its reorder level, with everything a
 /// purchase decision needs.
 /// Stock that isn't selling — money sitting on a shelf.
+/// A product ranked by how much it actually sells — the mirror of dead stock.
+class BestSellerItem {
+  const BestSellerItem({
+    required this.name,
+    required this.quantitySold,
+    required this.revenue,
+    this.profit,
+  });
+
+  final String name;
+  final double quantitySold;
+  final double revenue;
+
+  /// Null when cost prices aren't known, rather than 0 — a false "no profit"
+  /// is worse than admitting we can't tell.
+  final double? profit;
+}
+
+/// Money in vs money out over a period.
+class CashFlowSnapshot {
+  const CashFlowSnapshot({
+    required this.salesCollected,
+    required this.purchases,
+    required this.expenses,
+  });
+
+  final double salesCollected;
+  final double purchases;
+  final double expenses;
+
+  double get moneyOut => purchases + expenses;
+  double get net => salesCollected - moneyOut;
+  bool get isPositive => net >= 0;
+
+  static const CashFlowSnapshot empty =
+      CashFlowSnapshot(salesCollected: 0, purchases: 0, expenses: 0);
+}
+
 class DeadStockItem {
   const DeadStockItem({
     required this.id,

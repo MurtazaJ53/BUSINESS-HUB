@@ -19,6 +19,7 @@ import '../../features/settings/presentation/settings_expenses_screen.dart';
 import '../../features/settings/presentation/settings_billing_screen.dart';
 import '../../features/customers/presentation/khata_collection_screen.dart';
 import '../../features/inventory/presentation/reorder_list_screen.dart';
+import '../../features/reports/presentation/business_pulse_screen.dart';
 import '../../features/reports/presentation/dead_stock_screen.dart';
 import '../../features/settings/presentation/data_health_screen.dart';
 import '../../features/settings/presentation/settings_language_screen.dart';
@@ -123,6 +124,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: 'plan',
             pageBuilder: (context, state) =>
                 const NoTransitionPage<void>(child: SettingsPlanScreen()),
+          ),
+          GoRoute(
+            parentNavigatorKey: appRootNavigatorKey,
+            path: 'pulse',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage<void>(child: BusinessPulseScreen()),
           ),
           GoRoute(
             parentNavigatorKey: appRootNavigatorKey,
