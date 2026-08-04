@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:printing/printing.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -17,6 +18,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/premium_components.dart';
 import '../../pos/presentation/pos_scanner_sheet.dart';
+import '../../../core/receipt/barcode_labels_pdf.dart';
 import 'reorder_list_screen.dart';
 import 'variant_product_sheet.dart';
 
@@ -634,6 +636,15 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
             TextButton.icon(
               onPressed: () {
                 Navigator.pop(context);
+                _printLabels(item);
+              },
+              icon: const Icon(Icons.qr_code_2_rounded),
+              label: const Text('Print price labels'),
+            ),
+            const SizedBox(height: 4),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
                 _showStockHistory(context, item);
               },
               icon: const Icon(Icons.history_rounded),
@@ -1179,6 +1190,71 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
       descriptionController.dispose();
       reorderController.dispose();
     });
+  }
+
+  /// Print price/barcode stickers for an item. Asks how many, because a shop
+  /// labelling new stock wants a run of them, not one.
+  Future<void> _printLabels(InventoryCatalogItem item) async {
+    final controller = TextEditingController(text: '12');
+    final copies = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Labels for ${item.name}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              (item.sku ?? '').trim().isEmpty
+                  ? 'This item has no SKU, so the label will print name and '
+                      'price without a barcode.'
+                  : 'Barcode: ${item.sku}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'How many labels?',
+                helperText: '24 fit on one A4 sticker sheet',
+              ),
+            ),
+          ],
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(
+              dialogContext,
+              int.tryParse(controller.text.trim()) ?? 0,
+            ),
+            child: const Text('Print'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (copies == null || copies < 1 || !mounted) return;
+
+    final shop = ref.read(shopInfoProvider).asData?.value;
+    final bytes = await buildBarcodeLabelsPdf(
+      shopName: shop?.name ?? '',
+      labels: <LabelRequest>[
+        LabelRequest(
+          name: item.name,
+          price: item.price,
+          code: item.sku ?? '',
+          size: item.size,
+          copies: copies,
+        ),
+      ],
+    );
+    await Printing.layoutPdf(onLayout: (_) => bytes);
   }
 
   void _showRestockSheet(BuildContext context, InventoryCatalogItem item) {
