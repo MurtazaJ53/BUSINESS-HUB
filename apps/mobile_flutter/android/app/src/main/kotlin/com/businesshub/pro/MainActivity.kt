@@ -1,4 +1,4 @@
-package com.businesshub.pro.beta
+package com.businesshub.pro
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 

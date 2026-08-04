@@ -32,7 +32,7 @@ val hasReleaseSigning =
         !releaseKeyPassword.isNullOrBlank()
 
 android {
-    namespace = "com.businesshub.pro.beta"
+    namespace = "com.businesshub.pro"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -46,7 +46,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.businesshub.pro.beta"
+        applicationId = "com.businesshub.pro"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
