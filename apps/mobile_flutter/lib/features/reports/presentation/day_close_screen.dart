@@ -4,7 +4,10 @@ import 'package:printing/printing.dart';
 
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
+import '../../customers/presentation/khata_collection_screen.dart';
 import '../../../core/receipt/zreport_pdf.dart';
+import '../../../core/reports/day_summary.dart';
+import '../../../core/util/whatsapp.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
@@ -28,6 +31,38 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
     _counted.dispose();
     _openingFloat.dispose();
     super.dispose();
+  }
+
+  /// Send today's figures to the owner's own WhatsApp. Uses the shop's saved
+  /// phone number so it lands in their chat list; if none is set we fall back
+  /// to the share sheet rather than failing.
+  Future<void> _sendDaySummary(ZReportSnapshot z) async {
+    final shop = ref.read(shopInfoProvider).asData?.value;
+    final debtors =
+        ref.read(khataDebtorsProvider).asData?.value ?? const <KhataDebtor>[];
+    final lowStock = ref.read(dashboardLowStockPreviewProvider).asData?.value ??
+        const <LowStockItem>[];
+
+    final message = buildDaySummary(
+      shopName: shop?.name ?? '',
+      date: DateTime.now(),
+      z: z,
+      lowStockCount: lowStock.length,
+      outstandingUdhaar: debtors.fold<double>(0, (sum, d) => sum + d.balance),
+    );
+
+    final phone = shop?.phone ?? '';
+    final opened = await openWhatsApp(phone: phone, message: message);
+    if (opened || !mounted) return;
+    // No usable shop number — say so plainly instead of failing silently.
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Add your shop mobile number in Business settings to send the '
+          'summary to yourself.',
+        ),
+      ),
+    );
   }
 
   Future<void> _printZReport(ZReportSnapshot z) async {
@@ -189,8 +224,22 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
             ),
           ),
           const SizedBox(height: 18),
+          // The owner is often not in the shop at closing time, so the day's
+          // numbers should reach their phone without them opening the app.
           FilledButton.icon(
+            onPressed: () => _sendDaySummary(z),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(50),
+            ),
+            icon: const Icon(Icons.chat_rounded),
+            label: const Text('Send day summary on WhatsApp'),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
             onPressed: z.salesCount == 0 ? null : () => _printZReport(z),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(50),
+            ),
             icon: const Icon(Icons.print_rounded),
             label: const Text('Print / share Z-report'),
           ),
