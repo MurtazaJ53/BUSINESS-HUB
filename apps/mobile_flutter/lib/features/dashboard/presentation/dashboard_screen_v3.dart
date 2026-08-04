@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -99,7 +101,7 @@ class DashboardScreenV3 extends ConsumerWidget {
         const _GettingStartedCard(),
         // Today's takings hero
         HeroMetricCard(
-          label: "Today's Sales",
+          label: L.of(context).dashTodaySales,
           value: formatCurrency(overview.todayRevenue),
           caption:
               '${overview.todaySalesCount} ${overview.todaySalesCount == 1 ? 'sale' : 'sales'} today',
@@ -123,7 +125,7 @@ class DashboardScreenV3 extends ConsumerWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _StatCard(
-                label: 'Low stock',
+                label: L.of(context).dashLowStock,
                 value: '${metrics.lowStock}',
                 caption: metrics.lowStock > 0 ? 'Needs restock' : 'All good',
                 icon: Icons.warning_amber_rounded,
@@ -173,8 +175,9 @@ class DashboardScreenV3 extends ConsumerWidget {
 
         // Recent sales
         _SectionRow(
-          title: 'Recent sales',
-          actionLabel: recentSales.isEmpty ? null : 'View all',
+          title: L.of(context).dashRecentSales,
+          actionLabel:
+              recentSales.isEmpty ? null : L.of(context).dashViewAll,
           onAction: () => context.go('/history'),
         ),
         const SizedBox(height: 12),
@@ -192,8 +195,8 @@ class DashboardScreenV3 extends ConsumerWidget {
         if (lowStock.isNotEmpty) ...<Widget>[
           const SizedBox(height: 24),
           _SectionRow(
-            title: 'Low stock',
-            actionLabel: 'Manage',
+            title: L.of(context).dashLowStock,
+            actionLabel: L.of(context).dashManage,
             onAction: () => context.go('/inventory'),
           ),
           const SizedBox(height: 12),
@@ -327,7 +330,7 @@ class _RecentSaleTile extends StatelessWidget {
     final colors = AppColors.of(context);
     final theme = Theme.of(context);
     final title = (sale.customerName == null || sale.customerName!.isEmpty)
-        ? 'Walk-in sale'
+        ? L.of(context).dashWalkInSale
         : sale.customerName!;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -469,7 +472,7 @@ class _LowStockTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 StatusBadge(
-                  label: '${formatQty(item.stock)} left',
+                  label: L.of(context).dashLeft(formatQty(item.stock)),
                   color: AppPalette.error,
                   showDot: false,
                 ),

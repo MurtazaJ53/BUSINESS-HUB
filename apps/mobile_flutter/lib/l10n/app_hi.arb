@@ -1,14 +1,11 @@
 {
   "@@locale": "hi",
-
   "appName": "Business Hub",
-
   "navHome": "होम",
   "navStock": "स्टॉक",
   "navClients": "ग्राहक",
   "navHistory": "हिसाब",
   "navPos": "बिलिंग",
-
   "actionSave": "सेव करें",
   "actionCancel": "रद्द करें",
   "actionDelete": "हटाएँ",
@@ -24,7 +21,6 @@
   "actionContinue": "आगे बढ़ें",
   "actionBack": "वापस",
   "actionSearch": "खोजें",
-
   "labelTotal": "कुल",
   "labelSubtotal": "उप-कुल",
   "labelPaid": "चुकाया",
@@ -42,13 +38,11 @@
   "labelNotes": "टिप्पणी",
   "labelName": "नाम",
   "labelOptional": "वैकल्पिक",
-
   "payCash": "नकद",
   "payUpi": "UPI",
   "payCard": "कार्ड",
   "payCredit": "उधार",
   "paySplit": "मिश्रित",
-
   "posTitle": "बिलिंग",
   "posSearchHint": "नाम, SKU या बारकोड से खोजें",
   "posCartEmpty": "कार्ट खाली है",
@@ -56,24 +50,35 @@
   "posCompleteSale": "बिल पूरा करें",
   "posSaveWithDue": "{amount} बाकी के साथ सेव करें",
   "@posSaveWithDue": {
-    "placeholders": { "amount": { "type": "String" } }
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
   },
   "posAddDiscount": "छूट जोड़ें",
   "posDiscountOff": "{amount} की छूट",
   "@posDiscountOff": {
-    "placeholders": { "amount": { "type": "String" } }
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
   },
   "posAddSplit": "भुगतान बाँटें",
   "posScanToPay": "भुगतान के लिए स्कैन करें",
   "posShowUpiQr": "UPI QR दिखाएँ",
   "posSaleSaved": "बिल सेव हुआ: {amount}",
   "@posSaleSaved": {
-    "placeholders": { "amount": { "type": "String" } }
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
   },
   "posChange": "बाकी लौटाना",
   "posCustomItem": "अन्य",
   "posBuyerGstin": "ग्राहक GSTIN (वैकल्पिक)",
-
   "invTitle": "स्टॉक",
   "invSearchHint": "स्टॉक में खोजें...",
   "invAddItem": "नई वस्तु",
@@ -87,12 +92,15 @@
   "invInStock": "ठीक",
   "invItemSaved": "{name} सेव हुआ।",
   "@invItemSaved": {
-    "placeholders": { "name": { "type": "String" } }
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "invTakePhoto": "फोटो लें",
   "invChooseGallery": "गैलरी से चुनें",
   "invRemovePhoto": "फोटो हटाएँ",
-
   "custTitle": "ग्राहक",
   "custAdd": "ग्राहक जोड़ें",
   "custBalance": "बकाया",
@@ -101,7 +109,6 @@
   "custNoCustomers": "अभी कोई ग्राहक नहीं",
   "custSearchHint": "ग्राहक खोजें...",
   "custKhata": "खाता",
-
   "histTitle": "हिसाब",
   "histReceipts": "बिल",
   "histGross": "कुल बिक्री",
@@ -113,7 +120,6 @@
   "histQueued": "बाकी है",
   "histTapDetail": "विवरण देखें",
   "histShareReceipt": "बिल भेजें",
-
   "settingsTitle": "सेटिंग्स",
   "settingsBusiness": "दुकान की जानकारी",
   "settingsStaff": "स्टाफ और PIN",
@@ -127,22 +133,65 @@
   "settingsLanguage": "भाषा",
   "settingsLanguageSubtitle": "ऐप की भाषा",
   "settingsSignOut": "साइन आउट",
-
   "langEnglish": "English",
   "langHindi": "हिन्दी (Hindi)",
   "langGujarati": "ગુજરાતી (Gujarati)",
   "langChanged": "भाषा बदल गई।",
-
   "errGeneric": "कुछ गड़बड़ हुई। फिर कोशिश करें।",
   "errOffline": "आप ऑफलाइन हैं। बदलाव इसी फोन में सेव हैं।",
   "errRequired": "यह जरूरी है",
   "errInvalidNumber": "सही संख्या डालें",
-
   "commonYes": "हाँ",
   "commonNo": "नहीं",
   "commonToday": "आज",
   "commonYesterday": "कल",
   "commonThisWeek": "इस हफ्ते",
   "commonThisMonth": "इस महीने",
-  "commonAllTime": "अब तक"
+  "commonAllTime": "अब तक",
+  "settingsShop": "दुकान",
+  "settingsManage": "प्रबंधन",
+  "settingsBusinessSub": "नाम, बिल का संदेश, मुद्रा",
+  "settingsStaffSub": "खाते, भूमिकाएँ और PIN",
+  "settingsTeamSub": "वर्कस्पेस के सदस्य (क्लाउड)",
+  "settingsSwitchShop": "दुकान बदलें",
+  "settingsSwitchShopSub": "चालू वर्कस्पेस बदलें",
+  "settingsAttendance": "हाजिरी",
+  "settingsAttendanceSub": "हाजिरी और शिफ्ट का रिकॉर्ड",
+  "settingsExpensesSub": "दुकान का खर्च देखें",
+  "settingsPurchasesSub": "माल की खरीद और सप्लायर बकाया",
+  "settingsPlanBillingSub": "आपका प्लान, नवीनीकरण और भुगतान",
+  "settingsComparePlans": "प्लान की तुलना",
+  "settingsComparePlansSub": "हर प्लान में क्या मिलता है",
+  "settingsBackupSub": "अपना हिसाब सुरक्षित रखें",
+  "settingsImportSub": "Zobaze से डेटा लाएँ (.xlsx)",
+  "settingsChangePin": "PIN बदलें",
+  "settingsChangePinSub": "अपना अनलॉक PIN बदलें",
+  "settingsSecuritySub": "ऐप लॉक और MFA",
+  "settingsSync": "सिंक",
+  "settingsAdminTools": "एडमिन टूल्स",
+  "settingsAdminToolsSub": "डिवाइस और संचालन",
+  "settingsRole": "भूमिका",
+  "settingsSignedIn": "साइन इन",
+  "dashLowStock": "कम स्टॉक",
+  "dashManage": "देखें",
+  "dashWalkInSale": "सामान्य बिक्री",
+  "dashLeft": "{count} बचे",
+  "@dashLeft": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "dashRecentSales": "हाल की बिक्री",
+  "dashTodaySales": "आज की बिक्री",
+  "dashViewAll": "सब देखें",
+  "collectTitle": "उधार वसूली",
+  "collectTotalOutstanding": "कुल बकाया",
+  "collectRemindAll": "सबको याद दिलाएँ",
+  "collectOnlyOverdue": "सिर्फ बकाया",
+  "reorderTitle": "खरीद सूची",
+  "reorderSendOrder": "ऑर्डर भेजें",
+  "reorderOutOfStock": "स्टॉक खत्म",
+  "reorderSupplierPhone": "सप्लायर का मोबाइल नंबर"
 }

@@ -375,4 +375,123 @@ class LGu extends L {
 
   @override
   String get commonAllTime => 'અત્યાર સુધી';
+
+  @override
+  String get settingsShop => 'દુકાન';
+
+  @override
+  String get settingsManage => 'વ્યવસ્થા';
+
+  @override
+  String get settingsBusinessSub => 'નામ, બિલનો સંદેશ, ચલણ';
+
+  @override
+  String get settingsStaffSub => 'એકાઉન્ટ, ભૂમિકા અને PIN';
+
+  @override
+  String get settingsTeamSub => 'વર્કસ્પેસના સભ્યો (ક્લાઉડ)';
+
+  @override
+  String get settingsSwitchShop => 'દુકાન બદલો';
+
+  @override
+  String get settingsSwitchShopSub => 'ચાલુ વર્કસ્પેસ બદલો';
+
+  @override
+  String get settingsAttendance => 'હાજરી';
+
+  @override
+  String get settingsAttendanceSub => 'હાજરી અને શિફ્ટનો રેકોર્ડ';
+
+  @override
+  String get settingsExpensesSub => 'દુકાનનો ખર્ચ જુઓ';
+
+  @override
+  String get settingsPurchasesSub => 'માલની ખરીદી અને સપ્લાયર બાકી';
+
+  @override
+  String get settingsPlanBillingSub => 'તમારો પ્લાન, રિન્યુઅલ અને ચુકવણી';
+
+  @override
+  String get settingsComparePlans => 'પ્લાનની સરખામણી';
+
+  @override
+  String get settingsComparePlansSub => 'દરેક પ્લાનમાં શું મળે છે';
+
+  @override
+  String get settingsBackupSub => 'તમારો હિસાબ સુરક્ષિત રાખો';
+
+  @override
+  String get settingsImportSub => 'Zobaze માંથી ડેટા લાવો (.xlsx)';
+
+  @override
+  String get settingsChangePin => 'PIN બદલો';
+
+  @override
+  String get settingsChangePinSub => 'તમારો અનલોક PIN બદલો';
+
+  @override
+  String get settingsSecuritySub => 'એપ લોક અને MFA';
+
+  @override
+  String get settingsSync => 'સિંક';
+
+  @override
+  String get settingsAdminTools => 'એડમિન ટૂલ્સ';
+
+  @override
+  String get settingsAdminToolsSub => 'ડિવાઇસ અને સંચાલન';
+
+  @override
+  String get settingsRole => 'ભૂમિકા';
+
+  @override
+  String get settingsSignedIn => 'સાઇન ઇન';
+
+  @override
+  String get dashLowStock => 'ઓછો સ્ટોક';
+
+  @override
+  String get dashManage => 'જુઓ';
+
+  @override
+  String get dashWalkInSale => 'સામાન્ય વેચાણ';
+
+  @override
+  String dashLeft(String count) {
+    return '$count બાકી';
+  }
+
+  @override
+  String get dashRecentSales => 'તાજેતરની બિક્રી';
+
+  @override
+  String get dashTodaySales => 'આજનું વેચાણ';
+
+  @override
+  String get dashViewAll => 'બધું જુઓ';
+
+  @override
+  String get collectTitle => 'ઉધાર વસૂલાત';
+
+  @override
+  String get collectTotalOutstanding => 'કુલ બાકી';
+
+  @override
+  String get collectRemindAll => 'બધાને યાદ કરાવો';
+
+  @override
+  String get collectOnlyOverdue => 'ફક્ત બાકી';
+
+  @override
+  String get reorderTitle => 'ખરીદ યાદી';
+
+  @override
+  String get reorderSendOrder => 'ઓર્ડર મોકલો';
+
+  @override
+  String get reorderOutOfStock => 'સ્ટોક ખતમ';
+
+  @override
+  String get reorderSupplierPhone => 'સપ્લાયરનો મોબાઇલ નંબર';
 }

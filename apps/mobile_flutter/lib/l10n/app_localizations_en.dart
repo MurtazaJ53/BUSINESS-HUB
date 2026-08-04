@@ -375,4 +375,123 @@ class LEn extends L {
 
   @override
   String get commonAllTime => 'All time';
+
+  @override
+  String get settingsShop => 'Shop';
+
+  @override
+  String get settingsManage => 'MANAGE';
+
+  @override
+  String get settingsBusinessSub => 'Name, receipt footer, currency';
+
+  @override
+  String get settingsStaffSub => 'Accounts, roles and personal PINs';
+
+  @override
+  String get settingsTeamSub => 'Workspace members (cloud)';
+
+  @override
+  String get settingsSwitchShop => 'Switch shop';
+
+  @override
+  String get settingsSwitchShopSub => 'Change the active workspace';
+
+  @override
+  String get settingsAttendance => 'Attendance';
+
+  @override
+  String get settingsAttendanceSub => 'Clock-in and shift records';
+
+  @override
+  String get settingsExpensesSub => 'Track shop spending';
+
+  @override
+  String get settingsPurchasesSub => 'Stock buying and supplier dues';
+
+  @override
+  String get settingsPlanBillingSub => 'Your plan, renewals and payment';
+
+  @override
+  String get settingsComparePlans => 'Compare plans';
+
+  @override
+  String get settingsComparePlansSub => 'What each plan unlocks';
+
+  @override
+  String get settingsBackupSub => 'Protect your books from data loss';
+
+  @override
+  String get settingsImportSub => 'Migrate from Zobaze (.xlsx)';
+
+  @override
+  String get settingsChangePin => 'Change PIN';
+
+  @override
+  String get settingsChangePinSub => 'Update your unlock PIN';
+
+  @override
+  String get settingsSecuritySub => 'App lock and MFA';
+
+  @override
+  String get settingsSync => 'Sync';
+
+  @override
+  String get settingsAdminTools => 'Admin tools';
+
+  @override
+  String get settingsAdminToolsSub => 'Pulse, devices and operations';
+
+  @override
+  String get settingsRole => 'Role';
+
+  @override
+  String get settingsSignedIn => 'Signed in';
+
+  @override
+  String get dashLowStock => 'Low stock';
+
+  @override
+  String get dashManage => 'Manage';
+
+  @override
+  String get dashWalkInSale => 'Walk-in sale';
+
+  @override
+  String dashLeft(String count) {
+    return '$count left';
+  }
+
+  @override
+  String get dashRecentSales => 'Recent sales';
+
+  @override
+  String get dashTodaySales => 'Today\'s sales';
+
+  @override
+  String get dashViewAll => 'View all';
+
+  @override
+  String get collectTitle => 'Collect udhaar';
+
+  @override
+  String get collectTotalOutstanding => 'TOTAL OUTSTANDING';
+
+  @override
+  String get collectRemindAll => 'Remind all';
+
+  @override
+  String get collectOnlyOverdue => 'Only overdue';
+
+  @override
+  String get reorderTitle => 'Reorder list';
+
+  @override
+  String get reorderSendOrder => 'Send order';
+
+  @override
+  String get reorderOutOfStock => 'OUT OF STOCK';
+
+  @override
+  String get reorderSupplierPhone => 'Supplier mobile number';
 }

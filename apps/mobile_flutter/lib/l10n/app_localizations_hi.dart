@@ -375,4 +375,123 @@ class LHi extends L {
 
   @override
   String get commonAllTime => 'अब तक';
+
+  @override
+  String get settingsShop => 'दुकान';
+
+  @override
+  String get settingsManage => 'प्रबंधन';
+
+  @override
+  String get settingsBusinessSub => 'नाम, बिल का संदेश, मुद्रा';
+
+  @override
+  String get settingsStaffSub => 'खाते, भूमिकाएँ और PIN';
+
+  @override
+  String get settingsTeamSub => 'वर्कस्पेस के सदस्य (क्लाउड)';
+
+  @override
+  String get settingsSwitchShop => 'दुकान बदलें';
+
+  @override
+  String get settingsSwitchShopSub => 'चालू वर्कस्पेस बदलें';
+
+  @override
+  String get settingsAttendance => 'हाजिरी';
+
+  @override
+  String get settingsAttendanceSub => 'हाजिरी और शिफ्ट का रिकॉर्ड';
+
+  @override
+  String get settingsExpensesSub => 'दुकान का खर्च देखें';
+
+  @override
+  String get settingsPurchasesSub => 'माल की खरीद और सप्लायर बकाया';
+
+  @override
+  String get settingsPlanBillingSub => 'आपका प्लान, नवीनीकरण और भुगतान';
+
+  @override
+  String get settingsComparePlans => 'प्लान की तुलना';
+
+  @override
+  String get settingsComparePlansSub => 'हर प्लान में क्या मिलता है';
+
+  @override
+  String get settingsBackupSub => 'अपना हिसाब सुरक्षित रखें';
+
+  @override
+  String get settingsImportSub => 'Zobaze से डेटा लाएँ (.xlsx)';
+
+  @override
+  String get settingsChangePin => 'PIN बदलें';
+
+  @override
+  String get settingsChangePinSub => 'अपना अनलॉक PIN बदलें';
+
+  @override
+  String get settingsSecuritySub => 'ऐप लॉक और MFA';
+
+  @override
+  String get settingsSync => 'सिंक';
+
+  @override
+  String get settingsAdminTools => 'एडमिन टूल्स';
+
+  @override
+  String get settingsAdminToolsSub => 'डिवाइस और संचालन';
+
+  @override
+  String get settingsRole => 'भूमिका';
+
+  @override
+  String get settingsSignedIn => 'साइन इन';
+
+  @override
+  String get dashLowStock => 'कम स्टॉक';
+
+  @override
+  String get dashManage => 'देखें';
+
+  @override
+  String get dashWalkInSale => 'सामान्य बिक्री';
+
+  @override
+  String dashLeft(String count) {
+    return '$count बचे';
+  }
+
+  @override
+  String get dashRecentSales => 'हाल की बिक्री';
+
+  @override
+  String get dashTodaySales => 'आज की बिक्री';
+
+  @override
+  String get dashViewAll => 'सब देखें';
+
+  @override
+  String get collectTitle => 'उधार वसूली';
+
+  @override
+  String get collectTotalOutstanding => 'कुल बकाया';
+
+  @override
+  String get collectRemindAll => 'सबको याद दिलाएँ';
+
+  @override
+  String get collectOnlyOverdue => 'सिर्फ बकाया';
+
+  @override
+  String get reorderTitle => 'खरीद सूची';
+
+  @override
+  String get reorderSendOrder => 'ऑर्डर भेजें';
+
+  @override
+  String get reorderOutOfStock => 'स्टॉक खत्म';
+
+  @override
+  String get reorderSupplierPhone => 'सप्लायर का मोबाइल नंबर';
 }

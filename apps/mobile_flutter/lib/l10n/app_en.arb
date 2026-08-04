@@ -1,14 +1,11 @@
 {
   "@@locale": "en",
-
   "appName": "Business Hub",
-
   "navHome": "Home",
   "navStock": "Stock",
   "navClients": "Clients",
   "navHistory": "History",
   "navPos": "POS",
-
   "actionSave": "Save",
   "actionCancel": "Cancel",
   "actionDelete": "Delete",
@@ -24,7 +21,6 @@
   "actionContinue": "Continue",
   "actionBack": "Back",
   "actionSearch": "Search",
-
   "labelTotal": "Total",
   "labelSubtotal": "Subtotal",
   "labelPaid": "Paid",
@@ -42,13 +38,11 @@
   "labelNotes": "Notes",
   "labelName": "Name",
   "labelOptional": "optional",
-
   "payCash": "Cash",
   "payUpi": "UPI",
   "payCard": "Card",
   "payCredit": "Credit",
   "paySplit": "Split",
-
   "posTitle": "Point of Sale",
   "posSearchHint": "Search by name, SKU or barcode",
   "posCartEmpty": "Cart is empty",
@@ -56,24 +50,35 @@
   "posCompleteSale": "Complete sale",
   "posSaveWithDue": "Save with {amount} due",
   "@posSaveWithDue": {
-    "placeholders": { "amount": { "type": "String" } }
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
   },
   "posAddDiscount": "Add discount",
   "posDiscountOff": "-{amount} off",
   "@posDiscountOff": {
-    "placeholders": { "amount": { "type": "String" } }
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
   },
   "posAddSplit": "Add split",
   "posScanToPay": "Scan to pay",
   "posShowUpiQr": "Show UPI QR",
   "posSaleSaved": "Sale saved: {amount}",
   "@posSaleSaved": {
-    "placeholders": { "amount": { "type": "String" } }
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
   },
   "posChange": "Change",
   "posCustomItem": "Custom",
   "posBuyerGstin": "Buyer GSTIN (optional)",
-
   "invTitle": "Inventory",
   "invSearchHint": "Search inventory...",
   "invAddItem": "Add Item",
@@ -87,12 +92,15 @@
   "invInStock": "OK",
   "invItemSaved": "{name} saved.",
   "@invItemSaved": {
-    "placeholders": { "name": { "type": "String" } }
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "invTakePhoto": "Take photo",
   "invChooseGallery": "Choose from gallery",
   "invRemovePhoto": "Remove photo",
-
   "custTitle": "Clients",
   "custAdd": "Add customer",
   "custBalance": "Balance",
@@ -101,7 +109,6 @@
   "custNoCustomers": "No customers yet",
   "custSearchHint": "Search customers...",
   "custKhata": "Khata",
-
   "histTitle": "History",
   "histReceipts": "Receipts",
   "histGross": "Gross",
@@ -113,7 +120,6 @@
   "histQueued": "QUEUED",
   "histTapDetail": "Tap for detail",
   "histShareReceipt": "Share receipt",
-
   "settingsTitle": "Settings",
   "settingsBusiness": "Business details",
   "settingsStaff": "Staff & PINs",
@@ -127,22 +133,65 @@
   "settingsLanguage": "Language",
   "settingsLanguageSubtitle": "App display language",
   "settingsSignOut": "Sign out",
-
   "langEnglish": "English",
   "langHindi": "हिन्दी (Hindi)",
   "langGujarati": "ગુજરાતી (Gujarati)",
   "langChanged": "Language updated.",
-
   "errGeneric": "Something went wrong. Please try again.",
   "errOffline": "You are offline. Changes are saved on this device.",
   "errRequired": "This field is required",
   "errInvalidNumber": "Enter a valid number",
-
   "commonYes": "Yes",
   "commonNo": "No",
   "commonToday": "Today",
   "commonYesterday": "Yesterday",
   "commonThisWeek": "This week",
   "commonThisMonth": "This month",
-  "commonAllTime": "All time"
+  "commonAllTime": "All time",
+  "settingsShop": "Shop",
+  "settingsManage": "MANAGE",
+  "settingsBusinessSub": "Name, receipt footer, currency",
+  "settingsStaffSub": "Accounts, roles and personal PINs",
+  "settingsTeamSub": "Workspace members (cloud)",
+  "settingsSwitchShop": "Switch shop",
+  "settingsSwitchShopSub": "Change the active workspace",
+  "settingsAttendance": "Attendance",
+  "settingsAttendanceSub": "Clock-in and shift records",
+  "settingsExpensesSub": "Track shop spending",
+  "settingsPurchasesSub": "Stock buying and supplier dues",
+  "settingsPlanBillingSub": "Your plan, renewals and payment",
+  "settingsComparePlans": "Compare plans",
+  "settingsComparePlansSub": "What each plan unlocks",
+  "settingsBackupSub": "Protect your books from data loss",
+  "settingsImportSub": "Migrate from Zobaze (.xlsx)",
+  "settingsChangePin": "Change PIN",
+  "settingsChangePinSub": "Update your unlock PIN",
+  "settingsSecuritySub": "App lock and MFA",
+  "settingsSync": "Sync",
+  "settingsAdminTools": "Admin tools",
+  "settingsAdminToolsSub": "Pulse, devices and operations",
+  "settingsRole": "Role",
+  "settingsSignedIn": "Signed in",
+  "dashLowStock": "Low stock",
+  "dashManage": "Manage",
+  "dashWalkInSale": "Walk-in sale",
+  "dashLeft": "{count} left",
+  "@dashLeft": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "dashRecentSales": "Recent sales",
+  "dashTodaySales": "Today's sales",
+  "dashViewAll": "View all",
+  "collectTitle": "Collect udhaar",
+  "collectTotalOutstanding": "TOTAL OUTSTANDING",
+  "collectRemindAll": "Remind all",
+  "collectOnlyOverdue": "Only overdue",
+  "reorderTitle": "Reorder list",
+  "reorderSendOrder": "Send order",
+  "reorderOutOfStock": "OUT OF STOCK",
+  "reorderSupplierPhone": "Supplier mobile number"
 }

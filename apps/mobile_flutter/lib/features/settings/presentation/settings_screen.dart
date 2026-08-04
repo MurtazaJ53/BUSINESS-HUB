@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -28,16 +30,17 @@ class SettingsScreen extends ConsumerWidget {
     final version = ref.watch(appRuntimeInfoProvider).asData?.value.versionLabel;
     final syncCoordinator = ref.watch(mobileSyncCoordinatorProvider);
 
+    final l = L.of(context);
     final owner = session?.isOwnerLike ?? false;
 
     return MobileStandaloneScaffold(
-      title: 'Settings',
+      title: l.settingsTitle,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
         children: <Widget>[
           // Shop identity
           MobilePanel(
-            title: 'Shop',
+            title: l.settingsShop,
             action: MobileTag(
               label: '${shop.planLabel} plan',
               icon: Icons.workspace_premium_rounded,
@@ -72,29 +75,29 @@ class SettingsScreen extends ConsumerWidget {
           const _SectionLabel('Manage'),
           if (owner)
             MobileListTile(
-              title: 'Business details',
-              subtitle: 'Name, receipt footer, currency',
+              title: l.settingsBusiness,
+              subtitle: l.settingsBusinessSub,
               leadingIcon: Icons.storefront_rounded,
               onTap: () => context.push('/settings/business'),
             ),
           if (owner)
             MobileListTile(
-              title: 'Staff & PINs',
-              subtitle: 'Accounts, roles and personal PINs',
+              title: l.settingsStaff,
+              subtitle: l.settingsStaffSub,
               leadingIcon: Icons.badge_rounded,
               onTap: () => context.push('/settings/staff'),
             ),
           if (owner)
             MobileListTile(
-              title: 'Team',
-              subtitle: 'Workspace members (cloud)',
+              title: l.settingsTeam,
+              subtitle: l.settingsTeamSub,
               leadingIcon: Icons.groups_rounded,
               onTap: () => context.push('/settings/team'),
             ),
           if (MobileRuntimeConfig.backendAuthMode == 'jwt')
             MobileListTile(
-              title: 'Switch shop',
-              subtitle: 'Change the active workspace',
+              title: l.settingsSwitchShop,
+              subtitle: l.settingsSwitchShopSub,
               leadingIcon: Icons.swap_horiz_rounded,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -104,27 +107,27 @@ class SettingsScreen extends ConsumerWidget {
             ),
           if (shop.supportsAttendance)
             MobileListTile(
-              title: 'Attendance',
-              subtitle: 'Clock-in and shift records',
+              title: l.settingsAttendance,
+              subtitle: l.settingsAttendanceSub,
               leadingIcon: Icons.fact_check_rounded,
               onTap: () => context.push('/settings/attendance'),
             ),
           if (shop.supportsExpenses)
             MobileListTile(
-              title: 'Expenses',
-              subtitle: 'Track shop spending',
+              title: l.settingsExpenses,
+              subtitle: l.settingsExpensesSub,
               leadingIcon: Icons.payments_rounded,
               onTap: () => context.push('/settings/expenses'),
             ),
           MobileListTile(
-            title: 'Language',
-            subtitle: 'App display language',
+            title: l.settingsLanguage,
+            subtitle: l.settingsLanguageSubtitle,
             leadingIcon: Icons.translate_rounded,
             onTap: () => context.push('/settings/language'),
           ),
           MobileListTile(
-            title: 'Suppliers & purchases',
-            subtitle: 'Stock buying and supplier dues',
+            title: l.settingsPurchases,
+            subtitle: l.settingsPurchasesSub,
             leadingIcon: Icons.local_shipping_rounded,
             onTap: () => context.push('/settings/purchases'),
           ),
@@ -132,42 +135,42 @@ class SettingsScreen extends ConsumerWidget {
           // it, so owners had no way to see or change their plan in the app.
           if (owner)
             MobileListTile(
-              title: 'Plan & billing',
-              subtitle: 'Your plan, renewals and payment',
+              title: l.settingsPlanBilling,
+              subtitle: l.settingsPlanBillingSub,
               leadingIcon: Icons.workspace_premium_rounded,
               onTap: () => context.push('/settings/billing'),
             ),
           if (owner)
             MobileListTile(
-              title: 'Compare plans',
-              subtitle: 'What each plan unlocks',
+              title: l.settingsComparePlans,
+              subtitle: l.settingsComparePlansSub,
               leadingIcon: Icons.compare_arrows_rounded,
               onTap: () => context.push('/settings/plan'),
             ),
 
           MobileListTile(
-            title: 'Backup & restore',
-            subtitle: 'Protect your books from data loss',
+            title: l.settingsBackup,
+            subtitle: l.settingsBackupSub,
             leadingIcon: Icons.backup_rounded,
             onTap: () => context.push('/settings/backup'),
           ),
           if (owner)
             MobileListTile(
-              title: 'Import data',
-              subtitle: 'Migrate from Zobaze (.xlsx)',
+              title: l.settingsImport,
+              subtitle: l.settingsImportSub,
               leadingIcon: Icons.swap_horiz_rounded,
               onTap: () => context.push('/settings/import'),
             ),
           MobileListTile(
-            title: 'Change PIN',
-            subtitle: 'Update your unlock PIN',
+            title: l.settingsChangePin,
+            subtitle: l.settingsChangePinSub,
             leadingIcon: Icons.pin_rounded,
             onTap: () => _changePinDialog(context, ref),
           ),
           if (owner)
             MobileListTile(
-              title: 'Security',
-              subtitle: 'App lock and MFA',
+              title: l.settingsSecurity,
+              subtitle: l.settingsSecuritySub,
               leadingIcon: Icons.security_rounded,
               onTap: () => context.push('/settings/security'),
             ),
@@ -176,7 +179,7 @@ class SettingsScreen extends ConsumerWidget {
           if (pending > 0) ...<Widget>[
             const SizedBox(height: 22),
             MobilePanel(
-              title: 'Sync',
+              title: l.settingsSync,
               action: MobileTag(
                 label: '$pending queued',
                 icon: Icons.cloud_upload_rounded,
@@ -216,8 +219,8 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 22),
             const _SectionLabel('Advanced'),
             MobileListTile(
-              title: 'Admin tools',
-              subtitle: 'Pulse, devices and operations',
+              title: l.settingsAdminTools,
+              subtitle: l.settingsAdminToolsSub,
               leadingIcon: Icons.tune_rounded,
               accent: AppPalette.textTertiary,
               onTap: () => context.push('/settings/admin'),

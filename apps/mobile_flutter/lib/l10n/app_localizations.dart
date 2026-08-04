@@ -818,6 +818,240 @@ abstract class L {
   /// In en, this message translates to:
   /// **'All time'**
   String get commonAllTime;
+
+  /// No description provided for @settingsShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop'**
+  String get settingsShop;
+
+  /// No description provided for @settingsManage.
+  ///
+  /// In en, this message translates to:
+  /// **'MANAGE'**
+  String get settingsManage;
+
+  /// No description provided for @settingsBusinessSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Name, receipt footer, currency'**
+  String get settingsBusinessSub;
+
+  /// No description provided for @settingsStaffSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounts, roles and personal PINs'**
+  String get settingsStaffSub;
+
+  /// No description provided for @settingsTeamSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace members (cloud)'**
+  String get settingsTeamSub;
+
+  /// No description provided for @settingsSwitchShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch shop'**
+  String get settingsSwitchShop;
+
+  /// No description provided for @settingsSwitchShopSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the active workspace'**
+  String get settingsSwitchShopSub;
+
+  /// No description provided for @settingsAttendance.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance'**
+  String get settingsAttendance;
+
+  /// No description provided for @settingsAttendanceSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Clock-in and shift records'**
+  String get settingsAttendanceSub;
+
+  /// No description provided for @settingsExpensesSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Track shop spending'**
+  String get settingsExpensesSub;
+
+  /// No description provided for @settingsPurchasesSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock buying and supplier dues'**
+  String get settingsPurchasesSub;
+
+  /// No description provided for @settingsPlanBillingSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Your plan, renewals and payment'**
+  String get settingsPlanBillingSub;
+
+  /// No description provided for @settingsComparePlans.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare plans'**
+  String get settingsComparePlans;
+
+  /// No description provided for @settingsComparePlansSub.
+  ///
+  /// In en, this message translates to:
+  /// **'What each plan unlocks'**
+  String get settingsComparePlansSub;
+
+  /// No description provided for @settingsBackupSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Protect your books from data loss'**
+  String get settingsBackupSub;
+
+  /// No description provided for @settingsImportSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Migrate from Zobaze (.xlsx)'**
+  String get settingsImportSub;
+
+  /// No description provided for @settingsChangePin.
+  ///
+  /// In en, this message translates to:
+  /// **'Change PIN'**
+  String get settingsChangePin;
+
+  /// No description provided for @settingsChangePinSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Update your unlock PIN'**
+  String get settingsChangePinSub;
+
+  /// No description provided for @settingsSecuritySub.
+  ///
+  /// In en, this message translates to:
+  /// **'App lock and MFA'**
+  String get settingsSecuritySub;
+
+  /// No description provided for @settingsSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync'**
+  String get settingsSync;
+
+  /// No description provided for @settingsAdminTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin tools'**
+  String get settingsAdminTools;
+
+  /// No description provided for @settingsAdminToolsSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Pulse, devices and operations'**
+  String get settingsAdminToolsSub;
+
+  /// No description provided for @settingsRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Role'**
+  String get settingsRole;
+
+  /// No description provided for @settingsSignedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in'**
+  String get settingsSignedIn;
+
+  /// No description provided for @dashLowStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Low stock'**
+  String get dashLowStock;
+
+  /// No description provided for @dashManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage'**
+  String get dashManage;
+
+  /// No description provided for @dashWalkInSale.
+  ///
+  /// In en, this message translates to:
+  /// **'Walk-in sale'**
+  String get dashWalkInSale;
+
+  /// No description provided for @dashLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} left'**
+  String dashLeft(String count);
+
+  /// No description provided for @dashRecentSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent sales'**
+  String get dashRecentSales;
+
+  /// No description provided for @dashTodaySales.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s sales'**
+  String get dashTodaySales;
+
+  /// No description provided for @dashViewAll.
+  ///
+  /// In en, this message translates to:
+  /// **'View all'**
+  String get dashViewAll;
+
+  /// No description provided for @collectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Collect udhaar'**
+  String get collectTitle;
+
+  /// No description provided for @collectTotalOutstanding.
+  ///
+  /// In en, this message translates to:
+  /// **'TOTAL OUTSTANDING'**
+  String get collectTotalOutstanding;
+
+  /// No description provided for @collectRemindAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Remind all'**
+  String get collectRemindAll;
+
+  /// No description provided for @collectOnlyOverdue.
+  ///
+  /// In en, this message translates to:
+  /// **'Only overdue'**
+  String get collectOnlyOverdue;
+
+  /// No description provided for @reorderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reorder list'**
+  String get reorderTitle;
+
+  /// No description provided for @reorderSendOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Send order'**
+  String get reorderSendOrder;
+
+  /// No description provided for @reorderOutOfStock.
+  ///
+  /// In en, this message translates to:
+  /// **'OUT OF STOCK'**
+  String get reorderOutOfStock;
+
+  /// No description provided for @reorderSupplierPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier mobile number'**
+  String get reorderSupplierPhone;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {
