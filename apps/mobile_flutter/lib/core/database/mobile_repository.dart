@@ -490,6 +490,60 @@ class InventoryRepository {
         });
   }
 
+  /// Stock that hasn't sold in [days], worst first by money tied up.
+  ///
+  /// Uses the stock-movement log rather than parsing every sale's item JSON —
+  /// with tens of thousands of bills that would be far too slow to open a
+  /// screen with. Items that have NEVER sold are included: they're the worst
+  /// case, not an absence of data.
+  Stream<List<DeadStockItem>> watchDeadStock({int days = 90}) {
+    final cutoff = DateTime.now()
+        .subtract(Duration(days: days))
+        .millisecondsSinceEpoch;
+    return _db
+        .customSelect(
+          """
+            SELECT i.id, i.name, COALESCE(i.category, 'General') AS category,
+                   i.stock, i.price, p.cost_price,
+                   (SELECT MAX(m.created_at) FROM stock_movements m
+                     WHERE m.item_id = i.id AND m.reason = 'SALE')
+                     AS last_sold_at
+            FROM inventory i
+            LEFT JOIN inventory_private p ON p.id = i.id
+            WHERE i.tombstone = 0
+              AND i.stock > 0
+              AND (last_sold_at IS NULL OR last_sold_at < ?)
+            ORDER BY (i.stock * COALESCE(p.cost_price, i.price)) DESC;
+          """,
+          variables: [Variable<int>(cutoff)],
+          readsFrom: {
+            _db.inventoryEntries,
+            _db.inventoryPrivateEntries,
+            _db.stockMovementEntries,
+          },
+        )
+        .watch()
+        .map(
+          (rows) => rows
+              .map(
+                (row) => DeadStockItem(
+                  id: row.readNullable<String>('id') ?? '',
+                  name: row.readNullable<String>('name') ?? 'Unnamed item',
+                  category: row.readNullable<String>('category') ?? 'General',
+                  stock: row.readNullable<double>('stock') ?? 0,
+                  price: row.readNullable<double>('price') ?? 0,
+                  costPrice: row.readNullable<double>('cost_price'),
+                  lastSoldAt: row.readNullable<int>('last_sold_at') == null
+                      ? null
+                      : DateTime.fromMillisecondsSinceEpoch(
+                          row.read<int>('last_sold_at'),
+                        ),
+                ),
+              )
+              .toList(growable: false),
+        );
+  }
+
   /// Everything at or below its reorder level — the full buying list, worst
   /// first. Unlike watchLowStockPreview this isn't capped, because a purchase
   /// run needs every item, not a dashboard teaser.

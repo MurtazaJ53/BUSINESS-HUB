@@ -1399,6 +1399,50 @@ class InventoryCatalogFilter {
 
 /// An item that has fallen to or below its reorder level, with everything a
 /// purchase decision needs.
+/// Stock that isn't selling — money sitting on a shelf.
+class DeadStockItem {
+  const DeadStockItem({
+    required this.id,
+    required this.name,
+    required this.category,
+    required this.stock,
+    required this.price,
+    this.costPrice,
+    this.lastSoldAt,
+  });
+
+  final String id;
+  final String name;
+  final String category;
+  final double stock;
+  final double price;
+  final double? costPrice;
+
+  /// Null when the item has never sold at all — the worst case, not the best.
+  final DateTime? lastSoldAt;
+
+  int? get daysSinceSold {
+    final at = lastSoldAt;
+    if (at == null) return null;
+    return DateTime.now().difference(at).inDays;
+  }
+
+  bool get neverSold => lastSoldAt == null;
+
+  /// Cash tied up, valued at cost where known. Falls back to selling price so
+  /// an item without a cost price still shows up rather than reading as free.
+  double get tiedUpValue => stock * (costPrice ?? price);
+
+  String get lastSoldLabel {
+    if (neverSold) return 'Never sold';
+    final days = daysSinceSold!;
+    if (days == 0) return 'Sold today';
+    if (days == 1) return 'Sold yesterday';
+    if (days < 60) return 'Last sold $days days ago';
+    return 'Last sold ${(days / 30).floor()} months ago';
+  }
+}
+
 class ReorderItem {
   const ReorderItem({
     required this.id,

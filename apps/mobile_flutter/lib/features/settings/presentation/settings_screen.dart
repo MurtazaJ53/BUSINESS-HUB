@@ -149,6 +149,12 @@ class SettingsScreen extends ConsumerWidget {
             ),
 
           MobileListTile(
+            title: 'Dead stock',
+            subtitle: 'Money sitting in items that are not selling',
+            leadingIcon: Icons.inventory_rounded,
+            onTap: () => context.push('/settings/dead-stock'),
+          ),
+          MobileListTile(
             title: 'Data health',
             subtitle: 'Find and fix duplicates and bad counts',
             leadingIcon: Icons.healing_rounded,

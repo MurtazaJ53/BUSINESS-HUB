@@ -76,6 +76,26 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
     isPercent: _discountIsPercent,
   );
 
+  /// How far the bill has fallen below what the stock cost, after every
+  /// discount. Only counts lines where a cost price is actually known, so an
+  /// item with no cost never produces a false warning.
+  double get _belowCostBy {
+    var cost = 0.0;
+    var priced = 0.0;
+    for (final line in _cart) {
+      final unitCost = line.costPrice;
+      if (unitCost == null || unitCost <= 0) continue;
+      cost += unitCost * line.quantity;
+      priced += line.lineTotal;
+    }
+    if (cost <= 0) return 0;
+    // Spread the bill-level discount only across lines we can judge.
+    final share = _cartTotal <= 0 ? 0.0 : priced / _cartTotal;
+    final net = priced - (_discountAmount * share);
+    final gap = cost - net;
+    return gap > 0.009 ? gap : 0;
+  }
+
   double get _netTotal =>
       CartPricing.net(subtotal: _cartTotal, discount: _discountAmount);
 
@@ -971,6 +991,36 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
       ),
     );
     if (result == null || !mounted) return;
+
+    // Selling below cost is a silent way to lose money — the bill still looks
+    // fine, it just doesn't cover what the stock cost. Warn before saving.
+    final belowCost = _belowCostBy;
+    if (belowCost > 0) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Selling below cost'),
+          content: Text(
+            'This bill is ${formatCurrency(belowCost)} below what the stock '
+            'cost you.\n\nSave it anyway?',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Go back'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppPalette.error,
+              ),
+              child: const Text('Save anyway'),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true || !mounted) return;
+    }
 
     // Fraud guard: a discount above zero needs manager approval (no-op unless a
     // manager PIN is configured). Same gate can wrap void / Khata-delete flows.
