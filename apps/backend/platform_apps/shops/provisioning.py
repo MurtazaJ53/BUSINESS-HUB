@@ -89,6 +89,13 @@ def provision_shop(
         source_system=source_surface,
     )
 
+    # Every new workspace starts on a full-Pro trial; the subscription is the
+    # source of truth for the tier from here on.
+    from platform_apps.billing.models import Subscription
+
+    Subscription.start_trial(shop)
+    shop.refresh_from_db(fields=["settings_json"])
+
     membership = ShopMembership.objects.create(
         user=owner,
         shop=shop,

@@ -57,9 +57,13 @@ class Shop(SourceTrackedModel):
         explicit = self.settings_json.get("enabled_features")
         overrides = explicit if isinstance(explicit, dict) else None
         features = build_enabled_features(self.plan_tier, overrides=overrides)
-        
-        # Cache for 1 hour
-        cache.set(cache_key, features, 3600)
+
+        # Short TTL on purpose. save() clears this key, but the demo deployment
+        # runs without Redis, so LocMemCache is per-process: a plan change made
+        # in one worker (or a manage.py shell) leaves the other workers holding
+        # a stale answer. A minute keeps the read cheap while making an upgrade
+        # land almost immediately instead of up to an hour later.
+        cache.set(cache_key, features, 60)
         return features
 
     def save(self, *args, **kwargs):

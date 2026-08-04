@@ -368,6 +368,65 @@ class BackendApiClient {
     return _mapExpense(decoded);
   }
 
+  /// Current subscription state + the plan catalogue (prices/durations).
+  Future<Map<String, dynamic>> fetchSubscription({
+    required User user,
+    required String shopId,
+  }) async {
+    return _request(
+      user: user,
+      method: 'GET',
+      path: '/shops/$shopId/subscription/',
+    );
+  }
+
+  /// Re-evaluate the subscription server-side ("I've paid, check again").
+  Future<Map<String, dynamic>> refreshSubscription({
+    required User user,
+    required String shopId,
+  }) async {
+    return _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/subscription/refresh/',
+      body: const <String, dynamic>{},
+    );
+  }
+
+  /// Open a payment for a billing period. Returns the hosted payment URL to
+  /// launch; access is granted by the webhook, not by the app.
+  Future<Map<String, dynamic>> startSubscriptionCheckout({
+    required User user,
+    required String shopId,
+    required String billingPeriod,
+  }) async {
+    return _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/subscription/checkout/',
+      body: <String, dynamic>{'billing_period': billingPeriod},
+    );
+  }
+
+  /// Ask the platform to move this workspace onto another plan. Lands in the
+  /// admin queue as a ShopPlanRequest instead of being lost in a clipboard copy.
+  Future<void> requestPlanUpgrade({
+    required User user,
+    required String shopId,
+    required String requestedPlanTier,
+    String note = '',
+  }) async {
+    await _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/plan-requests/',
+      body: <String, dynamic>{
+        'requested_plan_tier': requestedPlanTier,
+        'request_note': note,
+      },
+    );
+  }
+
   /// Purchases (stock buying + supplier dues). The mobile app rolls suppliers
   /// up from their purchases, so syncing purchases also restores the supplier
   /// list and outstanding payables after a data clear.

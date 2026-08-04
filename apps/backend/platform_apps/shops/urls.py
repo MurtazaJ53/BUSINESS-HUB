@@ -19,6 +19,12 @@ from platform_apps.customers.views import (
     CustomerListCreateView,
     CustomerSummaryView,
 )
+from platform_apps.billing.views import (
+    SubscriptionCheckoutView,
+    SubscriptionInvoiceListView,
+    SubscriptionRefreshView,
+    SubscriptionView,
+)
 from platform_apps.expenses.views import ExpenseDetailView, ExpenseListCreateView, ExpenseSummaryView
 from platform_apps.inventory.views import (
     InventoryItemAdjustmentView,
@@ -64,6 +70,22 @@ urlpatterns = [
     path("", ShopMembershipListView.as_view(), name="shop-memberships"),
     path("<uuid:shop_id>/domain-state/<slug:domain>/", ShopDomainStateView.as_view(), name="shop-domain-state"),
     path("<uuid:shop_id>/plan-requests/", ShopPlanRequestListCreateView.as_view(), name="shop-plan-requests"),
+    path("<uuid:shop_id>/subscription/", SubscriptionView.as_view(), name="shop-subscription"),
+    path(
+        "<uuid:shop_id>/subscription/checkout/",
+        SubscriptionCheckoutView.as_view(),
+        name="shop-subscription-checkout",
+    ),
+    path(
+        "<uuid:shop_id>/subscription/refresh/",
+        SubscriptionRefreshView.as_view(),
+        name="shop-subscription-refresh",
+    ),
+    path(
+        "<uuid:shop_id>/subscription/invoices/",
+        SubscriptionInvoiceListView.as_view(),
+        name="shop-subscription-invoices",
+    ),
     path("<uuid:shop_id>/team/", WorkspaceTeamListCreateView.as_view(), name="workspace-team"),
     path("<uuid:shop_id>/team/<uuid:membership_id>/", WorkspaceTeamDetailView.as_view(), name="workspace-team-detail"),
     path("<uuid:shop_id>/permission-catalog/", PermissionCatalogView.as_view(), name="permission-catalog"),

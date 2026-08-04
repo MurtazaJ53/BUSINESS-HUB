@@ -122,6 +122,22 @@ class SettingsScreen extends ConsumerWidget {
             leadingIcon: Icons.local_shipping_rounded,
             onTap: () => context.push('/settings/purchases'),
           ),
+          // The plan screen and its route already existed but nothing linked to
+          // it, so owners had no way to see or change their plan in the app.
+          if (owner)
+            MobileListTile(
+              title: 'Plan & billing',
+              subtitle: 'Your plan, renewals and payment',
+              leadingIcon: Icons.workspace_premium_rounded,
+              onTap: () => context.push('/settings/billing'),
+            ),
+          if (owner)
+            MobileListTile(
+              title: 'Compare plans',
+              subtitle: 'What each plan unlocks',
+              leadingIcon: Icons.compare_arrows_rounded,
+              onTap: () => context.push('/settings/plan'),
+            ),
 
           MobileListTile(
             title: 'Backup & restore',

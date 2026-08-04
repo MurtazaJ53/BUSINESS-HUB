@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/backend/backend_api_client.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/models/mobile_session.dart';
 import '../../../core/providers/mobile_data_providers.dart';
@@ -13,6 +14,83 @@ import '../../shell/presentation/mobile_surface.dart';
 
 class SettingsPlanScreen extends ConsumerWidget {
   const SettingsPlanScreen({super.key});
+
+  /// Send a real upgrade request to the platform queue. Previously this only
+  /// copied a text brief to the clipboard, so an owner tapping "Upgrade" sent
+  /// nothing anywhere.
+  Future<void> _submitUpgradeRequest(
+    BuildContext context,
+    WidgetRef ref,
+    ShopInfo shop,
+  ) async {
+    final session = ref.read(mobileSessionProvider).asData?.value;
+    if (session == null || !session.hasShop) return;
+    final target = shop.normalizedPlanTier == 'starter' ? 'growth' : 'pro';
+
+    final noteController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Request ${target == 'pro' ? 'Pro' : 'Growth'} plan'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text(
+              'We will review this request and get back to you. Nothing is '
+              'charged automatically.',
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: noteController,
+              textCapitalization: TextCapitalization.sentences,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Anything we should know? (optional)',
+              ),
+            ),
+          ],
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Send request'),
+          ),
+        ],
+      ),
+    );
+    final note = noteController.text.trim();
+    noteController.dispose();
+    if (confirmed != true) return;
+
+    try {
+      await ref
+          .read(backendApiClientProvider)
+          .requestPlanUpgrade(
+            user: session.user,
+            shopId: session.shopId!,
+            requestedPlanTier: target,
+            // Fall back to the auto-generated brief (plan, role, usage signals)
+            // so the admin queue always has context to act on.
+            note: note.isEmpty ? _buildUpgradeBriefText(shop, session) : note,
+          );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Upgrade request sent. We will be in touch.'),
+        ),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not send request: $error')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -204,21 +282,8 @@ class SettingsPlanScreen extends ConsumerWidget {
                         if (shop.normalizedPlanTier != 'pro')
                           Expanded(
                             child: FilledButton.tonalIcon(
-                              onPressed: () async {
-                                await Clipboard.setData(
-                                  ClipboardData(
-                                    text: _buildUpgradeBriefText(shop, session),
-                                  ),
-                                );
-                                if (!context.mounted) {
-                                  return;
-                                }
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Upgrade brief copied.'),
-                                  ),
-                                );
-                              },
+                              onPressed: () =>
+                                  _submitUpgradeRequest(context, ref, shop),
                               icon: const Icon(Icons.trending_up_rounded),
                               label: Text(_upgradeButtonLabel(shop)),
                             ),

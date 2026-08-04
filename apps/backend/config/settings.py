@@ -94,6 +94,7 @@ INSTALLED_APPS = [
     "platform_apps.audit.apps.AuditConfig",
     "platform_apps.erpnext.apps.ERPNextConfig",
     "platform_apps.notifications.apps.NotificationsConfig",
+    "platform_apps.billing.apps.BillingConfig",
 ]
 
 MIDDLEWARE = [
@@ -254,6 +255,13 @@ CACHES = {
         "LOCATION": REDIS_URL if _redis_cache else "business-hub-dev-cache",
     }
 }
+
+# --- Subscription billing (Razorpay) -------------------------------------
+# Left blank until real keys are issued; the billing module stays inert and the
+# app keeps working, so nothing breaks before the merchant account exists.
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
 
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", REDIS_URL)
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
