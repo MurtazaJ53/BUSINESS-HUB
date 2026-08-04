@@ -10,6 +10,23 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../shell/presentation/mobile_surface.dart';
 
+/// Django REST Framework serialises DecimalField as a JSON *string*
+/// ("500.00"), not a number, so casting straight to num throws and takes the
+/// whole card down. Parse defensively and accept either shape.
+@visibleForTesting
+double planMoney(Object? value) {
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value.trim()) ?? 0;
+  return 0;
+}
+
+@visibleForTesting
+int planCount(Object? value) {
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value.trim()) ?? 0;
+  return 0;
+}
+
 /// Subscription state + plan catalogue, straight from the server so the app
 /// never has to hardcode prices.
 final subscriptionProvider =
@@ -66,7 +83,7 @@ class _SettingsBillingScreenState extends ConsumerState<SettingsBillingScreen> {
     }
   }
 
-  Future<void> _startCheckout(String period, String label, num amount) async {
+  Future<void> _startCheckout(String period, String label, double amount) async {
     final session = ref.read(mobileSessionProvider).asData?.value;
     if (session == null || !session.hasShop) return;
 
@@ -147,7 +164,7 @@ class _SettingsBillingScreenState extends ConsumerState<SettingsBillingScreen> {
     final status = (subscription['status'] ?? '').toString();
     final isTrial = subscription['is_trial'] == true;
     final hasAccess = subscription['has_paid_access'] == true;
-    final daysLeft = (subscription['days_remaining'] as num?)?.toInt() ?? 0;
+    final daysLeft = planCount(subscription['days_remaining']);
 
     return MobileStandaloneScaffold(
       title: 'Plan & billing',
@@ -178,20 +195,24 @@ class _SettingsBillingScreenState extends ConsumerState<SettingsBillingScreen> {
                     daysLeft: daysLeft,
                   ),
                   const SizedBox(height: 12),
-                  SizedBox(
-                    height: 46,
-                    child: OutlinedButton.icon(
-                      onPressed: _refreshing ? null : _refresh,
-                      icon: _refreshing
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.refresh_rounded),
-                      label: Text(
-                        _refreshing ? 'Checking...' : 'I have paid - Refresh',
-                      ),
+                  // No fixed height: with an icon + label a hard 46px clipped
+                  // the text on smaller screens.
+                  OutlinedButton.icon(
+                    onPressed: _refreshing ? null : _refresh,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      minimumSize: const Size.fromHeight(48),
+                    ),
+                    icon: _refreshing
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh_rounded),
+                    label: Text(
+                      _refreshing ? 'Checking...' : 'I have paid - Refresh',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
                   const SizedBox(height: 18),
@@ -217,7 +238,7 @@ class _SettingsBillingScreenState extends ConsumerState<SettingsBillingScreen> {
                         onPay: () => _startCheckout(
                           (raw['period'] ?? '').toString(),
                           (raw['label'] ?? '').toString(),
-                          (raw['amount'] as num?) ?? 0,
+                          planMoney(raw['amount']),
                         ),
                       ),
                     ),
@@ -269,6 +290,20 @@ class _SettingsBillingScreenState extends ConsumerState<SettingsBillingScreen> {
   }
 }
 
+/// "3650 days left" is technically true but reads like a glitch, so express
+/// long windows in months/years.
+String _humanRemaining(int days) {
+  if (days >= 365) {
+    final years = days ~/ 365;
+    return '$years ${years == 1 ? 'year' : 'years'}';
+  }
+  if (days >= 60) {
+    final months = days ~/ 30;
+    return '$months months';
+  }
+  return '$days ${days == 1 ? 'day' : 'days'}';
+}
+
 class _StatusCard extends StatelessWidget {
   const _StatusCard({
     required this.status,
@@ -289,7 +324,7 @@ class _StatusCard extends StatelessWidget {
       status
     ) {
       'trialing' => (
-          'Free trial - $daysLeft ${daysLeft == 1 ? 'day' : 'days'} left',
+          'Free trial - ${_humanRemaining(daysLeft)} left',
           'You have the complete Pro app during the trial. Pick a plan before '
               'it ends to keep everything switched on.',
           AppPalette.primary,
@@ -297,7 +332,7 @@ class _StatusCard extends StatelessWidget {
         ),
       'active' => (
           'Pro plan active',
-          '$daysLeft ${daysLeft == 1 ? 'day' : 'days'} remaining. Renew any '
+          '${_humanRemaining(daysLeft)} remaining. Renew any '
               'time - extra days are added on top, never lost.',
           AppPalette.success,
           Icons.verified_rounded,
@@ -380,9 +415,9 @@ class _PlanOptionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
     final label = (option['label'] ?? '').toString();
-    final amount = ((option['amount'] as num?) ?? 0).toDouble();
-    final perMonth = ((option['effective_monthly'] as num?) ?? 0).toDouble();
-    final savings = ((option['savings_percent'] as num?) ?? 0).toInt();
+    final amount = planMoney(option['amount']);
+    final perMonth = planMoney(option['effective_monthly']);
+    final savings = planCount(option['savings_percent']);
     final isBest = savings >= 8;
 
     return Container(
