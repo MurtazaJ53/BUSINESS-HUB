@@ -28,6 +28,19 @@ class InventoryScreenV3 extends ConsumerStatefulWidget {
   ConsumerState<InventoryScreenV3> createState() => _InventoryScreenV3State();
 }
 
+/// Pull the first frame that belongs to this app out of a stack trace, so an
+/// error shown to the user points at a real file and line instead of being an
+/// untraceable one-liner.
+String _firstAppFrame(StackTrace stackTrace) {
+  for (final line in stackTrace.toString().split('\n')) {
+    if (line.contains('package:business_hub_mobile/')) {
+      return line.trim();
+    }
+  }
+  final lines = stackTrace.toString().split('\n');
+  return lines.isEmpty ? '' : lines.first.trim();
+}
+
 class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
   /// Units of measurement offered in the item form.
   static const List<String> _unitOptions = <String>[
@@ -799,13 +812,22 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                     ),
                   ),
                 );
-              } catch (error) {
+              } catch (error, stackTrace) {
+                // Surface where it actually broke. A bare message ("Null check
+                // operator used on a null value") is untraceable in the field,
+                // so include the first app frame and log the full trace.
+                debugPrint('Inventory save failed: $error\n$stackTrace');
                 if (!sheetContext.mounted) {
                   return;
                 }
                 setSheetState(() => isSaving = false);
                 ScaffoldMessenger.of(sheetContext).showSnackBar(
-                  SnackBar(content: Text('Add item failed: $error')),
+                  SnackBar(
+                    content: Text(
+                      'Save failed: $error\n${_firstAppFrame(stackTrace)}',
+                    ),
+                    duration: const Duration(seconds: 12),
+                  ),
                 );
               }
             }
@@ -1179,11 +1201,17 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                     ),
                   ),
                 );
-              } catch (error) {
+              } catch (error, stackTrace) {
+                debugPrint('Restock failed: $error\n$stackTrace');
                 if (!sheetContext.mounted) return;
                 setSheetState(() => isSaving = false);
                 ScaffoldMessenger.of(sheetContext).showSnackBar(
-                  SnackBar(content: Text('Restock failed: $error')),
+                  SnackBar(
+                    content: Text(
+                      'Restock failed: $error\n${_firstAppFrame(stackTrace)}',
+                    ),
+                    duration: const Duration(seconds: 12),
+                  ),
                 );
               }
             }
