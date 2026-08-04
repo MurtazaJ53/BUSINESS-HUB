@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/backend/backend_api_client.dart';
 import '../../../core/models/mobile_models.dart';
@@ -97,12 +96,10 @@ class SettingsPlanScreen extends ConsumerWidget {
     final session = ref.watch(mobileSessionProvider).asData?.value;
     final shop =
         ref.watch(shopInfoProvider).asData?.value ?? ShopInfo.fallback();
-    final verifiedUntil = ref
-        .watch(mobileMfaVerifiedUntilProvider)
-        .asData
-        ?.value;
-    final hasFreshSecurityWindow =
-        verifiedUntil != null && verifiedUntil.isAfter(DateTime.now());
+    // No MFA gate here on purpose: this screen only COMPARES plans, it changes
+    // nothing. Requiring a fresh MFA check locked owners out entirely when MFA
+    // was never enrolled — there was no way to verify, so the screen could
+    // never be opened.
 
     return MobileStandaloneScaffold(
       title: 'Workspace plan',
@@ -135,30 +132,6 @@ class SettingsPlanScreen extends ConsumerWidget {
                 title: 'Plan compare is owner and admin only',
                 body:
                     'Daily users should stay focused on selling and operations. Workspace plan comparison stays limited to owners and admins.',
-              ),
-            )
-          else if (!hasFreshSecurityWindow)
-            MobilePanel(
-              title: 'Security check required',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    'Verify MFA from Security before opening Workspace plan on mobile. This keeps owner/admin business controls behind a real second factor.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.black.withValues(alpha: 0.72),
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  FilledButton.tonalIcon(
-                    onPressed: () {
-                      context.push('/settings/security');
-                    },
-                    icon: const Icon(Icons.security_rounded),
-                    label: const Text('Open security'),
-                  ),
-                ],
               ),
             )
           else ...<Widget>[

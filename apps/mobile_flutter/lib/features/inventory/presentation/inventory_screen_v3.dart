@@ -1263,6 +1263,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
       text: item.price.toStringAsFixed(2),
     );
     var isSaving = false;
+    var setExact = false;
 
     showModalBottomSheet<void>(
       context: context,
@@ -1272,8 +1273,17 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
             Future<void> save() async {
-              final addQty = double.tryParse(qtyController.text.trim()) ?? 0;
-              if (addQty <= 0 || isSaving) return;
+              final entered = double.tryParse(qtyController.text.trim()) ?? 0;
+              // "Set exact" repairs a wrong count (e.g. stock that went
+              // negative after duplicate imports); "Add" is the normal restock.
+              final addQty = setExact ? entered - item.stock : entered;
+              if (isSaving) return;
+              if (!setExact && entered <= 0) return;
+              if (setExact && entered < 0) return;
+              if (addQty == 0) {
+                Navigator.pop(sheetContext);
+                return;
+              }
               setSheetState(() => isSaving = true);
               try {
                 final newPrice =
@@ -1314,7 +1324,9 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                           ?.value
                           ?.user
                           .displayName,
-                      note: 'Restocked +$addQty',
+                      note: setExact
+                          ? 'Stock corrected to $entered'
+                          : 'Restocked +$addQty',
                     );
                 if (!sheetContext.mounted) return;
                 Navigator.pop(sheetContext);
@@ -1384,13 +1396,55 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                           color: AppColors.of(sheetContext).textSecondary,
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
+                      // A count can be wrong (duplicate imports left some items
+                      // negative), so allow correcting it outright instead of
+                      // only ever adding to a number that was never right.
+                      SegmentedButton<bool>(
+                        segments: const <ButtonSegment<bool>>[
+                          ButtonSegment<bool>(
+                            value: false,
+                            label: Text('Add stock'),
+                            icon: Icon(Icons.add_rounded, size: 18),
+                          ),
+                          ButtonSegment<bool>(
+                            value: true,
+                            label: Text('Set exact'),
+                            icon: Icon(Icons.tune_rounded, size: 18),
+                          ),
+                        ],
+                        selected: <bool>{setExact},
+                        onSelectionChanged: (selection) =>
+                            setSheetState(() => setExact = selection.first),
+                      ),
+                      if (item.stock < 0) ...<Widget>[
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppPalette.error.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            'This item shows ${formatQty(item.stock)} in stock, '
+                            'which cannot be right. Use "Set exact" to enter '
+                            'the real count from the shelf.',
+                            style: Theme.of(sheetContext).textTheme.bodySmall,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
                       TextField(
                         controller: qtyController,
                         keyboardType: TextInputType.number,
                         autofocus: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Add quantity',
+                        decoration: InputDecoration(
+                          labelText: setExact
+                              ? 'Actual stock on the shelf'
+                              : 'Add quantity',
+                          helperText: setExact
+                              ? 'Replaces the current count'
+                              : 'Added to the current count',
                         ),
                       ),
                       const SizedBox(height: 12),

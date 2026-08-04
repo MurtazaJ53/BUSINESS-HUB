@@ -159,17 +159,60 @@ class InventoryItemBulkCreateView(ShopScopedMixin, APIView):
             "can_view_purchase_workflow": False,
         }
         created = 0
+        updated = 0
         errors = []
         with transaction.atomic():
             for idx, raw in enumerate(rows):
                 serializer = InventoryItemSerializer(data=raw, context=context)
-                if serializer.is_valid():
+                if not serializer.is_valid():
+                    errors.append({"index": idx, "errors": serializer.errors})
+                    continue
+
+                # Re-importing the same sheet used to create a second copy of
+                # every item. The duplicates started at zero stock and went
+                # negative as soon as one was sold, so a shop ended up with
+                # several rows for one product and a nonsense stock count.
+                # Match an existing item by SKU, else by name (+ size).
+                data = serializer.validated_data
+                sku = str(raw.get("sku") or "").strip()
+                name = str(raw.get("name") or "").strip()
+                size = str(raw.get("size") or "").strip()
+
+                existing = None
+                base = InventoryItem.objects.filter(
+                    shop=membership.shop, tombstone=False
+                )
+                if sku:
+                    existing = base.filter(sku__iexact=sku).first()
+                if existing is None and name:
+                    existing = base.filter(name__iexact=name, size__iexact=size).first()
+
+                if existing is not None:
+                    for field in (
+                        "name",
+                        "sell_price",
+                        "category",
+                        "subcategory",
+                        "size",
+                        "description",
+                        "hsn_code",
+                        "gst_rate",
+                        "price_includes_tax",
+                    ):
+                        if field in data:
+                            setattr(existing, field, data[field])
+                    existing.save()
+                    updated += 1
+                else:
                     serializer.save()
                     created += 1
-                else:
-                    errors.append({"index": idx, "errors": serializer.errors})
         return Response(
-            {"created": created, "skipped": len(errors), "errors": errors[:20]},
+            {
+                "created": created,
+                "updated": updated,
+                "skipped": len(errors),
+                "errors": errors[:20],
+            },
             status=status.HTTP_201_CREATED,
         )
 
