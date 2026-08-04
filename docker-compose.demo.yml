@@ -53,6 +53,11 @@ services:
       # Optional — auto-create a platform admin on boot.
       ENSURE_PLATFORM_ADMIN_EMAIL: ${ENSURE_PLATFORM_ADMIN_EMAIL:-}
       ENSURE_PLATFORM_ADMIN_PASSWORD: ${ENSURE_PLATFORM_ADMIN_PASSWORD:-}
+      # Optional — subscription billing. Until these are set, plan checkout
+      # returns a clear "payment not enabled yet" instead of failing.
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
     ports:
       # Local-only by default; front it with Nginx + SSL. For a quick public
       # IP:port demo, change to "0.0.0.0:8001:8000" and open the firewall.
