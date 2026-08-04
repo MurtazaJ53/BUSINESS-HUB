@@ -38,13 +38,20 @@ class CustomerSerializer(serializers.ModelSerializer):
             "email",
             "total_spent",
             "balance",
+            "loyalty_points",
             "notes",
             "status",
             "tombstone",
             "source_meta_json",
             "opening_balance",
         )
-        read_only_fields = ("id", "total_spent", "balance", "tombstone")
+        read_only_fields = (
+            "id",
+            "total_spent",
+            "balance",
+            "loyalty_points",
+            "tombstone",
+        )
 
     @transaction.atomic
     def create(self, validated_data):

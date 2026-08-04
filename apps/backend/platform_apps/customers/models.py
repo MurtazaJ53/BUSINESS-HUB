@@ -26,6 +26,9 @@ class Customer(SourceTrackedModel):
     phone_hash = models.CharField(max_length=64, blank=True, default="", db_index=False)
     total_spent = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     balance = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    # Loyalty points currently available to redeem. Whole points only: fractional
+    # points confuse customers and invite rounding disputes at the counter.
+    loyalty_points = models.PositiveIntegerField(default=0)
     notes = models.TextField(blank=True)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
     tombstone = models.BooleanField(default=False)
@@ -84,3 +87,38 @@ class CustomerLedgerEntry(SourceTrackedModel):
 
     def __str__(self) -> str:
         return f"{self.customer.name}: {self.amount_delta}"
+
+
+class LoyaltyLedgerEntry(SourceTrackedModel):
+    """Every point earned or spent, so a disputed balance can be explained.
+
+    A bare points number on a customer record is impossible to defend when a
+    shopper says "I had more than that" — this is the audit trail.
+    """
+
+    class EventType(models.TextChoices):
+        EARNED = "earned", "Earned"
+        REDEEMED = "redeemed", "Redeemed"
+        ADJUSTMENT = "adjustment", "Adjustment"
+        EXPIRED = "expired", "Expired"
+
+    shop = models.ForeignKey(
+        Shop, on_delete=models.CASCADE, related_name="loyalty_entries"
+    )
+    customer = models.ForeignKey(
+        Customer, on_delete=models.CASCADE, related_name="loyalty_entries"
+    )
+    event_type = models.CharField(max_length=16, choices=EventType.choices)
+    # Negative when spent, positive when earned.
+    points_delta = models.IntegerField()
+    balance_after = models.PositiveIntegerField(default=0)
+    note = models.CharField(max_length=280, blank=True)
+    sale_id = models.UUIDField(null=True, blank=True)
+    occurred_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ("-occurred_at", "-created_at")
+        indexes = [models.Index(fields=["shop", "customer"])]
+
+    def __str__(self) -> str:
+        return f"{self.customer} {self.points_delta:+d} pts"

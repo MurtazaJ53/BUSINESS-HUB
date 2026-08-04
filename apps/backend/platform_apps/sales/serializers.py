@@ -6,7 +6,16 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
 
-from platform_apps.customers.models import Customer, CustomerLedgerEntry
+from platform_apps.customers.loyalty import (
+    clamp_redemption,
+    points_for_sale,
+    redemption_value,
+)
+from platform_apps.customers.models import (
+    Customer,
+    CustomerLedgerEntry,
+    LoyaltyLedgerEntry,
+)
 from platform_apps.inventory.models import InventoryItem, InventoryStockLedger
 from platform_apps.payments.models import SalePayment
 from platform_apps.sales.gst import apportion_discount, compute_line_gst
@@ -128,6 +137,11 @@ class SaleSerializer(serializers.ModelSerializer):
     amount_due = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     sale_date = serializers.DateField(required=False)
     occurred_at = serializers.DateTimeField(required=False)
+    # Loyalty points the customer wants to spend on this bill. The server
+    # decides what is actually allowed — never trust a client-side discount.
+    redeem_points = serializers.IntegerField(
+        required=False, min_value=0, write_only=True, default=0
+    )
 
     class Meta:
         model = Sale
@@ -162,6 +176,7 @@ class SaleSerializer(serializers.ModelSerializer):
             "payment_count",
             "items",
             "payments",
+            "redeem_points",
         )
         read_only_fields = (
             "id",
@@ -244,7 +259,42 @@ class SaleSerializer(serializers.ModelSerializer):
                 {"subtotal_amount": f"Subtotal must match item totals ({computed_subtotal})."}
             )
 
-        expected_total = computed_subtotal - item_discount_total - discount_amount
+        # Loyalty redemption reduces what the customer owes, so it has to be
+        # resolved HERE — computing it later would leave payments validated
+        # against a total that no longer exists.
+        shop = self.context.get("shop")
+        redeem_requested = int(attrs.get("redeem_points") or 0)
+        redeemed_points = 0
+        redeem_value = Decimal("0.00")
+        if shop is not None and redeem_requested > 0:
+            customer = None
+            customer_id = attrs.get("customer_id")
+            if customer_id:
+                customer = Customer.objects.filter(
+                    shop=shop, pk=customer_id, tombstone=False
+                ).first()
+            if customer is None:
+                raise serializers.ValidationError(
+                    {"redeem_points": "Points can only be redeemed for a saved customer."}
+                )
+            pre_redemption_total = (
+                computed_subtotal - item_discount_total - discount_amount
+            )
+            redeemed_points = clamp_redemption(
+                shop,
+                requested=redeem_requested,
+                available=customer.loyalty_points,
+                bill_total=pre_redemption_total,
+            )
+            if redeemed_points <= 0:
+                raise serializers.ValidationError(
+                    {"redeem_points": "Not enough points available for this bill."}
+                )
+            redeem_value = redemption_value(shop, redeemed_points)
+
+        expected_total = (
+            computed_subtotal - item_discount_total - discount_amount - redeem_value
+        )
         if expected_total < Decimal("0.00"):
             raise serializers.ValidationError({"discount_amount": "Discount cannot exceed subtotal."})
 
@@ -256,6 +306,8 @@ class SaleSerializer(serializers.ModelSerializer):
 
         attrs["_computed_subtotal"] = computed_subtotal
         attrs["_item_discount_total"] = item_discount_total
+        attrs["_redeemed_points"] = redeemed_points
+        attrs["_redeem_value"] = redeem_value
         attrs["_computed_total"] = expected_total
         attrs["_computed_paid"] = total_paid
         attrs["_computed_due"] = expected_total - total_paid
@@ -286,6 +338,9 @@ class SaleSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         item_payloads = validated_data.pop("items")
         payment_payloads = validated_data.pop("payments")
+        validated_data.pop("redeem_points", None)
+        redeemed_points = validated_data.pop("_redeemed_points", 0)
+        redeem_value = validated_data.pop("_redeem_value", Decimal("0.00"))
         computed_subtotal = validated_data.pop("_computed_subtotal")
         item_discount_total = validated_data.pop("_item_discount_total", Decimal("0.00"))
         computed_total = validated_data.pop("_computed_total")
@@ -296,7 +351,9 @@ class SaleSerializer(serializers.ModelSerializer):
         # stored discount_amount is the total the customer actually saved
         # (per-item + bill-level), so receipts and History report one figure.
         bill_discount = validated_data.get("discount_amount") or Decimal("0.00")
-        validated_data["discount_amount"] = bill_discount + item_discount_total
+        validated_data["discount_amount"] = (
+            bill_discount + item_discount_total + redeem_value
+        )
 
         shop = self.context["shop"]
         actor = self.context["actor"]
@@ -527,7 +584,48 @@ class SaleSerializer(serializers.ModelSerializer):
             )
             customer.balance = customer.balance + computed_due
             customer.total_spent = customer.total_spent + computed_total
-            customer.save(update_fields=["balance", "total_spent", "updated_at"])
+
+            # --- Loyalty -------------------------------------------------
+            # Spend first, then earn on what was actually paid, so a customer
+            # can't earn points on the part of the bill they settled with
+            # points.
+            points = customer.loyalty_points
+            if redeemed_points > 0:
+                points -= redeemed_points
+                LoyaltyLedgerEntry.objects.create(
+                    shop=shop,
+                    customer=customer,
+                    event_type=LoyaltyLedgerEntry.EventType.REDEEMED,
+                    points_delta=-redeemed_points,
+                    balance_after=max(points, 0),
+                    note=f"Redeemed on {sale.receipt_number}",
+                    sale_id=sale.id,
+                    occurred_at=occurred_at,
+                )
+
+            earned = points_for_sale(shop, computed_total)
+            if earned > 0:
+                points += earned
+                LoyaltyLedgerEntry.objects.create(
+                    shop=shop,
+                    customer=customer,
+                    event_type=LoyaltyLedgerEntry.EventType.EARNED,
+                    points_delta=earned,
+                    balance_after=max(points, 0),
+                    note=f"Earned on {sale.receipt_number}",
+                    sale_id=sale.id,
+                    occurred_at=occurred_at,
+                )
+
+            customer.loyalty_points = max(points, 0)
+            customer.save(
+                update_fields=[
+                    "balance",
+                    "total_spent",
+                    "loyalty_points",
+                    "updated_at",
+                ]
+            )
 
         return sale
 
