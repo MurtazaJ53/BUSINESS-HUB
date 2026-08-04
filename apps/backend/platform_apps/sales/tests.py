@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+import xml.etree.ElementTree as ET
 
 from django.test import TestCase
 from django.utils import timezone
@@ -876,3 +877,148 @@ class SaleItemOrderingTests(TestCase):
         rows = listing.json()
         rows = rows["results"] if isinstance(rows, dict) else rows
         self.assertEqual([i["name"] for i in rows[0]["items"]], self.names)
+
+
+class TallyExportTests(TestCase):
+    """A Tally voucher that doesn't balance is rejected on import — or worse,
+    imported wrong. Debits must equal credits on every voucher."""
+
+    def setUp(self):
+        self.user = PlatformUser.objects.create_user(
+            email="tally@example.com", password="secret", full_name="Owner"
+        )
+        self.shop = Shop.objects.create(
+            name="Tally Shop", slug="tally-shop", gstin="24ABCDE1234F1Z5"
+        )
+        ShopMembership.objects.create(
+            user=self.user,
+            shop=self.shop,
+            role=ShopMembership.Role.OWNER,
+            status=ShopMembership.Status.ACTIVE,
+        )
+        self.item = InventoryItem.objects.create(
+            shop=self.shop, name="Shirt", sku="S1", sell_price=Decimal("118.00"),
+            gst_rate=Decimal("18.00"),
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def _sale(self, amount="118.00"):
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/",
+            {
+                "items": [
+                    {
+                        "inventory_item_id": str(self.item.id),
+                        "quantity": 1,
+                        "unit_price": amount,
+                    }
+                ],
+                "payments": [{"payment_method": "CASH", "amount": amount}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+
+    def _export(self):
+        response = self.client.get(
+            f"/api/v1/shops/{self.shop.id}/sales/tally-export/"
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        return response
+
+    def test_export_is_well_formed_tally_xml(self):
+        self._sale()
+        response = self._export()
+        self.assertEqual(response["Content-Type"], "application/xml")
+        self.assertIn("attachment;", response["Content-Disposition"])
+
+        body = response.content.decode()
+        root = ET.fromstring(body)
+        self.assertEqual(root.tag, "ENVELOPE")
+        self.assertEqual(root.findtext("./HEADER/TALLYREQUEST"), "Import Data")
+        self.assertEqual(len(root.findall(".//VOUCHER")), 1)
+
+    def test_every_voucher_balances(self):
+        self._sale()
+        self._sale("236.00")
+        root = ET.fromstring(self._export().content.decode())
+        vouchers = root.findall(".//VOUCHER")
+        self.assertEqual(len(vouchers), 2)
+        for voucher in vouchers:
+            total = sum(
+                Decimal(entry.findtext("AMOUNT"))
+                for entry in voucher.findall("ALLLEDGERENTRIES.LIST")
+            )
+            self.assertEqual(
+                total,
+                Decimal("0.00"),
+                f"voucher {voucher.findtext('VOUCHERNUMBER')} does not balance",
+            )
+
+    def test_debit_is_negative_and_credit_positive(self):
+        self._sale()
+        root = ET.fromstring(self._export().content.decode())
+        entries = root.findall(".//ALLLEDGERENTRIES.LIST")
+        debits = [e for e in entries if e.findtext("ISDEEMEDPOSITIVE") == "Yes"]
+        credits = [e for e in entries if e.findtext("ISDEEMEDPOSITIVE") == "No"]
+        self.assertTrue(debits and credits)
+        # Tally's sign convention: reversing this silently flips every entry.
+        for entry in debits:
+            self.assertLess(Decimal(entry.findtext("AMOUNT")), 0)
+        for entry in credits:
+            self.assertGreater(Decimal(entry.findtext("AMOUNT")), 0)
+
+    def test_tax_is_posted_to_its_own_ledgers(self):
+        self._sale()
+        body = self._export().content.decode()
+        self.assertIn("Output CGST", body)
+        self.assertIn("Output SGST", body)
+        self.assertIn("Sales Account", body)
+
+    def test_voided_sales_are_excluded(self):
+        self._sale()
+        sale = Sale.objects.get()
+        self.client.patch(
+            f"/api/v1/shops/{self.shop.id}/sales/{sale.id}/void/", {}, format="json"
+        )
+        root = ET.fromstring(self._export().content.decode())
+        # A refunded bill in the CA's books would overstate revenue.
+        self.assertEqual(len(root.findall(".//VOUCHER")), 0)
+
+    def test_a_customer_name_with_an_ampersand_does_not_break_the_xml(self):
+        response = self.client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/",
+            {
+                "customer_name": "Ram & Sons <Traders>",
+                "items": [
+                    {
+                        "inventory_item_id": str(self.item.id),
+                        "quantity": 1,
+                        "unit_price": "118.00",
+                    }
+                ],
+                "payments": [{"payment_method": "CASH", "amount": "118.00"}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+        root = ET.fromstring(self._export().content.decode())
+        self.assertEqual(
+            root.findtext(".//PARTYLEDGERNAME"), "Ram & Sons <Traders>"
+        )
+
+    def test_staff_cannot_export_the_books(self):
+        staff = PlatformUser.objects.create_user(
+            email="staff-tally@example.com", password="secret", full_name="Staff"
+        )
+        ShopMembership.objects.create(
+            user=staff,
+            shop=self.shop,
+            role=ShopMembership.Role.STAFF,
+            status=ShopMembership.Status.ACTIVE,
+        )
+        client = APIClient()
+        client.force_authenticate(user=staff)
+        response = client.get(f"/api/v1/shops/{self.shop.id}/sales/tally-export/")
+        self.assertEqual(response.status_code, 403)

@@ -27,6 +27,7 @@ from platform_apps.payments.models import SalePayment
 from platform_apps.projections.services import refresh_shop_dashboard_projection
 from platform_apps.sales.models import Sale, SaleItem
 from platform_apps.sales.models import SaleCommandReceipt
+from platform_apps.sales.tally import build_tally_xml
 from platform_apps.inventory.models import InventoryStockLedger
 from platform_apps.customers.models import CustomerLedgerEntry
 from platform_apps.sales.serializers import (
@@ -863,3 +864,39 @@ class SaleHistoryBulkImportView(ShopScopedMixin, APIView):
         return Response(
             {"created": created, "skipped": skipped}, status=status.HTTP_201_CREATED
         )
+
+
+class SaleTallyExportView(ShopScopedMixin, APIView):
+    """Export a date range of sales as a Tally-importable XML voucher file.
+
+    Indian accountants work in Tally, so "can my CA import this?" decides
+    whether a shop can adopt the app at all. Voided sales are excluded: an
+    accountant importing a refunded bill would overstate revenue.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+    minimum_role = ShopMembership.Role.ADMIN
+
+    def get(self, request, shop_id):
+        membership = self.get_membership()
+        shop = membership.shop
+
+        date_from = request.query_params.get("date_from", "").strip()
+        date_to = request.query_params.get("date_to", "").strip()
+
+        sales = (
+            Sale.objects.filter(shop=shop, tombstone=False)
+            .exclude(status=Sale.Status.VOID)
+            .order_by("sale_date", "created_at")
+        )
+        if date_from:
+            sales = sales.filter(sale_date__gte=date_from)
+        if date_to:
+            sales = sales.filter(sale_date__lte=date_to)
+
+        xml = build_tally_xml(shop, sales)
+        response = HttpResponse(xml, content_type="application/xml")
+        suffix = f"_{date_from}_{date_to}" if date_from and date_to else ""
+        filename = f"Tally_{shop.slug}{suffix}.xml"
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
