@@ -1431,6 +1431,56 @@ class CustomerPulseSummary {
   final int pendingSales;
 }
 
+/// A customer who owes money, with everything the collection screen needs to
+/// decide who to chase next.
+class KhataDebtor {
+  const KhataDebtor({
+    required this.id,
+    required this.name,
+    required this.phone,
+    required this.balance,
+    this.lastRemindedAt,
+    this.lastSeenAt,
+  });
+
+  final String id;
+  final String name;
+  final String phone;
+  final double balance;
+  final DateTime? lastRemindedAt;
+  final DateTime? lastSeenAt;
+
+  bool get hasPhone => phone.trim().length >= 10;
+
+  /// Days since the last reminder; null if never reminded.
+  int? get daysSinceReminder {
+    final at = lastRemindedAt;
+    if (at == null) return null;
+    return DateTime.now().difference(at).inDays;
+  }
+
+  /// Reminded today already — the collection run should skip them so a
+  /// customer never gets chased twice in one day.
+  bool get remindedToday {
+    final at = lastRemindedAt;
+    if (at == null) return false;
+    final now = DateTime.now();
+    return at.year == now.year && at.month == now.month && at.day == now.day;
+  }
+
+  /// Overdue once a week has passed since the last nudge (or there never was
+  /// one). Mirrors how shopkeepers actually chase udhaar.
+  bool get isOverdue => (daysSinceReminder ?? 999) >= 7;
+
+  String get reminderStatus {
+    if (remindedToday) return 'Reminded today';
+    final days = daysSinceReminder;
+    if (days == null) return 'Never reminded';
+    if (days == 1) return 'Reminded yesterday';
+    return 'Reminded $days days ago';
+  }
+}
+
 class BackendCustomerSummary {
   const BackendCustomerSummary({
     required this.id,

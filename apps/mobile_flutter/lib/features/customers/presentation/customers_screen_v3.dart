@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/backend/backend_api_client.dart';
@@ -10,6 +11,7 @@ import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/khata/khata_reminder.dart';
 import '../../../core/util/whatsapp.dart';
+import 'khata_collection_screen.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/premium_components.dart';
@@ -81,6 +83,9 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
         child: CustomScrollView(
           slivers: <Widget>[
             SliverToBoxAdapter(child: _buildHeader(context)),
+            // Udhaar collection is the daily money job, so it gets a first-class
+            // entry point here rather than being buried in Settings.
+            SliverToBoxAdapter(child: _buildCollectBanner(context)),
             SliverToBoxAdapter(
               child: _buildMetrics(
                 totalCustomers: totalCustomers,
@@ -127,6 +132,65 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
       ),
       // End-aligned: a centre-floating FAB sat on top of the customer rows.
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+    );
+  }
+
+  /// Total outstanding + a one-tap route into the collection run.
+  Widget _buildCollectBanner(BuildContext context) {
+    final debtors =
+        ref.watch(khataDebtorsProvider).asData?.value ?? const <KhataDebtor>[];
+    if (debtors.isEmpty) return const SizedBox.shrink();
+    final total = debtors.fold<double>(0, (sum, d) => sum + d.balance);
+    final overdue = debtors.where((d) => d.isOverdue && d.hasPhone).length;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Material(
+        color: AppPalette.warning.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => context.push('/settings/collect'),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppPalette.warning.withValues(alpha: 0.30),
+              ),
+            ),
+            child: Row(
+              children: <Widget>[
+                const Icon(Icons.account_balance_wallet_rounded,
+                    color: AppPalette.warning),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        '${formatCurrency(total)} udhaar pending',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        overdue > 0
+                            ? '$overdue customer(s) need a reminder'
+                            : '${debtors.length} customer(s) owe you',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: AppColors.of(context).textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -495,13 +559,15 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
     BuildContext context,
     BackendCustomerSummary customer,
   ) async {
-    final shopName =
-        ref.read(shopInfoProvider).asData?.value.name ?? 'our shop';
+    final shop = ref.read(shopInfoProvider).asData?.value;
     final message = buildKhataReminder(
-      shopName: shopName,
+      shopName: shop?.name ?? 'our shop',
       customerName: customer.name,
       balance: customer.balance,
-      upiVpa: const String.fromEnvironment('BUSINESS_HUB_UPI_VPA'),
+      // Use the UPI id saved in Business settings. This read a compile-time
+      // String.fromEnvironment, which is empty in every normal build, so the
+      // pay link silently never appeared in the reminder.
+      upiVpa: shop?.upiVpa ?? '',
     );
     final ok = await openWhatsApp(phone: customer.phone ?? '', message: message);
     if (!ok && context.mounted) {

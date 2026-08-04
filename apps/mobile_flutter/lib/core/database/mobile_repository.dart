@@ -1083,6 +1083,48 @@ class CustomerRepository {
 
   final BusinessHubDatabase _db;
 
+  /// Everyone who owes money, biggest debt first — the order a shopkeeper
+  /// actually works through when collecting udhaar.
+  Stream<List<KhataDebtor>> watchDebtors() {
+    final query = _db.select(_db.customerEntries)
+      ..where((t) => t.tombstone.equals(false) & t.balance.isBiggerThanValue(0))
+      ..orderBy([(t) => OrderingTerm.desc(t.balance)]);
+    return query.watch().map(
+          (rows) => rows
+              .map(
+                (row) => KhataDebtor(
+                  id: row.id,
+                  name: row.name,
+                  phone: row.phone ?? '',
+                  balance: row.balance,
+                  lastRemindedAt: row.lastRemindedAt == null
+                      ? null
+                      : DateTime.fromMillisecondsSinceEpoch(
+                          row.lastRemindedAt!,
+                        ),
+                  lastSeenAt: row.lastSeenAt == null
+                      ? null
+                      : DateTime.fromMillisecondsSinceEpoch(row.lastSeenAt!),
+                ),
+              )
+              .toList(growable: false),
+        );
+  }
+
+  /// Record that a reminder was sent, so the same customer isn't chased twice
+  /// in a day and the list can show who is genuinely overdue.
+  Future<void> markReminded(String customerId) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await (_db.update(_db.customerEntries)
+          ..where((t) => t.id.equals(customerId)))
+        .write(
+      CustomerEntriesCompanion(
+        lastRemindedAt: Value(now),
+        updatedAt: Value(now),
+      ),
+    );
+  }
+
   Stream<List<BackendCustomerSummary>> watchLegacyCustomers({
     String search = '',
   }) {

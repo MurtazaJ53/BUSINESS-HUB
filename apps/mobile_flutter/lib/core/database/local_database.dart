@@ -136,6 +136,10 @@ class CustomerEntries extends Table {
   IntColumn get updatedAt =>
       integer().named('updated_at').withDefault(const Constant(0))();
   IntColumn get lastSeenAt => integer().named('last_seen_at').nullable()();
+  /// When a khata reminder was last sent to this customer, so the collection
+  /// list can skip anyone already chased today and show who is overdue.
+  IntColumn get lastRemindedAt =>
+      integer().named('last_reminded_at').nullable()();
   BoolColumn get tombstone => boolean().withDefault(const Constant(false))();
 
   @override
@@ -301,7 +305,7 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
   BusinessHubDatabase.forTesting(super.executor) : super();
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 16;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -309,6 +313,9 @@ class BusinessHubDatabase extends _$BusinessHubDatabase {
       await m.createAll();
     },
     onUpgrade: (m, from, to) async {
+      if (from < 16) {
+        await m.addColumn(customerEntries, customerEntries.lastRemindedAt);
+      }
       if (from < 15) {
         await m.addColumn(commerceOutboxEntries, commerceOutboxEntries.isDeadLetter);
         await m.addColumn(commerceOutboxEntries, commerceOutboxEntries.deadLetterReason);

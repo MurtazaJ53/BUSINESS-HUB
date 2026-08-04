@@ -3161,6 +3161,17 @@ class $CustomerEntriesTable extends CustomerEntries
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _lastRemindedAtMeta = const VerificationMeta(
+    'lastRemindedAt',
+  );
+  @override
+  late final GeneratedColumn<int> lastRemindedAt = GeneratedColumn<int>(
+    'last_reminded_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _tombstoneMeta = const VerificationMeta(
     'tombstone',
   );
@@ -3189,6 +3200,7 @@ class $CustomerEntriesTable extends CustomerEntries
     createdAt,
     updatedAt,
     lastSeenAt,
+    lastRemindedAt,
     tombstone,
   ];
   @override
@@ -3275,6 +3287,15 @@ class $CustomerEntriesTable extends CustomerEntries
         ),
       );
     }
+    if (data.containsKey('last_reminded_at')) {
+      context.handle(
+        _lastRemindedAtMeta,
+        lastRemindedAt.isAcceptableOrUnknown(
+          data['last_reminded_at']!,
+          _lastRemindedAtMeta,
+        ),
+      );
+    }
     if (data.containsKey('tombstone')) {
       context.handle(
         _tombstoneMeta,
@@ -3334,6 +3355,10 @@ class $CustomerEntriesTable extends CustomerEntries
         DriftSqlType.int,
         data['${effectivePrefix}last_seen_at'],
       ),
+      lastRemindedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_reminded_at'],
+      ),
       tombstone: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}tombstone'],
@@ -3359,6 +3384,10 @@ class CustomerEntry extends DataClass implements Insertable<CustomerEntry> {
   final int createdAt;
   final int updatedAt;
   final int? lastSeenAt;
+
+  /// When a khata reminder was last sent to this customer, so the collection
+  /// list can skip anyone already chased today and show who is overdue.
+  final int? lastRemindedAt;
   final bool tombstone;
   const CustomerEntry({
     required this.id,
@@ -3372,6 +3401,7 @@ class CustomerEntry extends DataClass implements Insertable<CustomerEntry> {
     required this.createdAt,
     required this.updatedAt,
     this.lastSeenAt,
+    this.lastRemindedAt,
     required this.tombstone,
   });
   @override
@@ -3395,6 +3425,9 @@ class CustomerEntry extends DataClass implements Insertable<CustomerEntry> {
     map['updated_at'] = Variable<int>(updatedAt);
     if (!nullToAbsent || lastSeenAt != null) {
       map['last_seen_at'] = Variable<int>(lastSeenAt);
+    }
+    if (!nullToAbsent || lastRemindedAt != null) {
+      map['last_reminded_at'] = Variable<int>(lastRemindedAt);
     }
     map['tombstone'] = Variable<bool>(tombstone);
     return map;
@@ -3421,6 +3454,9 @@ class CustomerEntry extends DataClass implements Insertable<CustomerEntry> {
       lastSeenAt: lastSeenAt == null && nullToAbsent
           ? const Value.absent()
           : Value(lastSeenAt),
+      lastRemindedAt: lastRemindedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastRemindedAt),
       tombstone: Value(tombstone),
     );
   }
@@ -3442,6 +3478,7 @@ class CustomerEntry extends DataClass implements Insertable<CustomerEntry> {
       createdAt: serializer.fromJson<int>(json['createdAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
       lastSeenAt: serializer.fromJson<int?>(json['lastSeenAt']),
+      lastRemindedAt: serializer.fromJson<int?>(json['lastRemindedAt']),
       tombstone: serializer.fromJson<bool>(json['tombstone']),
     );
   }
@@ -3460,6 +3497,7 @@ class CustomerEntry extends DataClass implements Insertable<CustomerEntry> {
       'createdAt': serializer.toJson<int>(createdAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
       'lastSeenAt': serializer.toJson<int?>(lastSeenAt),
+      'lastRemindedAt': serializer.toJson<int?>(lastRemindedAt),
       'tombstone': serializer.toJson<bool>(tombstone),
     };
   }
@@ -3476,6 +3514,7 @@ class CustomerEntry extends DataClass implements Insertable<CustomerEntry> {
     int? createdAt,
     int? updatedAt,
     Value<int?> lastSeenAt = const Value.absent(),
+    Value<int?> lastRemindedAt = const Value.absent(),
     bool? tombstone,
   }) => CustomerEntry(
     id: id ?? this.id,
@@ -3489,6 +3528,9 @@ class CustomerEntry extends DataClass implements Insertable<CustomerEntry> {
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     lastSeenAt: lastSeenAt.present ? lastSeenAt.value : this.lastSeenAt,
+    lastRemindedAt: lastRemindedAt.present
+        ? lastRemindedAt.value
+        : this.lastRemindedAt,
     tombstone: tombstone ?? this.tombstone,
   );
   CustomerEntry copyWithCompanion(CustomerEntriesCompanion data) {
@@ -3508,6 +3550,9 @@ class CustomerEntry extends DataClass implements Insertable<CustomerEntry> {
       lastSeenAt: data.lastSeenAt.present
           ? data.lastSeenAt.value
           : this.lastSeenAt,
+      lastRemindedAt: data.lastRemindedAt.present
+          ? data.lastRemindedAt.value
+          : this.lastRemindedAt,
       tombstone: data.tombstone.present ? data.tombstone.value : this.tombstone,
     );
   }
@@ -3526,6 +3571,7 @@ class CustomerEntry extends DataClass implements Insertable<CustomerEntry> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('lastSeenAt: $lastSeenAt, ')
+          ..write('lastRemindedAt: $lastRemindedAt, ')
           ..write('tombstone: $tombstone')
           ..write(')'))
         .toString();
@@ -3544,6 +3590,7 @@ class CustomerEntry extends DataClass implements Insertable<CustomerEntry> {
     createdAt,
     updatedAt,
     lastSeenAt,
+    lastRemindedAt,
     tombstone,
   );
   @override
@@ -3561,6 +3608,7 @@ class CustomerEntry extends DataClass implements Insertable<CustomerEntry> {
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.lastSeenAt == this.lastSeenAt &&
+          other.lastRemindedAt == this.lastRemindedAt &&
           other.tombstone == this.tombstone);
 }
 
@@ -3576,6 +3624,7 @@ class CustomerEntriesCompanion extends UpdateCompanion<CustomerEntry> {
   final Value<int> createdAt;
   final Value<int> updatedAt;
   final Value<int?> lastSeenAt;
+  final Value<int?> lastRemindedAt;
   final Value<bool> tombstone;
   final Value<int> rowid;
   const CustomerEntriesCompanion({
@@ -3590,6 +3639,7 @@ class CustomerEntriesCompanion extends UpdateCompanion<CustomerEntry> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.lastSeenAt = const Value.absent(),
+    this.lastRemindedAt = const Value.absent(),
     this.tombstone = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -3605,6 +3655,7 @@ class CustomerEntriesCompanion extends UpdateCompanion<CustomerEntry> {
     required int createdAt,
     this.updatedAt = const Value.absent(),
     this.lastSeenAt = const Value.absent(),
+    this.lastRemindedAt = const Value.absent(),
     this.tombstone = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -3622,6 +3673,7 @@ class CustomerEntriesCompanion extends UpdateCompanion<CustomerEntry> {
     Expression<int>? createdAt,
     Expression<int>? updatedAt,
     Expression<int>? lastSeenAt,
+    Expression<int>? lastRemindedAt,
     Expression<bool>? tombstone,
     Expression<int>? rowid,
   }) {
@@ -3637,6 +3689,7 @@ class CustomerEntriesCompanion extends UpdateCompanion<CustomerEntry> {
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (lastSeenAt != null) 'last_seen_at': lastSeenAt,
+      if (lastRemindedAt != null) 'last_reminded_at': lastRemindedAt,
       if (tombstone != null) 'tombstone': tombstone,
       if (rowid != null) 'rowid': rowid,
     });
@@ -3654,6 +3707,7 @@ class CustomerEntriesCompanion extends UpdateCompanion<CustomerEntry> {
     Value<int>? createdAt,
     Value<int>? updatedAt,
     Value<int?>? lastSeenAt,
+    Value<int?>? lastRemindedAt,
     Value<bool>? tombstone,
     Value<int>? rowid,
   }) {
@@ -3669,6 +3723,7 @@ class CustomerEntriesCompanion extends UpdateCompanion<CustomerEntry> {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+      lastRemindedAt: lastRemindedAt ?? this.lastRemindedAt,
       tombstone: tombstone ?? this.tombstone,
       rowid: rowid ?? this.rowid,
     );
@@ -3710,6 +3765,9 @@ class CustomerEntriesCompanion extends UpdateCompanion<CustomerEntry> {
     if (lastSeenAt.present) {
       map['last_seen_at'] = Variable<int>(lastSeenAt.value);
     }
+    if (lastRemindedAt.present) {
+      map['last_reminded_at'] = Variable<int>(lastRemindedAt.value);
+    }
     if (tombstone.present) {
       map['tombstone'] = Variable<bool>(tombstone.value);
     }
@@ -3733,6 +3791,7 @@ class CustomerEntriesCompanion extends UpdateCompanion<CustomerEntry> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('lastSeenAt: $lastSeenAt, ')
+          ..write('lastRemindedAt: $lastRemindedAt, ')
           ..write('tombstone: $tombstone, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -8812,6 +8871,7 @@ typedef $$CustomerEntriesTableCreateCompanionBuilder =
       required int createdAt,
       Value<int> updatedAt,
       Value<int?> lastSeenAt,
+      Value<int?> lastRemindedAt,
       Value<bool> tombstone,
       Value<int> rowid,
     });
@@ -8828,6 +8888,7 @@ typedef $$CustomerEntriesTableUpdateCompanionBuilder =
       Value<int> createdAt,
       Value<int> updatedAt,
       Value<int?> lastSeenAt,
+      Value<int?> lastRemindedAt,
       Value<bool> tombstone,
       Value<int> rowid,
     });
@@ -8893,6 +8954,11 @@ class $$CustomerEntriesTableFilterComposer
 
   ColumnFilters<int> get lastSeenAt => $composableBuilder(
     column: $table.lastSeenAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastRemindedAt => $composableBuilder(
+    column: $table.lastRemindedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8966,6 +9032,11 @@ class $$CustomerEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get lastRemindedAt => $composableBuilder(
+    column: $table.lastRemindedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get tombstone => $composableBuilder(
     column: $table.tombstone,
     builder: (column) => ColumnOrderings(column),
@@ -9015,6 +9086,11 @@ class $$CustomerEntriesTableAnnotationComposer
 
   GeneratedColumn<int> get lastSeenAt => $composableBuilder(
     column: $table.lastSeenAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get lastRemindedAt => $composableBuilder(
+    column: $table.lastRemindedAt,
     builder: (column) => column,
   );
 
@@ -9070,6 +9146,7 @@ class $$CustomerEntriesTableTableManager
                 Value<int> createdAt = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
                 Value<int?> lastSeenAt = const Value.absent(),
+                Value<int?> lastRemindedAt = const Value.absent(),
                 Value<bool> tombstone = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CustomerEntriesCompanion(
@@ -9084,6 +9161,7 @@ class $$CustomerEntriesTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 lastSeenAt: lastSeenAt,
+                lastRemindedAt: lastRemindedAt,
                 tombstone: tombstone,
                 rowid: rowid,
               ),
@@ -9100,6 +9178,7 @@ class $$CustomerEntriesTableTableManager
                 required int createdAt,
                 Value<int> updatedAt = const Value.absent(),
                 Value<int?> lastSeenAt = const Value.absent(),
+                Value<int?> lastRemindedAt = const Value.absent(),
                 Value<bool> tombstone = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CustomerEntriesCompanion.insert(
@@ -9114,6 +9193,7 @@ class $$CustomerEntriesTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 lastSeenAt: lastSeenAt,
+                lastRemindedAt: lastRemindedAt,
                 tombstone: tombstone,
                 rowid: rowid,
               ),
