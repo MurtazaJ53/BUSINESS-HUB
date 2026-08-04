@@ -18,7 +18,16 @@ umask 077
 
 PROJECT_DIR="${PROJECT_DIR:-/opt/bhub}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.demo.yml}"
-ENV_FILE="${ENV_FILE:-$PROJECT_DIR/.env.demo}"
+# Compose reads .env by default when no --env-file is passed, so look there
+# first and fall back to .env.demo. Getting this wrong used to be silent: the
+# script simply used built-in defaults, which would target the wrong database
+# on any shop that customised POSTGRES_DB.
+ENV_FILE="${ENV_FILE:-}"
+if [[ -z "$ENV_FILE" ]]; then
+  for candidate in "$PROJECT_DIR/.env" "$PROJECT_DIR/.env.demo"; do
+    if [[ -f "$candidate" ]]; then ENV_FILE="$candidate"; break; fi
+  done
+fi
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/bhub}"
 DAILY_KEEP="${DAILY_KEEP:-14}"
 WEEKLY_KEEP="${WEEKLY_KEEP:-8}"
@@ -31,9 +40,12 @@ trap 'fail "backup aborted on line $LINENO"' ERR
 cd "$PROJECT_DIR" || fail "project dir $PROJECT_DIR not found"
 
 # Credentials live in the compose env file; never hardcode them here.
-if [[ -f "$ENV_FILE" ]]; then
+if [[ -n "$ENV_FILE" && -f "$ENV_FILE" ]]; then
   # shellcheck disable=SC1090
   set -a; source "$ENV_FILE"; set +a
+else
+  log "WARNING: no env file found in $PROJECT_DIR (.env / .env.demo);"
+  log "         falling back to default database name and user."
 fi
 PG_USER="${POSTGRES_USER:-bhub}"
 PG_DB="${POSTGRES_DB:-business_hub}"
