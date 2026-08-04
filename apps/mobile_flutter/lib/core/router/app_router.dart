@@ -17,6 +17,7 @@ import '../../features/settings/presentation/settings_ops_screen.dart';
 import '../../features/settings/presentation/settings_attendance_screen.dart';
 import '../../features/settings/presentation/settings_expenses_screen.dart';
 import '../../features/settings/presentation/settings_billing_screen.dart';
+import '../../features/settings/presentation/settings_language_screen.dart';
 import '../../features/settings/presentation/settings_plan_screen.dart';
 import '../../features/settings/presentation/settings_purchases_screen.dart';
 import '../../features/settings/presentation/settings_pulse_screen.dart';
@@ -118,6 +119,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: 'plan',
             pageBuilder: (context, state) =>
                 const NoTransitionPage<void>(child: SettingsPlanScreen()),
+          ),
+          GoRoute(
+            parentNavigatorKey: appRootNavigatorKey,
+            path: 'language',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage<void>(child: SettingsLanguageScreen()),
           ),
           GoRoute(
             parentNavigatorKey: appRootNavigatorKey,

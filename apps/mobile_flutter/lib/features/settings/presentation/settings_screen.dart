@@ -117,6 +117,12 @@ class SettingsScreen extends ConsumerWidget {
               onTap: () => context.push('/settings/expenses'),
             ),
           MobileListTile(
+            title: 'Language',
+            subtitle: 'App display language',
+            leadingIcon: Icons.translate_rounded,
+            onTap: () => context.push('/settings/language'),
+          ),
+          MobileListTile(
             title: 'Suppliers & purchases',
             subtitle: 'Stock buying and supplier dues',
             leadingIcon: Icons.local_shipping_rounded,

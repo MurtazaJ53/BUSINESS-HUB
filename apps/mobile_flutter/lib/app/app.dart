@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../core/i18n/locale_controller.dart';
+import '../l10n/app_localizations.dart';
 
 import '../core/database/local_database.dart';
 import '../core/router/app_router.dart';
@@ -50,6 +54,16 @@ class BusinessHubMobileApp extends ConsumerWidget {
           themeMode: themeMode,
           theme: AppTheme.light,
           darkTheme: AppTheme.light,
+          // null locale = follow the device, so a phone already set to
+          // Gujarati opens in Gujarati without hunting through settings.
+          locale: ref.watch(localeControllerProvider).locale,
+          supportedLocales: kSupportedLocales,
+          localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+            L.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
           routerConfig: router,
           // Overlay the PIN lock above every route when one is configured.
           builder: (context, child) =>

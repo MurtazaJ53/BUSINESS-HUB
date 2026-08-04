@@ -1,5 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+
+import '../../../l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -436,7 +438,10 @@ class _NavButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = active ? AppPalette.primary : AppPalette.textSecondary;
-    final label = compact ? item.compactLabel : item.label;
+    final label = _localizedNavLabel(
+      context,
+      compact ? item.compactLabel : item.label,
+    );
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: compact ? 2 : 4),
       child: Material(
@@ -580,6 +585,22 @@ const List<_VisibleShellNavItem> _cashierNavItems = <_VisibleShellNavItem>[
   _VisibleShellNavItem(branchIndex: 3, item: _historyNavItem),
   _VisibleShellNavItem(branchIndex: 0, item: _dashboardNavItem),
 ];
+
+
+/// Translate a bottom-nav label. Nav items are `const`, so they can't hold a
+/// BuildContext — resolve at render time and fall back to the English label
+/// for anything not yet translated.
+String _localizedNavLabel(BuildContext context, String fallback) {
+  final l = L.of(context);
+  return switch (fallback) {
+    'Home' || 'Overview' => l.navHome,
+    'Stock' || 'Inventory' => l.navStock,
+    'Clients' || 'Customers' => l.navClients,
+    'History' => l.navHistory,
+    'POS' => l.navPos,
+    _ => fallback,
+  };
+}
 
 const _ShellNavItem _dashboardNavItem = _ShellNavItem(
   label: 'Overview',
