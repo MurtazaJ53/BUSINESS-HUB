@@ -1397,6 +1397,44 @@ class InventoryCatalogFilter {
       Object.hash(search, category, page, pageSize, includeCost, lowStockOnly);
 }
 
+/// An item that has fallen to or below its reorder level, with everything a
+/// purchase decision needs.
+class ReorderItem {
+  const ReorderItem({
+    required this.id,
+    required this.name,
+    required this.category,
+    required this.stock,
+    required this.reorderLevel,
+    this.unit,
+    this.sku,
+    this.costPrice,
+  });
+
+  final String id;
+  final String name;
+  final String category;
+  final double stock;
+  final int reorderLevel;
+  final String? unit;
+  final String? sku;
+  final double? costPrice;
+
+  bool get isOutOfStock => stock <= 0;
+
+  /// How much to buy: enough to reach twice the reorder level, so the shop
+  /// isn't back at the threshold the day after restocking. Always at least 1.
+  double get suggestedQty {
+    final target = reorderLevel * 2;
+    final gap = target - stock;
+    return gap < 1 ? 1 : gap.ceilToDouble();
+  }
+
+  /// What the suggested quantity is likely to cost, when a cost price is known.
+  double? get estimatedCost =>
+      costPrice == null ? null : costPrice! * suggestedQty;
+}
+
 class LowStockItem {
   const LowStockItem({
     required this.id,

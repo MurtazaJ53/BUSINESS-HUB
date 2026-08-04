@@ -17,6 +17,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/premium_components.dart';
 import '../../pos/presentation/pos_scanner_sheet.dart';
+import 'reorder_list_screen.dart';
 import 'variant_product_sheet.dart';
 
 /// Redesigned Inventory Screen v3.0
@@ -304,6 +305,9 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
             child: _buildChipsBar(categories),
           ),
         ),
+        // Buying decisions are a daily job, so surface the reorder list here
+        // rather than leaving reorder_level as data nobody acts on.
+        SliverToBoxAdapter(child: _buildReorderBanner(context)),
         if (items.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
@@ -389,6 +393,50 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReorderBanner(BuildContext context) {
+    final due = ref.watch(reorderListProvider).asData?.value ??
+        const <ReorderItem>[];
+    if (due.isEmpty) return const SizedBox.shrink();
+    final out = due.where((i) => i.isOutOfStock).length;
+    final accent = out > 0 ? AppPalette.error : AppPalette.warning;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Material(
+        color: accent.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => context.push('/settings/reorder'),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: accent.withValues(alpha: 0.30)),
+            ),
+            child: Row(
+              children: <Widget>[
+                Icon(Icons.shopping_cart_checkout_rounded, color: accent),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    out > 0
+                        ? '${due.length} to reorder - $out already out of stock'
+                        : '${due.length} item(s) running low - tap to order',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded),
+              ],
+            ),
           ),
         ),
       ),

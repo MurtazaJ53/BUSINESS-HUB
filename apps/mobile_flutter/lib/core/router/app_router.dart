@@ -18,6 +18,7 @@ import '../../features/settings/presentation/settings_attendance_screen.dart';
 import '../../features/settings/presentation/settings_expenses_screen.dart';
 import '../../features/settings/presentation/settings_billing_screen.dart';
 import '../../features/customers/presentation/khata_collection_screen.dart';
+import '../../features/inventory/presentation/reorder_list_screen.dart';
 import '../../features/settings/presentation/settings_language_screen.dart';
 import '../../features/settings/presentation/settings_plan_screen.dart';
 import '../../features/settings/presentation/settings_purchases_screen.dart';
@@ -120,6 +121,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: 'plan',
             pageBuilder: (context, state) =>
                 const NoTransitionPage<void>(child: SettingsPlanScreen()),
+          ),
+          GoRoute(
+            parentNavigatorKey: appRootNavigatorKey,
+            path: 'reorder',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage<void>(child: ReorderListScreen()),
           ),
           GoRoute(
             parentNavigatorKey: appRootNavigatorKey,

@@ -490,6 +490,43 @@ class InventoryRepository {
         });
   }
 
+  /// Everything at or below its reorder level — the full buying list, worst
+  /// first. Unlike watchLowStockPreview this isn't capped, because a purchase
+  /// run needs every item, not a dashboard teaser.
+  Stream<List<ReorderItem>> watchReorderList() {
+    return _db
+        .customSelect(
+          """
+            SELECT i.id, i.name, COALESCE(i.category, 'General') AS category,
+                   i.stock, COALESCE(i.reorder_level, 5) AS reorder_level,
+                   i.unit, i.sku, p.cost_price
+            FROM inventory i
+            LEFT JOIN inventory_private p ON p.id = i.id
+            WHERE i.tombstone = 0
+              AND i.stock <= COALESCE(i.reorder_level, 5)
+            ORDER BY (i.stock <= 0) DESC, i.stock ASC, LOWER(i.name) ASC;
+          """,
+          readsFrom: {_db.inventoryEntries, _db.inventoryPrivateEntries},
+        )
+        .watch()
+        .map(
+          (rows) => rows
+              .map(
+                (row) => ReorderItem(
+                  id: row.readNullable<String>('id') ?? '',
+                  name: row.readNullable<String>('name') ?? 'Unnamed item',
+                  category: row.readNullable<String>('category') ?? 'General',
+                  stock: row.readNullable<double>('stock') ?? 0,
+                  reorderLevel: row.readNullable<int>('reorder_level') ?? 5,
+                  unit: row.readNullable<String>('unit'),
+                  sku: row.readNullable<String>('sku'),
+                  costPrice: row.readNullable<double>('cost_price'),
+                ),
+              )
+              .toList(growable: false),
+        );
+  }
+
   Stream<List<LowStockItem>> watchLowStockPreview({int limit = 8}) {
     return _db
         .customSelect(
