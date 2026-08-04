@@ -475,17 +475,17 @@ class InventoryRepository {
         .watchSingle()
         .map((row) {
           final metrics = InventoryMetrics(
-            totalItems: row.read<int>('total_items'),
-            totalStock: row.read<double>('total_stock'),
-            inventoryValue: row.read<double>('inventory_value'),
-            potentialProfit: row.read<double>('potential_profit'),
-            lowStock: row.read<int>('low_stock'),
+            totalItems: row.readNullable<int>('total_items') ?? 0,
+            totalStock: row.readNullable<double>('total_stock') ?? 0,
+            inventoryValue: row.readNullable<double>('inventory_value') ?? 0,
+            potentialProfit: row.readNullable<double>('potential_profit') ?? 0,
+            lowStock: row.readNullable<int>('low_stock') ?? 0,
           );
 
           return DashboardOverview(
             metrics: metrics,
-            todaySalesCount: row.read<int>('today_sales'),
-            todayRevenue: row.read<double>('today_revenue'),
+            todaySalesCount: row.readNullable<int>('today_sales') ?? 0,
+            todayRevenue: row.readNullable<double>('today_revenue') ?? 0,
           );
         });
   }
@@ -536,7 +536,7 @@ class InventoryRepository {
                   lastSoldAt: row.readNullable<int>('last_sold_at') == null
                       ? null
                       : DateTime.fromMillisecondsSinceEpoch(
-                          row.read<int>('last_sold_at'),
+                          row.readNullable<int>('last_sold_at') ?? 0,
                         ),
                 ),
               )
@@ -599,10 +599,10 @@ class InventoryRepository {
           (rows) => rows
               .map(
                 (row) => LowStockItem(
-                  id: row.read<String>('id'),
-                  name: row.read<String>('name'),
-                  category: row.read<String>('category'),
-                  stock: row.read<double>('stock'),
+                  id: row.readNullable<String>('id') ?? '',
+                  name: row.readNullable<String>('name') ?? '',
+                  category: row.readNullable<String>('category') ?? '',
+                  stock: row.readNullable<double>('stock') ?? 0,
                   size: row.readNullable<String>('size'),
                 ),
               )
@@ -627,8 +627,8 @@ class InventoryRepository {
           (rows) => rows
               .map(
                 (row) => InventoryCategorySummary(
-                  category: row.read<String>('category'),
-                  productCount: row.read<int>('product_count'),
+                  category: row.readNullable<String>('category') ?? '',
+                  productCount: row.readNullable<int>('product_count') ?? 0,
                 ),
               )
               .toList(growable: false),
@@ -669,7 +669,7 @@ class InventoryRepository {
           readsFrom: {_db.inventoryEntries},
         )
         .watchSingle()
-        .map((row) => row.read<int>('total'));
+        .map((row) => row.readNullable<int>('total') ?? 0);
   }
 
   Stream<List<InventoryCatalogItem>> watchCatalogPage({
@@ -1140,19 +1140,19 @@ class InventoryRepository {
           (rows) => rows
               .map(
                 (row) => StockMovement(
-                  id: row.read<String>('id'),
-                  itemId: row.read<String>('item_id'),
-                  itemName: row.read<String>('item_name'),
-                  delta: row.read<double>('delta'),
+                  id: row.readNullable<String>('id') ?? '',
+                  itemId: row.readNullable<String>('item_id') ?? '',
+                  itemName: row.readNullable<String>('item_name') ?? '',
+                  delta: row.readNullable<double>('delta') ?? 0,
                   balanceAfter: row.readNullable<double>('balance_after'),
-                  reason: row.read<String>('reason'),
+                  reason: row.readNullable<String>('reason') ?? '',
                   refId: row.readNullable<String>('ref_id'),
-                  note: row.read<String>('note'),
+                  note: row.readNullable<String>('note') ?? '',
                   actorName: _asStringOrNull(
                     row.readNullable<String>('actor_name'),
                   ),
                   createdAt: DateTime.fromMillisecondsSinceEpoch(
-                    row.read<int>('created_at'),
+                    row.readNullable<int>('created_at') ?? 0,
                   ),
                 ),
               )
@@ -1264,14 +1264,14 @@ class CustomerRepository {
           (rows) => rows
               .map(
                 (row) => BackendCustomerSummary(
-                  id: row.read<String>('id'),
-                  name: row.read<String>('name'),
+                  id: row.readNullable<String>('id') ?? '',
+                  name: row.readNullable<String>('name') ?? '',
                   phone: _asStringOrNull(row.readNullable<String>('phone')),
                   email: _asStringOrNull(row.readNullable<String>('email')),
                   notes: _asStringOrNull(row.readNullable<String>('notes')),
-                  status: row.read<String>('status'),
-                  totalSpent: row.read<double>('total_spent'),
-                  balance: row.read<double>('balance'),
+                  status: row.readNullable<String>('status') ?? '',
+                  totalSpent: row.readNullable<double>('total_spent') ?? 0,
+                  balance: row.readNullable<double>('balance') ?? 0,
                 ),
               )
               .toList(growable: false),
@@ -1413,7 +1413,7 @@ class CustomerRepository {
       'SELECT 1 FROM customer_ledger l WHERE l.customer_id = c.id);',
       readsFrom: {_db.customerEntries, _db.customerLedgerEntries},
     ).get();
-    return rows.first.read<int>('c');
+    return rows.first.readNullable<int>('c') ?? 0;
   }
 
   /// Give those balances an origin row, dated to when the customer was added.
@@ -1456,18 +1456,18 @@ class CustomerRepository {
           (rows) => rows
               .map(
                 (row) => CustomerLedgerRecord(
-                  id: row.read<String>('id'),
-                  customerId: row.read<String>('customer_id'),
-                  type: row.read<String>('type'),
-                  amount: row.read<double>('amount'),
-                  balanceAfter: row.read<double>('balance_after'),
+                  id: row.readNullable<String>('id') ?? '',
+                  customerId: row.readNullable<String>('customer_id') ?? '',
+                  type: row.readNullable<String>('type') ?? '',
+                  amount: row.readNullable<double>('amount') ?? 0,
+                  balanceAfter: row.readNullable<double>('balance_after') ?? 0,
                   refId: _asStringOrNull(row.readNullable<String>('ref_id')),
-                  note: row.read<String>('note'),
+                  note: row.readNullable<String>('note') ?? '',
                   actorName: _asStringOrNull(
                     row.readNullable<String>('actor_name'),
                   ),
                   createdAt: DateTime.fromMillisecondsSinceEpoch(
-                    row.read<int>('created_at'),
+                    row.readNullable<int>('created_at') ?? 0,
                   ),
                 ),
               )
@@ -1509,17 +1509,17 @@ class SalesRepository {
         .watchSingle()
         .map(
           (row) => HistoryOverview(
-            totalSales: row.read<int>('total_sales'),
-            syncedSales: row.read<int>('synced_sales'),
-            queuedSales: row.read<int>('queued_sales'),
-            failedSales: row.read<int>('failed_sales'),
-            rejectedSales: row.read<int>('rejected_sales'),
-            totalRevenue: row.read<double>('total_revenue'),
-            queuedRevenue: row.read<double>('queued_revenue'),
+            totalSales: row.readNullable<int>('total_sales') ?? 0,
+            syncedSales: row.readNullable<int>('synced_sales') ?? 0,
+            queuedSales: row.readNullable<int>('queued_sales') ?? 0,
+            failedSales: row.readNullable<int>('failed_sales') ?? 0,
+            rejectedSales: row.readNullable<int>('rejected_sales') ?? 0,
+            totalRevenue: row.readNullable<double>('total_revenue') ?? 0,
+            queuedRevenue: row.readNullable<double>('queued_revenue') ?? 0,
             lastSyncedAt: row.readNullable<int>('last_synced_at') == null
                 ? null
                 : DateTime.fromMillisecondsSinceEpoch(
-                    row.read<int>('last_synced_at'),
+                    row.readNullable<int>('last_synced_at') ?? 0,
                   ),
           ),
         );
@@ -1636,10 +1636,10 @@ class SalesRepository {
     return rows
         .map(
           (row) => ImportedDuplicateGroup(
-            date: row.read<String>('date'),
-            total: row.read<double>('total'),
-            customerName: row.read<String>('who'),
-            copies: row.read<int>('copies'),
+            date: row.readNullable<String>('date') ?? '',
+            total: row.readNullable<double>('total') ?? 0,
+            customerName: row.readNullable<String>('who') ?? '',
+            copies: row.readNullable<int>('copies') ?? 0,
           ),
         )
         .toList();
@@ -1788,13 +1788,13 @@ class SalesRepository {
           (rows) => rows
               .map(
                 (row) => CustomerPulseSummary(
-                  name: row.read<String>('customer_name'),
+                  name: row.readNullable<String>('customer_name') ?? '',
                   phone: row.readNullable<String>('customer_phone'),
-                  visitCount: row.read<int>('visit_count'),
-                  lifetimeSpend: row.read<double>('lifetime_spend'),
-                  pendingSales: row.read<int>('pending_sales'),
+                  visitCount: row.readNullable<int>('visit_count') ?? 0,
+                  lifetimeSpend: row.readNullable<double>('lifetime_spend') ?? 0,
+                  pendingSales: row.readNullable<int>('pending_sales') ?? 0,
                   lastSeenAt: DateTime.fromMillisecondsSinceEpoch(
-                    row.read<int>('last_seen_at'),
+                    row.readNullable<int>('last_seen_at') ?? 0,
                   ),
                 ),
               )
@@ -1813,7 +1813,7 @@ class SalesRepository {
           readsFrom: {_db.commerceOutboxEntries},
         )
         .watchSingle()
-        .map((row) => row.read<int>('total'));
+        .map((row) => row.readNullable<int>('total') ?? 0);
   }
 
   Stream<List<CommerceOutboxAttentionEntry>> watchOutboxAttentionEntries({
@@ -1854,11 +1854,11 @@ class SalesRepository {
           (rows) => rows
               .map(
                 (row) => CommerceOutboxAttentionEntry(
-                  commandId: row.read<String>('command_id'),
-                  commandType: row.read<String>('command_type'),
-                  syncStatus: row.read<String>('sync_status'),
-                  attemptCount: row.read<int>('attempt_count'),
-                  updatedAt: row.read<int>('updated_at'),
+                  commandId: row.readNullable<String>('command_id') ?? '',
+                  commandType: row.readNullable<String>('command_type') ?? '',
+                  syncStatus: row.readNullable<String>('sync_status') ?? '',
+                  attemptCount: row.readNullable<int>('attempt_count') ?? 0,
+                  updatedAt: row.readNullable<int>('updated_at') ?? 0,
                   lastAttemptAt: row.readNullable<int>('last_attempt_at'),
                   lastError: _asStringOrNull(
                     row.readNullable<String>('last_error'),
@@ -1867,7 +1867,7 @@ class SalesRepository {
                   customerName: _asStringOrNull(
                     row.readNullable<String>('customer_name'),
                   ),
-                  total: row.read<double>('total'),
+                  total: row.readNullable<double>('total') ?? 0,
                   saleDate: _asStringOrNull(
                     row.readNullable<String>('sale_date'),
                   ),
@@ -3174,12 +3174,12 @@ class PurchaseRepository {
           (rows) => rows
               .map(
                 (row) => SupplierDue(
-                  name: row.read<String>('name'),
+                  name: row.readNullable<String>('name') ?? '',
                   phone:
                       _asStringOrNull(row.readNullable<String>('phone')) ?? '',
-                  purchaseCount: row.read<int>('purchase_count'),
-                  totalPurchased: row.read<double>('total_purchased'),
-                  payable: row.read<double>('payable'),
+                  purchaseCount: row.readNullable<int>('purchase_count') ?? 0,
+                  totalPurchased: row.readNullable<double>('total_purchased') ?? 0,
+                  payable: row.readNullable<double>('payable') ?? 0,
                 ),
               )
               .toList(growable: false),
@@ -3201,10 +3201,10 @@ class PurchaseRepository {
         .watchSingle()
         .map(
           (row) => PurchaseSummarySnapshot(
-            totalPurchases: row.read<int>('total_purchases'),
-            totalSpent: row.read<double>('total_spent'),
-            totalPayable: row.read<double>('total_payable'),
-            supplierCount: row.read<int>('supplier_count'),
+            totalPurchases: row.readNullable<int>('total_purchases') ?? 0,
+            totalSpent: row.readNullable<double>('total_spent') ?? 0,
+            totalPayable: row.readNullable<double>('total_payable') ?? 0,
+            supplierCount: row.readNullable<int>('supplier_count') ?? 0,
           ),
         );
   }
@@ -3266,11 +3266,11 @@ class ReportsRepository {
           (rows) => rows
               .map(
                 (row) => ReportSale(
-                  total: row.read<double>('total'),
+                  total: row.readNullable<double>('total') ?? 0,
                   customerName: _asStringOrNull(
                     row.readNullable<String>('customer_name'),
                   ),
-                  lines: _parseReportLines(row.read<String>('items_json')),
+                  lines: _parseReportLines(row.readNullable<String>('items_json') ?? ''),
                 ),
               )
               .toList(growable: false),
@@ -3308,10 +3308,10 @@ class ReportsRepository {
           DateTime? firstAt;
           DateTime? lastAt;
           for (final row in rows) {
-            gross += row.read<double>('total');
-            discount += row.read<double>('discount');
+            gross += row.readNullable<double>('total') ?? 0;
+            discount += row.readNullable<double>('discount') ?? 0;
             for (final line in _parseReportLines(
-              row.read<String>('items_json'),
+              row.readNullable<String>('items_json') ?? '',
             )) {
               final lineTotal = line.price * line.quantity;
               if (line.gstRate > 0) {
@@ -3320,13 +3320,13 @@ class ReportsRepository {
                     : lineTotal * line.gstRate / 100;
               }
             }
-            for (final p in _parseZPayments(row.read<String>('payments_json'))) {
+            for (final p in _parseZPayments(row.readNullable<String>('payments_json') ?? '')) {
               final mode = p.key.isEmpty ? 'OTHER' : p.key;
               tender[mode] = (tender[mode] ?? 0) + p.value;
               collected += p.value;
             }
             final createdAt = DateTime.fromMillisecondsSinceEpoch(
-              row.read<int>('created_at'),
+              row.readNullable<int>('created_at') ?? 0,
             );
             if (firstAt == null || createdAt.isBefore(firstAt)) {
               firstAt = createdAt;
@@ -3381,7 +3381,7 @@ class ReportsRepository {
           readsFrom: {_db.expenseEntries},
         )
         .watchSingle()
-        .map((row) => row.read<double>('total'));
+        .map((row) => row.readNullable<double>('total') ?? 0);
   }
 
   List<ReportSaleLine> _parseReportLines(String itemsJson) {

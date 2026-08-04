@@ -37,13 +37,23 @@ class InventoryScreenV3 extends ConsumerStatefulWidget {
 /// error shown to the user points at a real file and line instead of being an
 /// untraceable one-liner.
 String _firstAppFrame(StackTrace stackTrace) {
-  for (final line in stackTrace.toString().split('\n')) {
-    if (line.contains('package:business_hub_mobile/')) {
-      return line.trim();
-    }
-  }
-  final lines = stackTrace.toString().split('\n');
-  return lines.isEmpty ? '' : lines.first.trim();
+  // Show the frame that actually threw (#0) AND the first frame in our own
+  // code. Only reporting our frame hid the real cause inside a package, which
+  // is why this crash survived several attempts to pin it down.
+  final lines = stackTrace
+      .toString()
+      .split("\n")
+      .map((l) => l.trim())
+      .where((l) => l.isNotEmpty)
+      .toList();
+  if (lines.isEmpty) return '';
+  final top = lines.first;
+  final app = lines.firstWhere(
+    (l) => l.contains('package:business_hub_mobile/'),
+    orElse: () => '',
+  );
+  if (app.isEmpty || app == top) return top;
+  return '$top\n$app';
 }
 
 class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
