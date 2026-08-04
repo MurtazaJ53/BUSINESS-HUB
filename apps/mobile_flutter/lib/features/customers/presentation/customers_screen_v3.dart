@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -210,7 +212,7 @@ class _CustomersScreenV3State extends ConsumerState<CustomersScreenV3> {
         children: [
           PremiumSearchBar(
             controller: _searchController,
-            hintText: 'Search customers...',
+            hintText: L.of(context).custSearchHint,
             onChanged: (value) {
               setState(() {
                 _search = value;

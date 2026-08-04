@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../l10n/app_localizations.dart';
+
 import 'dead_letter_banner.dart';
 import '../../../core/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -910,7 +912,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       context: sheetContext,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Text('Return / refund'),
+          title: Text(L.of(context).histRefund),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[

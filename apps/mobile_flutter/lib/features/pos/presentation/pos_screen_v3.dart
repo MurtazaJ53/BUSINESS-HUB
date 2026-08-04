@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+
+import '../../../l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
@@ -1445,7 +1447,7 @@ class _PosScreenV3State extends ConsumerState<PosScreenV3> {
               TextButton.icon(
                 onPressed: _addCustomItem,
                 icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
-                label: const Text('Custom'),
+                label: Text(L.of(context).posCustomItem),
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                 ),

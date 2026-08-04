@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+
+import '../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
 import 'package:go_router/go_router.dart';
@@ -279,7 +281,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                 Expanded(
                   child: PremiumSearchBar(
                     controller: _searchController,
-                    hintText: 'Search inventory...',
+                    hintText: L.of(context).invSearchHint,
                     onChanged: _onSearchChanged,
                     onClear: () {
                       _searchDebounce?.cancel();
@@ -587,7 +589,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                       _showRestockSheet(context, item);
                     },
                     icon: const Icon(Icons.add_box_rounded),
-                    label: const Text('Restock'),
+                    label: Text(L.of(context).invRestock),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -770,7 +772,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                     children: [
                       ListTile(
                         leading: const Icon(Icons.photo_camera_rounded),
-                        title: const Text('Take photo'),
+                        title: Text(L.of(context).invTakePhoto),
                         onTap: () {
                           Navigator.pop(optionsContext);
                           pickImage(ImageSource.camera);
@@ -778,7 +780,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                       ),
                       ListTile(
                         leading: const Icon(Icons.photo_library_rounded),
-                        title: const Text('Choose from gallery'),
+                        title: Text(L.of(context).invChooseGallery),
                         onTap: () {
                           Navigator.pop(optionsContext);
                           pickImage(ImageSource.gallery);
@@ -787,7 +789,7 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                       if (imagePath != null)
                         ListTile(
                           leading: const Icon(Icons.delete_outline_rounded),
-                          title: const Text('Remove photo'),
+                          title: Text(L.of(context).invRemovePhoto),
                           onTap: () {
                             Navigator.pop(optionsContext);
                             setSheetState(() => imagePath = null);
@@ -1401,10 +1403,10 @@ class _InventoryScreenV3State extends ConsumerState<InventoryScreenV3> {
                       // negative), so allow correcting it outright instead of
                       // only ever adding to a number that was never right.
                       SegmentedButton<bool>(
-                        segments: const <ButtonSegment<bool>>[
+                        segments: <ButtonSegment<bool>>[
                           ButtonSegment<bool>(
                             value: false,
-                            label: Text('Add stock'),
+                            label: Text(L.of(context).invAddStock),
                             icon: Icon(Icons.add_rounded, size: 18),
                           ),
                           ButtonSegment<bool>(
