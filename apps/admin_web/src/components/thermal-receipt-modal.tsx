@@ -62,7 +62,7 @@ export function ThermalReceiptModal({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--text-primary)]/60 backdrop-blur-sm animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
@@ -70,25 +70,25 @@ export function ThermalReceiptModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-5 border-b border-[#F1F5F9] flex items-center justify-between bg-[#F8FAFC]">
+        <div className="p-5 border-b border-[var(--bg-soft)] flex items-center justify-between bg-[var(--bg-base)]">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <CheckCircle2 className="w-5 h-5" />
             </div>
-            <span className="font-[900] text-sm text-[#0F172A]">
+            <span className="font-[900] text-sm text-[var(--text-primary)]">
               Sale Completed Successfully
             </span>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-[var(--text-tertiary)] hover:text-[#0F172A] hover:bg-[#EEF2F6]"
+            className="p-2 rounded-xl text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-app)]"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Scrollable Receipt Preview (Paper look) */}
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-100 flex justify-center border-b border-[#F1F5F9]">
+        <div className="flex-1 overflow-y-auto p-6 bg-[var(--bg-soft)] flex justify-center border-b border-[var(--bg-soft)]">
           <div
             ref={receiptRef}
             className="w-[76mm] min-h-[120mm] bg-white text-black p-5 font-mono text-[11px] leading-tight shadow-md border border-[var(--border-soft)] rounded-lg"
@@ -220,17 +220,17 @@ export function ThermalReceiptModal({
         </div>
 
         {/* Action Buttons */}
-        <div className="p-5 bg-[#F8FAFC] flex items-center gap-3">
+        <div className="p-5 bg-[var(--bg-base)] flex items-center gap-3">
           <button
             onClick={handlePrint}
-            className="flex-1 flex items-center justify-center gap-2 py-3 px-5 bg-gradient-to-r from-[#38BDF8] to-[#0284C7] hover:from-[#0EA5E9] hover:to-[#0369A1] text-white rounded-2xl font-extrabold text-xs shadow-[0_8px_20px_rgba(14,165,233,0.35)] transition-all cursor-pointer"
+            className="flex-1 flex items-center justify-center gap-2 py-3 px-5 bg-gradient-to-r from-[var(--primary-light)] to-[var(--primary-hover)] hover:from-[var(--primary)] hover:to-[var(--primary-dark)] text-white rounded-2xl font-extrabold text-xs shadow-[0_8px_20px_rgba(14,165,233,0.35)] transition-all cursor-pointer"
           >
             <Printer className="w-4 h-4" />
             <span>Print Receipt</span>
           </button>
           <button
             onClick={onClose}
-            className="py-3 px-5 bg-white hover:bg-[#F1F5F9] border border-[var(--border-soft)] text-[var(--text-secondary)] hover:text-[#0F172A] rounded-2xl font-bold text-xs transition-colors"
+            className="py-3 px-5 bg-white hover:bg-[var(--bg-soft)] border border-[var(--border-soft)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-2xl font-bold text-xs transition-colors"
           >
             Done
           </button>

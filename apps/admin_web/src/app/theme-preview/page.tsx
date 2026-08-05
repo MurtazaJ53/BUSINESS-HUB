@@ -269,7 +269,7 @@ export default async function ThemePreviewPage() {
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-[#0EA5E9]/10 border border-[#0EA5E9]/20 text-[#0284C7] dark:text-[#38BDF8] text-xs font-bold flex items-start gap-2.5">
+            <div className="p-4 rounded-2xl bg-[var(--primary)]/10 border border-[var(--primary)]/20 text-[var(--primary-hover)] dark:text-[var(--primary-light)] text-xs font-bold flex items-start gap-2.5">
               <Info className="w-4 h-4 mt-0.5 shrink-0" />
               <div>
                 <p className="font-black">Information Message</p>

@@ -20,7 +20,7 @@ function getTone(status: MigrationSteadyStateReadiness["overall_status"]) {
         shell:
           "border-[rgba(56,189,248,0.18)] bg-[rgba(7,20,33,0.76)]",
         badge:
-          "border-[rgba(56,189,248,0.18)] bg-[rgba(7,20,33,0.88)] text-[#38bdf8]",
+          "border-[rgba(56,189,248,0.18)] bg-[rgba(7,20,33,0.88)] text-[var(--primary-light)]",
         label: "Ready for steady state",
       };
     case "improvement_window":

@@ -28,7 +28,7 @@ function getTone(status: MigrationGoLiveReadiness["overall_status"]) {
         shell:
           "border-[rgba(56,189,248,0.18)] bg-[rgba(7,20,33,0.76)]",
         badge:
-          "border-[rgba(56,189,248,0.18)] bg-[rgba(7,20,33,0.88)] text-[#38bdf8]",
+          "border-[rgba(56,189,248,0.18)] bg-[rgba(7,20,33,0.88)] text-[var(--primary-light)]",
         label: "Ready for go-live",
       };
     case "rollback_recommended":
@@ -151,7 +151,7 @@ export function MigrationGoLiveReadinessPanel({
           <input type="hidden" name="decision" value="execute_go_live" />
           <button
             type="submit"
-            className="w-full rounded-[14px] border border-[rgba(56,189,248,0.18)] bg-[rgba(7,20,33,0.88)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#38bdf8]"
+            className="w-full rounded-[14px] border border-[rgba(56,189,248,0.18)] bg-[rgba(7,20,33,0.88)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--primary-light)]"
           >
             Execute go-live
           </button>

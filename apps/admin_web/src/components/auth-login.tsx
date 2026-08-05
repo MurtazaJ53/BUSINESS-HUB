@@ -238,15 +238,15 @@ export function AuthLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-[#EEF2F6] flex flex-col items-center justify-center p-4 sm:p-6 select-none">
+    <div className="min-h-screen bg-[var(--bg-app)] flex flex-col items-center justify-center p-4 sm:p-6 select-none">
       <div className="w-full max-w-[440px] flex flex-col items-center">
         
         {/* Brand Hero matching Flutter _BrandHero */}
         <div className="flex flex-col items-center text-center mb-6">
-          <div className="w-20 h-20 rounded-[26px] bg-gradient-to-br from-[#38BDF8] to-[#0284C7] flex items-center justify-center shadow-[0_12px_28px_rgba(14,165,233,0.38)] mb-4">
+          <div className="w-20 h-20 rounded-[26px] bg-gradient-to-br from-[var(--primary-light)] to-[var(--primary-hover)] flex items-center justify-center shadow-[0_12px_28px_rgba(14,165,233,0.38)] mb-4">
             <Store className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-[900] text-[#0F172A] tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-[900] text-[var(--text-primary)] tracking-tight">
             Business Hub
           </h1>
           <p className="text-xs sm:text-sm font-semibold text-[var(--text-secondary)] mt-1">
@@ -258,14 +258,14 @@ export function AuthLogin() {
         <div className="w-full bg-white border border-[var(--border-soft)] rounded-[28px] shadow-[0_10px_30px_rgba(14,165,233,0.06),0_4px_12px_rgba(0,0,0,0.03)] p-6 sm:p-7">
           
           {/* Header Action tag matching MobileTag */}
-          <div className="flex items-center justify-between pb-4 border-b border-[#F1F5F9] mb-5">
-            <span className="text-base font-extrabold text-[#0F172A]">
+          <div className="flex items-center justify-between pb-4 border-b border-[var(--bg-soft)] mb-5">
+            <span className="text-base font-extrabold text-[var(--text-primary)]">
               {panelMode === "login" && "Cloud Sign-in"}
               {panelMode === "register" && "Create your shop"}
               {panelMode === "join" && "Join a shop"}
               {panelMode === "pin" && "Staff Login"}
             </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold tracking-wider bg-[#0EA5E9]/10 text-[#0284C7] border border-[#0EA5E9]/20 uppercase">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold tracking-wider bg-[var(--primary)]/10 text-[var(--primary-hover)] border border-[var(--primary)]/20 uppercase">
               {panelMode === "login" && <Globe className="w-3.5 h-3.5" />}
               {panelMode === "register" && <Store className="w-3.5 h-3.5" />}
               {panelMode === "join" && <User className="w-3.5 h-3.5" />}
@@ -311,7 +311,7 @@ export function AuthLogin() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Email"
-                    className="w-full pl-10 pr-4 py-3.5 bg-[#F8FAFC] border border-[var(--border-soft)] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[var(--text-tertiary)] outline-none transition-all"
+                    className="w-full pl-10 pr-4 py-3.5 bg-[var(--bg-base)] border border-[var(--border-soft)] focus:border-[var(--primary)] focus:bg-white rounded-2xl text-xs font-semibold text-[var(--text-primary)] placeholder-[var(--text-tertiary)] outline-none transition-all"
                   />
                 </div>
               </div>
@@ -328,7 +328,7 @@ export function AuthLogin() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Password"
-                    className="w-full pl-10 pr-4 py-3.5 bg-[#F8FAFC] border border-[var(--border-soft)] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[var(--text-tertiary)] outline-none transition-all"
+                    className="w-full pl-10 pr-4 py-3.5 bg-[var(--bg-base)] border border-[var(--border-soft)] focus:border-[var(--primary)] focus:bg-white rounded-2xl text-xs font-semibold text-[var(--text-primary)] placeholder-[var(--text-tertiary)] outline-none transition-all"
                   />
                 </div>
               </div>
@@ -336,7 +336,7 @@ export function AuthLogin() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-13 py-3.5 bg-[#0EA5E9] hover:bg-[#0284C7] text-white text-xs font-extrabold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 mt-3 cursor-pointer"
+                className="w-full h-13 py-3.5 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-extrabold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 mt-3 cursor-pointer"
               >
                 {isLoading ? (
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -352,14 +352,14 @@ export function AuthLogin() {
                 <button
                   type="button"
                   onClick={() => setPanelMode("register")}
-                  className="font-bold text-[#0EA5E9] hover:underline"
+                  className="font-bold text-[var(--primary)] hover:underline"
                 >
                   Create a shop
                 </button>
                 <button
                   type="button"
                   onClick={() => setPanelMode("join")}
-                  className="font-bold text-[#0EA5E9] hover:underline"
+                  className="font-bold text-[var(--primary)] hover:underline"
                 >
                   Join with a code
                 </button>
@@ -369,7 +369,7 @@ export function AuthLogin() {
                 <button
                   type="button"
                   onClick={() => setPanelMode("pin")}
-                  className="text-xs font-bold text-[var(--text-secondary)] hover:text-[#0EA5E9] transition-colors"
+                  className="text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors"
                 >
                   Switch to Staff PIN Login
                 </button>
@@ -391,7 +391,7 @@ export function AuthLogin() {
                   value={regOwnerName}
                   onChange={(e) => setRegOwnerName(e.target.value)}
                   placeholder="Your name *"
-                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[var(--border-soft)] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[var(--text-tertiary)] outline-none"
+                  className="w-full px-3.5 py-3 bg-[var(--bg-base)] border border-[var(--border-soft)] focus:border-[var(--primary)] focus:bg-white rounded-2xl text-xs font-semibold text-[var(--text-primary)] placeholder-[var(--text-tertiary)] outline-none"
                 />
               </div>
 
@@ -402,7 +402,7 @@ export function AuthLogin() {
                   value={regBusinessName}
                   onChange={(e) => setRegBusinessName(e.target.value)}
                   placeholder="Business name *"
-                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[var(--border-soft)] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[var(--text-tertiary)] outline-none"
+                  className="w-full px-3.5 py-3 bg-[var(--bg-base)] border border-[var(--border-soft)] focus:border-[var(--primary)] focus:bg-white rounded-2xl text-xs font-semibold text-[var(--text-primary)] placeholder-[var(--text-tertiary)] outline-none"
                 />
               </div>
 
@@ -413,7 +413,7 @@ export function AuthLogin() {
                   value={regEmail}
                   onChange={(e) => setRegEmail(e.target.value)}
                   placeholder="Email *"
-                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[var(--border-soft)] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[var(--text-tertiary)] outline-none"
+                  className="w-full px-3.5 py-3 bg-[var(--bg-base)] border border-[var(--border-soft)] focus:border-[var(--primary)] focus:bg-white rounded-2xl text-xs font-semibold text-[var(--text-primary)] placeholder-[var(--text-tertiary)] outline-none"
                 />
               </div>
 
@@ -425,7 +425,7 @@ export function AuthLogin() {
                   value={regPassword}
                   onChange={(e) => setRegPassword(e.target.value)}
                   placeholder="Password (8+ characters) *"
-                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[var(--border-soft)] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[var(--text-tertiary)] outline-none"
+                  className="w-full px-3.5 py-3 bg-[var(--bg-base)] border border-[var(--border-soft)] focus:border-[var(--primary)] focus:bg-white rounded-2xl text-xs font-semibold text-[var(--text-primary)] placeholder-[var(--text-tertiary)] outline-none"
                 />
               </div>
 
@@ -435,7 +435,7 @@ export function AuthLogin() {
                   value={regMobile}
                   onChange={(e) => setRegMobile(e.target.value)}
                   placeholder="Mobile (optional)"
-                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[var(--border-soft)] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[var(--text-tertiary)] outline-none"
+                  className="w-full px-3.5 py-3 bg-[var(--bg-base)] border border-[var(--border-soft)] focus:border-[var(--primary)] focus:bg-white rounded-2xl text-xs font-semibold text-[var(--text-primary)] placeholder-[var(--text-tertiary)] outline-none"
                 />
               </div>
 
@@ -443,7 +443,7 @@ export function AuthLogin() {
                 <select
                   value={regBusinessType}
                   onChange={(e) => setRegBusinessType(e.target.value)}
-                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[var(--border-soft)] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] outline-none"
+                  className="w-full px-3.5 py-3 bg-[var(--bg-base)] border border-[var(--border-soft)] focus:border-[var(--primary)] focus:bg-white rounded-2xl text-xs font-semibold text-[var(--text-primary)] outline-none"
                 >
                   <option value="retail">Retail</option>
                   <option value="wholesale">Wholesale</option>
@@ -460,7 +460,7 @@ export function AuthLogin() {
                   value={regStateCode}
                   onChange={(e) => setRegStateCode(e.target.value)}
                   placeholder="State Code"
-                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[var(--border-soft)] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[var(--text-tertiary)] outline-none text-center"
+                  className="w-full px-3.5 py-3 bg-[var(--bg-base)] border border-[var(--border-soft)] focus:border-[var(--primary)] focus:bg-white rounded-2xl text-xs font-semibold text-[var(--text-primary)] placeholder-[var(--text-tertiary)] outline-none text-center"
                 />
               </div>
 
@@ -470,14 +470,14 @@ export function AuthLogin() {
                   value={regGstin}
                   onChange={(e) => setRegGstin(e.target.value)}
                   placeholder="GSTIN (optional)"
-                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[var(--border-soft)] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[var(--text-tertiary)] outline-none uppercase"
+                  className="w-full px-3.5 py-3 bg-[var(--bg-base)] border border-[var(--border-soft)] focus:border-[var(--primary)] focus:bg-white rounded-2xl text-xs font-semibold text-[var(--text-primary)] placeholder-[var(--text-tertiary)] outline-none uppercase"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-13 py-3.5 bg-[#0EA5E9] hover:bg-[#0284C7] text-white text-xs font-extrabold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 mt-3 cursor-pointer"
+                className="w-full h-13 py-3.5 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-extrabold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 mt-3 cursor-pointer"
               >
                 {isLoading ? (
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -490,7 +490,7 @@ export function AuthLogin() {
                 <button
                   type="button"
                   onClick={() => setPanelMode("login")}
-                  className="text-xs font-bold text-[#0EA5E9] hover:underline"
+                  className="text-xs font-bold text-[var(--primary)] hover:underline"
                 >
                   Already have an account? Sign in
                 </button>
@@ -512,7 +512,7 @@ export function AuthLogin() {
                   value={joinCode}
                   onChange={(e) => setJoinCode(e.target.value)}
                   placeholder="Invite code *"
-                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[var(--border-soft)] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[var(--text-tertiary)] outline-none"
+                  className="w-full px-3.5 py-3 bg-[var(--bg-base)] border border-[var(--border-soft)] focus:border-[var(--primary)] focus:bg-white rounded-2xl text-xs font-semibold text-[var(--text-primary)] placeholder-[var(--text-tertiary)] outline-none"
                 />
               </div>
 
@@ -522,7 +522,7 @@ export function AuthLogin() {
                   value={joinName}
                   onChange={(e) => setJoinName(e.target.value)}
                   placeholder="Your name"
-                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[var(--border-soft)] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[var(--text-tertiary)] outline-none"
+                  className="w-full px-3.5 py-3 bg-[var(--bg-base)] border border-[var(--border-soft)] focus:border-[var(--primary)] focus:bg-white rounded-2xl text-xs font-semibold text-[var(--text-primary)] placeholder-[var(--text-tertiary)] outline-none"
                 />
               </div>
 
@@ -534,14 +534,14 @@ export function AuthLogin() {
                   value={joinPassword}
                   onChange={(e) => setJoinPassword(e.target.value)}
                   placeholder="Set a password (8+ characters) *"
-                  className="w-full px-3.5 py-3 bg-[#F8FAFC] border border-[var(--border-soft)] focus:border-[#0EA5E9] focus:bg-white rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[var(--text-tertiary)] outline-none"
+                  className="w-full px-3.5 py-3 bg-[var(--bg-base)] border border-[var(--border-soft)] focus:border-[var(--primary)] focus:bg-white rounded-2xl text-xs font-semibold text-[var(--text-primary)] placeholder-[var(--text-tertiary)] outline-none"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-13 py-3.5 bg-[#0EA5E9] hover:bg-[#0284C7] text-white text-xs font-extrabold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 mt-3 cursor-pointer"
+                className="w-full h-13 py-3.5 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-extrabold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 mt-3 cursor-pointer"
               >
                 {isLoading ? (
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -554,7 +554,7 @@ export function AuthLogin() {
                 <button
                   type="button"
                   onClick={() => setPanelMode("login")}
-                  className="text-xs font-bold text-[#0EA5E9] hover:underline"
+                  className="text-xs font-bold text-[var(--primary)] hover:underline"
                 >
                   Back to sign in
                 </button>
@@ -576,8 +576,8 @@ export function AuthLogin() {
                     key={idx}
                     className={`w-5 h-5 rounded-full border-2 transition-all ${
                       pin.length > idx
-                        ? "bg-[#0EA5E9] border-[#0EA5E9] scale-110 shadow-md shadow-[#0EA5E9]/30"
-                        : "bg-[#F1F5F9] border-[var(--border)]"
+                        ? "bg-[var(--primary)] border-[var(--primary)] scale-110 shadow-md shadow-[var(--primary)]/30"
+                        : "bg-[var(--bg-soft)] border-[var(--border)]"
                     }`}
                   />
                 ))}
@@ -590,7 +590,7 @@ export function AuthLogin() {
                     key={num}
                     type="button"
                     onClick={() => handlePinDigit(num)}
-                    className="h-13 bg-[#F8FAFC] hover:bg-[#EEF2F6] active:bg-[var(--border-soft)] border border-[var(--border-soft)] rounded-2xl text-xl font-bold text-[#0F172A] shadow-sm transition-all flex items-center justify-center cursor-pointer"
+                    className="h-13 bg-[var(--bg-base)] hover:bg-[var(--bg-app)] active:bg-[var(--border-soft)] border border-[var(--border-soft)] rounded-2xl text-xl font-bold text-[var(--text-primary)] shadow-sm transition-all flex items-center justify-center cursor-pointer"
                   >
                     {num}
                   </button>
@@ -598,21 +598,21 @@ export function AuthLogin() {
                 <button
                   type="button"
                   onClick={() => setPin("")}
-                  className="h-13 bg-[#F8FAFC] hover:bg-[#EEF2F6] border border-[var(--border-soft)] rounded-2xl text-xs font-bold text-[var(--text-secondary)] shadow-sm flex items-center justify-center cursor-pointer"
+                  className="h-13 bg-[var(--bg-base)] hover:bg-[var(--bg-app)] border border-[var(--border-soft)] rounded-2xl text-xs font-bold text-[var(--text-secondary)] shadow-sm flex items-center justify-center cursor-pointer"
                 >
                   CLEAR
                 </button>
                 <button
                   type="button"
                   onClick={() => handlePinDigit("0")}
-                  className="h-13 bg-[#F8FAFC] hover:bg-[#EEF2F6] border border-[var(--border-soft)] rounded-2xl text-xl font-bold text-[#0F172A] shadow-sm flex items-center justify-center cursor-pointer"
+                  className="h-13 bg-[var(--bg-base)] hover:bg-[var(--bg-app)] border border-[var(--border-soft)] rounded-2xl text-xl font-bold text-[var(--text-primary)] shadow-sm flex items-center justify-center cursor-pointer"
                 >
                   0
                 </button>
                 <button
                   type="button"
                   onClick={handlePinBackspace}
-                  className="h-13 bg-[#F8FAFC] hover:bg-[#EEF2F6] border border-[var(--border-soft)] rounded-2xl text-[var(--text-secondary)] shadow-sm flex items-center justify-center cursor-pointer"
+                  className="h-13 bg-[var(--bg-base)] hover:bg-[var(--bg-app)] border border-[var(--border-soft)] rounded-2xl text-[var(--text-secondary)] shadow-sm flex items-center justify-center cursor-pointer"
                 >
                   <Delete className="w-5 h-5" />
                 </button>
@@ -622,7 +622,7 @@ export function AuthLogin() {
                 type="button"
                 onClick={() => handlePinSubmit(pin)}
                 disabled={pin.length < 4 || isLoading}
-                className="w-full h-13 py-3.5 bg-[#0EA5E9] hover:bg-[#0284C7] disabled:bg-slate-300 text-white text-xs font-extrabold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer"
+                className="w-full h-13 py-3.5 bg-[var(--primary)] hover:bg-[var(--primary-hover)] disabled:bg-[var(--border)] text-white text-xs font-extrabold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer"
               >
                 {isLoading ? (
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -638,7 +638,7 @@ export function AuthLogin() {
                 <button
                   type="button"
                   onClick={() => setPanelMode("login")}
-                  className="text-xs font-bold text-[var(--text-secondary)] hover:text-[#0EA5E9] transition-colors"
+                  className="text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors"
                 >
                   Sign in with Cloud Account
                 </button>
@@ -647,7 +647,7 @@ export function AuthLogin() {
           )}
 
           {/* Quick 1-Click Role Testing */}
-          <div className="mt-6 pt-5 border-t border-[#F1F5F9]">
+          <div className="mt-6 pt-5 border-t border-[var(--bg-soft)]">
             <div className="text-[10px] uppercase font-extrabold text-[var(--text-tertiary)] tracking-wider text-center mb-2.5">
               Quick 1-Click Test Access
             </div>
@@ -655,21 +655,21 @@ export function AuthLogin() {
               <button
                 type="button"
                 onClick={() => handleQuickLogin("owner@businesshub.com", "owner")}
-                className="p-2 text-center rounded-xl bg-[#F8FAFC] hover:bg-[#EEF2F6] active:bg-[var(--border-soft)] border border-[var(--border-soft)] text-[11px] font-bold text-[#0F172A] transition-all cursor-pointer"
+                className="p-2 text-center rounded-xl bg-[var(--bg-base)] hover:bg-[var(--bg-app)] active:bg-[var(--border-soft)] border border-[var(--border-soft)] text-[11px] font-bold text-[var(--text-primary)] transition-all cursor-pointer"
               >
                 👑 Owner
               </button>
               <button
                 type="button"
                 onClick={() => handleQuickLogin("cashier@businesshub.com", "cashier")}
-                className="p-2 text-center rounded-xl bg-[#F8FAFC] hover:bg-[#EEF2F6] active:bg-[var(--border-soft)] border border-[var(--border-soft)] text-[11px] font-bold text-[#0F172A] transition-all cursor-pointer"
+                className="p-2 text-center rounded-xl bg-[var(--bg-base)] hover:bg-[var(--bg-app)] active:bg-[var(--border-soft)] border border-[var(--border-soft)] text-[11px] font-bold text-[var(--text-primary)] transition-all cursor-pointer"
               >
                 💳 Cashier
               </button>
               <button
                 type="button"
                 onClick={() => handleQuickLogin("admin@businesshub.com", "admin")}
-                className="p-2 text-center rounded-xl bg-[#F8FAFC] hover:bg-[#EEF2F6] active:bg-[var(--border-soft)] border border-[var(--border-soft)] text-[11px] font-bold text-[#0F172A] transition-all cursor-pointer"
+                className="p-2 text-center rounded-xl bg-[var(--bg-base)] hover:bg-[var(--bg-app)] active:bg-[var(--border-soft)] border border-[var(--border-soft)] text-[11px] font-bold text-[var(--text-primary)] transition-all cursor-pointer"
               >
                 ⚙️ Admin
               </button>

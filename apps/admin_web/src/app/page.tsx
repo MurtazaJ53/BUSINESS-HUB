@@ -33,7 +33,7 @@ export default async function HomePage() {
       ) : (
         <div className="space-y-6">
           {/* Today's takings hero matching HeroMetricCard */}
-          <div className="bg-gradient-to-br from-[#38BDF8] to-[#0284C7] text-white rounded-[24px] p-6 sm:p-8 shadow-md animate-fade-in-up">
+          <div className="bg-gradient-to-br from-[var(--primary-light)] to-[var(--primary-hover)] text-white rounded-[24px] p-6 sm:p-8 shadow-md animate-fade-in-up">
             <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-sky-100">
               Today&apos;s Sales
             </span>
@@ -58,15 +58,15 @@ export default async function HomePage() {
             {/* Stat: Items */}
             <Link
               href="/inventory"
-              className="bg-white border border-[var(--border-soft)] hover:border-[#0EA5E9] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-1 hover-lift"
+              className="bg-white border border-[var(--border-soft)] hover:border-[var(--primary)] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-1 hover-lift"
             >
-              <div className="w-10 h-10 rounded-xl bg-[#0EA5E9]/10 text-[#0284C7] flex items-center justify-center transition-colors group-hover:bg-[#0EA5E9]/20">
+              <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/10 text-[var(--primary-hover)] flex items-center justify-center transition-colors group-hover:bg-[var(--primary)]/20">
                 <Package className="w-5 h-5" />
               </div>
               <span className="block text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-tertiary)] mt-3.5">
                 ITEMS
               </span>
-              <h3 className="text-xl font-black text-[#0F172A] mt-1">
+              <h3 className="text-xl font-black text-[var(--text-primary)] mt-1">
                 {dashboardSnapshot?.inventory_items_count ?? 0}
               </h3>
               <span className="block text-[11px] font-semibold text-[var(--text-secondary)] mt-0.5">
@@ -77,7 +77,7 @@ export default async function HomePage() {
             {/* Stat: Low Stock */}
             <Link
               href="/inventory"
-              className="bg-white border border-[var(--border-soft)] hover:border-[#0EA5E9] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-2 hover-lift"
+              className="bg-white border border-[var(--border-soft)] hover:border-[var(--primary)] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-2 hover-lift"
             >
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
                 (dashboardSnapshot?.low_stock_items_count ?? 0) > 0
@@ -89,7 +89,7 @@ export default async function HomePage() {
               <span className="block text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-tertiary)] mt-3.5">
                 LOW STOCK
               </span>
-              <h3 className="text-xl font-black text-[#0F172A] mt-1">
+              <h3 className="text-xl font-black text-[var(--text-primary)] mt-1">
                 {dashboardSnapshot?.low_stock_items_count ?? 0}
               </h3>
               <span className={`block text-[11px] font-semibold mt-0.5 ${
@@ -102,7 +102,7 @@ export default async function HomePage() {
             {/* Stat: Total Sales */}
             <Link
               href="/sales"
-              className="bg-white border border-[var(--border-soft)] hover:border-[#0EA5E9] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-3 hover-lift"
+              className="bg-white border border-[var(--border-soft)] hover:border-[var(--primary)] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-3 hover-lift"
             >
               <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center transition-colors group-hover:bg-violet-100">
                 <TrendingUp className="w-5 h-5" />
@@ -110,7 +110,7 @@ export default async function HomePage() {
               <span className="block text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-tertiary)] mt-3.5">
                 TOTAL SALES
               </span>
-              <h3 className="text-xl font-black text-[#0F172A] mt-1">
+              <h3 className="text-xl font-black text-[var(--text-primary)] mt-1">
                 {formatCurrency(grossRevenue, currencyCode)}
               </h3>
               <span className="block text-[11px] font-semibold text-[var(--text-secondary)] mt-0.5">
@@ -121,7 +121,7 @@ export default async function HomePage() {
             {/* Stat: Stock Value */}
             <Link
               href="/inventory"
-              className="bg-white border border-[var(--border-soft)] hover:border-[#0EA5E9] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-4 hover-lift"
+              className="bg-white border border-[var(--border-soft)] hover:border-[var(--primary)] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-4 hover-lift"
             >
               <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center transition-colors group-hover:bg-emerald-100">
                 <TrendingDown className="w-5 h-5" />
@@ -129,7 +129,7 @@ export default async function HomePage() {
               <span className="block text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-tertiary)] mt-3.5">
                 STOCK VALUE
               </span>
-              <h3 className="text-xl font-black text-[#0F172A] mt-1">
+              <h3 className="text-xl font-black text-[var(--text-primary)] mt-1">
                 {formatCurrency(stockValue, currencyCode)}
               </h3>
               <span className="block text-[11px] font-semibold text-[var(--text-secondary)] mt-0.5">
@@ -141,7 +141,7 @@ export default async function HomePage() {
           {/* Primary Action: Start New Sale */}
           <Link
             href="/pos"
-            className="w-full flex items-center justify-center gap-2.5 py-4 px-6 bg-gradient-to-r from-[#38BDF8] to-[#0284C7] hover:from-[#0EA5E9] hover:to-[#0369A1] text-white rounded-[20px] text-sm font-extrabold shadow-md shadow-[#0EA5E9]/20 transition-all hover:scale-[1.005] animate-fade-in-up delay-5 hover-lift"
+            className="w-full flex items-center justify-center gap-2.5 py-4 px-6 bg-gradient-to-r from-[var(--primary-light)] to-[var(--primary-hover)] hover:from-[var(--primary)] hover:to-[var(--primary-dark)] text-white rounded-[20px] text-sm font-extrabold shadow-md shadow-[var(--primary)]/20 transition-all hover:scale-[1.005] animate-fade-in-up delay-5 hover-lift"
           >
             <ShoppingCart className="w-5 h-5" />
             <span>START NEW SALE</span>
@@ -153,13 +153,13 @@ export default async function HomePage() {
             {/* Column 1: Recent Sales */}
             <div className="bg-white border border-[var(--border-soft)] rounded-[24px] p-5 sm:p-6 shadow-sm animate-fade-in-up delay-6">
               <div className="flex items-center justify-between gap-4 mb-4">
-                <h3 className="text-base font-extrabold text-[#0F172A]">
+                <h3 className="text-base font-extrabold text-[var(--text-primary)]">
                   Recent sales
                 </h3>
                 {recentSales.length > 0 && (
                   <Link
                     href="/sales"
-                    className="text-xs font-bold text-[#0EA5E9] hover:underline animate-fade-in"
+                    className="text-xs font-bold text-[var(--primary)] hover:underline animate-fade-in"
                   >
                     View all
                   </Link>
@@ -167,7 +167,7 @@ export default async function HomePage() {
               </div>
 
               {recentSales.length === 0 ? (
-                <div className="py-12 text-center text-[var(--text-tertiary)] text-xs font-bold border border-dashed border-[var(--border-soft)] rounded-2xl bg-[#F8FAFC]">
+                <div className="py-12 text-center text-[var(--text-tertiary)] text-xs font-bold border border-dashed border-[var(--border-soft)] rounded-2xl bg-[var(--bg-base)]">
                   No sales yet. Tap Start New Sale to begin.
                 </div>
               ) : (
@@ -175,15 +175,15 @@ export default async function HomePage() {
                   {recentSales.slice(0, 5).map((sale, index) => (
                     <div
                       key={sale.id}
-                      className="flex items-center justify-between p-3.5 bg-[#F8FAFC] border border-[var(--border-soft)] rounded-2xl hover-lift"
+                      className="flex items-center justify-between p-3.5 bg-[var(--bg-base)] border border-[var(--border-soft)] rounded-2xl hover-lift"
                       style={{ animationDelay: `${240 + index * 40}ms` }}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-[#0EA5E9]/10 text-[#0284C7] flex items-center justify-center shrink-0">
+                        <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/10 text-[var(--primary-hover)] flex items-center justify-center shrink-0">
                           <Receipt className="w-4 h-4" />
                         </div>
                         <div>
-                          <h4 className="text-xs font-extrabold text-[#0F172A]">
+                          <h4 className="text-xs font-extrabold text-[var(--text-primary)]">
                             {sale.customer_name || "Walk-in Guest"}
                           </h4>
                           <span className="block text-[10px] font-bold text-[var(--text-secondary)] mt-0.5">
@@ -192,7 +192,7 @@ export default async function HomePage() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <span className="block text-sm font-black text-[#0F172A]">
+                        <span className="block text-sm font-black text-[var(--text-primary)]">
                           {formatCurrency(Number(sale.total_amount), currencyCode)}
                         </span>
                         {Number(sale.amount_due) > 0 && (
@@ -210,13 +210,13 @@ export default async function HomePage() {
             {/* Column 2: Low Stock */}
             <div className="bg-white border border-[var(--border-soft)] rounded-[24px] p-5 sm:p-6 shadow-sm animate-fade-in-up delay-7">
               <div className="flex items-center justify-between gap-4 mb-4">
-                <h3 className="text-base font-extrabold text-[#0F172A]">
+                <h3 className="text-base font-extrabold text-[var(--text-primary)]">
                   Low stock watch
                 </h3>
               </div>
 
               {!dashboardSnapshot?.low_stock_preview || dashboardSnapshot.low_stock_preview.length === 0 ? (
-                <div className="py-12 text-center text-[var(--text-tertiary)] text-xs font-bold border border-dashed border-[var(--border-soft)] rounded-2xl bg-[#F8FAFC]">
+                <div className="py-12 text-center text-[var(--text-tertiary)] text-xs font-bold border border-dashed border-[var(--border-soft)] rounded-2xl bg-[var(--bg-base)]">
                   No urgent low-stock items.
                 </div>
               ) : (
@@ -224,11 +224,11 @@ export default async function HomePage() {
                   {dashboardSnapshot.low_stock_preview.slice(0, 5).map((item, index) => (
                     <div
                       key={item.id}
-                      className="flex items-center justify-between p-3.5 bg-[#F8FAFC] border border-[var(--border-soft)] rounded-2xl hover-lift"
+                      className="flex items-center justify-between p-3.5 bg-[var(--bg-base)] border border-[var(--border-soft)] rounded-2xl hover-lift"
                       style={{ animationDelay: `${280 + index * 40}ms` }}
                     >
                       <div>
-                        <h4 className="text-xs font-extrabold text-[#0F172A]">
+                        <h4 className="text-xs font-extrabold text-[var(--text-primary)]">
                           {item.item_name}
                         </h4>
                         <span className="block text-[10px] font-bold text-[var(--text-secondary)] mt-0.5">

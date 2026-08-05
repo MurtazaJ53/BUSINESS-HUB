@@ -19,8 +19,8 @@ type MetricCardProps = {
 };
 
 const accentMap: Record<MetricAccent, { bg: string; text: string; border: string }> = {
-  primary: { bg: "bg-[#0EA5E9]/10", text: "text-[#0284C7]", border: "border-[#0EA5E9]/20" },
-  blue: { bg: "bg-[#0EA5E9]/10", text: "text-[#0284C7]", border: "border-[#0EA5E9]/20" },
+  primary: { bg: "bg-[var(--primary)]/10", text: "text-[var(--primary-hover)]", border: "border-[var(--primary)]/20" },
+  blue: { bg: "bg-[var(--primary)]/10", text: "text-[var(--primary-hover)]", border: "border-[var(--primary)]/20" },
   success: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
   green: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
   warning: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" },
@@ -45,7 +45,7 @@ export function MetricCard({
           <p className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--text-tertiary)] mb-1">
             {label}
           </p>
-          <p className="text-2xl sm:text-3xl font-[900] text-[#0F172A] tracking-tight">
+          <p className="text-2xl sm:text-3xl font-[900] text-[var(--text-primary)] tracking-tight">
             {value}
           </p>
           <p className="mt-2 text-xs font-semibold text-[var(--text-secondary)] leading-relaxed">

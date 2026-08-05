@@ -135,7 +135,7 @@ export function PosCheckoutModal({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--text-primary)]/60 backdrop-blur-sm animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
@@ -143,23 +143,23 @@ export function PosCheckoutModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-5 border-b border-[#F1F5F9] flex items-center justify-between bg-[#F8FAFC]">
+        <div className="p-5 border-b border-[var(--bg-soft)] flex items-center justify-between bg-[var(--bg-base)]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#0EA5E9]/10 text-[#0284C7] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl bg-[var(--primary)]/10 text-[var(--primary-hover)] flex items-center justify-center">
               <CreditCard className="w-5 h-5" />
             </div>
             <div>
-              <span className="font-[900] text-base text-[#0F172A]">
+              <span className="font-[900] text-base text-[var(--text-primary)]">
                 Checkout & Payment
               </span>
               <div className="text-xs font-bold text-[var(--text-secondary)]">
-                Total Payable: <strong className="text-[#0284C7]">{formatCurrency(totalAmount)}</strong>
+                Total Payable: <strong className="text-[var(--primary-hover)]">{formatCurrency(totalAmount)}</strong>
               </div>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-[var(--text-tertiary)] hover:text-[#0F172A] hover:bg-[#EEF2F6]"
+            className="p-2 rounded-xl text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-app)]"
           >
             <X className="w-5 h-5" />
           </button>
@@ -174,8 +174,8 @@ export function PosCheckoutModal({
               onClick={() => handleExactPayment("cash")}
               className={`p-3.5 rounded-2xl border flex flex-col items-center gap-1.5 transition-all ${
                 activeTab === "cash" && numCash === totalAmount
-                  ? "border-[#0EA5E9] bg-[#0EA5E9]/10 text-[#0284C7] shadow-sm font-extrabold"
-                  : "border-[var(--border-soft)] bg-[#F8FAFC] text-[var(--text-secondary)] hover:border-[var(--border)]"
+                  ? "border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary-hover)] shadow-sm font-extrabold"
+                  : "border-[var(--border-soft)] bg-[var(--bg-base)] text-[var(--text-secondary)] hover:border-[var(--border)]"
               }`}
             >
               <Banknote className="w-5 h-5 text-emerald-600" />
@@ -187,11 +187,11 @@ export function PosCheckoutModal({
               onClick={() => handleExactPayment("upi")}
               className={`p-3.5 rounded-2xl border flex flex-col items-center gap-1.5 transition-all ${
                 activeTab === "upi" && numUpi === totalAmount
-                  ? "border-[#0EA5E9] bg-[#0EA5E9]/10 text-[#0284C7] shadow-sm font-extrabold"
-                  : "border-[var(--border-soft)] bg-[#F8FAFC] text-[var(--text-secondary)] hover:border-[var(--border)]"
+                  ? "border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary-hover)] shadow-sm font-extrabold"
+                  : "border-[var(--border-soft)] bg-[var(--bg-base)] text-[var(--text-secondary)] hover:border-[var(--border)]"
               }`}
             >
-              <QrCode className="w-5 h-5 text-[#0284C7]" />
+              <QrCode className="w-5 h-5 text-[var(--primary-hover)]" />
               <span className="text-xs font-bold">100% UPI QR</span>
             </button>
 
@@ -200,8 +200,8 @@ export function PosCheckoutModal({
               onClick={() => handleExactPayment("card")}
               className={`p-3.5 rounded-2xl border flex flex-col items-center gap-1.5 transition-all ${
                 activeTab === "card" && numCard === totalAmount
-                  ? "border-[#0EA5E9] bg-[#0EA5E9]/10 text-[#0284C7] shadow-sm font-extrabold"
-                  : "border-[var(--border-soft)] bg-[#F8FAFC] text-[var(--text-secondary)] hover:border-[var(--border)]"
+                  ? "border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary-hover)] shadow-sm font-extrabold"
+                  : "border-[var(--border-soft)] bg-[var(--bg-base)] text-[var(--text-secondary)] hover:border-[var(--border)]"
               }`}
             >
               <CreditCard className="w-5 h-5 text-purple-600" />
@@ -214,10 +214,10 @@ export function PosCheckoutModal({
               onClick={() => handleExactPayment("khata")}
               className={`p-3.5 rounded-2xl border flex flex-col items-center gap-1.5 transition-all ${
                 !selectedCustomer
-                  ? "opacity-40 cursor-not-allowed border-[var(--border-soft)] bg-[#F8FAFC] text-[var(--text-tertiary)]"
+                  ? "opacity-40 cursor-not-allowed border-[var(--border-soft)] bg-[var(--bg-base)] text-[var(--text-tertiary)]"
                   : activeTab === "khata" && numKhata === totalAmount
-                  ? "border-[#0EA5E9] bg-[#0EA5E9]/10 text-[#0284C7] shadow-sm font-extrabold"
-                  : "border-[var(--border-soft)] bg-[#F8FAFC] text-[var(--text-secondary)] hover:border-[var(--border)]"
+                  ? "border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary-hover)] shadow-sm font-extrabold"
+                  : "border-[var(--border-soft)] bg-[var(--bg-base)] text-[var(--text-secondary)] hover:border-[var(--border)]"
               }`}
             >
               <Users className="w-5 h-5 text-amber-600" />
@@ -226,14 +226,14 @@ export function PosCheckoutModal({
           </div>
 
           {/* Payment Method Split Rows */}
-          <div className="space-y-3.5 bg-[#F8FAFC] p-5 rounded-2xl border border-[var(--border-soft)]">
+          <div className="space-y-3.5 bg-[var(--bg-base)] p-5 rounded-2xl border border-[var(--border-soft)]">
             <h4 className="text-[11px] font-extrabold text-[var(--text-tertiary)] uppercase tracking-wider">
               Split Tender Allocation
             </h4>
 
             {/* Cash Input */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-1">
-              <div className="w-32 flex items-center gap-2 text-xs font-bold text-[#0F172A]">
+              <div className="w-32 flex items-center gap-2 text-xs font-bold text-[var(--text-primary)]">
                 <Banknote className="w-4 h-4 text-emerald-600" />
                 <span>Cash:</span>
               </div>
@@ -250,7 +250,7 @@ export function PosCheckoutModal({
                     }
                   }}
                   placeholder="₹0.00"
-                  className="flex-1 px-3.5 py-2.5 bg-white border border-[var(--border-soft)] rounded-xl text-xs font-bold text-[#0F172A] focus:outline-none focus:border-[#0EA5E9]"
+                  className="flex-1 px-3.5 py-2.5 bg-white border border-[var(--border-soft)] rounded-xl text-xs font-bold text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)]"
                 />
                 {numCash > 0 && (
                   <input
@@ -277,7 +277,7 @@ export function PosCheckoutModal({
 
             {/* Card Input */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <div className="w-32 flex items-center gap-2 text-xs font-bold text-[#0F172A]">
+              <div className="w-32 flex items-center gap-2 text-xs font-bold text-[var(--text-primary)]">
                 <CreditCard className="w-4 h-4 text-purple-600" />
                 <span>Card:</span>
               </div>
@@ -289,22 +289,22 @@ export function PosCheckoutModal({
                   value={cardAmount}
                   onChange={(e) => setCardAmount(e.target.value)}
                   placeholder="₹0.00"
-                  className="flex-1 px-3.5 py-2.5 bg-white border border-[var(--border-soft)] rounded-xl text-xs font-bold text-[#0F172A] focus:outline-none focus:border-[#0EA5E9]"
+                  className="flex-1 px-3.5 py-2.5 bg-white border border-[var(--border-soft)] rounded-xl text-xs font-bold text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)]"
                 />
                 <input
                   type="text"
                   value={cardRef}
                   onChange={(e) => setCardRef(e.target.value)}
                   placeholder="Auth/Ref # (optional)"
-                  className="w-36 px-3.5 py-2.5 bg-white border border-[var(--border-soft)] rounded-xl text-xs font-medium text-[#0F172A] focus:outline-none"
+                  className="w-36 px-3.5 py-2.5 bg-white border border-[var(--border-soft)] rounded-xl text-xs font-medium text-[var(--text-primary)] focus:outline-none"
                 />
               </div>
             </div>
 
             {/* UPI QR Input & QR Code Box */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-2">
-              <div className="w-32 flex items-center gap-2 text-xs font-bold text-[#0F172A] pt-2.5">
-                <QrCode className="w-4 h-4 text-[#0284C7]" />
+              <div className="w-32 flex items-center gap-2 text-xs font-bold text-[var(--text-primary)] pt-2.5">
+                <QrCode className="w-4 h-4 text-[var(--primary-hover)]" />
                 <span>UPI / QR:</span>
               </div>
               <div className="flex-1 space-y-2">
@@ -316,25 +316,25 @@ export function PosCheckoutModal({
                     value={upiAmount}
                     onChange={(e) => setUpiAmount(e.target.value)}
                     placeholder="₹0.00"
-                    className="flex-1 px-3.5 py-2.5 bg-white border border-[var(--border-soft)] rounded-xl text-xs font-bold text-[#0F172A] focus:outline-none focus:border-[#0EA5E9]"
+                    className="flex-1 px-3.5 py-2.5 bg-white border border-[var(--border-soft)] rounded-xl text-xs font-bold text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)]"
                   />
                   <input
                     type="text"
                     value={upiRef}
                     onChange={(e) => setUpiRef(e.target.value)}
                     placeholder="UTR/Txn # (optional)"
-                    className="w-36 px-3.5 py-2.5 bg-white border border-[var(--border-soft)] rounded-xl text-xs font-medium text-[#0F172A] focus:outline-none"
+                    className="w-36 px-3.5 py-2.5 bg-white border border-[var(--border-soft)] rounded-xl text-xs font-medium text-[var(--text-primary)] focus:outline-none"
                   />
                 </div>
 
                 {numUpi > 0 && (
                   <div className="p-4 bg-white border border-[#BAE6FD] rounded-2xl flex items-center gap-4 shadow-sm">
-                    <div className="w-20 h-20 bg-slate-900 p-2 rounded-xl flex flex-col items-center justify-center text-white text-[8px] text-center font-mono">
-                      <QrCode className="w-8 h-8 text-[#38BDF8] mb-0.5" />
+                    <div className="w-20 h-20 bg-[var(--text-primary)] p-2 rounded-xl flex flex-col items-center justify-center text-white text-[8px] text-center font-mono">
+                      <QrCode className="w-8 h-8 text-[var(--primary-light)] mb-0.5" />
                       <span>UPI SCAN</span>
                     </div>
                     <div className="flex-1 text-xs space-y-1">
-                      <div className="font-extrabold text-[#0F172A]">
+                      <div className="font-extrabold text-[var(--text-primary)]">
                         Scan to Pay {formatCurrency(numUpi)}
                       </div>
                       <div className="text-[11px] text-[var(--text-secondary)] font-mono truncate">
@@ -343,7 +343,7 @@ export function PosCheckoutModal({
                       <button
                         type="button"
                         onClick={handleCopyUpi}
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0284C7] hover:underline"
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--primary-hover)] hover:underline"
                       >
                         {copiedUpi ? (
                           <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
@@ -360,7 +360,7 @@ export function PosCheckoutModal({
 
             {/* Khata Credit Due Input */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <div className="w-32 flex items-center gap-2 text-xs font-bold text-[#0F172A]">
+              <div className="w-32 flex items-center gap-2 text-xs font-bold text-[var(--text-primary)]">
                 <Users className="w-4 h-4 text-amber-600" />
                 <span>Khata Due:</span>
               </div>
@@ -375,7 +375,7 @@ export function PosCheckoutModal({
                   placeholder={
                     selectedCustomer ? "₹0.00" : "Select a customer to allow Khata credit"
                   }
-                  className="w-full px-3.5 py-2.5 bg-white border border-[var(--border-soft)] rounded-xl text-xs font-bold text-[#0F172A] focus:outline-none focus:border-[#0EA5E9] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-3.5 py-2.5 bg-white border border-[var(--border-soft)] rounded-xl text-xs font-bold text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 {selectedCustomer && (
                   <div className="text-[10px] font-bold text-[var(--text-secondary)] mt-1">
@@ -388,10 +388,10 @@ export function PosCheckoutModal({
           </div>
 
           {/* Allocation Validation & Remaining Counter */}
-          <div className="p-4 rounded-2xl border border-[var(--border-soft)] bg-[#F8FAFC] flex items-center justify-between">
+          <div className="p-4 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-base)] flex items-center justify-between">
             <div>
               <div className="text-[11px] font-bold text-[var(--text-secondary)]">Total Allocated:</div>
-              <div className="text-sm font-extrabold text-[#0F172A]">
+              <div className="text-sm font-extrabold text-[var(--text-primary)]">
                 {formatCurrency(totalAllocated)} / {formatCurrency(totalAmount)}
               </div>
             </div>
@@ -416,11 +416,11 @@ export function PosCheckoutModal({
         </form>
 
         {/* Actions Footer */}
-        <div className="p-5 border-t border-[#F1F5F9] bg-[#F8FAFC] flex items-center justify-between gap-3">
+        <div className="p-5 border-t border-[var(--bg-soft)] bg-[var(--bg-base)] flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="py-3 px-5 bg-white hover:bg-[#F1F5F9] border border-[var(--border-soft)] text-[var(--text-secondary)] hover:text-[#0F172A] rounded-2xl font-bold text-xs transition-colors"
+            className="py-3 px-5 bg-white hover:bg-[var(--bg-soft)] border border-[var(--border-soft)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-2xl font-bold text-xs transition-colors"
           >
             Cancel
           </button>
@@ -429,7 +429,7 @@ export function PosCheckoutModal({
             type="button"
             disabled={!isValid}
             onClick={handleSubmit}
-            className="flex-1 flex items-center justify-center gap-2 py-3 px-5 bg-gradient-to-r from-[#38BDF8] to-[#0284C7] hover:from-[#0EA5E9] hover:to-[#0369A1] disabled:opacity-40 text-white rounded-2xl font-extrabold text-xs shadow-[0_8px_20px_rgba(14,165,233,0.35)] transition-all cursor-pointer"
+            className="flex-1 flex items-center justify-center gap-2 py-3 px-5 bg-gradient-to-r from-[var(--primary-light)] to-[var(--primary-hover)] hover:from-[var(--primary)] hover:to-[var(--primary-dark)] disabled:opacity-40 text-white rounded-2xl font-extrabold text-xs shadow-[0_8px_20px_rgba(14,165,233,0.35)] transition-all cursor-pointer"
           >
             <span>CONFIRM & PRINT RECEIPT</span>
             <ArrowRight className="w-4 h-4" />

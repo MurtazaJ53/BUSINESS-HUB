@@ -127,7 +127,7 @@ export function AdminShell({
           {/* Logo & Store Selector */}
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#38BDF8] to-[#0284C7] flex items-center justify-center shadow-[0_4px_12px_rgba(14,165,233,0.3)]">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[var(--primary-light)] to-[var(--primary-hover)] flex items-center justify-center shadow-[0_4px_12px_rgba(14,165,233,0.3)]">
                 <Store className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -145,7 +145,7 @@ export function AdminShell({
                 <div className="px-3 py-1.5 bg-bg-base border border-border-soft rounded-xl flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   <span className="text-xs font-bold text-text-primary">{activeShop.shop.name}</span>
-                  <span className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-[#0EA5E9]/10 text-primary uppercase">
+                  <span className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-[var(--primary)]/10 text-primary uppercase">
                     {workspacePlanLabel}
                   </span>
                 </div>
@@ -157,7 +157,7 @@ export function AdminShell({
           <div className="flex items-center gap-2.5">
             <Link
               href="/pos"
-              className="px-4 py-2 bg-gradient-to-r from-[#38BDF8] to-[#0284C7] hover:from-[#0EA5E9] hover:to-[#0369A1] text-white rounded-xl text-xs font-extrabold shadow-[0_4px_14px_rgba(14,165,233,0.3)] flex items-center gap-1.5 transition-all"
+              className="px-4 py-2 bg-gradient-to-r from-[var(--primary-light)] to-[var(--primary-hover)] hover:from-[var(--primary)] hover:to-[var(--primary-dark)] text-white rounded-xl text-xs font-extrabold shadow-[0_4px_14px_rgba(14,165,233,0.3)] flex items-center gap-1.5 transition-all"
             >
               <ShoppingCart className="w-4 h-4" />
               <span className="hidden sm:inline">OPEN POS TERMINAL</span>
@@ -170,7 +170,7 @@ export function AdminShell({
               title="Notifications"
             >
               <Bell className="w-4 h-4" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#0EA5E9]" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[var(--primary)]" />
             </Link>
 
             <ThemeSwitcher />
@@ -179,7 +179,7 @@ export function AdminShell({
 
             {/* Profile pill */}
             <div className="flex items-center gap-2 pl-2 border-l border-border-soft">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#0EA5E9] to-[#38BDF8] text-white text-xs font-black flex items-center justify-center shadow-sm">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[var(--primary)] to-[var(--primary-light)] text-white text-xs font-black flex items-center justify-center shadow-sm">
                 {(session?.user?.full_name || session?.user?.email || "U").charAt(0).toUpperCase()}
               </div>
               <div className="hidden xl:block text-left">
@@ -223,9 +223,9 @@ export function AdminShell({
                   href={item.href}
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                     isActive
-                      ? "bg-[#0EA5E9] text-white shadow-[0_4px_12px_rgba(14,165,233,0.3)]"
+                      ? "bg-[var(--primary)] text-white shadow-[0_4px_12px_rgba(14,165,233,0.3)]"
                       : item.highlight
-                      ? "bg-[#0EA5E9]/10 text-primary hover:bg-[#0EA5E9]/20"
+                      ? "bg-[var(--primary)]/10 text-primary hover:bg-[var(--primary)]/20"
                       : "text-text-secondary hover:bg-bg-soft hover:text-text-primary"
                   }`}
                 >
@@ -250,7 +250,7 @@ export function AdminShell({
                   href={item.href}
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                     isActive
-                      ? "bg-[#0EA5E9] text-white shadow-[0_4px_12px_rgba(14,165,233,0.3)]"
+                      ? "bg-[var(--primary)] text-white shadow-[0_4px_12px_rgba(14,165,233,0.3)]"
                       : "text-text-secondary hover:bg-bg-soft hover:text-text-primary"
                   }`}
                 >
@@ -276,7 +276,7 @@ export function AdminShell({
                     href={item.href}
                     className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                       isActive
-                        ? "bg-[#0EA5E9] text-white shadow-[0_4px_12px_rgba(14,165,233,0.3)]"
+                        ? "bg-[var(--primary)] text-white shadow-[0_4px_12px_rgba(14,165,233,0.3)]"
                         : "text-text-secondary hover:bg-bg-soft hover:text-text-primary"
                     }`}
                   >
@@ -291,7 +291,7 @@ export function AdminShell({
           {/* Connected Server Card */}
           <div className="bg-gradient-to-br from-surface to-bg-soft border border-primary/20 rounded-[24px] p-4 text-xs transition-colors duration-200">
             <div className="flex items-center gap-2 text-primary font-extrabold mb-1">
-              <span className="w-2 h-2 rounded-full bg-[#0EA5E9] animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-[var(--primary)] animate-pulse" />
               <span>Backend Connected</span>
             </div>
             <p className="text-[11px] text-text-secondary leading-relaxed">
