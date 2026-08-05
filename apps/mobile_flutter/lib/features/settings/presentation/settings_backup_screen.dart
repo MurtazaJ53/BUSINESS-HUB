@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+
+import '../../../l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -144,7 +146,7 @@ class _SettingsBackupScreenState extends ConsumerState<SettingsBackupScreen> {
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
     return MobileStandaloneScaffold(
-      title: 'Backup & restore',
+      title: L.of(context).backupTitle,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
         children: <Widget>[
@@ -189,7 +191,7 @@ class _SettingsBackupScreenState extends ConsumerState<SettingsBackupScreen> {
           ),
           const SizedBox(height: 18),
           MobilePanel(
-            title: 'Saved backups',
+            title: L.of(context).backupSaved,
             action: MobileTag(
               label: '${_backups.length}',
               icon: Icons.folder_rounded,

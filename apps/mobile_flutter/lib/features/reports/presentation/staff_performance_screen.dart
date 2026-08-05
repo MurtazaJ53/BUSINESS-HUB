@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/backend/backend_api_client.dart';
@@ -59,7 +61,7 @@ class _StaffPerformanceScreenState
     final total = rows.fold<double>(0, (sum, r) => sum + _money(r['gross']));
 
     return MobileStandaloneScaffold(
-      title: 'Staff performance',
+      title: L.of(context).staffPerformance,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
         children: <Widget>[

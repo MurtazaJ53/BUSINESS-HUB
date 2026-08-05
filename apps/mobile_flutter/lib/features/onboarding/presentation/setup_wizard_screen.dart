@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -140,7 +142,7 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
     return MobileStandaloneScaffold(
-      title: 'Set up your shop',
+      title: L.of(context).welcomeSetup,
       child: Column(
         children: <Widget>[
           Padding(
@@ -279,7 +281,7 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
                 ),
                 TextButton(
                   onPressed: _saving ? null : _skip,
-                  child: const Text('Skip for now'),
+                  child: Text(L.of(context).welcomeSkip),
                 ),
               ],
             ),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/health/data_health.dart';
@@ -75,7 +77,7 @@ class _DataHealthScreenState extends ConsumerState<DataHealthScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Merge'),
+            child: Text(L.of(context).healthMerge),
           ),
         ],
       ),
@@ -152,7 +154,7 @@ class _DataHealthScreenState extends ConsumerState<DataHealthScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Merge all'),
+            child: Text(L.of(context).healthMergeAll),
           ),
         ],
       ),
@@ -210,15 +212,15 @@ class _DataHealthScreenState extends ConsumerState<DataHealthScreen> {
     final report = ref.watch(dataHealthProvider);
 
     return MobileStandaloneScaffold(
-      title: 'Data health',
+      title: L.of(context).healthTitle,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
         children: <Widget>[
           _HeaderCard(report: report),
           const SizedBox(height: 16),
           if (report.isHealthy)
-            const MobilePanel(
-              title: 'Nothing to fix',
+            MobilePanel(
+              title: L.of(context).healthNothing,
               child: MobileEmptyState(
                 icon: Icons.verified_rounded,
                 title: 'Your data looks healthy',
@@ -229,7 +231,7 @@ class _DataHealthScreenState extends ConsumerState<DataHealthScreen> {
             ),
           if (report.duplicateGroups.isNotEmpty) ...<Widget>[
             _SectionHeader(
-              title: 'Duplicate products',
+              title: L.of(context).healthDuplicates,
               count: report.duplicateRowCount,
               explanation:
                   'The same product imported more than once. Copies split one '
@@ -240,7 +242,7 @@ class _DataHealthScreenState extends ConsumerState<DataHealthScreen> {
                       onPressed: _busy
                           ? null
                           : () => _mergeAll(report.duplicateGroups),
-                      child: const Text('Merge all'),
+                      child: Text(L.of(context).healthMergeAll),
                     )
                   : null,
             ),
@@ -466,7 +468,7 @@ class _DuplicateTile extends StatelessWidget {
           const SizedBox(width: 10),
           OutlinedButton(
             onPressed: busy ? null : onMerge,
-            child: const Text('Merge'),
+            child: Text(L.of(context).healthMerge),
           ),
         ],
       ),

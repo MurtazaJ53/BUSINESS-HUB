@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/mobile_repository.dart';
@@ -154,7 +156,7 @@ class _KhataCollectionScreenState extends ConsumerState<KhataCollectionScreen> {
     final noPhone = all.where((d) => !d.hasPhone).length;
 
     return MobileStandaloneScaffold(
-      title: 'Collect udhaar',
+      title: L.of(context).collectTitle,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
         children: <Widget>[
@@ -187,7 +189,7 @@ class _KhataCollectionScreenState extends ConsumerState<KhataCollectionScreen> {
             contentPadding: EdgeInsets.zero,
             value: _onlyOverdue,
             onChanged: (v) => setState(() => _onlyOverdue = v),
-            title: const Text('Only overdue'),
+            title: Text(L.of(context).collectOnlyOverdue),
             subtitle: const Text('Not reminded in the last 7 days'),
           ),
           if (noPhone > 0) ...<Widget>[

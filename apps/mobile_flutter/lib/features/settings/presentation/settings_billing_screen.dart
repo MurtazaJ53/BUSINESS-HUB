@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -167,7 +169,7 @@ class _SettingsBillingScreenState extends ConsumerState<SettingsBillingScreen> {
     final daysLeft = planCount(subscription['days_remaining']);
 
     return MobileStandaloneScaffold(
-      title: 'Plan & billing',
+      title: L.of(context).billingTitle,
       child: async.isLoading
           ? const Center(child: Padding(
               padding: EdgeInsets.all(48),

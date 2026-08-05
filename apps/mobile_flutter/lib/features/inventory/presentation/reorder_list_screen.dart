@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/mobile_repository.dart';
@@ -114,7 +116,7 @@ class _ReorderListScreenState extends ConsumerState<ReorderListScreen> {
         .fold<double>(0, (sum, c) => sum + c);
 
     return MobileStandaloneScaffold(
-      title: 'Reorder list',
+      title: L.of(context).reorderTitle,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
         children: <Widget>[
@@ -165,9 +167,9 @@ class _ReorderListScreenState extends ConsumerState<ReorderListScreen> {
             TextField(
               controller: _supplierPhone,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Supplier mobile number',
-                prefixIcon: Icon(Icons.person_rounded),
+              decoration: InputDecoration(
+                labelText: L.of(context).reorderSupplierPhone,
+                prefixIcon: const Icon(Icons.person_rounded),
               ),
             ),
             const SizedBox(height: 10),

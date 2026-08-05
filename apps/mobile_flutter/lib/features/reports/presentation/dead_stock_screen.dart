@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/mobile_repository.dart';
@@ -38,7 +40,7 @@ class _DeadStockScreenState extends ConsumerState<DeadStockScreen> {
     final neverSold = items.where((i) => i.neverSold).length;
 
     return MobileStandaloneScaffold(
-      title: 'Dead stock',
+      title: L.of(context).deadStockTitle,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
         children: <Widget>[

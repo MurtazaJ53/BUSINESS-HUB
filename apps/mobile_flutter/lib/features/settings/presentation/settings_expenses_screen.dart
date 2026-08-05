@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../l10n/app_localizations.dart';
+
 import '../../../core/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -116,16 +118,16 @@ class _SettingsExpensesScreenState
                 child: ListView(
                   shrinkWrap: true,
                   children: <Widget>[
-                    const MobileSheetHeader(
+                    MobileSheetHeader(
                       eyebrow: 'Store expenses',
-                      title: 'Add expense',
+                      title: L.of(context).expAdd,
                       subtitle:
                           'Capture practical store spending from the phone without opening a heavy finance desk.',
                       icon: Icons.payments_rounded,
                     ),
                     const SizedBox(height: 16),
                     MobileSheetSection(
-                      title: 'Expense details',
+                      title: L.of(context).expDetails,
                       child: Column(
                         children: <Widget>[
                           TextField(
@@ -311,7 +313,7 @@ class _SettingsExpensesScreenState
 
     if (session == null) {
       return MobileStandaloneScaffold(
-        title: 'Expenses',
+        title: L.of(context).settingsExpenses,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
           children: const <Widget>[
@@ -331,7 +333,7 @@ class _SettingsExpensesScreenState
 
     if (!shop.supportsExpenses) {
       return MobileStandaloneScaffold(
-        title: 'Expenses',
+        title: L.of(context).settingsExpenses,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
           children: const <Widget>[
@@ -353,7 +355,7 @@ class _SettingsExpensesScreenState
       ..sort((left, right) => right.amount.compareTo(left.amount));
 
     return MobileStandaloneScaffold(
-      title: 'Expenses',
+      title: L.of(context).settingsExpenses,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
         children: <Widget>[
@@ -443,7 +445,7 @@ class _SettingsExpensesScreenState
           ),
           const SizedBox(height: 18),
           MobilePanel(
-            title: 'Add expense',
+            title: L.of(context).expAdd,
             action: MobileTag(
               label: session.isViewer ? 'View only' : 'Daily ops',
               icon: session.isViewer

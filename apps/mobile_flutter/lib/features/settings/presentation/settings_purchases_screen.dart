@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/mobile_repository.dart';
@@ -35,7 +37,7 @@ class SettingsPurchasesScreen extends ConsumerWidget {
     final canManage = session != null && !session.isReadOnly;
 
     return MobileStandaloneScaffold(
-      title: 'Suppliers & purchases',
+      title: L.of(context).purSuppliers,
       trailing: canManage
           ? IconButton(
               icon: const Icon(Icons.add_rounded),
@@ -80,7 +82,7 @@ class SettingsPurchasesScreen extends ConsumerWidget {
           if (suppliers.any((s) => s.payable > 0)) ...<Widget>[
             const SizedBox(height: 16),
             MobilePanel(
-              title: 'Outstanding to suppliers',
+              title: L.of(context).purOutstanding,
               action: const MobileTag(
                 label: 'PAYABLE',
                 icon: Icons.trending_up_rounded,
@@ -95,7 +97,7 @@ class SettingsPurchasesScreen extends ConsumerWidget {
           ],
           const SizedBox(height: 16),
           MobilePanel(
-            title: 'Recent purchases',
+            title: L.of(context).purRecent,
             action: MobileTag(
               label: '${purchases.length} ENTRIES',
               icon: Icons.receipt_long_rounded,
