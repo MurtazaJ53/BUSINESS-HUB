@@ -30,6 +30,10 @@ class Customer(SourceTrackedModel):
     # points confuse customers and invite rounding disputes at the counter.
     loyalty_points = models.PositiveIntegerField(default=0)
     notes = models.TextField(blank=True)
+    # When this customer was last chased for an outstanding balance. Shared
+    # across devices on purpose: the owner on the web and the cashier on the
+    # phone must not both nudge the same person on the same day.
+    last_reminded_at = models.DateTimeField(blank=True, null=True)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
     tombstone = models.BooleanField(default=False)
     source_meta_json = models.JSONField(default=dict, blank=True)

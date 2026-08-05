@@ -39,6 +39,7 @@ class CustomerSerializer(serializers.ModelSerializer):
             "total_spent",
             "balance",
             "loyalty_points",
+            "last_reminded_at",
             "notes",
             "status",
             "tombstone",
@@ -50,6 +51,7 @@ class CustomerSerializer(serializers.ModelSerializer):
             "total_spent",
             "balance",
             "loyalty_points",
+            "last_reminded_at",
             "tombstone",
         )
 

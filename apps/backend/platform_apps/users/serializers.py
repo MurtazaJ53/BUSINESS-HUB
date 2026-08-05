@@ -80,9 +80,15 @@ class MembershipShopSerializer(serializers.Serializer):
         child=serializers.BooleanField(),
     )
     business_phone = serializers.SerializerMethodField()
+    # Needed so the web can put a one-tap UPI pay link in khata reminders, the
+    # same as the phone does. Public payee id, not a secret.
+    upi_vpa = serializers.SerializerMethodField()
 
     def get_business_phone(self, obj):
         return obj.settings_json.get("business_phone", "")
+
+    def get_upi_vpa(self, obj):
+        return obj.settings_json.get("upi_vpa", "")
 
 
 class SessionMembershipSerializer(serializers.ModelSerializer):

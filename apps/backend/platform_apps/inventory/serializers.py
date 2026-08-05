@@ -45,6 +45,8 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             "hsn_code",
             "gst_rate",
             "price_includes_tax",
+            "unit",
+            "reorder_level",
             "status",
             "tombstone",
             "source_meta_json",
@@ -53,12 +55,13 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             "cost_price",
             "supplier_id",
             "last_purchase_date",
+            "created_at",
             "opening_stock",
             "private_cost_price",
             "private_supplier_id",
             "private_last_purchase_date",
         )
-        read_only_fields = ("id", "stock_on_hand")
+        read_only_fields = ("id", "stock_on_hand", "created_at")
 
     def _can_view_costs(self) -> bool:
         return bool(self.context.get("can_view_costs"))

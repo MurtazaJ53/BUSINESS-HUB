@@ -32,6 +32,13 @@ class InventoryItem(SourceTrackedModel):
     gst_rate = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
     price_includes_tax = models.BooleanField(default=True)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
+    # How the shop counts this item ("kg", "pcs", "mtr"). Free text because a
+    # kirana and a garment shop do not share a unit list.
+    unit = models.CharField(max_length=32, blank=True)
+    # Stock level at which the item joins the buying list. Null means "use the
+    # shop default" rather than "never reorder", so an item nobody has
+    # configured still shows up before it runs out.
+    reorder_level = models.PositiveIntegerField(blank=True, null=True)
     tombstone = models.BooleanField(default=False)
     source_meta_json = models.JSONField(default=dict, blank=True)
     # Product photo as a base64 data URI. Stored in the DB (not MEDIA_ROOT)

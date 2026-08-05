@@ -11,6 +11,8 @@ from platform_apps.attendance.views import (
     AttendanceSessionListCreateView,
     AttendanceSummaryView,
 )
+from platform_apps.customers.khata_views import CustomerRemindView, DebtorListView
+from platform_apps.customers.loyalty_views import LoyaltySettingsView
 from platform_apps.customers.views import (
     CustomerBulkCreateView,
     CustomerDetailView,
@@ -26,6 +28,7 @@ from platform_apps.billing.views import (
     SubscriptionView,
 )
 from platform_apps.expenses.views import ExpenseDetailView, ExpenseListCreateView, ExpenseSummaryView
+from platform_apps.inventory.report_views import DeadStockView, ReorderListView
 from platform_apps.inventory.views import (
     InventoryItemAdjustmentView,
     InventoryItemBulkCreateView,
@@ -51,6 +54,7 @@ from platform_apps.projections.views import (
     ShopPulseSignalListView,
     ShopPulseSnapshotView,
 )
+from platform_apps.sales.pulse_views import BestSellersView, CashFlowView
 from platform_apps.sales.views import (
     SaleStaffPerformanceView,
     SaleTallyExportView,
@@ -124,6 +128,13 @@ urlpatterns = [
     ),
     path("<uuid:shop_id>/customers/", CustomerListCreateView.as_view(), name="customer-list"),
     path("<uuid:shop_id>/customers/bulk/", CustomerBulkCreateView.as_view(), name="customer-bulk"),
+    path("<uuid:shop_id>/customers/debtors/", DebtorListView.as_view(), name="customer-debtors"),
+    path("<uuid:shop_id>/loyalty/", LoyaltySettingsView.as_view(), name="shop-loyalty"),
+    path(
+        "<uuid:shop_id>/customers/<uuid:customer_id>/remind/",
+        CustomerRemindView.as_view(),
+        name="customer-remind",
+    ),
     path("<uuid:shop_id>/customers/summary/", CustomerSummaryView.as_view(), name="customer-summary"),
     path("<uuid:shop_id>/customers/<uuid:customer_id>/", CustomerDetailView.as_view(), name="customer-detail"),
     path(
@@ -194,6 +205,26 @@ urlpatterns = [
         name="projection-pulse-signal-detail",
     ),
     path("<uuid:shop_id>/sales/", SaleListCreateView.as_view(), name="sale-list"),
+    path(
+        "<uuid:shop_id>/reports/dead-stock/",
+        DeadStockView.as_view(),
+        name="report-dead-stock",
+    ),
+    path(
+        "<uuid:shop_id>/reports/reorder-list/",
+        ReorderListView.as_view(),
+        name="report-reorder-list",
+    ),
+    path(
+        "<uuid:shop_id>/reports/best-sellers/",
+        BestSellersView.as_view(),
+        name="report-best-sellers",
+    ),
+    path(
+        "<uuid:shop_id>/reports/cash-flow/",
+        CashFlowView.as_view(),
+        name="report-cash-flow",
+    ),
     path(
         "<uuid:shop_id>/sales/staff-performance/",
         SaleStaffPerformanceView.as_view(),
