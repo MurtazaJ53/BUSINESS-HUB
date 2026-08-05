@@ -66,7 +66,7 @@ export function ThermalReceiptModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-white border border-[#E2E8F0] rounded-[28px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        className="w-full max-w-md bg-white border border-[var(--border-soft)] rounded-[28px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -81,7 +81,7 @@ export function ThermalReceiptModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-[#94A3B8] hover:text-[#0F172A] hover:bg-[#EEF2F6]"
+            className="p-2 rounded-xl text-[var(--text-tertiary)] hover:text-[#0F172A] hover:bg-[#EEF2F6]"
           >
             <X className="w-4 h-4" />
           </button>
@@ -91,7 +91,7 @@ export function ThermalReceiptModal({
         <div className="flex-1 overflow-y-auto p-6 bg-slate-100 flex justify-center border-b border-[#F1F5F9]">
           <div
             ref={receiptRef}
-            className="w-[76mm] min-h-[120mm] bg-white text-black p-5 font-mono text-[11px] leading-tight shadow-md border border-[#E2E8F0] rounded-lg"
+            className="w-[76mm] min-h-[120mm] bg-white text-black p-5 font-mono text-[11px] leading-tight shadow-md border border-[var(--border-soft)] rounded-lg"
             style={{ fontFamily: "'Courier New', Courier, monospace" }}
           >
             {/* Store Header */}
@@ -230,7 +230,7 @@ export function ThermalReceiptModal({
           </button>
           <button
             onClick={onClose}
-            className="py-3 px-5 bg-white hover:bg-[#F1F5F9] border border-[#E2E8F0] text-[#64748B] hover:text-[#0F172A] rounded-2xl font-bold text-xs transition-colors"
+            className="py-3 px-5 bg-white hover:bg-[#F1F5F9] border border-[var(--border-soft)] text-[var(--text-secondary)] hover:text-[#0F172A] rounded-2xl font-bold text-xs transition-colors"
           >
             Done
           </button>

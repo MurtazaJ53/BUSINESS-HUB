@@ -39,16 +39,16 @@ export function MetricCard({
   const styles = accentMap[accent] || accentMap.primary;
 
   return (
-    <div className="bg-white border border-[#E2E8F0] rounded-[24px] p-5 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+    <div className="bg-white border border-[var(--border-soft)] rounded-[24px] p-5 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
-          <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#94A3B8] mb-1">
+          <p className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--text-tertiary)] mb-1">
             {label}
           </p>
           <p className="text-2xl sm:text-3xl font-[900] text-[#0F172A] tracking-tight">
             {value}
           </p>
-          <p className="mt-2 text-xs font-semibold text-[#64748B] leading-relaxed">
+          <p className="mt-2 text-xs font-semibold text-[var(--text-secondary)] leading-relaxed">
             {detail}
           </p>
         </div>

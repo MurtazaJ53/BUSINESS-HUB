@@ -10,15 +10,15 @@
   --surface: #FFFFFF;
   --surface-strong: #F4F4F5;
   --surface-muted: #F8FAFC;
-  --border-soft: #E2E8F0;
-  --border: #CBD5E1;
-  --border-strong: #94A3B8;
+  --border-soft: #E4E4E7;
+  --border: #D4D4D8;
+  --border-strong: #A1A1AA;
 
   /* Text Hierarchy (Slate / Zinc ink) */
   --text-primary: #0F172A;
-  --text-secondary: #475569;
-  --text-tertiary: #94A3B8;
-  --text-disabled: #CBD5E1;
+  --text-secondary: #3F3F46;
+  --text-tertiary: #71717A;
+  --text-disabled: #A1A1AA;
 
   /* Brand Colors - Sky Blue */
   --primary: #0EA5E9;
@@ -43,9 +43,9 @@
   --error-light: #F87171;
   --error-dark: #DC2626;
 
-  --info: #0EA5E9;
-  --info-light: #38BDF8;
-  --info-dark: #0284C7;
+  --info: #3B82F6;
+  --info-light: #60A5FA;
+  --info-dark: #2563EB;
 
   /* Domain Colors */
   --revenue: #10B981;

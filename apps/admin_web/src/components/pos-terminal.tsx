@@ -376,11 +376,11 @@ export function PosTerminal({
       {/* ========================================================= */}
       {/* LEFT COLUMN: Product Catalog & Search                      */}
       {/* ========================================================= */}
-      <div className="flex-1 flex flex-col min-w-0 bg-white border border-[#E2E8F0] rounded-[28px] overflow-hidden shadow-sm">
+      <div className="flex-1 flex flex-col min-w-0 bg-white border border-[var(--border-soft)] rounded-[28px] overflow-hidden shadow-sm">
         {/* Search Bar & Barcode Scanner */}
         <div className="p-4 border-b border-[#F1F5F9] bg-[#F8FAFC] flex items-center gap-3">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-[var(--text-tertiary)] absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               ref={searchInputRef}
               type="text"
@@ -388,18 +388,18 @@ export function PosTerminal({
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleSearchKeyDown}
               placeholder="Scan barcode or search product / SKU... (Press / to focus)"
-              className="w-full pl-10 pr-10 py-3 bg-white border border-[#E2E8F0] focus:border-[#0EA5E9] rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[#94A3B8] outline-none shadow-sm transition-all"
+              className="w-full pl-10 pr-10 py-3 bg-white border border-[var(--border-soft)] focus:border-[#0EA5E9] rounded-2xl text-xs font-semibold text-[#0F172A] placeholder-[var(--text-tertiary)] outline-none shadow-sm transition-all"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#0F172A]"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] hover:text-[#0F172A]"
               >
                 <X className="w-4 h-4" />
               </button>
             )}
           </div>
-          <div className="hidden sm:flex items-center gap-2 px-4 py-3 bg-white rounded-2xl border border-[#E2E8F0] text-xs font-bold text-[#0284C7] shadow-sm">
+          <div className="hidden sm:flex items-center gap-2 px-4 py-3 bg-white rounded-2xl border border-[var(--border-soft)] text-xs font-bold text-[#0284C7] shadow-sm">
             <Barcode className="w-4 h-4" />
             <span>Scanner Ready</span>
           </div>
@@ -414,7 +414,7 @@ export function PosTerminal({
               className={`px-4 py-2 rounded-xl text-xs font-bold shrink-0 transition-all ${
                 selectedCategory === cat
                   ? "bg-[#0EA5E9] text-white shadow-md shadow-[#0EA5E9]/25"
-                  : "bg-[#F8FAFC] text-[#64748B] hover:text-[#0F172A] border border-[#E2E8F0]"
+                  : "bg-[#F8FAFC] text-[var(--text-secondary)] hover:text-[#0F172A] border border-[var(--border-soft)]"
               }`}
             >
               {cat}
@@ -425,7 +425,7 @@ export function PosTerminal({
         {/* Product Grid */}
         <div className="flex-1 overflow-y-auto p-4 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3.5">
           {filteredProducts.length === 0 ? (
-            <div className="col-span-full py-16 text-center text-[#94A3B8] text-xs font-bold">
+            <div className="col-span-full py-16 text-center text-[var(--text-tertiary)] text-xs font-bold">
               No products found matching &quot;{searchQuery}&quot;.
             </div>
           ) : (
@@ -433,11 +433,11 @@ export function PosTerminal({
               <button
                 key={prod.id}
                 onClick={() => addToCart(prod)}
-                className="group relative flex flex-col justify-between p-4 rounded-2xl bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-[#0EA5E9] hover:shadow-md text-left transition-all active:scale-98"
+                className="group relative flex flex-col justify-between p-4 rounded-2xl bg-[#F8FAFC] hover:bg-white border border-[var(--border-soft)] hover:border-[#0EA5E9] hover:shadow-md text-left transition-all active:scale-98"
               >
                 <div>
                   <div className="flex items-start justify-between gap-1 mb-1.5">
-                    <span className="text-[10px] font-bold text-[#94A3B8] truncate">
+                    <span className="text-[10px] font-bold text-[var(--text-tertiary)] truncate">
                       {prod.sku}
                     </span>
                     {(prod.tax_rate ?? 0) > 0 ? (
@@ -455,7 +455,7 @@ export function PosTerminal({
                   </h4>
                 </div>
 
-                <div className="mt-4 pt-2.5 border-t border-[#E2E8F0] flex items-center justify-between">
+                <div className="mt-4 pt-2.5 border-t border-[var(--border-soft)] flex items-center justify-between">
                   <span className="text-sm font-[900] text-[#0F172A]">
                     {formatCurrency(prod.selling_price)}
                   </span>
@@ -463,7 +463,7 @@ export function PosTerminal({
                     className={`text-[10px] font-bold ${
                       prod.is_low_stock
                         ? "text-rose-600 font-extrabold"
-                        : "text-[#64748B]"
+                        : "text-[var(--text-secondary)]"
                     }`}
                   >
                     Qty: {prod.current_stock}
@@ -478,7 +478,7 @@ export function PosTerminal({
       {/* ========================================================= */}
       {/* RIGHT COLUMN: Interactive Cart & Tender Total              */}
       {/* ========================================================= */}
-      <div className="w-full lg:w-[420px] flex flex-col bg-white border border-[#E2E8F0] rounded-[28px] overflow-hidden shadow-sm shrink-0">
+      <div className="w-full lg:w-[420px] flex flex-col bg-white border border-[var(--border-soft)] rounded-[28px] overflow-hidden shadow-sm shrink-0">
         {/* Cart Header */}
         <div className="p-4 border-b border-[#F1F5F9] bg-[#F8FAFC] flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -522,15 +522,15 @@ export function PosTerminal({
               </div>
               <button
                 onClick={() => setSelectedCustomer(null)}
-                className="p-1 text-[#94A3B8] hover:text-[#0F172A]"
+                className="p-1 text-[var(--text-tertiary)] hover:text-[#0F172A]"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
           ) : (
             <div className="relative">
-              <div className="flex items-center gap-2 px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl">
-                <User className="w-4 h-4 text-[#94A3B8]" />
+              <div className="flex items-center gap-2 px-3 py-2 bg-[#F8FAFC] border border-[var(--border-soft)] rounded-xl">
+                <User className="w-4 h-4 text-[var(--text-tertiary)]" />
                 <input
                   type="text"
                   value={customerSearch}
@@ -540,13 +540,13 @@ export function PosTerminal({
                     setShowCustomerDropdown(true);
                   }}
                   placeholder="Attach Khata / Customer Account..."
-                  className="flex-1 bg-transparent text-xs font-semibold text-[#0F172A] placeholder-[#94A3B8] outline-none"
+                  className="flex-1 bg-transparent text-xs font-semibold text-[#0F172A] placeholder-[var(--text-tertiary)] outline-none"
                 />
               </div>
 
               {/* Customer Dropdown */}
               {showCustomerDropdown && (
-                <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-[#E2E8F0] rounded-2xl shadow-xl z-20 max-h-52 overflow-y-auto p-1.5">
+                <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-[var(--border-soft)] rounded-2xl shadow-xl z-20 max-h-52 overflow-y-auto p-1.5">
                   {customers
                     .filter(
                       (c) =>
@@ -565,7 +565,7 @@ export function PosTerminal({
                       >
                         <div>
                           <div className="font-extrabold text-[#0F172A]">{c.name}</div>
-                          <div className="text-[10px] text-[#64748B]">{c.phone}</div>
+                          <div className="text-[10px] text-[var(--text-secondary)]">{c.phone}</div>
                         </div>
                         <div className="text-right">
                           <div className="text-[10px] font-bold text-amber-600">
@@ -576,7 +576,7 @@ export function PosTerminal({
                     ))}
                   <button
                     onClick={() => setShowCustomerDropdown(false)}
-                    className="w-full text-center py-2 text-[10px] font-bold text-[#94A3B8] hover:text-[#0F172A] border-t border-[#F1F5F9]"
+                    className="w-full text-center py-2 text-[10px] font-bold text-[var(--text-tertiary)] hover:text-[#0F172A] border-t border-[#F1F5F9]"
                   >
                     Close Dropdown
                   </button>
@@ -589,10 +589,10 @@ export function PosTerminal({
         {/* Cart Items List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 divide-y divide-[#F1F5F9]">
           {cart.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center p-8 text-[#94A3B8]">
-              <ShoppingCart className="w-12 h-12 stroke-1 mb-2 text-[#CBD5E1]" />
+            <div className="h-full flex flex-col items-center justify-center text-center p-8 text-[var(--text-tertiary)]">
+              <ShoppingCart className="w-12 h-12 stroke-1 mb-2 text-[var(--border)]" />
               <p className="text-xs font-bold">Cart is currently empty</p>
-              <p className="text-[11px] text-[#94A3B8] mt-1">
+              <p className="text-[11px] text-[var(--text-tertiary)] mt-1">
                 Scan barcode or click items to add to cart
               </p>
             </div>
@@ -601,7 +601,7 @@ export function PosTerminal({
               <div key={item.id} className="pt-3 first:pt-0 flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <h5 className="text-xs font-extrabold text-[#0F172A] truncate">{item.name}</h5>
-                  <div className="flex items-center gap-2 text-[10px] font-bold text-[#64748B] mt-0.5">
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-[var(--text-secondary)] mt-0.5">
                     <span>{formatCurrency(item.unit_price)}</span>
                     <span>•</span>
                     <span>GST {item.tax_rate}%</span>
@@ -609,10 +609,10 @@ export function PosTerminal({
 
                   {/* Quantity Stepper Controls */}
                   <div className="flex items-center gap-2 mt-2">
-                    <div className="flex items-center border border-[#E2E8F0] rounded-xl bg-[#F8FAFC]">
+                    <div className="flex items-center border border-[var(--border-soft)] rounded-xl bg-[#F8FAFC]">
                       <button
                         onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                        className="p-1.5 text-[#64748B] hover:text-[#0F172A]"
+                        className="p-1.5 text-[var(--text-secondary)] hover:text-[#0F172A]"
                       >
                         <Minus className="w-3.5 h-3.5" />
                       </button>
@@ -621,7 +621,7 @@ export function PosTerminal({
                       </span>
                       <button
                         onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        className="p-1.5 text-[#64748B] hover:text-[#0F172A]"
+                        className="p-1.5 text-[var(--text-secondary)] hover:text-[#0F172A]"
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </button>
@@ -649,7 +649,7 @@ export function PosTerminal({
 
         {/* Financial Summary & Checkout Button */}
         <div className="p-5 border-t border-[#F1F5F9] bg-[#F8FAFC] space-y-3">
-          <div className="space-y-1.5 text-xs font-semibold text-[#64748B]">
+          <div className="space-y-1.5 text-xs font-semibold text-[var(--text-secondary)]">
             <div className="flex justify-between">
               <span>Subtotal:</span>
               <span className="text-[#0F172A] font-bold">
@@ -664,15 +664,15 @@ export function PosTerminal({
             )}
             <div className="flex justify-between text-[11px]">
               <span>Tax (GST CGST+SGST):</span>
-              <span className="text-[#64748B]">
+              <span className="text-[var(--text-secondary)]">
                 {formatCurrency(cartTaxBreakdown.totalTax)}
               </span>
             </div>
           </div>
 
-          <div className="pt-3 border-t border-[#E2E8F0] flex items-baseline justify-between">
+          <div className="pt-3 border-t border-[var(--border-soft)] flex items-baseline justify-between">
             <div>
-              <div className="text-[10px] uppercase font-black tracking-wider text-[#94A3B8]">
+              <div className="text-[10px] uppercase font-black tracking-wider text-[var(--text-tertiary)]">
                 Grand Total
               </div>
               <div className="text-2xl font-[900] text-[#0284C7] tracking-tight">

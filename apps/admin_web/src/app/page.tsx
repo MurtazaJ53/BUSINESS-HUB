@@ -58,18 +58,18 @@ export default async function HomePage() {
             {/* Stat: Items */}
             <Link
               href="/inventory"
-              className="bg-white border border-[#E2E8F0] hover:border-[#0EA5E9] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-1 hover-lift"
+              className="bg-white border border-[var(--border-soft)] hover:border-[#0EA5E9] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-1 hover-lift"
             >
               <div className="w-10 h-10 rounded-xl bg-[#0EA5E9]/10 text-[#0284C7] flex items-center justify-center transition-colors group-hover:bg-[#0EA5E9]/20">
                 <Package className="w-5 h-5" />
               </div>
-              <span className="block text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8] mt-3.5">
+              <span className="block text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-tertiary)] mt-3.5">
                 ITEMS
               </span>
               <h3 className="text-xl font-black text-[#0F172A] mt-1">
                 {dashboardSnapshot?.inventory_items_count ?? 0}
               </h3>
-              <span className="block text-[11px] font-semibold text-[#64748B] mt-0.5">
+              <span className="block text-[11px] font-semibold text-[var(--text-secondary)] mt-0.5">
                 {dashboardSnapshot?.active_inventory_items_count ?? 0} live items
               </span>
             </Link>
@@ -77,7 +77,7 @@ export default async function HomePage() {
             {/* Stat: Low Stock */}
             <Link
               href="/inventory"
-              className="bg-white border border-[#E2E8F0] hover:border-[#0EA5E9] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-2 hover-lift"
+              className="bg-white border border-[var(--border-soft)] hover:border-[#0EA5E9] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-2 hover-lift"
             >
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
                 (dashboardSnapshot?.low_stock_items_count ?? 0) > 0
@@ -86,7 +86,7 @@ export default async function HomePage() {
               }`}>
                 <AlertCircle className="w-5 h-5" />
               </div>
-              <span className="block text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8] mt-3.5">
+              <span className="block text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-tertiary)] mt-3.5">
                 LOW STOCK
               </span>
               <h3 className="text-xl font-black text-[#0F172A] mt-1">
@@ -102,18 +102,18 @@ export default async function HomePage() {
             {/* Stat: Total Sales */}
             <Link
               href="/sales"
-              className="bg-white border border-[#E2E8F0] hover:border-[#0EA5E9] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-3 hover-lift"
+              className="bg-white border border-[var(--border-soft)] hover:border-[#0EA5E9] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-3 hover-lift"
             >
               <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center transition-colors group-hover:bg-violet-100">
                 <TrendingUp className="w-5 h-5" />
               </div>
-              <span className="block text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8] mt-3.5">
+              <span className="block text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-tertiary)] mt-3.5">
                 TOTAL SALES
               </span>
               <h3 className="text-xl font-black text-[#0F172A] mt-1">
                 {formatCurrency(grossRevenue, currencyCode)}
               </h3>
-              <span className="block text-[11px] font-semibold text-[#64748B] mt-0.5">
+              <span className="block text-[11px] font-semibold text-[var(--text-secondary)] mt-0.5">
                 View detailed history
               </span>
             </Link>
@@ -121,18 +121,18 @@ export default async function HomePage() {
             {/* Stat: Stock Value */}
             <Link
               href="/inventory"
-              className="bg-white border border-[#E2E8F0] hover:border-[#0EA5E9] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-4 hover-lift"
+              className="bg-white border border-[var(--border-soft)] hover:border-[#0EA5E9] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-4 hover-lift"
             >
               <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center transition-colors group-hover:bg-emerald-100">
                 <TrendingDown className="w-5 h-5" />
               </div>
-              <span className="block text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8] mt-3.5">
+              <span className="block text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-tertiary)] mt-3.5">
                 STOCK VALUE
               </span>
               <h3 className="text-xl font-black text-[#0F172A] mt-1">
                 {formatCurrency(stockValue, currencyCode)}
               </h3>
-              <span className="block text-[11px] font-semibold text-[#64748B] mt-0.5">
+              <span className="block text-[11px] font-semibold text-[var(--text-secondary)] mt-0.5">
                 At selling price
               </span>
             </Link>
@@ -151,7 +151,7 @@ export default async function HomePage() {
           <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
             
             {/* Column 1: Recent Sales */}
-            <div className="bg-white border border-[#E2E8F0] rounded-[24px] p-5 sm:p-6 shadow-sm animate-fade-in-up delay-6">
+            <div className="bg-white border border-[var(--border-soft)] rounded-[24px] p-5 sm:p-6 shadow-sm animate-fade-in-up delay-6">
               <div className="flex items-center justify-between gap-4 mb-4">
                 <h3 className="text-base font-extrabold text-[#0F172A]">
                   Recent sales
@@ -167,7 +167,7 @@ export default async function HomePage() {
               </div>
 
               {recentSales.length === 0 ? (
-                <div className="py-12 text-center text-[#94A3B8] text-xs font-bold border border-dashed border-[#E2E8F0] rounded-2xl bg-[#F8FAFC]">
+                <div className="py-12 text-center text-[var(--text-tertiary)] text-xs font-bold border border-dashed border-[var(--border-soft)] rounded-2xl bg-[#F8FAFC]">
                   No sales yet. Tap Start New Sale to begin.
                 </div>
               ) : (
@@ -175,7 +175,7 @@ export default async function HomePage() {
                   {recentSales.slice(0, 5).map((sale, index) => (
                     <div
                       key={sale.id}
-                      className="flex items-center justify-between p-3.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl hover-lift"
+                      className="flex items-center justify-between p-3.5 bg-[#F8FAFC] border border-[var(--border-soft)] rounded-2xl hover-lift"
                       style={{ animationDelay: `${240 + index * 40}ms` }}
                     >
                       <div className="flex items-center gap-3">
@@ -186,7 +186,7 @@ export default async function HomePage() {
                           <h4 className="text-xs font-extrabold text-[#0F172A]">
                             {sale.customer_name || "Walk-in Guest"}
                           </h4>
-                          <span className="block text-[10px] font-bold text-[#64748B] mt-0.5">
+                          <span className="block text-[10px] font-bold text-[var(--text-secondary)] mt-0.5">
                             {sale.payment_mode} • {new Date(sale.sale_date).toLocaleDateString()}
                           </span>
                         </div>
@@ -208,7 +208,7 @@ export default async function HomePage() {
             </div>
 
             {/* Column 2: Low Stock */}
-            <div className="bg-white border border-[#E2E8F0] rounded-[24px] p-5 sm:p-6 shadow-sm animate-fade-in-up delay-7">
+            <div className="bg-white border border-[var(--border-soft)] rounded-[24px] p-5 sm:p-6 shadow-sm animate-fade-in-up delay-7">
               <div className="flex items-center justify-between gap-4 mb-4">
                 <h3 className="text-base font-extrabold text-[#0F172A]">
                   Low stock watch
@@ -216,7 +216,7 @@ export default async function HomePage() {
               </div>
 
               {!dashboardSnapshot?.low_stock_preview || dashboardSnapshot.low_stock_preview.length === 0 ? (
-                <div className="py-12 text-center text-[#94A3B8] text-xs font-bold border border-dashed border-[#E2E8F0] rounded-2xl bg-[#F8FAFC]">
+                <div className="py-12 text-center text-[var(--text-tertiary)] text-xs font-bold border border-dashed border-[var(--border-soft)] rounded-2xl bg-[#F8FAFC]">
                   No urgent low-stock items.
                 </div>
               ) : (
@@ -224,14 +224,14 @@ export default async function HomePage() {
                   {dashboardSnapshot.low_stock_preview.slice(0, 5).map((item, index) => (
                     <div
                       key={item.id}
-                      className="flex items-center justify-between p-3.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl hover-lift"
+                      className="flex items-center justify-between p-3.5 bg-[#F8FAFC] border border-[var(--border-soft)] rounded-2xl hover-lift"
                       style={{ animationDelay: `${280 + index * 40}ms` }}
                     >
                       <div>
                         <h4 className="text-xs font-extrabold text-[#0F172A]">
                           {item.item_name}
                         </h4>
-                        <span className="block text-[10px] font-bold text-[#64748B] mt-0.5">
+                        <span className="block text-[10px] font-bold text-[var(--text-secondary)] mt-0.5">
                           {item.category || "Uncategorized"}
                         </span>
                       </div>

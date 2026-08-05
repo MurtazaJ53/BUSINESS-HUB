@@ -44,7 +44,7 @@ export function ThemeSwitcher() {
   const activeIcon = () => {
     if (theme === "light") return <Sun className="w-4 h-4 text-[#F59E0B]" />;
     if (theme === "dark") return <Moon className="w-4 h-4 text-[#38BDF8]" />;
-    return <Monitor className="w-4 h-4 text-[#64748B]" />;
+    return <Monitor className="w-4 h-4 text-[var(--text-secondary)]" />;
   };
 
   return (
@@ -52,7 +52,7 @@ export function ThemeSwitcher() {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 rounded-xl bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#2E3A52] text-[#64748B] dark:text-[#94A3B8] hover:bg-[#F8FAFC] dark:hover:bg-[#151B2C] transition-all flex items-center justify-center shadow-sm"
+        className="p-2 rounded-xl bg-white dark:bg-[#1E293B] border border-[var(--border-soft)] dark:border-[#2E3A52] text-[var(--text-secondary)] dark:text-[var(--text-tertiary)] hover:bg-[#F8FAFC] dark:hover:bg-[#151B2C] transition-all flex items-center justify-center shadow-sm"
         title="Switch theme"
       >
         {activeIcon()}
@@ -64,13 +64,13 @@ export function ThemeSwitcher() {
             className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 mt-2 w-40 rounded-2xl bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#2E3A52] p-1.5 shadow-lg z-50 animate-in fade-in slide-in-from-top-2 duration-100">
+          <div className="absolute right-0 mt-2 w-40 rounded-2xl bg-white dark:bg-[#1E293B] border border-[var(--border-soft)] dark:border-[#2E3A52] p-1.5 shadow-lg z-50 animate-in fade-in slide-in-from-top-2 duration-100">
             <button
               onClick={() => updateTheme("light")}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                 theme === "light"
                   ? "bg-[#0EA5E9]/10 text-[#0284C7] dark:text-[#38BDF8]"
-                  : "text-[#475569] dark:text-[#CBD5E1] hover:bg-[#F8FAFC] dark:hover:bg-[#151B2C]"
+                  : "text-[#475569] dark:text-[var(--border)] hover:bg-[#F8FAFC] dark:hover:bg-[#151B2C]"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -85,7 +85,7 @@ export function ThemeSwitcher() {
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                 theme === "dark"
                   ? "bg-[#0EA5E9]/10 text-[#0284C7] dark:text-[#38BDF8]"
-                  : "text-[#475569] dark:text-[#CBD5E1] hover:bg-[#F8FAFC] dark:hover:bg-[#151B2C]"
+                  : "text-[#475569] dark:text-[var(--border)] hover:bg-[#F8FAFC] dark:hover:bg-[#151B2C]"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -100,7 +100,7 @@ export function ThemeSwitcher() {
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                 theme === "system"
                   ? "bg-[#0EA5E9]/10 text-[#0284C7] dark:text-[#38BDF8]"
-                  : "text-[#475569] dark:text-[#CBD5E1] hover:bg-[#F8FAFC] dark:hover:bg-[#151B2C]"
+                  : "text-[#475569] dark:text-[var(--border)] hover:bg-[#F8FAFC] dark:hover:bg-[#151B2C]"
               }`}
             >
               <div className="flex items-center gap-2">
