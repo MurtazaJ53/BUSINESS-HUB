@@ -210,7 +210,13 @@ REST_FRAMEWORK = {
         # JWT first: only claims tokens signed with our SECRET_KEY, otherwise
         # returns None so the Firebase adapter still handles Firebase ID tokens.
         "platform_apps.users.jwt_auth.JWTAuthentication",
-        "platform_apps.users.authentication.FirebaseAuthentication",
+        # FirebaseAuthentication deliberately removed from the chain. Nothing
+        # authenticates with Firebase any more (the Flutter app has no Firebase
+        # dependency at all, and no service account ships in the image), but
+        # leaving it registered meant a malformed or expired JWT fell through to
+        # it and returned "Firebase authentication is not configured on this
+        # backend" — a misleading error for a plain auth failure. The module
+        # stays for the historical migration tooling.
         "platform_apps.users.authentication.DevHeaderAuthentication",
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",

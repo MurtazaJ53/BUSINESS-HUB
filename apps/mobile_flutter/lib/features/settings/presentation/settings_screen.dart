@@ -187,8 +187,8 @@ class SettingsScreen extends ConsumerWidget {
               onTap: () => context.push('/settings/import'),
             ),
           MobileListTile(
-            title: l.settingsChangePin,
-            subtitle: l.settingsChangePinSub,
+            title: 'Staff till PIN',
+            subtitle: 'Identifies who is on the till (not the app lock)',
             leadingIcon: Icons.pin_rounded,
             onTap: () => _changePinDialog(context, ref),
           ),
@@ -284,25 +284,39 @@ class SettingsScreen extends ConsumerWidget {
 }
 
 Future<void> _changePinDialog(BuildContext context, WidgetRef ref) async {
+  // Asking for a "current PIN" that was never set made this impossible to use.
+  final hasPin = await ref
+      .read(mobileSessionProvider.notifier)
+      .hasStaffPin();
+  if (!context.mounted) return;
   final current = TextEditingController();
   final next = TextEditingController();
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: const Text('Change PIN'),
+      title: Text(hasPin ? 'Change till PIN' : 'Set till PIN'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          TextField(
-            controller: current,
-            obscureText: true,
-            keyboardType: TextInputType.number,
-            maxLength: 4,
-            decoration: const InputDecoration(
-              labelText: 'Current PIN',
-              counterText: '',
-            ),
+          Text(
+            hasPin
+                ? 'This PIN identifies you on the till. It is not the app '
+                    'lock — that lives in Settings > Security.'
+                : 'You have not set a till PIN yet. Choose one now.',
+            style: Theme.of(dialogContext).textTheme.bodySmall,
           ),
+          const SizedBox(height: 10),
+          if (hasPin)
+            TextField(
+              controller: current,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              maxLength: 4,
+              decoration: const InputDecoration(
+                labelText: 'Current PIN',
+                counterText: '',
+              ),
+            ),
           TextField(
             controller: next,
             obscureText: true,
@@ -343,7 +357,9 @@ Future<void> _changePinDialog(BuildContext context, WidgetRef ref) async {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              changed ? 'PIN updated.' : 'Current PIN is incorrect.',
+              changed
+                  ? (hasPin ? 'Till PIN updated.' : 'Till PIN set.')
+                  : 'Current PIN is incorrect.',
             ),
           ),
         );

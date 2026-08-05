@@ -481,12 +481,26 @@ class MobileSessionNotifier extends AsyncNotifier<MobileSession?> {
   }
 
   /// Change the currently signed-in user's PIN.
+  /// Whether the signed-in staff member has a till PIN at all.
+  ///
+  /// Without this the UI asked for a "current PIN" that never existed, so
+  /// anyone who had not set one could never set one — the dialog rejected
+  /// every value including the correct (empty) one.
+  Future<bool> hasStaffPin() async {
+    final staff = await _loadStaff();
+    final id = _currentStaffId ?? 'owner';
+    final idx = staff.indexWhere((s) => s.id == id);
+    return idx >= 0 && staff[idx].pinHash.trim().isNotEmpty;
+  }
+
   Future<bool> changePin(String currentPin, String newPin) async {
     final staff = await _loadStaff();
     final id = _currentStaffId ?? 'owner';
     final idx = staff.indexWhere((s) => s.id == id);
     if (idx < 0) return false;
-    if (staff[idx].pinHash != _hash(currentPin)) return false;
+    // First-time set: there is nothing to verify against.
+    final existing = staff[idx].pinHash.trim();
+    if (existing.isNotEmpty && existing != _hash(currentPin)) return false;
     staff[idx] = StaffUser(
       id: staff[idx].id,
       name: staff[idx].name,
