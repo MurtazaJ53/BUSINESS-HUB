@@ -513,6 +513,8 @@ class BackendApiClient {
     double gstRate = 0,
     bool priceIncludesTax = true,
     String? imageData,
+    String? unit,
+    int? reorderLevel,
   }) async {
     final body = <String, dynamic>{
       'name': name,
@@ -529,6 +531,8 @@ class BackendApiClient {
       'hsn_code': hsnCode.trim(),
       'gst_rate': gstRate.toStringAsFixed(2),
       'price_includes_tax': priceIncludesTax,
+      'unit': unit ?? '',
+      'reorder_level': reorderLevel,
       'status': 'active',
     };
     if (costPrice != null) {
@@ -601,6 +605,8 @@ class BackendApiClient {
     double? costPrice,
     String description = '',
     String? imageData,
+    String? unit,
+    int? reorderLevel,
   }) async {
     final body = <String, dynamic>{
       'name': name,
@@ -611,6 +617,10 @@ class BackendApiClient {
       'gst_rate': gstRate.toStringAsFixed(2),
       'price_includes_tax': priceIncludesTax,
       'description': description,
+      // The edit form owns both fields outright, so send them every time:
+      // null genuinely means "cleared", not "unchanged".
+      'unit': unit ?? '',
+      'reorder_level': reorderLevel,
     };
     if (costPrice != null) {
       body['private_cost_price'] = costPrice.toStringAsFixed(2);
@@ -825,6 +835,21 @@ class BackendApiClient {
       },
     );
     return _mapCustomerSummary(decoded);
+  }
+
+  /// Record that a payment reminder went out, so every other device shows the
+  /// customer as already chased today.
+  Future<void> markCustomerReminded({
+    required User user,
+    required String shopId,
+    required String customerId,
+  }) async {
+    await _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/customers/$customerId/remind/',
+      body: const <String, dynamic>{},
+    );
   }
 
   Future<List<CustomerLedgerPreviewEntry>> fetchCustomerLedger({

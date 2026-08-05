@@ -303,18 +303,18 @@ class MobileSyncCoordinator {
         hsnCode: hsnCode.trim(),
         gstRate: gstRate,
         priceIncludesTax: priceIncludesTax,
+        unit: unit,
+        reorderLevel: reorderLevel,
       );
       await _inventoryRepository.mergeBackendInventoryItem(
         created,
         updatedAt: updatedAt,
       );
-      // The backend has no image / unit / reorder fields yet, so keep those
-      // local-only by re-merging them onto the freshly synced row.
+      // Unit and reorder level now round-trip through the API, but the local
+      // image path is still device-only, so re-merge it onto the synced row.
       final createdId = created['id']?.toString();
       final localOnly = <String, dynamic>{};
       if (imagePath != null) localOnly['imagePath'] = imagePath;
-      if (unit != null) localOnly['unit'] = unit;
-      if (reorderLevel != null) localOnly['reorderLevel'] = reorderLevel;
       if (localOnly.isNotEmpty && createdId != null && createdId.isNotEmpty) {
         await _inventoryRepository.mergeInventoryDocument(
           createdId,
@@ -506,6 +506,8 @@ class MobileSyncCoordinator {
           priceIncludesTax: priceIncludesTax,
           costPrice: session.canViewCost ? costPrice : null,
           description: description,
+          unit: unit,
+          reorderLevel: reorderLevel,
         );
       } catch (error) {
         debugPrint('Backend inventory update failed: $error');
@@ -680,6 +682,33 @@ class MobileSyncCoordinator {
         state: CommerceSyncState.failed,
         message: 'Cloud unreachable: $error',
       );
+    }
+  }
+
+  /// Record that a payment reminder went out.
+  ///
+  /// Written locally first so the list updates instantly and an offline shop
+  /// still doesn't chase the same person twice on this device. The push is
+  /// best-effort: failing to tell the server is not a reason to make the owner
+  /// think the reminder never happened.
+  Future<void> markCustomerReminded(String customerId) async {
+    await _customerRepository.markReminded(customerId);
+
+    final session = _session;
+    if (session == null ||
+        !session.hasShop ||
+        !MobileRuntimeConfig.backendSyncEnabled ||
+        !_uuidPattern.hasMatch(customerId)) {
+      return;
+    }
+    try {
+      await _backendApiClient.markCustomerReminded(
+        user: session.user,
+        shopId: session.shopId!,
+        customerId: customerId,
+      );
+    } catch (error) {
+      debugPrint('Backend reminder mark failed: $error');
     }
   }
 

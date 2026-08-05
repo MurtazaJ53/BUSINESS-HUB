@@ -7,6 +7,7 @@ import '../../../core/database/mobile_repository.dart';
 import '../../../core/khata/khata_reminder.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
+import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/util/whatsapp.dart';
@@ -54,7 +55,11 @@ class _KhataCollectionScreenState extends ConsumerState<KhataCollectionScreen> {
     );
     final opened = await openWhatsApp(phone: debtor.phone, message: message);
     if (opened) {
-      await ref.read(customerRepositoryProvider).markReminded(debtor.id);
+      // Via the coordinator so the reminder is shared with the web and every
+      // other device, not just this phone.
+      await ref.read(mobileSyncCoordinatorProvider).markCustomerReminded(
+            debtor.id,
+          );
     }
     return opened;
   }

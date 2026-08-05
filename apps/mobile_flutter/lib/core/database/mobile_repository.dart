@@ -982,6 +982,10 @@ class InventoryRepository {
       'gst_rate': row['gst_rate'],
       'price_includes_tax': row['price_includes_tax'],
       'stock': row['stock_on_hand'] ?? row['stock'],
+      // These used to be device-only, so a reinstall lost every reorder level
+      // the shop had set. They now round-trip through the API.
+      'unit': row['unit'],
+      'reorderLevel': row['reorder_level'] ?? row['reorderLevel'],
       'sourceMeta': row['source_meta_json'] ?? row['sourceMeta'],
       'createdAt': row['created_at'] ?? resolvedUpdatedAt,
       'updatedAt': row['updated_at'] ?? resolvedUpdatedAt,
@@ -1330,6 +1334,11 @@ class CustomerRepository {
             createdAt: createdAt,
             updatedAt: Value(updatedAt),
             lastSeenAt: Value(lastSeenAt),
+            // Shared across devices so the owner on the web and the cashier
+            // here never chase the same customer on the same day.
+            lastRemindedAt: Value(
+              _asEpoch(data['lastRemindedAt'] ?? data['last_reminded_at']),
+            ),
             tombstone: Value(data['tombstone'] == true),
           ),
         );
