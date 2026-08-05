@@ -1,307 +1,439 @@
 "use client";
 
-import React, { useState } from "react";
-import {
-  TrendingUp,
-  BarChart3,
-  Download,
-  Calendar,
-  DollarSign,
-  PieChart,
-  FileSpreadsheet,
-  ArrowUpRight,
-  ArrowDownRight,
-  Sparkles,
-} from "lucide-react";
-import { formatCurrency, formatPercentage } from "@/lib/utils";
+import { useCallback, useEffect, useState } from "react";
+import { BarChart3, Download, FileSpreadsheet, Loader2, PieChart } from "lucide-react";
+
+import { formatCurrency } from "@/lib/utils";
+
+/**
+ * Real P&L and GST figures from the backend.
+ *
+ * These numbers get read to an accountant and filed with the tax portal, so
+ * anything this screen cannot prove it must refuse to show rather than
+ * estimate.
+ */
+
+type ProfitAndLoss = {
+  start: string;
+  end: string;
+  revenue: string;
+  tax_collected: string;
+  cost_of_goods_sold: string;
+  gross_profit: string;
+  total_expenses: string;
+  net_profit: string;
+  net_margin_pct: string;
+  purchases_total: string;
+};
+
+type GstRateRow = {
+  "items__gst_rate": string | null;
+  taxable_amount: string;
+  tax_amount: string;
+  cgst_amount: string;
+  sgst_amount: string;
+  igst_amount: string;
+};
+
+type GstSummary = {
+  taxable_amount: string;
+  tax_amount: string;
+  cgst_amount: string;
+  sgst_amount: string;
+  igst_amount: string;
+  gross_amount: string;
+  b2c_small: GstRateRow[];
+  hsn_summary: Record<string, string | null>[];
+};
+
+function num(value: string | number | null | undefined): number {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const parsed = parseFloat(String(value ?? "0"));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function startOfMonth(): string {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+}
+
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export function ReportsAnalytics() {
-  const [dateRange, setDateRange] = useState("this_month");
-  const [activeReportTab, setActiveReportTab] = useState<"pnl" | "gst" | "inventory" | "products">("pnl");
+  const [start, setStart] = useState(startOfMonth());
+  const [end, setEnd] = useState(today());
+  const [tab, setTab] = useState<"pnl" | "gst">("pnl");
 
-  // Sample aggregated business metrics
-  const financialData = {
-    grossRevenue: 486500.0,
-    cogs: 342000.0,
-    grossProfit: 144500.0,
-    grossMargin: 29.7,
-    operatingExpenses: 41570.0,
-    netProfit: 102930.0,
-    netMargin: 21.15,
+  const [pnl, setPnl] = useState<ProfitAndLoss | null>(null);
+  const [gst, setGst] = useState<GstSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [pnlError, setPnlError] = useState<string | null>(null);
+  const [gstError, setGstError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setPnlError(null);
+    setGstError(null);
+
+    // P&L is admin-only while the GST summary is not, so they fail separately.
+    const [pnlRes, gstRes] = await Promise.allSettled([
+      fetch(`/api/reports/profit-loss?start=${start}&end=${end}`),
+      fetch(`/api/reports/gst-summary?date_from=${start}&date_to=${end}`),
+    ]);
+
+    if (pnlRes.status === "fulfilled" && pnlRes.value.ok) {
+      setPnl(await pnlRes.value.json());
+    } else {
+      setPnl(null);
+      const status = pnlRes.status === "fulfilled" ? pnlRes.value.status : 0;
+      setPnlError(
+        status === 403
+          ? "Profit and loss is limited to owners and admins."
+          : `Could not load profit and loss${status ? ` (${status})` : ""}.`
+      );
+    }
+
+    if (gstRes.status === "fulfilled" && gstRes.value.ok) {
+      setGst(await gstRes.value.json());
+    } else {
+      setGst(null);
+      const status = gstRes.status === "fulfilled" ? gstRes.value.status : 0;
+      setGstError(`Could not load the GST summary${status ? ` (${status})` : ""}.`);
+    }
+
+    setLoading(false);
+  }, [start, end]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const downloadGstr1 = async () => {
+    setDownloading(true);
+    setGstError(null);
+    try {
+      const res = await fetch(`/api/reports/gstr1?date_from=${start}&date_to=${end}`);
+      if (res.status === 403) {
+        throw new Error("Filing exports are limited to owners and admins.");
+      }
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
+
+      const disposition = res.headers.get("content-disposition") || "";
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = match?.[1] || `GSTR1_${start}_${end}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setGstError(err?.message || "Could not build the export.");
+    } finally {
+      setDownloading(false);
+    }
   };
 
-  const gstData = [
-    { slab: "0% (Exempt)", taxable: 45000.0, cgst: 0, sgst: 0, totalTax: 0 },
-    { slab: "5% (Essential)", taxable: 180000.0, cgst: 4500, sgst: 4500, totalTax: 9000 },
-    { slab: "12% (Standard 1)", taxable: 95000.0, cgst: 5700, sgst: 5700, totalTax: 11400 },
-    { slab: "18% (Standard 2)", taxable: 140000.0, cgst: 12600, sgst: 12600, totalTax: 25200 },
-    { slab: "28% (Luxury)", taxable: 26500.0, cgst: 3710, sgst: 3710, totalTax: 7420 },
-  ];
-
-  const topProducts = [
-    { name: "Fortune Premium Sunflower Oil 1L", qty: 240, revenue: 39600, margin: 21.2 },
-    { name: "Aashirvaad Superior MP Atta 5kg", qty: 180, revenue: 46800, margin: 15.3 },
-    { name: "Amul Butter Pasteurised 500g", qty: 140, revenue: 38500, margin: 10.9 },
-    { name: "Cadbury Dairy Milk Silk 150g", qty: 110, revenue: 19250, margin: 20.0 },
-    { name: "Dettol Antiseptic Liquid 500ml", qty: 95, revenue: 20425, margin: 13.9 },
-  ];
-
-  const handleExportGst = () => {
-    const headers = "Tax Slab,Taxable Value,CGST,SGST,Total GST Tax\n";
-    const rows = gstData
-      .map((g) => `"${g.slab}",${g.taxable},${g.cgst},${g.sgst},${g.totalTax}`)
-      .join("\n");
-    const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `gstr1_summary_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  const rangeIsBackwards = start > end;
+  const costsIncomplete = pnl
+    ? num(pnl.cost_of_goods_sold) <= 0 && num(pnl.revenue) > 0
+    : false;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-text-primary tracking-tight">
-            Financial Analytics & Tax Reports
-          </h2>
-          <p className="text-xs text-[var(--text-tertiary)]">
-            Profit & Loss statements, GSTR-1 summaries, and sales performance intelligence
-          </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="block">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-text-tertiary">
+              From
+            </span>
+            <input
+              type="date"
+              value={start}
+              max={end}
+              onChange={(e) => setStart(e.target.value)}
+              className="mt-1.5 block rounded-xl border border-border-soft bg-surface px-3 py-2 text-sm font-bold text-text-primary"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-text-tertiary">
+              To
+            </span>
+            <input
+              type="date"
+              value={end}
+              min={start}
+              onChange={(e) => setEnd(e.target.value)}
+              className="mt-1.5 block rounded-xl border border-border-soft bg-surface px-3 py-2 text-sm font-bold text-text-primary"
+            />
+          </label>
         </div>
-
-        <div className="flex items-center gap-3">
-          <select
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value)}
-            className="px-3 py-2 bg-[var(--surface)] border border-[var(--border-soft)] text-xs text-text-primary rounded-xl outline-none"
-          >
-            <option value="today">Today</option>
-            <option value="this_week">This Week</option>
-            <option value="this_month">This Month (August 2026)</option>
-            <option value="last_month">Last Month</option>
-            <option value="ytd">Year to Date (FY 2026-27)</option>
-          </select>
-
+        <div className="inline-flex rounded-2xl border border-border-soft bg-surface p-1">
           <button
-            onClick={handleExportGst}
-            className="flex items-center gap-1.5 px-3 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-text-primary text-xs font-semibold rounded-xl shadow-md shadow-blue-500/20"
+            type="button"
+            onClick={() => setTab("pnl")}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold ${
+              tab === "pnl"
+                ? "bg-[var(--primary)] text-white"
+                : "text-text-secondary hover:text-text-primary"
+            }`}
           >
-            <Download className="w-4 h-4" />
-            <span>Export GSTR-1 CSV</span>
+            <BarChart3 className="w-3.5 h-3.5" />
+            Profit &amp; loss
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("gst")}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold ${
+              tab === "gst"
+                ? "bg-[var(--primary)] text-white"
+                : "text-text-secondary hover:text-text-primary"
+            }`}
+          >
+            <PieChart className="w-3.5 h-3.5" />
+            GST
           </button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-[var(--border-soft)]">
-        <button
-          onClick={() => setActiveReportTab("pnl")}
-          className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-colors ${
-            activeReportTab === "pnl"
-              ? "border-[var(--primary)] text-text-primary"
-              : "border-transparent text-[var(--text-tertiary)] hover:text-text-primary"
-          }`}
-        >
-          Profit & Loss Statement
-        </button>
-        <button
-          onClick={() => setActiveReportTab("gst")}
-          className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-colors ${
-            activeReportTab === "gst"
-              ? "border-[var(--primary)] text-text-primary"
-              : "border-transparent text-[var(--text-tertiary)] hover:text-text-primary"
-          }`}
-        >
-          GSTR-1 Tax Breakup
-        </button>
-        <button
-          onClick={() => setActiveReportTab("products")}
-          className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-colors ${
-            activeReportTab === "products"
-              ? "border-[var(--primary)] text-text-primary"
-              : "border-transparent text-[var(--text-tertiary)] hover:text-text-primary"
-          }`}
-        >
-          Top Selling Products
-        </button>
-      </div>
-
-      {activeReportTab === "pnl" && (
-        /* P&L View */
-        <div className="space-y-6">
-          {/* Executive Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-4 bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl">
-              <div className="text-xs text-[var(--text-tertiary)]">Gross Revenue</div>
-              <div className="text-2xl font-black text-text-primary font-mono mt-1">
-                {formatCurrency(financialData.grossRevenue)}
-              </div>
-              <div className="flex items-center gap-1 text-[11px] text-emerald-400 mt-1 font-semibold">
-                <ArrowUpRight className="w-3.5 h-3.5" />
-                <span>+14.8% vs last month</span>
-              </div>
-            </div>
-
-            <div className="p-4 bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl">
-              <div className="text-xs text-[var(--text-tertiary)]">Gross Margin Profit</div>
-              <div className="text-2xl font-black text-blue-400 font-mono mt-1">
-                {formatCurrency(financialData.grossProfit)}
-              </div>
-              <div className="text-[11px] text-[var(--text-secondary)] mt-1">
-                {formatPercentage(financialData.grossMargin)} gross margin rate
-              </div>
-            </div>
-
-            <div className="p-4 bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl">
-              <div className="text-xs text-[var(--text-tertiary)]">Net Operating Profit</div>
-              <div className="text-2xl font-black text-emerald-400 font-mono mt-1">
-                {formatCurrency(financialData.netProfit)}
-              </div>
-              <div className="text-[11px] text-emerald-400 font-semibold mt-1">
-                {formatPercentage(financialData.netMargin)} net bottom-line
-              </div>
-            </div>
-          </div>
-
-          {/* Structured P&L Table */}
-          <div className="bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl overflow-hidden shadow-xl p-6">
-            <h3 className="text-sm font-bold text-text-primary mb-4 pb-2 border-b border-[var(--border-soft)]">
-              Income Statement Breakdown (P&L)
-            </h3>
-
-            <div className="space-y-3 text-xs">
-              <div className="flex justify-between py-1.5 font-bold text-text-primary">
-                <span>Gross Sales Revenue (A)</span>
-                <span className="font-mono text-sm">{formatCurrency(financialData.grossRevenue)}</span>
-              </div>
-              <div className="flex justify-between py-1.5 text-red-400 pl-4 border-t border-[var(--border-soft)]">
-                <span>- Cost of Goods Sold (COGS)</span>
-                <span className="font-mono">-{formatCurrency(financialData.cogs)}</span>
-              </div>
-              <div className="flex justify-between py-2 font-bold text-blue-400 pl-2 bg-bg-soft rounded-lg">
-                <span>Gross Profit (A - COGS)</span>
-                <span className="font-mono">{formatCurrency(financialData.grossProfit)}</span>
-              </div>
-
-              <div className="flex justify-between py-1.5 text-red-400 pl-4 border-t border-[var(--border-soft)]">
-                <span>- Operating Expenses (Rent, Utilities, Staff, Overheads)</span>
-                <span className="font-mono">-{formatCurrency(financialData.operatingExpenses)}</span>
-              </div>
-
-              <div className="flex justify-between py-3 font-black text-base text-emerald-400 pl-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl mt-4">
-                <span>NET STORE PROFIT</span>
-                <span className="font-mono">{formatCurrency(financialData.netProfit)}</span>
-              </div>
-            </div>
-          </div>
+      {rangeIsBackwards && (
+        <div className="rounded-2xl border border-[var(--error)]/30 bg-[var(--error)]/10 px-5 py-4 text-sm font-semibold text-[var(--error-strong)]">
+          The start date is after the end date.
         </div>
       )}
 
-      {activeReportTab === "gst" && (
-        /* GSTR-1 View */
-        <div className="bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl overflow-hidden shadow-xl">
-          <div className="p-4 border-b border-[var(--border-soft)] bg-[var(--bg-soft)] flex items-center justify-between">
-            <div>
-              <h3 className="font-bold text-sm text-text-primary">GSTR-1 Outward Supplies Summary</h3>
-              <p className="text-[11px] text-[var(--text-tertiary)]">
-                Taxable turnover and CGST/SGST/IGST liability categorized by tax rate
-              </p>
+      {loading && !pnl && !gst ? (
+        <div className="rounded-[28px] border border-border-soft bg-surface px-6 py-12 text-center text-sm font-semibold text-text-secondary">
+          Loading&hellip;
+        </div>
+      ) : tab === "pnl" ? (
+        pnlError ? (
+          <div className="rounded-2xl border border-[var(--warning)]/30 bg-[var(--warning)]/10 px-5 py-4 text-sm font-semibold text-text-secondary">
+            {pnlError}
+          </div>
+        ) : (
+          pnl && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Figure label="Revenue" value={num(pnl.revenue)} />
+                <Figure
+                  label="Cost of goods sold"
+                  value={num(pnl.cost_of_goods_sold)}
+                  tone="negative"
+                />
+                <Figure
+                  label="Gross profit"
+                  value={num(pnl.gross_profit)}
+                  tone="positive"
+                />
+                <Figure
+                  label="Net profit"
+                  value={num(pnl.net_profit)}
+                  tone={num(pnl.net_profit) >= 0 ? "positive" : "negative"}
+                  detail={`${num(pnl.net_margin_pct).toFixed(2)}% margin`}
+                />
+              </div>
+
+              <div className="rounded-[28px] border border-border-soft bg-surface overflow-hidden">
+                <table className="min-w-full border-collapse">
+                  <tbody>
+                    <Row label="Revenue" value={num(pnl.revenue)} />
+                    <Row
+                      label="Less: cost of goods sold"
+                      value={-num(pnl.cost_of_goods_sold)}
+                    />
+                    <Row label="Gross profit" value={num(pnl.gross_profit)} strong />
+                    <Row label="Less: expenses" value={-num(pnl.total_expenses)} />
+                    <Row label="Net profit" value={num(pnl.net_profit)} strong />
+                    <Row
+                      label="Tax collected (held for GST, not income)"
+                      value={num(pnl.tax_collected)}
+                      muted
+                    />
+                    <Row
+                      label="Stock purchased (cash out, not a P&amp;L expense)"
+                      value={num(pnl.purchases_total)}
+                      muted
+                    />
+                  </tbody>
+                </table>
+              </div>
+
+              {costsIncomplete && (
+                <div className="rounded-2xl border border-[var(--warning)]/30 bg-[var(--warning)]/10 px-5 py-4 text-xs font-semibold text-text-secondary">
+                  No cost prices were recorded on the bills in this range, so cost of
+                  goods sold is zero and gross profit is overstated. Add cost prices
+                  in Stock for a true margin.
+                </div>
+              )}
             </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-[var(--bg-soft)] border-b border-[var(--border-soft)] text-[var(--text-tertiary)] font-semibold uppercase tracking-wider text-[10px]">
-                  <th className="py-3 px-4">GST Slab</th>
-                  <th className="py-3 px-4 text-right">Taxable Turnover</th>
-                  <th className="py-3 px-4 text-right">CGST</th>
-                  <th className="py-3 px-4 text-right">SGST</th>
-                  <th className="py-3 px-4 text-right">Total Tax Liability</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border-soft)]">
-                {gstData.map((g) => (
-                  <tr key={g.slab} className="hover:bg-bg-base">
-                    <td className="py-3 px-4 font-semibold text-text-primary">{g.slab}</td>
-                    <td className="py-3 px-4 text-right font-mono text-text-primary">
-                      {formatCurrency(g.taxable)}
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono text-[var(--text-secondary)]">
-                      {formatCurrency(g.cgst)}
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono text-[var(--text-secondary)]">
-                      {formatCurrency(g.sgst)}
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-blue-400">
-                      {formatCurrency(g.totalTax)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="bg-bg-soft font-bold text-text-primary border-t border-[var(--border-soft)]">
-                  <td className="py-3 px-4">TOTALS</td>
-                  <td className="py-3 px-4 text-right font-mono">
-                    {formatCurrency(gstData.reduce((s, g) => s + g.taxable, 0))}
-                  </td>
-                  <td className="py-3 px-4 text-right font-mono">
-                    {formatCurrency(gstData.reduce((s, g) => s + g.cgst, 0))}
-                  </td>
-                  <td className="py-3 px-4 text-right font-mono">
-                    {formatCurrency(gstData.reduce((s, g) => s + g.sgst, 0))}
-                  </td>
-                  <td className="py-3 px-4 text-right font-mono text-blue-400">
-                    {formatCurrency(gstData.reduce((s, g) => s + g.totalTax, 0))}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          )
+        )
+      ) : gstError ? (
+        <div className="rounded-2xl border border-[var(--warning)]/30 bg-[var(--warning)]/10 px-5 py-4 text-sm font-semibold text-text-secondary">
+          {gstError}
         </div>
-      )}
+      ) : (
+        gst && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Figure label="Taxable value" value={num(gst.taxable_amount)} />
+              <Figure label="CGST" value={num(gst.cgst_amount)} />
+              <Figure label="SGST" value={num(gst.sgst_amount)} />
+              <Figure label="IGST" value={num(gst.igst_amount)} />
+            </div>
 
-      {activeReportTab === "products" && (
-        /* Top Products View */
-        <div className="bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl overflow-hidden shadow-xl">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-[var(--bg-soft)] border-b border-[var(--border-soft)] text-[var(--text-tertiary)] font-semibold uppercase tracking-wider text-[10px]">
-                  <th className="py-3 px-4">Product Name</th>
-                  <th className="py-3 px-4 text-center">Units Sold</th>
-                  <th className="py-3 px-4 text-right">Revenue Contributed</th>
-                  <th className="py-3 px-4 text-right">Margin %</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border-soft)]">
-                {topProducts.map((p, idx) => (
-                  <tr key={p.name} className="hover:bg-bg-base">
-                    <td className="py-3 px-4 font-semibold text-text-primary">
-                      <span className="text-[var(--text-tertiary)] font-mono mr-2">#{idx + 1}</span>
-                      {p.name}
-                    </td>
-                    <td className="py-3 px-4 text-center font-mono font-bold text-text-primary">
-                      {p.qty}
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-emerald-400">
-                      {formatCurrency(p.revenue)}
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono text-blue-300">
-                      {formatPercentage(p.margin)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="rounded-[28px] border border-border-soft bg-surface overflow-hidden">
+              <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-5 border-b border-border-soft">
+                <h2 className="text-sm font-black text-text-primary uppercase tracking-wide">
+                  By tax rate
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => void downloadGstr1()}
+                  disabled={downloading || rangeIsBackwards}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2 text-xs font-extrabold text-white disabled:opacity-50"
+                >
+                  {downloading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Download className="w-3.5 h-3.5" />
+                  )}
+                  Download GSTR-1
+                </button>
+              </div>
+
+              {gst.b2c_small.length === 0 ? (
+                <div className="px-6 py-12 text-center">
+                  <FileSpreadsheet className="w-8 h-8 mx-auto text-text-tertiary" />
+                  <p className="mt-3 text-sm font-bold text-text-primary">
+                    No taxable sales in this range
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border-collapse">
+                    <thead>
+                      <tr className="border-b border-border-soft text-left text-[11px] uppercase tracking-wider text-text-tertiary">
+                        <th className="px-6 py-3 font-extrabold">Rate</th>
+                        <th className="px-6 py-3 font-extrabold text-right">Taxable</th>
+                        <th className="px-6 py-3 font-extrabold text-right">CGST</th>
+                        <th className="px-6 py-3 font-extrabold text-right">SGST</th>
+                        <th className="px-6 py-3 font-extrabold text-right">IGST</th>
+                        <th className="px-6 py-3 font-extrabold text-right">Total tax</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {gst.b2c_small.map((row, index) => (
+                        <tr
+                          key={index}
+                          className="border-b border-border-soft/60 last:border-0"
+                        >
+                          <td className="px-6 py-4 text-sm font-bold text-text-primary">
+                            {num(row["items__gst_rate"]).toFixed(2)}%
+                          </td>
+                          <td className="px-6 py-4 text-right text-sm font-semibold text-text-secondary">
+                            {formatCurrency(num(row.taxable_amount))}
+                          </td>
+                          <td className="px-6 py-4 text-right text-sm font-semibold text-text-secondary">
+                            {formatCurrency(num(row.cgst_amount))}
+                          </td>
+                          <td className="px-6 py-4 text-right text-sm font-semibold text-text-secondary">
+                            {formatCurrency(num(row.sgst_amount))}
+                          </td>
+                          <td className="px-6 py-4 text-right text-sm font-semibold text-text-secondary">
+                            {formatCurrency(num(row.igst_amount))}
+                          </td>
+                          <td className="px-6 py-4 text-right text-sm font-extrabold text-text-primary">
+                            {formatCurrency(num(row.tax_amount))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs font-semibold text-text-tertiary">
+              Refunded bills are excluded. Check these figures against your books
+              before filing — this is a summary of what was billed, not tax advice.
+            </p>
           </div>
-        </div>
+        )
       )}
     </div>
+  );
+}
+
+function Figure({
+  label,
+  value,
+  detail,
+  tone = "neutral",
+}: {
+  label: string;
+  value: number;
+  detail?: string;
+  tone?: "neutral" | "positive" | "negative";
+}) {
+  const colour =
+    tone === "positive"
+      ? "text-[var(--success-strong)]"
+      : tone === "negative"
+        ? "text-[var(--error-strong)]"
+        : "text-text-primary";
+  return (
+    <div className="rounded-[24px] border border-border-soft bg-surface p-5">
+      <p className="text-[11px] font-extrabold uppercase tracking-wider text-text-tertiary">
+        {label}
+      </p>
+      <p className={`mt-1 text-2xl font-[900] tracking-tight ${colour}`}>
+        {formatCurrency(value)}
+      </p>
+      {detail && (
+        <p className="mt-1 text-[11px] font-semibold text-text-secondary">{detail}</p>
+      )}
+    </div>
+  );
+}
+
+function Row({
+  label,
+  value,
+  strong = false,
+  muted = false,
+}: {
+  label: string;
+  value: number;
+  strong?: boolean;
+  muted?: boolean;
+}) {
+  return (
+    <tr className="border-b border-border-soft/60 last:border-0">
+      <td
+        className={`px-6 py-3.5 text-sm ${
+          strong ? "font-black text-text-primary" : "font-semibold text-text-secondary"
+        }`}
+      >
+        {label}
+      </td>
+      <td
+        className={`px-6 py-3.5 text-right text-sm ${
+          muted
+            ? "font-semibold text-text-tertiary"
+            : strong
+              ? "font-[900] text-text-primary"
+              : "font-bold text-text-primary"
+        }`}
+      >
+        {formatCurrency(value)}
+      </td>
+    </tr>
   );
 }

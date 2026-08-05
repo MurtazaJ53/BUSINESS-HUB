@@ -115,6 +115,7 @@ export type ShopMembership = {
     plan_tier: BusinessHubPlanTier;
     enabled_features: Record<string, boolean>;
     business_phone?: string;
+    upi_vpa?: string;
   };
 };
 
@@ -237,6 +238,7 @@ export type InventoryItem = {
   cost_price: string | null;
   supplier_id: string | null;
   last_purchase_date: string | null;
+  created_at?: string;
 };
 
 export type InventorySummaryPayload = {

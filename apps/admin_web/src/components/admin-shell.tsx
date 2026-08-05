@@ -10,7 +10,10 @@ import {
   Package,
   Users,
   Receipt,
+  FileSpreadsheet,
+  Stethoscope,
   TrendingDown,
+  TrendingUp,
   Clock,
   BarChart3,
   Settings,
@@ -46,6 +49,10 @@ type AdminShellProps = {
     | "sales"
     | "expenses"
     | "attendance"
+    | "insights"
+    | "data-health"
+    | "billing"
+    | "tally"
     | "reports"
     | "suppliers"
     | "purchases"
@@ -103,12 +110,16 @@ export function AdminShell({
   ];
 
   const adminNav = [
+    { key: "insights", label: "Business pulse", href: "/insights", icon: TrendingUp },
     { key: "settings", label: "Business details", href: "/settings", icon: Settings },
     { key: "team", label: "Staff & PINs", href: "/team", icon: Users },
     { key: "attendance", label: "Attendance", href: "/attendance", icon: Clock },
     { key: "expenses", label: "Expenses", href: "/expenses", icon: TrendingDown },
     { key: "suppliers", label: "Suppliers & purchases", href: "/suppliers", icon: Truck },
     { key: "migration", label: "Import & migration", href: "/migration", icon: Layers },
+    { key: "data-health", label: "Data health", href: "/data-health", icon: Stethoscope },
+    { key: "tally", label: "Accountant export", href: "/tally", icon: FileSpreadsheet },
+    { key: "billing", label: "Subscription", href: "/billing", icon: CreditCard },
     { key: "security", label: "Security", href: "/security", icon: ShieldCheck },
   ];
 

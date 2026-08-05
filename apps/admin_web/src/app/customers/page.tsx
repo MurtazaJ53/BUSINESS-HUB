@@ -1,4 +1,4 @@
-import { CustomersKhata } from "@/components/customers-khata";
+import { CustomersTabs } from "@/components/customers-tabs";
 import { AdminShell } from "@/components/admin-shell";
 import { getSession, resolveActiveShop, getCustomers, getCustomerSummary } from "@/lib/admin-api";
 import type { Customer, CustomerSummaryPayload } from "@/lib/types";
@@ -60,7 +60,13 @@ export default async function CustomersPage() {
           </pre>
         </div>
       ) : (
-        <CustomersKhata initialCustomers={customers} initialSummary={summary} shopId={shopId} />
+        <CustomersTabs
+          initialCustomers={customers}
+          initialSummary={summary}
+          shopId={shopId}
+          shopName={activeShop?.shop.name ?? ""}
+          upiVpa={activeShop?.shop.upi_vpa ?? ""}
+        />
       )}
     </AdminShell>
   );

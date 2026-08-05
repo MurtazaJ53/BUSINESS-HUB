@@ -47,6 +47,12 @@
   --info-light: #60A5FA;
   --info-dark: #2563EB;
 
+  /* Status text that has to stay readable on a tinted panel. Light theme wants
+     the deep shade; dark theme overrides these with the light shade. */
+  --success-strong: #059669;
+  --warning-strong: #D97706;
+  --error-strong: #DC2626;
+
   /* Domain Colors */
   --revenue: #10B981;
   --expense: #EF4444;
@@ -113,6 +119,11 @@
   --info: #3B82F6;
   --info-light: #60A5FA;
   --info-dark: #2563EB;
+
+  /* See the light-theme note: the deep shades go muddy on a dark panel. */
+  --success-strong: #34D399;
+  --warning-strong: #FBBF24;
+  --error-strong: #F87171;
 
   /* Domain Colors */
   --revenue: #10B981;
