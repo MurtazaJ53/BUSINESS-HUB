@@ -148,6 +148,13 @@ class SettingsScreen extends ConsumerWidget {
               onTap: () => context.push('/settings/plan'),
             ),
 
+          if (owner)
+            MobileListTile(
+              title: 'Staff performance',
+              subtitle: 'Who sold how much',
+              leadingIcon: Icons.emoji_events_rounded,
+              onTap: () => context.push('/settings/staff-performance'),
+            ),
           MobileListTile(
             title: 'Business pulse',
             subtitle: 'Best sellers and cash flow',

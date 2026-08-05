@@ -1022,3 +1022,93 @@ class TallyExportTests(TestCase):
         client.force_authenticate(user=staff)
         response = client.get(f"/api/v1/shops/{self.shop.id}/sales/tally-export/")
         self.assertEqual(response.status_code, 403)
+
+
+class StaffPerformanceTests(TestCase):
+    """Attribution decides who gets credit (and blame) for a shop's takings, so
+    it must never invent a split it can't justify."""
+
+    def setUp(self):
+        self.owner = PlatformUser.objects.create_user(
+            email="perf-owner@example.com", password="secret", full_name="Owner Ben"
+        )
+        self.staff = PlatformUser.objects.create_user(
+            email="perf-staff@example.com", password="secret", full_name="Staff Sam"
+        )
+        self.shop = Shop.objects.create(name="Perf Shop", slug="perf-shop")
+        for user, role in ((self.owner, ShopMembership.Role.OWNER),
+                           (self.staff, ShopMembership.Role.STAFF)):
+            ShopMembership.objects.create(
+                user=user, shop=self.shop, role=role,
+                status=ShopMembership.Status.ACTIVE,
+            )
+        self.item = InventoryItem.objects.create(
+            shop=self.shop, name="Shirt", sku="S1", sell_price=Decimal("100.00")
+        )
+
+    def _sell(self, user, amount="100.00"):
+        client = APIClient()
+        client.force_authenticate(user=user)
+        response = client.post(
+            f"/api/v1/shops/{self.shop.id}/sales/",
+            {
+                "items": [{
+                    "inventory_item_id": str(self.item.id),
+                    "quantity": 1,
+                    "unit_price": amount,
+                }],
+                "payments": [{"payment_method": "CASH", "amount": amount}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+
+    def _report(self, user=None):
+        client = APIClient()
+        client.force_authenticate(user=user or self.owner)
+        response = client.get(
+            f"/api/v1/shops/{self.shop.id}/sales/staff-performance/"
+        )
+        return response
+
+    def test_splits_takings_by_who_sold(self):
+        self._sell(self.owner, "100.00")
+        self._sell(self.staff, "250.00")
+        self._sell(self.staff, "150.00")
+
+        response = self._report()
+        self.assertEqual(response.status_code, 200, response.content)
+        rows = {r["name"]: r for r in response.json()}
+
+        self.assertEqual(rows["Staff Sam"]["sale_count"], 2)
+        self.assertEqual(Decimal(rows["Staff Sam"]["gross"]), Decimal("400.00"))
+        self.assertEqual(rows["Owner Ben"]["sale_count"], 1)
+
+    def test_ordered_by_takings(self):
+        self._sell(self.owner, "100.00")
+        self._sell(self.staff, "900.00")
+        names = [r["name"] for r in self._report().json()]
+        self.assertEqual(names[0], "Staff Sam")
+
+    def test_average_ticket_is_per_person(self):
+        self._sell(self.staff, "100.00")
+        self._sell(self.staff, "300.00")
+        row = self._report().json()[0]
+        self.assertEqual(Decimal(row["average_ticket"]), Decimal("200.00"))
+
+    def test_voided_sales_do_not_count_towards_anyone(self):
+        self._sell(self.staff, "500.00")
+        sale = Sale.objects.get()
+        client = APIClient()
+        client.force_authenticate(user=self.owner)
+        client.patch(
+            f"/api/v1/shops/{self.shop.id}/sales/{sale.id}/void/", {}, format="json"
+        )
+        # A refunded sale must not leave someone credited for revenue the shop
+        # gave back.
+        self.assertEqual(self._report().json(), [])
+
+    def test_a_cashier_cannot_see_everyone_takings(self):
+        self._sell(self.staff)
+        response = self._report(user=self.staff)
+        self.assertEqual(response.status_code, 403, response.content)

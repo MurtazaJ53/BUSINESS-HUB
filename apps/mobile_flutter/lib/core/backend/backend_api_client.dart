@@ -408,6 +408,24 @@ class BackendApiClient {
     );
   }
 
+  /// Who sold how much, over an optional date window.
+  Future<List<Map<String, dynamic>>> fetchStaffPerformance({
+    required User user,
+    required String shopId,
+    String dateFrom = '',
+    String dateTo = '',
+  }) async {
+    final parts = <String>[];
+    if (dateFrom.isNotEmpty) parts.add('date_from=$dateFrom');
+    if (dateTo.isNotEmpty) parts.add('date_to=$dateTo');
+    final query = parts.isEmpty ? '' : '?${parts.join('&')}';
+    return _requestList(
+      user: user,
+      method: 'GET',
+      path: '/shops/$shopId/sales/staff-performance/$query',
+    );
+  }
+
   /// Ask the platform to move this workspace onto another plan. Lands in the
   /// admin queue as a ShopPlanRequest instead of being lost in a clipboard copy.
   Future<void> requestPlanUpgrade({

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../onboarding/presentation/setup_wizard_screen.dart';
 import '../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -59,6 +60,8 @@ class DashboardScreenV3 extends ConsumerWidget {
                 serverGross: serverGross,
                 lowStock: lowStock,
                 recentSales: recentSales,
+                needsSetup:
+                    ref.watch(needsOnboardingProvider).asData?.value == true,
               ),
       ),
     );
@@ -92,6 +95,7 @@ class DashboardScreenV3 extends ConsumerWidget {
     required double? serverGross,
     required List<LowStockItem> lowStock,
     required List<RecentSaleSummary> recentSales,
+    required bool needsSetup,
   }) {
     final metrics = overview.metrics;
     return ListView(
@@ -99,6 +103,57 @@ class DashboardScreenV3 extends ConsumerWidget {
       children: <Widget>[
         const _UpdateBanner(),
         const _GettingStartedCard(),
+        // First-run prompt: a new shopkeeper otherwise lands here with an empty
+        // app and no idea what to do first. Disappears once setup is done.
+        if (needsSetup) ...<Widget>[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Material(
+              color: AppPalette.primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => context.push('/setup'),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppPalette.primary.withValues(alpha: 0.30),
+                    ),
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      const Icon(Icons.rocket_launch_rounded,
+                          color: AppPalette.primary),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              'Finish setting up your shop',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w800),
+                            ),
+                            Text(
+                              'Shop name, UPI ID and your first product',
+                              style: Theme.of(context).textTheme.labelSmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+
         // Today's takings hero
         HeroMetricCard(
           label: L.of(context).dashTodaySales,

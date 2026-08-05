@@ -900,3 +900,66 @@ class SaleTallyExportView(ShopScopedMixin, APIView):
         filename = f"Tally_{shop.slug}{suffix}.xml"
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
+
+
+class SaleStaffPerformanceView(ShopScopedMixin, APIView):
+    """Who sold how much, over a date window.
+
+    Attribution comes from the authenticated user on each sale, so it is only
+    meaningful when team members sign in as themselves — a shop where everyone
+    shares one login sees a single row, which is the honest answer rather than
+    an invented split.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+    minimum_role = ShopMembership.Role.MANAGER
+
+    def get(self, request, shop_id):
+        membership = self.get_membership()
+
+        queryset = (
+            Sale.objects.filter(shop=membership.shop, tombstone=False)
+            .exclude(status=Sale.Status.VOID)
+        )
+        date_from = request.query_params.get("date_from", "").strip()
+        date_to = request.query_params.get("date_to", "").strip()
+        if date_from:
+            queryset = queryset.filter(sale_date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(sale_date__lte=date_to)
+
+        rows = (
+            queryset.values(
+                "actor_user__id", "actor_user__full_name", "actor_user__email"
+            )
+            .annotate(
+                sale_count=Count("id"),
+                gross=Coalesce(Sum("total_amount"), Decimal("0.00")),
+                collected=Coalesce(Sum("amount_received"), Decimal("0.00")),
+                discount_given=Coalesce(Sum("discount_amount"), Decimal("0.00")),
+            )
+            .order_by("-gross")
+        )
+
+        results = []
+        for row in rows:
+            name = (row["actor_user__full_name"] or "").strip()
+            if not name:
+                name = (row["actor_user__email"] or "").strip() or "Unattributed"
+            sale_count = row["sale_count"] or 0
+            gross = row["gross"] or Decimal("0.00")
+            results.append(
+                {
+                    "name": name,
+                    "sale_count": sale_count,
+                    "gross": gross,
+                    "collected": row["collected"] or Decimal("0.00"),
+                    "discount_given": row["discount_given"] or Decimal("0.00"),
+                    "average_ticket": (
+                        (gross / sale_count).quantize(Decimal("0.01"))
+                        if sale_count
+                        else Decimal("0.00")
+                    ),
+                }
+            )
+        return Response(results)
