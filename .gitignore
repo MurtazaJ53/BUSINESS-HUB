@@ -83,3 +83,8 @@ secrets_audit.json
 
 # Docker demo env
 .env.demo
+
+# Coursework documents and extracted template assets (not project source)
+/Project_*.docx
+/~$*.docx
+/assets/

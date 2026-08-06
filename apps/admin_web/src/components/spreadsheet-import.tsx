@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, FileUp, Loader2, Upload } from "lucide-react";
 
+import { readXlsx, looksLikeXlsx, type XlsxSheet } from "@/lib/xlsx";
 import {
   applyMapping,
   autoMap,
@@ -35,6 +36,8 @@ export function SpreadsheetImport() {
   const [kind, setKind] = useState<ImportKind>("products");
   const [fileName, setFileName] = useState<string | null>(null);
   const [table, setTable] = useState<ParsedTable | null>(null);
+  const [sheets, setSheets] = useState<XlsxSheet[]>([]);
+  const [activeSheet, setActiveSheet] = useState<string | null>(null);
   const [mapping, setMapping] = useState<FieldMapping>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +48,8 @@ export function SpreadsheetImport() {
 
   const reset = () => {
     setTable(null);
+    setSheets([]);
+    setActiveSheet(null);
     setMapping({});
     setFileName(null);
     setResult(null);
@@ -52,33 +57,60 @@ export function SpreadsheetImport() {
     if (inputRef.current) inputRef.current.value = "";
   };
 
+  const useSheet = useCallback(
+    (sheet: XlsxSheet, forKind: ImportKind) => {
+      // A sheet's first row is its header, matching the CSV path.
+      const rows = sheet.rows.filter((r) => r.some((cell) => cell.trim() !== ""));
+      if (rows.length === 0) throw new Error(`Sheet "${sheet.name}" is empty.`);
+      const parsed = { headers: rows[0].map((h) => h.trim()), rows: rows.slice(1) };
+      setTable(parsed);
+      setMapping(autoMap(parsed.headers, forKind));
+      setActiveSheet(sheet.name);
+    },
+    []
+  );
+
   const readFile = useCallback(
     async (file: File, forKind: ImportKind) => {
       setError(null);
       setResult(null);
       try {
-        const text = await file.text();
-        const parsed = parseCsv(text);
-        if (parsed.headers.length === 0) {
-          throw new Error("That file has no readable rows.");
+        if (/\.xlsx$/i.test(file.name)) {
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          if (!looksLikeXlsx(bytes)) {
+            throw new Error(
+              "That looks like an old .xls file. Open it in Excel and save as .xlsx or .csv."
+            );
+          }
+          const parsedSheets = (await readXlsx(bytes)).filter((s) => s.rows.length > 0);
+          if (parsedSheets.length === 0) throw new Error("That workbook has no readable rows.");
+          setSheets(parsedSheets);
+          useSheet(parsedSheets[0], forKind);
+        } else {
+          const text = await file.text();
+          const parsed = parseCsv(text);
+          if (parsed.headers.length === 0) {
+            throw new Error("That file has no readable rows.");
+          }
+          setSheets([]);
+          setActiveSheet(null);
+          setTable(parsed);
+          setMapping(autoMap(parsed.headers, forKind));
         }
-        setTable(parsed);
-        setMapping(autoMap(parsed.headers, forKind));
         setFileName(file.name);
       } catch (err) {
         setTable(null);
+        setSheets([]);
         setError(errorMessage(err, "Could not read that file."));
       }
     },
-    []
+    [useSheet]
   );
 
   const onPick = async (file: File | undefined) => {
     if (!file) return;
-    if (!/\.csv$/i.test(file.name)) {
-      setError(
-        "Only CSV files are supported here. In Excel choose File → Save As → CSV, then upload that."
-      );
+    if (!/\.(csv|xlsx)$/i.test(file.name)) {
+      setError("Choose a .xlsx or .csv file.");
       return;
     }
     await readFile(file, kind);
@@ -190,7 +222,7 @@ export function SpreadsheetImport() {
       <div className="rounded-[28px] border border-dashed border-border bg-surface p-8 text-center">
         <FileUp className="w-8 h-8 mx-auto text-text-tertiary" />
         <p className="mt-3 text-sm font-bold text-text-primary">
-          {fileName ?? "Choose a CSV file"}
+          {fileName ?? "Choose an Excel or CSV file"}
         </p>
         <p className="mt-1 text-xs font-semibold text-text-secondary">
           Any column order works — we match your headings automatically and show
@@ -199,7 +231,7 @@ export function SpreadsheetImport() {
         <input
           ref={inputRef}
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           onChange={(e) => void onPick(e.target.files?.[0])}
           className="hidden"
         />
@@ -212,9 +244,45 @@ export function SpreadsheetImport() {
           Choose file
         </button>
         <p className="mt-3 text-[11px] font-semibold text-text-tertiary">
-          Excel file? File &rarr; Save As &rarr; CSV.
+          Excel (.xlsx) and CSV both work.
         </p>
       </div>
+
+      {/* Sheet picker: a workbook often carries products and customers on
+          separate sheets, so let the shopkeeper choose which one to read. */}
+      {sheets.length > 1 && (
+        <div>
+          <p className="text-[11px] font-extrabold uppercase tracking-wider text-text-tertiary">
+            Which sheet?
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {sheets.map((sheet) => (
+              <button
+                key={sheet.name}
+                type="button"
+                onClick={() => {
+                  try {
+                    useSheet(sheet, kind);
+                    setError(null);
+                  } catch (err) {
+                    setError(errorMessage(err, "Could not read that sheet."));
+                  }
+                }}
+                className={`rounded-2xl border px-4 py-2 text-xs font-extrabold transition-colors ${
+                  activeSheet === sheet.name
+                    ? "border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary-hover)]"
+                    : "border-border-soft bg-surface text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                {sheet.name}
+                <span className="ml-1.5 font-semibold text-text-tertiary">
+                  {Math.max(0, sheet.rows.length - 1)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Mapping */}
       {table && (
