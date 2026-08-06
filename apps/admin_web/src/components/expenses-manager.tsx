@@ -385,7 +385,7 @@ export function ExpensesManager({ initialExpenses, initialSummary }: ExpensesMan
                   </label>
                   <select
                     value={paymentMode}
-                    onChange={(e) => setPaymentMode(e.target.value as any)}
+                    onChange={(e) => setPaymentMode(e.target.value as "CASH" | "BANK" | "UPI")}
                     className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                   >
                     <option value="CASH">Cash (From Till Float)</option>

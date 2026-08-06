@@ -41,13 +41,32 @@ function formatQty(value: number): string {
 
 /** The API speaks snake_case and returns only what the UI needs; map it onto
  *  the shape this component and the merge routine already use. */
-function toReport(body: any): DataHealthReport {
-  const groups = (body?.duplicate_groups ?? []).map((g: any) => ({
+/** The data-health payload, naming only what this screen reads. */
+type ApiHealthItem = { id: string; name: string; stock?: string | number };
+type ApiDuplicateGroup = {
+  key: string;
+  copies: number;
+  combined_stock: string | number;
+  keeper: ApiHealthItem;
+  duplicates?: ApiHealthItem[];
+};
+type ApiHealthReport = {
+  duplicate_groups?: ApiDuplicateGroup[];
+  negative_stock?: unknown[];
+  missing_price?: unknown[];
+  customers_without_phone?: unknown[];
+  duplicate_row_count?: number;
+  total_issues?: number;
+  is_healthy?: boolean;
+};
+
+function toReport(body: ApiHealthReport): DataHealthReport {
+  const groups = (body?.duplicate_groups ?? []).map((g) => ({
     key: g.key,
     copies: g.copies,
     combinedStock: num(g.combined_stock),
     keeper: { id: g.keeper.id, name: g.keeper.name, stock_on_hand: num(g.keeper.stock) },
-    duplicates: (g.duplicates ?? []).map((d: any) => ({
+    duplicates: (g.duplicates ?? []).map((d) => ({
       id: d.id,
       name: d.name,
       stock_on_hand: num(d.stock),

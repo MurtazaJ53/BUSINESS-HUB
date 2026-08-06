@@ -57,7 +57,7 @@ export function SpreadsheetImport() {
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  const useSheet = useCallback(
+  const applySheet = useCallback(
     (sheet: XlsxSheet, forKind: ImportKind) => {
       // A sheet's first row is its header, matching the CSV path.
       const rows = sheet.rows.filter((r) => r.some((cell) => cell.trim() !== ""));
@@ -85,7 +85,7 @@ export function SpreadsheetImport() {
           const parsedSheets = (await readXlsx(bytes)).filter((s) => s.rows.length > 0);
           if (parsedSheets.length === 0) throw new Error("That workbook has no readable rows.");
           setSheets(parsedSheets);
-          useSheet(parsedSheets[0], forKind);
+          applySheet(parsedSheets[0], forKind);
         } else {
           const text = await file.text();
           const parsed = parseCsv(text);
@@ -104,7 +104,7 @@ export function SpreadsheetImport() {
         setError(errorMessage(err, "Could not read that file."));
       }
     },
-    [useSheet]
+    [applySheet]
   );
 
   const onPick = async (file: File | undefined) => {
@@ -262,7 +262,7 @@ export function SpreadsheetImport() {
                 type="button"
                 onClick={() => {
                   try {
-                    useSheet(sheet, kind);
+                    applySheet(sheet, kind);
                     setError(null);
                   } catch (err) {
                     setError(errorMessage(err, "Could not read that sheet."));

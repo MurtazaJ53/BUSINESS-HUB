@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Search,
   Plus,
@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Customer, CustomerSummaryPayload } from "@/lib/types";
+import { useT } from "@/lib/i18n";
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
@@ -34,21 +35,39 @@ interface CustomersKhataProps {
  * FUNCTION — and React runs a function passed to a setter as a state updater,
  * which throws "Cannot convert undefined or null to object".
  */
-function readTimelineEntries(payload: unknown): any[] {
-  if (Array.isArray(payload)) return payload;
+type TimelineEntry = {
+  id: string;
+  event_type?: string;
+  amount_delta: string;
+  running_balance?: string;
+  note?: string;
+  occurred_at?: string;
+  actor_name?: string | null;
+};
+
+function readTimelineEntries(payload: unknown): TimelineEntry[] {
+  if (Array.isArray(payload)) return payload as TimelineEntry[];
   const entries = (payload as { entries?: unknown })?.entries;
-  return Array.isArray(entries) ? entries : [];
+  return Array.isArray(entries) ? (entries as TimelineEntry[]) : [];
 }
 
 export function CustomersKhata({ initialCustomers, initialSummary }: CustomersKhataProps) {
+  const t = useT();
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers ?? []);
   const [summary, setSummary] = useState<CustomerSummaryPayload>(initialSummary ?? { total_customers: 0, active_credit_customers: 0, total_outstanding_balance: "0.00", total_lifetime_spend: null });
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(
     (initialCustomers ?? [])[0]?.id || ""
   );
   const [search, setSearch] = useState("");
-  const [timeline, setTimeline] = useState<any[]>([]);
+  const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [isTimelineLoading, setIsTimelineLoading] = useState(false);
+  // Read inside the search effect without making it a dependency: the
+  // effect needs the selection as it stands when the response lands, and
+  // depending on it would refetch the list on every selection change.
+  const selectedCustomerIdRef = useRef(selectedCustomerId);
+  useEffect(() => {
+    selectedCustomerIdRef.current = selectedCustomerId;
+  }, [selectedCustomerId]);
 
   // Modal states
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
@@ -109,7 +128,10 @@ export function CustomersKhata({ initialCustomers, initialSummary }: CustomersKh
         const data = await res.json();
         if (active) {
           setCustomers(data);
-          if (data.length > 0 && !data.some((c: Customer) => c.id === selectedCustomerId)) {
+          if (
+            data.length > 0 &&
+            !data.some((c: Customer) => c.id === selectedCustomerIdRef.current)
+          ) {
             setSelectedCustomerId(data[0].id);
           }
         }
@@ -295,7 +317,7 @@ export function CustomersKhata({ initialCustomers, initialSummary }: CustomersKh
           <div className="flex-1 overflow-y-auto space-y-1 pr-1">
             {customers.length === 0 ? (
               <div className="text-center text-xs text-[var(--text-tertiary)] py-8">
-                No customers found.
+                {t("webNoCustomersFound")}
               </div>
             ) : (
               customers.map((cust) => {
@@ -387,7 +409,7 @@ export function CustomersKhata({ initialCustomers, initialSummary }: CustomersKh
                 </div>
                 <div>
                   <div className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">
-                    Lifetime Business Spend
+                    {t("webLifetimeSpend")}
                   </div>
                   <div className="text-base font-black font-mono text-text-primary mt-0.5">
                     {formatCurrency(parseFloat(selectedCustomer.total_spent || "0"))}
@@ -406,7 +428,7 @@ export function CustomersKhata({ initialCustomers, initialSummary }: CustomersKh
                 <div className="text-xs font-bold text-text-primary">Ledger History Timeline</div>
                 {timeline.length === 0 ? (
                   <div className="text-center text-xs text-[var(--text-tertiary)] py-12">
-                    No ledger transactions recorded for this customer yet.
+                    {t("webNoLedgerYet")}
                   </div>
                 ) : (
                   <div className="relative pl-4 border-l border-[var(--border-soft)] ml-2 space-y-4 pt-1">

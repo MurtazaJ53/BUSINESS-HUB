@@ -351,7 +351,7 @@ export function StoreSettings({
                 </label>
                 <select
                   value={paperWidth}
-                  onChange={(e) => setPaperWidth(e.target.value as any)}
+                  onChange={(e) => setPaperWidth(e.target.value as "58mm" | "80mm")}
                   className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                 >
                   <option value="80mm">80mm Standard POS Thermal Roll</option>

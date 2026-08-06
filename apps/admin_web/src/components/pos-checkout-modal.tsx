@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import type { SplitPaymentTender, Customer } from "@/lib/types";
+import { useT } from "@/lib/i18n";
 
 type PosCheckoutModalProps = {
   isOpen: boolean;
@@ -33,6 +34,7 @@ export function PosCheckoutModal({
   shopName = "Business Hub Store",
   onCompleteSale,
 }: PosCheckoutModalProps) {
+  const t = useT();
   const [cashAmount, setCashAmount] = useState<string>("");
   const [cashReceived, setCashReceived] = useState<string>("");
   const [cardAmount, setCardAmount] = useState<string>("");
@@ -149,7 +151,7 @@ export function PosCheckoutModal({
             </div>
             <div>
               <span className="font-[900] text-base text-[var(--text-primary)]">
-                Checkout & Payment
+                {t("webCheckoutPayment")}
               </span>
               <div className="text-xs font-bold text-[var(--text-secondary)]">
                 Total Payable: <strong className="text-[var(--primary-hover)]">{formatCurrency(totalAmount)}</strong>

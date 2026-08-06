@@ -50,7 +50,7 @@ export function NotificationsPopover() {
       // The API calls it action_url; this component reads link_url. Map it, or
       // every "view" link silently disappears.
       setNotifications(
-        (Array.isArray(body) ? body : []).map((n: any) => ({
+        (Array.isArray(body) ? body : []).map((n: NotificationItem & { action_url?: string }) => ({
           ...n,
           link_url: n.link_url ?? n.action_url ?? undefined,
         }))

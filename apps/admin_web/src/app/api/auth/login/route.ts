@@ -57,8 +57,18 @@ export async function POST(req: NextRequest) {
     const refreshToken = tokenData.refresh;
 
     // 2. Fetch User Profile and Shop Memberships
-    let sessionUser: any = { email, full_name: email.split("@")[0] };
-    let memberships: any[] = [];
+    let sessionUser: Record<string, unknown> = {
+      email,
+      full_name: email.split("@")[0],
+    };
+    // Only the fields this route reads from the session payload.
+    type SessionMembership = {
+      status?: string;
+      role?: string;
+      shop_id?: string;
+      shop?: { id?: string };
+    };
+    let memberships: SessionMembership[] = [];
     let activeShopId = "";
     let userRole = "owner";
 

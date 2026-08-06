@@ -78,7 +78,6 @@ export function AdminShell({
   activeRoute,
   title,
   subtitle,
-  surfaceMode = "product",
   children,
 }: AdminShellProps) {
   const router = useRouter();

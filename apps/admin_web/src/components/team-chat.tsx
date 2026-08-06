@@ -87,7 +87,7 @@ interface TeamChatProps {
   currentUserName?: string;
 }
 
-export function TeamChat({ currentUserName = "Manager" }: TeamChatProps) {
+export function TeamChat({}: TeamChatProps) {
   const [channels] = useState<LocalChatChannel[]>(SEED_CHANNELS);
   const [activeChannelId, setActiveChannelId] = useState<string>("ch-1");
   const [messages, setMessages] = useState<Record<string, LocalChatMessage[]>>(SEED_MESSAGES);

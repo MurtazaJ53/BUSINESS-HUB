@@ -12,6 +12,7 @@ import {
   History,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
@@ -37,18 +38,38 @@ export interface ProductItem {
   updated_at?: string;
 }
 
+/** An inventory row as the API returns it; only the fields read here. */
+type ApiInventoryRow = {
+  id: string;
+  name: string;
+  sku?: string;
+  barcode?: string;
+  category?: string;
+  cost_price?: string | null;
+  sell_price?: string;
+  stock_on_hand?: number;
+  gst_rate?: string;
+  status?: string;
+  hsn_code?: string;
+  size?: string;
+  description?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
 interface InventoryManagerProps {
-  initialInventory: any[];
-  initialSummary: any;
+  initialInventory: ApiInventoryRow[];
+  initialSummary?: unknown;
   shopId: string;
 }
 
 export function InventoryManager({ initialInventory }: InventoryManagerProps) {
+  const t = useT();
   const mappedInitial = React.useMemo(() => {
-    return (initialInventory ?? []).map((item: any) => ({
+    return (initialInventory ?? []).map((item: ApiInventoryRow) => ({
       id: item.id,
       name: item.name,
-      sku: item.sku,
+      sku: item.sku ?? "",
       barcode: item.barcode || "",
       category: item.category || "General",
       cost_price: parseFloat(item.cost_price || "0"),
@@ -57,7 +78,7 @@ export function InventoryManager({ initialInventory }: InventoryManagerProps) {
       reorder_level: 10,
       is_low_stock: (item.stock_on_hand || 0) <= 10,
       tax_rate: parseFloat(item.gst_rate || "5"),
-      status: item.status,
+      status: item.status ?? "active",
       created_at: item.created_at || new Date().toISOString(),
       updated_at: item.updated_at || new Date().toISOString(),
     }));
@@ -98,10 +119,10 @@ export function InventoryManager({ initialInventory }: InventoryManagerProps) {
       const res = await fetch("/api/inventory");
       if (!res.ok) throw new Error("Failed to fetch inventory from server");
       const data = await res.json();
-      const mapped = data.map((item: any) => ({
+      const mapped = data.map((item: ApiInventoryRow) => ({
         id: item.id,
         name: item.name,
-        sku: item.sku,
+        sku: item.sku ?? "",
         barcode: item.barcode || "",
         category: item.category || "General",
         cost_price: parseFloat(item.cost_price || "0"),
@@ -110,7 +131,7 @@ export function InventoryManager({ initialInventory }: InventoryManagerProps) {
         reorder_level: 10,
         is_low_stock: (item.stock_on_hand || 0) <= 10,
         tax_rate: parseFloat(item.gst_rate || "5"),
-        status: item.status,
+        status: item.status ?? "active",
         created_at: item.created_at || new Date().toISOString(),
         updated_at: item.updated_at || new Date().toISOString(),
       }));
@@ -283,7 +304,7 @@ export function InventoryManager({ initialInventory }: InventoryManagerProps) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-text-primary tracking-tight">
-            Inventory & Catalog
+            {t("webInventoryCatalog")}
           </h2>
           <p className="text-xs text-[var(--text-tertiary)]">
             Manage product items, SKU variants, barcodes, GST slabs, and reorder levels
@@ -423,7 +444,7 @@ export function InventoryManager({ initialInventory }: InventoryManagerProps) {
                           }}
                           className="px-2.5 py-1 text-[11px] font-medium bg-bg-base hover:bg-[var(--surface)] text-[var(--primary-light)] rounded-lg transition-colors"
                         >
-                          Adjust Stock
+                          {t("webAdjustStock")}
                         </button>
                         <button
                           onClick={() => openEditModal(item)}
@@ -516,7 +537,7 @@ export function InventoryManager({ initialInventory }: InventoryManagerProps) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
-                    Category
+                    {t("webCategory")}
                   </label>
                   <input
                     type="text"
@@ -659,11 +680,11 @@ export function InventoryManager({ initialInventory }: InventoryManagerProps) {
 
               <div>
                 <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
-                  Adjustment Type
+                  {t("webAdjustmentType")}
                 </label>
                 <select
                   value={adjustType}
-                  onChange={(e) => setAdjustType(e.target.value as any)}
+                  onChange={(e) => setAdjustType(e.target.value as "inward" | "damage" | "correction")}
                   className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                 >
                   <option value="inward">Inward Delivery / Stock In (+)</option>
@@ -712,7 +733,7 @@ export function InventoryManager({ initialInventory }: InventoryManagerProps) {
                   type="submit"
                   className="px-5 py-2 text-xs font-semibold text-white bg-[var(--primary)] hover:bg-[var(--primary-hover)] rounded-xl shadow-md"
                 >
-                  Confirm Adjustment
+                  {t("webConfirmAdjustment")}
                 </button>
               </div>
             </form>

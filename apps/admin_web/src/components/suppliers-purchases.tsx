@@ -54,33 +54,38 @@ function asArray<T>(value: unknown): T[] {
   return Array.isArray(results) ? (results as T[]) : [];
 }
 
-function toSupplier(row: any): SupplierRecord {
+/** Read a string field from a loosely-typed API row. */
+function text(value: unknown, fallback = ""): string {
+  return typeof value === "string" && value ? value : fallback;
+}
+
+function toSupplier(row: Record<string, unknown>): SupplierRecord {
   return {
     id: String(row.id),
-    name: row.name ?? "Unnamed supplier",
+    name: text(row.name, "Unnamed supplier"),
     // The backend has no contact_person column; showing an empty line is
     // honest, inventing a name is not.
     contact_person: "",
-    phone: row.phone ?? "",
-    email: row.email ?? "",
-    gstin: row.gstin ?? "",
-    address: row.address ?? "",
+    phone: text(row.phone, ""),
+    email: text(row.email, ""),
+    gstin: text(row.gstin, ""),
+    address: text(row.address, ""),
     balance_due: num(row.balance),
-    created_at: row.created_at ?? "",
+    created_at: text(row.created_at, ""),
   };
 }
 
-function toPurchase(row: any): PurchaseOrderRecord {
+function toPurchase(row: Record<string, unknown>): PurchaseOrderRecord {
   return {
     id: String(row.id),
     supplier_id: row.supplier_id ? String(row.supplier_id) : "",
-    supplier_name: row.supplier_name || "Supplier",
-    invoice_number: row.invoice_number || row.reference || "-",
+    supplier_name: text(row.supplier_name, "Supplier"),
+    invoice_number: text(row.invoice_number) || text(row.reference, "-"),
     total_amount: num(row.total_amount),
     paid_amount: num(row.amount_paid),
     status: row.status === "void" ? "cancelled" : "received",
     items_count: num(row.item_count),
-    created_at: row.purchase_date || row.occurred_at || "",
+    created_at: text(row.purchase_date) || text(row.occurred_at),
   };
 }
 
@@ -125,8 +130,8 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
 
       const supBody = await supRes.json();
       const purBody = await purRes.json();
-      setSuppliers(asArray<any>(supBody.items).map(toSupplier));
-      setPurchases(asArray<any>(purBody.items).map(toPurchase));
+      setSuppliers(asArray<Record<string, unknown>>(supBody.items).map(toSupplier));
+      setPurchases(asArray<Record<string, unknown>>(purBody.items).map(toPurchase));
       // Prefer the server's own total over one summed in the browser: the
       // browser only sees the rows it loaded.
       setOutstandingPayable(

@@ -21,6 +21,7 @@ import type {
   SplitPaymentTender,
 } from "@/lib/types";
 import type { ProductItem } from "@/components/inventory-manager";
+import { useT } from "@/lib/i18n";
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
@@ -28,14 +29,31 @@ function errorMessage(error: unknown, fallback: string): string {
 
 
 
+/** An inventory row as the API returns it; only the fields read here. */
+type ApiInventoryRow = {
+  id: string;
+  name: string;
+  sku?: string;
+  barcode?: string;
+  category?: string;
+  cost_price?: string | null;
+  sell_price?: string;
+  stock_on_hand?: number;
+  gst_rate?: string;
+  status?: string;
+  hsn_code?: string;
+  size?: string;
+  description?: string;
+};
+
 type PosTerminalProps = {
   shopName?: string;
   shopAddress?: string;
   shopGstin?: string;
   shopPhone?: string;
   cashierName?: string;
-  initialInventory: any[];
-  initialCustomers: any[];
+  initialInventory: ApiInventoryRow[];
+  initialCustomers: Customer[];
   shopId: string;
 };
 
@@ -48,12 +66,13 @@ export function PosTerminal({
   initialInventory,
   initialCustomers,
 }: PosTerminalProps) {
+  const t = useT();
   const mappedInitialProducts = React.useMemo(() => {
-    return (initialInventory ?? []).map((item: any) => ({
+    return (initialInventory ?? []).map((item: ApiInventoryRow) => ({
       id: item.id,
       name: item.name,
-      sku: item.sku,
-      barcode: item.barcode,
+      sku: item.sku ?? "",
+      barcode: item.barcode ?? "",
       category: item.category || "General",
       cost_price: parseFloat(item.cost_price || "0"),
       selling_price: parseFloat(item.sell_price || "0"),
@@ -61,7 +80,7 @@ export function PosTerminal({
       reorder_level: 0,
       tax_rate: parseFloat(item.gst_rate || "0"),
       is_low_stock: false,
-      status: item.status,
+      status: item.status ?? "active",
     }));
   }, [initialInventory]);
 
@@ -86,11 +105,11 @@ export function PosTerminal({
         const invData = await invRes.json();
         
         // Map backend InventoryItem to ProductItem
-        const mappedProducts: ProductItem[] = invData.map((item: any) => ({
+        const mappedProducts: ProductItem[] = invData.map((item: ApiInventoryRow) => ({
           id: item.id,
           name: item.name,
-          sku: item.sku,
-          barcode: item.barcode,
+          sku: item.sku ?? "",
+          barcode: item.barcode ?? "",
           category: item.category || "General",
           cost_price: parseFloat(item.cost_price || "0"),
           selling_price: parseFloat(item.sell_price || "0"),
@@ -98,7 +117,7 @@ export function PosTerminal({
           reorder_level: 0,
           tax_rate: parseFloat(item.gst_rate || "0"),
           is_low_stock: false,
-          status: item.status,
+          status: item.status ?? "active",
         }));
         setProducts(mappedProducts);
 
@@ -347,11 +366,11 @@ export function PosTerminal({
       const invRes = await fetch("/api/inventory");
       if (invRes.ok) {
         const invData = await invRes.json();
-        const mappedProducts: ProductItem[] = invData.map((item: any) => ({
+        const mappedProducts: ProductItem[] = invData.map((item: ApiInventoryRow) => ({
           id: item.id,
           name: item.name,
-          sku: item.sku,
-          barcode: item.barcode,
+          sku: item.sku ?? "",
+          barcode: item.barcode ?? "",
           category: item.category || "General",
           cost_price: parseFloat(item.cost_price || "0"),
           selling_price: parseFloat(item.sell_price || "0"),
@@ -359,7 +378,7 @@ export function PosTerminal({
           reorder_level: 0,
           tax_rate: parseFloat(item.gst_rate || "0"),
           is_low_stock: false,
-          status: item.status,
+          status: item.status ?? "active",
         }));
         setProducts(mappedProducts);
       }
@@ -483,7 +502,7 @@ export function PosTerminal({
               <ShoppingCart className="w-4 h-4" />
             </div>
             <span className="font-extrabold text-sm text-[var(--text-primary)]">
-              Current Cart
+              {t("webCurrentCart")}
             </span>
             <span className="px-2.5 py-0.5 text-xs font-extrabold bg-[var(--primary)] text-white rounded-full">
               {cart.reduce((s, i) => s + i.quantity, 0)}
@@ -495,7 +514,7 @@ export function PosTerminal({
               onClick={clearCart}
               className="text-xs text-[var(--error-strong)] hover:text-[var(--error-strong)] hover:underline font-bold"
             >
-              Clear Cart
+              {t("webClearCart")}
             </button>
           )}
         </div>
@@ -670,7 +689,7 @@ export function PosTerminal({
           <div className="pt-3 border-t border-[var(--border-soft)] flex items-baseline justify-between">
             <div>
               <div className="text-[10px] uppercase font-black tracking-wider text-[var(--text-tertiary)]">
-                Grand Total
+                {t("webGrandTotal")}
               </div>
               <div className="text-2xl font-[900] text-[var(--primary-hover)] tracking-tight">
                 {formatCurrency(grandTotal)}

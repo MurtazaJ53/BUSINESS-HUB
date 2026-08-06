@@ -36,38 +36,70 @@ export interface SaleOrder {
 }
 
 interface SalesManagerProps {
-  initialSales: any[];
-  initialSummary: any;
+  initialSales: ApiSale[];
+  initialSummary?: unknown;
   shopId: string;
+}
+
+/** A sale row as the API returns it. Only the fields this screen reads. */
+type ApiSalePayment = { payment_method: string; amount: string };
+type ApiSale = {
+  id: string;
+  receipt_number?: string;
+  shop?: string;
+  actor_name?: string | null;
+  customer_name?: string;
+  customer_phone?: string;
+  subtotal_amount?: string;
+  tax_amount?: string;
+  discount_amount?: string;
+  total_amount?: string;
+  payment_mode?: string;
+  status?: string;
+  item_count?: number;
+  occurred_at?: string;
+  payments?: ApiSalePayment[];
+};
+
+/** Total the tenders of one method. Amounts arrive as strings from DRF. */
+function tenderTotal(payments: ApiSalePayment[], method: string): number {
+  return payments
+    .filter((p) => p.payment_method === method)
+    .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+}
+
+/** Map one API sale onto the shape this screen renders. */
+function toSaleOrder(item: ApiSale): SaleOrder {
+  const payments = item.payments ?? [];
+  return {
+    id: item.id,
+    receipt_number:
+      item.receipt_number ||
+      `INV-${item.id.replace(/-/g, "").slice(0, 6).toUpperCase()}`,
+    shop: item.shop || "",
+    cashier_name: item.actor_name || "Cashier",
+    customer_name: item.customer_name || "Walk-in Guest",
+    customer_phone: item.customer_phone || "",
+    subtotal: parseFloat(item.subtotal_amount || "0"),
+    tax_amount: parseFloat(item.tax_amount || "0"),
+    discount_amount: parseFloat(item.discount_amount || "0"),
+    total_amount: parseFloat(item.total_amount || "0"),
+    payment_mode: (item.payment_mode || "cash").toLowerCase(),
+    payment_breakdown: {
+      cash: tenderTotal(payments, "CASH"),
+      card: tenderTotal(payments, "CARD"),
+      upi: tenderTotal(payments, "UPI"),
+      khata_due: tenderTotal(payments, "CREDIT"),
+    },
+    status: item.status || "completed",
+    items_count: item.item_count || 1,
+    created_at: item.occurred_at || new Date().toISOString(),
+  } as SaleOrder;
 }
 
 export function SalesManager({ initialSales }: SalesManagerProps) {
   const mappedInitial = React.useMemo(() => {
-    return (initialSales ?? []).map((item: any) => {
-      const payments = item.payments || [];
-      const cash = payments.filter((p: any) => p.payment_method === "CASH").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-      const card = payments.filter((p: any) => p.payment_method === "CARD").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-      const upi = payments.filter((p: any) => p.payment_method === "UPI").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-      const khata_due = payments.filter((p: any) => p.payment_method === "CREDIT").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-
-      return {
-        id: item.id,
-        receipt_number: item.receipt_number || `INV-${item.id.replace(/-/g, "").slice(0, 6).toUpperCase()}`,
-        shop: item.shop || "",
-        cashier_name: item.actor_name || "Cashier",
-        customer_name: item.customer_name || "Walk-in Guest",
-        customer_phone: item.customer_phone || "",
-        subtotal: parseFloat(item.subtotal_amount || "0"),
-        tax_amount: parseFloat(item.tax_amount || "0"),
-        discount_amount: parseFloat(item.discount_amount || "0"),
-        total_amount: parseFloat(item.total_amount || "0"),
-        payment_mode: (item.payment_mode || "cash").toLowerCase(),
-        payment_breakdown: { cash, card, upi, khata_due },
-        status: item.status || "completed",
-        items_count: item.item_count || 1,
-        created_at: item.occurred_at || new Date().toISOString(),
-      };
-    });
+    return (initialSales ?? []).map(toSaleOrder);
   }, [initialSales]);
 
   const [sales, setSales] = useState<SaleOrder[]>(mappedInitial);
@@ -94,31 +126,7 @@ export function SalesManager({ initialSales }: SalesManagerProps) {
       if (!res.ok) throw new Error("Failed to load sales history");
       const data = await res.json();
       
-      const mappedSales: SaleOrder[] = data.map((item: any) => {
-        const payments = item.payments || [];
-        const cash = payments.filter((p: any) => p.payment_method === "CASH").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-        const card = payments.filter((p: any) => p.payment_method === "CARD").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-        const upi = payments.filter((p: any) => p.payment_method === "UPI").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-        const khata_due = payments.filter((p: any) => p.payment_method === "CREDIT").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-        
-        return {
-          id: item.id,
-          receipt_number: item.receipt_number || `INV-${item.id.replace(/-/g, "").slice(0, 6).toUpperCase()}`,
-          shop: item.shop || "",
-          cashier_name: item.actor_name || "Cashier",
-          customer_name: item.customer_name || "Walk-in Guest",
-          customer_phone: item.customer_phone || "",
-          subtotal: parseFloat(item.subtotal_amount || "0"),
-          tax_amount: parseFloat(item.tax_amount || "0"),
-          discount_amount: parseFloat(item.discount_amount || "0"),
-          total_amount: parseFloat(item.total_amount || "0"),
-          payment_mode: (item.payment_mode || "cash").toLowerCase(),
-          payment_breakdown: { cash, card, upi, khata_due },
-          status: item.status || "completed",
-          items_count: item.item_count || 1,
-          created_at: item.occurred_at || new Date().toISOString(),
-        };
-      });
+      const mappedSales: SaleOrder[] = data.map(toSaleOrder);
       setSales(mappedSales);
     } catch (err) {
       setError(errorMessage(err, "Failed to load sales"));

@@ -395,7 +395,7 @@ export function TeamAttendance({ initialTeam, initialSessions, initialSummary }:
                         {record.clock_out_at ? new Date(record.clock_out_at).toLocaleTimeString("en-IN", { timeStyle: "short" }) : "Active Shift"}
                       </td>
                       <td className="py-3 px-4 text-center font-mono font-semibold text-text-primary">
-                        {record.total_hours !== undefined ? `${parseFloat(record.total_hours as any).toFixed(1)} hrs` : "—"}
+                        {record.total_hours !== undefined ? `${parseFloat(String(record.total_hours)).toFixed(1)} hrs` : "—"}
                       </td>
                       <td className="py-3 px-4 text-center">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
@@ -483,7 +483,7 @@ export function TeamAttendance({ initialTeam, initialSessions, initialSummary }:
                 </label>
                 <select
                   value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value as any)}
+                  onChange={(e) => setInviteRole(e.target.value as "admin" | "staff" | "viewer")}
                   className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                 >
                   <option value="staff">Staff Operator / Cashier</option>
@@ -567,7 +567,7 @@ export function TeamAttendance({ initialTeam, initialSessions, initialSummary }:
                 </label>
                 <select
                   value={attendanceStatus}
-                  onChange={(e) => setAttendanceStatus(e.target.value as any)}
+                  onChange={(e) => setAttendanceStatus(e.target.value as "present" | "half_day" | "leave" | "absent")}
                   className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none"
                 >
                   <option value="present">Present (Full Day)</option>
