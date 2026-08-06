@@ -12,6 +12,7 @@ import {
   Receipt,
   FileSpreadsheet,
   Stethoscope,
+  Upload,
   TrendingDown,
   TrendingUp,
   Clock,
@@ -45,6 +46,7 @@ type AdminShellProps = {
     | "attendance"
     | "insights"
     | "data-health"
+    | "import"
     | "billing"
     | "tally"
     | "reports"
@@ -110,6 +112,7 @@ export function AdminShell({
     { key: "attendance", label: "Attendance", href: "/attendance", icon: Clock },
     { key: "expenses", label: "Expenses", href: "/expenses", icon: TrendingDown },
     { key: "suppliers", label: "Suppliers & purchases", href: "/suppliers", icon: Truck },
+    { key: "import", label: "Import spreadsheet", href: "/import", icon: Upload },
     { key: "data-health", label: "Data health", href: "/data-health", icon: Stethoscope },
     { key: "tally", label: "Accountant export", href: "/tally", icon: FileSpreadsheet },
     { key: "billing", label: "Subscription", href: "/billing", icon: CreditCard },

@@ -208,40 +208,6 @@ export function AuthLogin() {
     }
   };
 
-  // Quick sign-in for the seeded demo accounts. Unlike before, a failed
-  // attempt stays on the login screen: the old version called router.push in
-  // both the failure and catch branches, so clicking "Admin" landed on
-  // /platform whether or not authentication succeeded.
-  const handleQuickLogin = async (testEmail: string, testRole: string) => {
-    setEmail(testEmail);
-    setPassword("DemoPass123!");
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: testEmail, password: "DemoPass123!" }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        router.push(data.defaultRoute || (testRole === "cashier" ? "/pos" : "/"));
-        router.refresh();
-      } else {
-        setError(
-          data?.error ||
-            "That demo account does not exist on this backend. Sign in with a real account."
-        );
-      }
-    } catch {
-      setError("Cannot reach the server. Check your connection and try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[var(--bg-app)] flex flex-col items-center justify-center p-4 sm:p-6 select-none">
       <div className="w-full max-w-[440px] flex flex-col items-center">
@@ -651,35 +617,6 @@ export function AuthLogin() {
             </div>
           )}
 
-          {/* Quick 1-Click Role Testing */}
-          <div className="mt-6 pt-5 border-t border-[var(--bg-soft)]">
-            <div className="text-[10px] uppercase font-extrabold text-[var(--text-tertiary)] tracking-wider text-center mb-2.5">
-              Quick 1-Click Test Access
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("owner@businesshub.com", "owner")}
-                className="p-2 text-center rounded-xl bg-[var(--bg-base)] hover:bg-[var(--bg-app)] active:bg-[var(--border-soft)] border border-[var(--border-soft)] text-[11px] font-bold text-[var(--text-primary)] transition-all cursor-pointer"
-              >
-                👑 Owner
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("cashier@businesshub.com", "cashier")}
-                className="p-2 text-center rounded-xl bg-[var(--bg-base)] hover:bg-[var(--bg-app)] active:bg-[var(--border-soft)] border border-[var(--border-soft)] text-[11px] font-bold text-[var(--text-primary)] transition-all cursor-pointer"
-              >
-                💳 Cashier
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("admin@businesshub.com", "admin")}
-                className="p-2 text-center rounded-xl bg-[var(--bg-base)] hover:bg-[var(--bg-app)] active:bg-[var(--border-soft)] border border-[var(--border-soft)] text-[11px] font-bold text-[var(--text-primary)] transition-all cursor-pointer"
-              >
-                ⚙️ Admin
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Footer */}
