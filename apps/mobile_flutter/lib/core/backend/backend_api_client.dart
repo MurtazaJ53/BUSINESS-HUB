@@ -837,6 +837,33 @@ class BackendApiClient {
     return _mapCustomerSummary(decoded);
   }
 
+  /// Fetch the shop's own details (name, GSTIN, UPI id, receipt lines).
+  Future<Map<String, dynamic>> fetchShopSettings({
+    required User user,
+    required String shopId,
+  }) async {
+    return _request(
+      user: user,
+      method: 'GET',
+      path: '/shops/$shopId/settings/',
+    );
+  }
+
+  /// Push the shop's details so every device and the website agree. Only the
+  /// keys supplied are changed.
+  Future<Map<String, dynamic>> updateShopSettings({
+    required User user,
+    required String shopId,
+    required Map<String, dynamic> changes,
+  }) async {
+    return _request(
+      user: user,
+      method: 'PATCH',
+      path: '/shops/$shopId/settings/',
+      body: changes,
+    );
+  }
+
   /// Record that a payment reminder went out, so every other device shows the
   /// customer as already chased today.
   Future<void> markCustomerReminded({

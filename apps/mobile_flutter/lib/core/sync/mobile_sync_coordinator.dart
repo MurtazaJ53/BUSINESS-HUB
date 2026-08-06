@@ -604,6 +604,39 @@ class MobileSyncCoordinator {
   /// Pull the latest inventory + customers from the backend and merge them
   /// locally. Merges are upserts, so a pull can never lose local data. Paired
   /// with the outbox push this gives two-way, multi-device sync.
+  /// Refresh the shop's business details from the server.
+  ///
+  /// Best-effort: a shop that cannot reach the server should still sync its
+  /// sales, and the locally stored details stay usable meanwhile.
+  Future<void> _pullShopSettings(MobileSession session) async {
+    try {
+      final remote = await _backendApiClient.fetchShopSettings(
+        user: session.user,
+        shopId: session.shopId!,
+      );
+      final name = (remote['name'] ?? '').toString().trim();
+      // An empty name would blank the receipt header; treat it as no answer.
+      if (name.isEmpty) return;
+
+      // saveShopDocument overwrites the whole record, so carry through the
+      // fields the settings endpoint does not own (plan tier and features).
+      final current = await _shopRepository.watchShopInfo().first;
+      await _shopRepository.saveShopDocument(<String, dynamic>{
+        'name': name,
+        'tagline': (remote['tagline'] ?? current.tagline).toString(),
+        'footer': (remote['footer'] ?? current.footer).toString(),
+        'currency': (remote['currency_code'] ?? current.currency).toString(),
+        'business_phone': (remote['business_phone'] ?? current.phone).toString(),
+        'gstin': (remote['gstin'] ?? current.gstin).toString(),
+        'upi_vpa': (remote['upi_vpa'] ?? current.upiVpa).toString(),
+        'plan_tier': current.planTier,
+        'enabled_features': current.enabledFeatures,
+      });
+    } catch (error) {
+      debugPrint('Shop settings pull failed: $error');
+    }
+  }
+
   Future<CommerceSyncResult> pullFromCloud() async {
     if (!MobileRuntimeConfig.backendSyncEnabled) {
       return const CommerceSyncResult(
@@ -623,6 +656,9 @@ class MobileSyncCoordinator {
 
     setStatus(MobileSyncStatus.syncing);
     final now = DateTime.now().millisecondsSinceEpoch;
+    // Shop details first: on a fresh install the receipt header, GSTIN and UPI
+    // id would otherwise stay at their defaults until someone re-typed them.
+    await _pullShopSettings(session);
     try {
       final shopId = session.shopId!;
       final user = session.user;
@@ -682,6 +718,40 @@ class MobileSyncCoordinator {
         state: CommerceSyncState.failed,
         message: 'Cloud unreachable: $error',
       );
+    }
+  }
+
+  /// Save the shop's business details locally and push them to the server.
+  ///
+  /// These used to be device-only: a reinstall lost the shop's GSTIN and UPI
+  /// id, and the website had no way to read them. Local write first so the
+  /// receipt is correct immediately even with no signal; the push is
+  /// best-effort and re-runs on the next save.
+  Future<void> saveBusinessDetails(Map<String, dynamic> document) async {
+    await _shopRepository.saveShopDocument(document);
+
+    final session = _session;
+    if (session == null ||
+        !session.hasShop ||
+        !MobileRuntimeConfig.backendSyncEnabled) {
+      return;
+    }
+    try {
+      await _backendApiClient.updateShopSettings(
+        user: session.user,
+        shopId: session.shopId!,
+        changes: <String, dynamic>{
+          'name': document['name'],
+          'tagline': document['tagline'],
+          'footer': document['footer'],
+          'currency_code': document['currency'],
+          'business_phone': document['business_phone'],
+          'gstin': document['gstin'],
+          'upi_vpa': document['upi_vpa'],
+        },
+      );
+    } catch (error) {
+      debugPrint('Backend shop settings push failed: $error');
     }
   }
 
