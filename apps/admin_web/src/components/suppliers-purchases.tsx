@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Truck,
   Plus,
@@ -42,63 +42,57 @@ export interface PurchaseOrderRecord {
   created_at: string;
 }
 
-const SEED_SUPPLIERS: SupplierRecord[] = [
-  {
-    id: "sup-1",
-    shop: "shop-1",
-    name: "National FMCG Distributors Ltd",
-    contact_person: "Manoj Agarwal",
-    phone: "+91 98450 12345",
-    email: "manoj@nationalfmcg.com",
-    gstin: "27AABCN8921R1ZX",
-    address: "Godown 4, Transport Nagar, Phase 2",
-    balance_due: 42000.0,
-    created_at: "2026-05-10T10:00:00Z",
-  },
-  {
-    id: "sup-2",
-    shop: "shop-1",
-    name: "Golden Grain Mills & Agri Trading",
-    contact_person: "Surendra Seth",
-    phone: "+91 98220 99887",
-    email: "orders@goldengrain.in",
-    gstin: "27AAACG4412Q1ZR",
-    address: "Grain Market Yard, Gate 3",
-    balance_due: 0.0,
-    created_at: "2026-06-01T10:00:00Z",
-  },
-];
+function num(value: unknown): number {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const parsed = parseFloat(String(value ?? "0"));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
-const SEED_PURCHASES: PurchaseOrderRecord[] = [
-  {
-    id: "po-101",
-    shop: "shop-1",
-    supplier_id: "sup-1",
-    supplier_name: "National FMCG Distributors Ltd",
-    invoice_number: "INV-NF-8921",
-    total_amount: 54000.0,
-    paid_amount: 12000.0,
-    status: "received",
-    items_count: 8,
-    created_at: "2026-07-28T11:00:00Z",
-  },
-  {
-    id: "po-102",
-    shop: "shop-1",
-    supplier_id: "sup-2",
-    supplier_name: "Golden Grain Mills & Agri Trading",
-    invoice_number: "PO-GG-3301",
-    total_amount: 32500.0,
-    paid_amount: 32500.0,
-    status: "received",
-    items_count: 4,
-    created_at: "2026-08-01T09:30:00Z",
-  },
-];
+/** The API may hand back a bare array or a {results: []} envelope. */
+function asArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  const results = (value as { results?: unknown })?.results;
+  return Array.isArray(results) ? (results as T[]) : [];
+}
+
+function toSupplier(row: any): SupplierRecord {
+  return {
+    id: String(row.id),
+    name: row.name ?? "Unnamed supplier",
+    // The backend has no contact_person column; showing an empty line is
+    // honest, inventing a name is not.
+    contact_person: "",
+    phone: row.phone ?? "",
+    email: row.email ?? "",
+    gstin: row.gstin ?? "",
+    address: row.address ?? "",
+    balance_due: num(row.balance),
+    created_at: row.created_at ?? "",
+  };
+}
+
+function toPurchase(row: any): PurchaseOrderRecord {
+  return {
+    id: String(row.id),
+    supplier_id: row.supplier_id ? String(row.supplier_id) : "",
+    supplier_name: row.supplier_name || "Supplier",
+    invoice_number: row.invoice_number || row.reference || "-",
+    total_amount: num(row.total_amount),
+    paid_amount: num(row.amount_paid),
+    status: row.status === "void" ? "cancelled" : "received",
+    items_count: num(row.item_count),
+    created_at: row.purchase_date || row.occurred_at || "",
+  };
+}
 
 export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: "purchases" | "suppliers" } = {}) {
-  const [suppliers, setSuppliers] = useState<SupplierRecord[]>(SEED_SUPPLIERS);
-  const [purchases, setPurchases] = useState<PurchaseOrderRecord[]>(SEED_PURCHASES);
+  const [suppliers, setSuppliers] = useState<SupplierRecord[]>([]);
+  const [purchases, setPurchases] = useState<PurchaseOrderRecord[]>([]);
+  const [outstandingPayable, setOutstandingPayable] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"purchases" | "suppliers">(initialTab);
   const [search, setSearch] = useState("");
 
@@ -119,71 +113,138 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
   const [supGstin, setSupGstin] = useState("");
   const [supAddress, setSupAddress] = useState("");
 
-  const totalPayables = useMemo(() => {
-    return suppliers.reduce((sum, s) => sum + (s.balance_due || 0), 0);
-  }, [suppliers]);
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const [supRes, purRes] = await Promise.all([
+        fetch("/api/suppliers"),
+        fetch("/api/purchases"),
+      ]);
+      if (!supRes.ok) throw new Error(`Could not load suppliers (${supRes.status})`);
+      if (!purRes.ok) throw new Error(`Could not load purchases (${purRes.status})`);
 
-  const handleCreatePo = (e: React.FormEvent) => {
+      const supBody = await supRes.json();
+      const purBody = await purRes.json();
+      setSuppliers(asArray<any>(supBody.items).map(toSupplier));
+      setPurchases(asArray<any>(purBody.items).map(toPurchase));
+      // Prefer the server's own total over one summed in the browser: the
+      // browser only sees the rows it loaded.
+      setOutstandingPayable(
+        purBody.summary ? num(purBody.summary.outstanding_payable) : null
+      );
+    } catch (err: any) {
+      setLoadError(err?.message || "Something went wrong loading suppliers.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const totalPayables = useMemo(() => {
+    if (outstandingPayable !== null) return outstandingPayable;
+    return suppliers.reduce((sum, s) => sum + (s.balance_due || 0), 0);
+  }, [suppliers, outstandingPayable]);
+
+  const handleCreatePo = async (e: React.FormEvent) => {
     e.preventDefault();
     const sup = suppliers.find((s) => s.id === poSupplierId);
     const total = parseFloat(poTotalAmount) || 0;
     const paid = parseFloat(poPaidAmount) || 0;
-    const due = total - paid;
 
-    const newPo: PurchaseOrderRecord = {
-      id: `po-${Date.now()}`,
-      shop: "shop-1",
-      supplier_id: poSupplierId,
-      supplier_name: sup?.name || "Supplier",
-      invoice_number: poInvoiceNo || `PO-${Date.now().toString().slice(-4)}`,
-      total_amount: total,
-      paid_amount: paid,
-      status: "received",
-      items_count: 1,
-      created_at: new Date().toISOString(),
-    };
-
-    setPurchases((prev) => [newPo, ...prev]);
-
-    // Update supplier balance
-    if (due > 0 && sup) {
-      setSuppliers((prev) =>
-        prev.map((s) =>
-          s.id === sup.id ? { ...s, balance_due: (s.balance_due || 0) + due } : s
-        )
-      );
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      const invoice = poInvoiceNo.trim();
+      const res = await fetch("/api/purchases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          supplier_id: poSupplierId || null,
+          supplier_name: sup?.name ?? "",
+          invoice_number: invoice,
+          amount_paid: paid.toFixed(2),
+          payment_mode: "CASH",
+          purchase_date: new Date().toISOString().slice(0, 10),
+          // One summary line for the whole invoice, matching what the mobile
+          // app sends: the backend requires at least one item, and this form
+          // records an invoice total rather than a line-by-line delivery.
+          items: [
+            {
+              name: invoice || "Stock purchase",
+              quantity: "1",
+              unit_cost: total.toFixed(2),
+            },
+          ],
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error || `Could not save the purchase (${res.status})`);
+      }
+      setIsNewPoOpen(false);
+      setPoInvoiceNo("");
+      setPoTotalAmount("");
+      setPoPaidAmount("");
+      // Re-read rather than patch local state: the supplier's payable balance
+      // is recalculated server-side from its ledger.
+      await load();
+    } catch (err: any) {
+      setSaveError(err?.message || "Could not save the purchase.");
+    } finally {
+      setIsSaving(false);
     }
-
-    setIsNewPoOpen(false);
-    setPoInvoiceNo("");
-    setPoTotalAmount("");
-    setPoPaidAmount("");
   };
 
-  const handleCreateSupplier = (e: React.FormEvent) => {
+  const handleCreateSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newSup: SupplierRecord = {
-      id: `sup-${Date.now()}`,
-      shop: "shop-1",
-      name: supName,
-      contact_person: supContact,
-      phone: supPhone,
-      gstin: supGstin,
-      address: supAddress,
-      balance_due: 0,
-      created_at: new Date().toISOString(),
-    };
-    setSuppliers((prev) => [newSup, ...prev]);
-    setIsNewSupplierOpen(false);
-    setSupName("");
-    setSupContact("");
-    setSupPhone("");
-    setSupGstin("");
-    setSupAddress("");
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      const res = await fetch("/api/suppliers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: supName.trim(),
+          phone: supPhone.trim(),
+          gstin: supGstin.trim(),
+          address: supAddress.trim(),
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error || `Could not save the supplier (${res.status})`);
+      }
+      setIsNewSupplierOpen(false);
+      setSupName("");
+      setSupContact("");
+      setSupPhone("");
+      setSupGstin("");
+      setSupAddress("");
+      await load();
+    } catch (err: any) {
+      setSaveError(err?.message || "Could not save the supplier.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
     <div className="space-y-6">
+      {(loadError || saveError) && (
+        <div className="rounded-2xl border border-[var(--error)]/30 bg-[var(--error)]/10 px-5 py-4 text-sm font-semibold text-[var(--error-strong)]">
+          {loadError || saveError}
+        </div>
+      )}
+      {isLoading && (
+        <div className="rounded-2xl border border-border-soft bg-surface px-5 py-4 text-sm font-semibold text-[var(--text-secondary)]">
+          Loading suppliers and purchases&hellip;
+        </div>
+      )}
+
       {/* Top Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -196,16 +257,16 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-2 text-xs">
+          <div className="px-4 py-2 bg-[var(--error)]/10 border border-[var(--error)]/20 rounded-xl flex items-center gap-2 text-xs">
             <span className="text-[var(--text-secondary)]">Total Vendor Payables:</span>
-            <span className="font-bold text-red-400 font-mono">
+            <span className="font-bold text-[var(--error)] font-mono">
               {formatCurrency(totalPayables)}
             </span>
           </div>
 
           <button
             onClick={() => setIsNewPoOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-text-primary text-xs font-semibold rounded-xl shadow-md shadow-blue-500/20"
+            className="flex items-center gap-1.5 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-semibold rounded-xl shadow-md shadow-blue-500/20"
           >
             <Plus className="w-4 h-4" />
             <span>Record Inward PO</span>
@@ -266,18 +327,18 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
                       </td>
                       <td className="py-3 px-4 text-text-primary font-medium">{po.supplier_name}</td>
                       <td className="py-3 px-4 text-center">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-500/20 text-emerald-300">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-[var(--success)]/20 text-[var(--success)]">
                           {po.status}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-text-primary font-semibold">
                         {formatCurrency(po.total_amount)}
                       </td>
-                      <td className="py-3 px-4 text-right font-mono text-emerald-400">
+                      <td className="py-3 px-4 text-right font-mono text-[var(--success)]">
                         {formatCurrency(po.paid_amount)}
                       </td>
                       <td className="py-3 px-4 text-right font-mono font-bold">
-                        <span className={due > 0 ? "text-red-400" : "text-[var(--text-tertiary)]"}>
+                        <span className={due > 0 ? "text-[var(--error)]" : "text-[var(--text-tertiary)]"}>
                           {formatCurrency(due)}
                         </span>
                       </td>
@@ -315,7 +376,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xs font-mono font-bold text-red-400">
+                    <div className="text-xs font-mono font-bold text-[var(--error)]">
                       {formatCurrency(sup.balance_due || 0)}
                     </div>
                     <div className="text-[9px] uppercase font-semibold text-[var(--text-tertiary)]">
@@ -432,9 +493,10 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-xs font-semibold text-white bg-[var(--primary)] hover:bg-[var(--primary-hover)] rounded-xl shadow-md"
+                  disabled={isSaving}
+                  className="px-5 py-2 text-xs font-semibold text-white bg-[var(--primary)] hover:bg-[var(--primary-hover)] rounded-xl shadow-md disabled:opacity-50"
                 >
-                  Record Inward Stock
+                  {isSaving ? "Saving…" : "Record Inward Stock"}
                 </button>
               </div>
             </form>
@@ -545,9 +607,10 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-xs font-semibold text-white bg-[var(--primary)] hover:bg-[var(--primary-hover)] rounded-xl shadow-md"
+                  disabled={isSaving}
+                  className="px-5 py-2 text-xs font-semibold text-white bg-[var(--primary)] hover:bg-[var(--primary-hover)] rounded-xl shadow-md disabled:opacity-50"
                 >
-                  Save Supplier
+                  {isSaving ? "Saving…" : "Save Supplier"}
                 </button>
               </div>
             </form>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Bell,
   CheckCircle2,
@@ -22,55 +22,64 @@ export interface NotificationItem {
   created_at: string;
 }
 
-const SEED_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: "notif-1",
-    title: "Low Stock Warning",
-    message: "Cadbury Dairy Milk Silk 150g is running low (4 units remaining in shelf).",
-    type: "warning",
-    is_read: false,
-    created_at: "2026-08-02T11:30:00Z",
-  },
-  {
-    id: "notif-2",
-    title: "Khata Udhaar Payment Received",
-    message: "Rajesh Kumar settled ₹3,000.00 via UPI QR code.",
-    type: "success",
-    is_read: false,
-    created_at: "2026-08-02T10:45:00Z",
-  },
-  {
-    id: "notif-3",
-    title: "Shift Attendance",
-    message: "Rashi Cashier clocked into POS Terminal Desk #1.",
-    type: "info",
-    is_read: true,
-    created_at: "2026-08-02T09:00:00Z",
-  },
-  {
-    id: "notif-4",
-    title: "Day Close Register Reconciled",
-    message: "August 1st day-close register closed with ₹18,400.00 cash float matched.",
-    type: "info",
-    is_read: true,
-    created_at: "2026-08-01T21:15:00Z",
-  },
-];
-
 export function NotificationsFeed() {
-  const [notifications, setNotifications] = useState<NotificationItem[]>(SEED_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
-  const handleMarkAllRead = () => {
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/notifications");
+      if (!res.ok) throw new Error(`Could not load notifications (${res.status})`);
+      const body = await res.json();
+      setNotifications(Array.isArray(body) ? body : []);
+    } catch (err: any) {
+      setError(err?.message || "Something went wrong loading notifications.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const handleMarkAllRead = async () => {
+    // Optimistic: the list should feel instant. Reload afterwards so a failed
+    // write cannot leave the badge showing zero unread when the server
+    // disagrees.
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    try {
+      const res = await fetch("/api/notifications/read-all", { method: "POST" });
+      if (!res.ok) throw new Error(`Could not mark all read (${res.status})`);
+    } catch (err: any) {
+      setError(err?.message || "Could not mark all as read.");
+    } finally {
+      await load();
+    }
   };
 
-  const handleToggleRead = (id: string) => {
+  const handleToggleRead = async (id: string) => {
+    const current = notifications.find((n) => n.id === id);
+    // The API can only mark as read; there is no "unread" endpoint, so don't
+    // pretend the toggle works both ways.
+    if (!current || current.is_read) return;
+
     setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, is_read: !n.is_read } : n))
+      prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
     );
+    try {
+      const res = await fetch(`/api/notifications/${id}/read`, { method: "POST" });
+      if (!res.ok) throw new Error(`Could not mark as read (${res.status})`);
+    } catch (err: any) {
+      setError(err?.message || "Could not mark as read.");
+      await load();
+    }
   };
 
   const filtered = notifications.filter((n) => {
@@ -131,9 +140,20 @@ export function NotificationsFeed() {
         </button>
       </div>
 
+      {error && (
+        <div className="mb-3 rounded-2xl border border-[var(--error)]/30 bg-[var(--error)]/10 px-5 py-4 text-sm font-semibold text-[var(--error-strong)]">
+          {error}
+        </div>
+      )}
+
       {/* Feed List */}
       <div className="space-y-3">
-        {filtered.length === 0 ? (
+        {isLoading && notifications.length === 0 && (
+          <div className="p-12 text-center bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl text-xs text-[var(--text-tertiary)]">
+            Loading notifications&hellip;
+          </div>
+        )}
+        {!isLoading && filtered.length === 0 ? (
           <div className="p-12 text-center bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl">
             <Bell className="w-8 h-8 text-[var(--text-disabled)] mx-auto mb-2" />
             <p className="text-xs text-[var(--text-tertiary)]">No unread notifications.</p>
@@ -152,9 +172,9 @@ export function NotificationsFeed() {
               <div
                 className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
                   item.type === "warning"
-                    ? "bg-amber-500/10 text-amber-400"
+                    ? "bg-[var(--warning)]/10 text-[var(--warning)]"
                     : item.type === "success"
-                    ? "bg-emerald-500/10 text-emerald-400"
+                    ? "bg-[var(--success)]/10 text-[var(--success)]"
                     : "bg-blue-500/10 text-blue-400"
                 }`}
               >

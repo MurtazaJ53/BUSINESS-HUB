@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Bell,
@@ -24,48 +24,9 @@ export type NotificationItem = {
   link_url?: string;
 };
 
-const DEFAULT_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: "notif-1",
-    type: "low_stock",
-    title: "Low Stock Alert: Organic Mustard Oil",
-    message: "Current stock level is 3 units (reorder threshold is 10 units).",
-    created_at: new Date(Date.now() - 1000 * 60 * 14).toISOString(),
-    is_read: false,
-    link_url: "/inventory",
-  },
-  {
-    id: "notif-2",
-    type: "khata_due",
-    title: "High Outstanding Balance: Ramesh Verma",
-    message: "Khata balance reached ₹14,500 against credit limit of ₹15,000.",
-    created_at: new Date(Date.now() - 1000 * 60 * 65).toISOString(),
-    is_read: false,
-    link_url: "/customers",
-  },
-  {
-    id: "notif-3",
-    type: "security",
-    title: "New Passkey Enrolled",
-    message: "A new biometric passkey was successfully registered for your account.",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-    is_read: true,
-    link_url: "/security",
-  },
-  {
-    id: "notif-4",
-    type: "system",
-    title: "Day Close Summary Reconciled",
-    message: "Yesterday's cash register closed with ₹0.00 variance.",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 22).toISOString(),
-    is_read: true,
-    link_url: "/day-close",
-  },
-];
-
 export function NotificationsPopover() {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(DEFAULT_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -83,14 +44,54 @@ export function NotificationsPopover() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
-  const markAllAsRead = () => {
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/notifications");
+      if (!res.ok) return;
+      const body = await res.json();
+      // The API calls it action_url; this component reads link_url. Map it, or
+      // every "view" link silently disappears.
+      setNotifications(
+        (Array.isArray(body) ? body : []).map((n: any) => ({
+          ...n,
+          link_url: n.link_url ?? n.action_url ?? undefined,
+        }))
+      );
+    } catch {
+      // The bell is ambient: a failure here must not interrupt the page. The
+      // full list on /notifications reports errors properly.
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Refresh when the popover opens so the count is not stale from page load.
+  useEffect(() => {
+    if (isOpen) void load();
+  }, [isOpen, load]);
+
+  const markAllAsRead = async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    try {
+      await fetch("/api/notifications/read-all", { method: "POST" });
+    } finally {
+      await load();
+    }
   };
 
-  const markAsRead = (id: string) => {
+  const markAsRead = async (id: string) => {
+    const current = notifications.find((n) => n.id === id);
+    if (!current || current.is_read) return;
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
     );
+    try {
+      await fetch(`/api/notifications/${id}/read`, { method: "POST" });
+    } catch {
+      await load();
+    }
   };
 
   const filteredNotifications = notifications.filter((n) => {
@@ -101,11 +102,11 @@ export function NotificationsPopover() {
   const getIcon = (type: NotificationItem["type"]) => {
     switch (type) {
       case "low_stock":
-        return <Package className="w-4 h-4 text-amber-400" />;
+        return <Package className="w-4 h-4 text-[var(--warning)]" />;
       case "khata_due":
-        return <CreditCard className="w-4 h-4 text-red-400" />;
+        return <CreditCard className="w-4 h-4 text-[var(--error)]" />;
       case "security":
-        return <ShieldCheck className="w-4 h-4 text-emerald-400" />;
+        return <ShieldCheck className="w-4 h-4 text-[var(--success)]" />;
       default:
         return <CheckCircle2 className="w-4 h-4 text-blue-400" />;
     }

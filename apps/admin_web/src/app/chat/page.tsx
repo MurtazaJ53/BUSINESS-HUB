@@ -1,25 +1,16 @@
-import { TeamChat } from "@/components/team-chat";
-import { AdminShell } from "@/components/admin-shell";
-import { getSession, resolveActiveShop } from "@/lib/admin-api";
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "Team Chat & Channels | Business Hub",
-  description: "Internal team communication, store alerts, cashier handover notes",
-};
-
-export default async function ChatPage() {
-  const session = await getSession();
-  const activeShop = resolveActiveShop(session);
-
-  return (
-    <AdminShell
-      session={session}
-      activeShop={activeShop}
-      activeRoute="chat"
-      title="Team Communication & Shift Notes"
-      subtitle="Store channels, cashier handover logs, urgent restocking alerts & manager direct messages"
-    >
-      <TeamChat currentUserName={session.user.full_name || "Manager"} />
-    </AdminShell>
-  );
+/**
+ * Retired.
+ *
+ * This page rendered a fully mocked team chat: seeded channels and messages,
+ * with anything typed kept in React state and lost on refresh. There is no
+ * chat API on the backend and no chat feature in the mobile app, so it
+ * advertised something the product does not do.
+ *
+ * It was never linked from the navigation. The previous implementation is in
+ * git history (commit 76769d9) if team chat is ever built for real.
+ */
+export default function ChatPage() {
+  redirect("/");
 }

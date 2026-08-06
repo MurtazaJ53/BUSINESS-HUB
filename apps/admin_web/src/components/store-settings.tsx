@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Settings,
   Building2,
@@ -26,16 +26,18 @@ export function StoreSettings({
 
   // Form State
   const [shopName, setShopName] = useState(currentShopName);
-  const [legalName, setLegalName] = useState("Murtaza Retail Enterprises Pvt Ltd");
-  const [phone, setPhone] = useState("+91 98450 00000");
-  const [email, setEmail] = useState("store@businesshub.com");
-  const [address, setAddress] = useState("Shop 4, Commercial Complex, Main Road, Mumbai 400001");
+  const [legalName, setLegalName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [address, setAddress] = useState("");
   const [currency, setCurrency] = useState("INR");
+  // Printed on the khata reminder as a one-tap pay link.
+  const [upiVpa, setUpiVpa] = useState("");
 
   // Tax State
-  const [gstin, setGstin] = useState("27AAACB1234F1Z5");
-  const [invoicePrefix, setInvoicePrefix] = useState("INV-");
-  const [footerNotes, setFooterNotes] = useState("Thank you for shopping with us! Goods once sold cannot be returned without original receipt.");
+  const [gstin, setGstin] = useState("");
+  const [invoicePrefix, setInvoicePrefix] = useState("");
+  const [footerNotes, setFooterNotes] = useState("");
 
   // Hardware State
   const [paperWidth, setPaperWidth] = useState<"58mm" | "80mm">("80mm");
@@ -43,11 +45,78 @@ export function StoreSettings({
   const [scannerDelay, setScannerDelay] = useState("50");
 
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSave = (e: React.FormEvent) => {
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/settings");
+      if (!res.ok) throw new Error(`Could not load settings (${res.status})`);
+      const data = await res.json();
+      setShopName(data.name ?? "");
+      setLegalName(data.legal_name ?? "");
+      setPhone(data.business_phone ?? "");
+      setEmail(data.business_email ?? "");
+      setAddress(data.address ?? "");
+      setCurrency(data.currency_code || "INR");
+      setUpiVpa(data.upi_vpa ?? "");
+      setGstin(data.gstin ?? "");
+      setInvoicePrefix(data.invoice_prefix ?? "");
+      setFooterNotes(data.footer ?? "");
+    } catch (err: any) {
+      setError(err?.message || "Something went wrong loading settings.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+    setIsSaving(true);
+    setError(null);
+    setSavedSuccess(false);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: shopName,
+          legal_name: legalName,
+          business_phone: phone,
+          business_email: email,
+          address,
+          currency_code: currency,
+          upi_vpa: upiVpa,
+          gstin,
+          invoice_prefix: invoicePrefix,
+          footer: footerNotes,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        // The backend explains exactly which field is wrong (GSTIN shape, UPI
+        // shape, empty name); showing its message beats a generic failure.
+        throw new Error(
+          typeof body?.error === "string" ? body.error : `Could not save (${res.status})`
+        );
+      }
+      // Re-read so the form shows exactly what was stored (the server trims and
+      // uppercases the GSTIN).
+      await load();
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 3000);
+    } catch (err: any) {
+      setError(err?.message || "Could not save settings.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -62,7 +131,7 @@ export function StoreSettings({
         </div>
 
         {savedSuccess && (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold rounded-xl animate-in fade-in">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--success)]/10 border border-[var(--success)]/30 text-[var(--success)] text-xs font-semibold rounded-xl animate-in fade-in">
             <CheckCircle2 className="w-4 h-4" />
             <span>Settings Saved!</span>
           </div>
@@ -116,6 +185,17 @@ export function StoreSettings({
           <span>Plan & Subscription</span>
         </button>
       </div>
+
+      {error && (
+        <div className="rounded-2xl border border-[var(--error)]/30 bg-[var(--error)]/10 px-5 py-4 text-sm font-semibold text-[var(--error-strong)]">
+          {error}
+        </div>
+      )}
+      {isLoading && (
+        <div className="rounded-2xl border border-border-soft bg-surface px-5 py-4 text-sm font-semibold text-[var(--text-secondary)]">
+          Loading settings&hellip;
+        </div>
+      )}
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* General Store Tab */}
@@ -174,6 +254,23 @@ export function StoreSettings({
                   className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none focus:border-[var(--primary)]"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
+                UPI ID
+              </label>
+              <input
+                type="text"
+                value={upiVpa}
+                onChange={(e) => setUpiVpa(e.target.value)}
+                placeholder="shopname@okaxis"
+                className="w-full px-3 py-2 bg-bg-soft border border-[var(--border-soft)] rounded-xl text-xs text-text-primary focus:outline-none focus:border-[var(--primary)]"
+              />
+              <p className="mt-1 text-[11px] font-semibold text-[var(--text-tertiary)]">
+                Added to khata reminders as a one-tap pay link, and to the receipt
+                QR. Leave blank to send reminders without a pay link.
+              </p>
             </div>
 
             <div>
@@ -316,7 +413,7 @@ export function StoreSettings({
               </div>
               <div className="p-4 rounded-xl bg-[var(--bg-soft)] border border-[var(--border-soft)]">
                 <div className="text-xs text-[var(--text-tertiary)]">GST Invoicing</div>
-                <div className="text-xl font-bold text-emerald-400 mt-1">Full GSTR-1</div>
+                <div className="text-xl font-bold text-[var(--success)] mt-1">Full GSTR-1</div>
               </div>
             </div>
           </div>
@@ -325,10 +422,11 @@ export function StoreSettings({
         <div className="flex justify-end">
           <button
             type="submit"
-            className="flex items-center gap-2 px-6 py-2.5 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-text-primary text-xs font-semibold rounded-xl shadow-lg shadow-blue-500/25"
+            disabled={isSaving || isLoading}
+            className="flex items-center gap-2 px-6 py-2.5 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-semibold rounded-xl shadow-lg shadow-blue-500/25 disabled:opacity-50"
           >
             <Save className="w-4 h-4" />
-            <span>Save Store Preferences</span>
+            <span>{isSaving ? "Saving…" : "Save Store Preferences"}</span>
           </button>
         </div>
       </form>
