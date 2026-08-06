@@ -3,6 +3,12 @@ import { AdminShell } from "@/components/admin-shell";
 import { getSession, resolveActiveShop, getInventory, getInventorySummary } from "@/lib/admin-api";
 import type { InventoryItem, InventorySummaryPayload } from "@/lib/types";
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
+
 export const metadata = {
   title: "Inventory Management | Business Hub",
   description: "Manage products, barcodes, stock levels, variants, and low-stock alerts",
@@ -32,8 +38,8 @@ export default async function InventoryPage() {
       ]);
       inventory = resInventory;
       summary = resSummary;
-    } catch (err: any) {
-      errorMsg = err.message || "Failed to load inventory data from backend";
+    } catch (err) {
+      errorMsg = errorMessage(err, "Failed to load inventory data from backend");
       console.error("InventoryPage fetch error:", err);
     }
   }

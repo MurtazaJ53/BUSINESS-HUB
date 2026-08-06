@@ -3,6 +3,12 @@ import { AdminShell } from "@/components/admin-shell";
 import { getSession, resolveActiveShop, getWorkspaceTeamMembers, getAttendanceSessions, getAttendanceSummary } from "@/lib/admin-api";
 import type { WorkspaceTeamMemberPayload, AttendanceSession, AttendanceSummaryPayload } from "@/lib/types";
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
+
 export const metadata = {
   title: "Staff Attendance & Timesheet | Business Hub",
   description: "Track staff shifts, check-in timestamps, working hours, and leave records",
@@ -33,8 +39,8 @@ export default async function AttendancePage() {
       team = resTeam;
       sessions = resSessions;
       summary = resSummary;
-    } catch (err: any) {
-      errorMsg = err.message || "Failed to load attendance data from backend";
+    } catch (err) {
+      errorMsg = errorMessage(err, "Failed to load attendance data from backend");
       console.error("AttendancePage fetch error:", err);
     }
   }

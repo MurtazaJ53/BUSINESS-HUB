@@ -4,17 +4,16 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Truck,
   Plus,
-  Search,
-  Phone,
   Building,
-  FileCheck,
-  Calendar,
-  DollarSign,
-  CheckCircle2,
   X,
-  ArrowRight,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
 
 export interface SupplierRecord {
   id: string;
@@ -94,7 +93,7 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"purchases" | "suppliers">(initialTab);
-  const [search, setSearch] = useState("");
+  const [_search, _setSearch] = useState("");
 
   // Modals
   const [isNewPoOpen, setIsNewPoOpen] = useState(false);
@@ -133,8 +132,8 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
       setOutstandingPayable(
         purBody.summary ? num(purBody.summary.outstanding_payable) : null
       );
-    } catch (err: any) {
-      setLoadError(err?.message || "Something went wrong loading suppliers.");
+    } catch (err) {
+      setLoadError(errorMessage(err, "Something went wrong loading suppliers."));
     } finally {
       setIsLoading(false);
     }
@@ -192,8 +191,8 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
       // Re-read rather than patch local state: the supplier's payable balance
       // is recalculated server-side from its ledger.
       await load();
-    } catch (err: any) {
-      setSaveError(err?.message || "Could not save the purchase.");
+    } catch (err) {
+      setSaveError(errorMessage(err, "Could not save the purchase."));
     } finally {
       setIsSaving(false);
     }
@@ -225,8 +224,8 @@ export function SuppliersPurchases({ initialTab = "purchases" }: { initialTab?: 
       setSupGstin("");
       setSupAddress("");
       await load();
-    } catch (err: any) {
-      setSaveError(err?.message || "Could not save the supplier.");
+    } catch (err) {
+      setSaveError(errorMessage(err, "Could not save the supplier."));
     } finally {
       setIsSaving(false);
     }

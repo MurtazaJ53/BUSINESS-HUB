@@ -5,6 +5,12 @@ import { CheckCircle2, ClipboardCopy, RefreshCw } from "lucide-react";
 
 import { formatCurrency } from "@/lib/utils";
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
+
 type ReorderItem = {
   id: string;
   name: string;
@@ -74,8 +80,8 @@ export function ReorderList({ shopName }: { shopName: string }) {
       const res = await fetch("/api/reports/reorder-list");
       if (!res.ok) throw new Error(`Could not load the buying list (${res.status})`);
       setData(await res.json());
-    } catch (err: any) {
-      setError(err?.message || "Something went wrong loading the list.");
+    } catch (err) {
+      setError(errorMessage(err, "Something went wrong loading the list."));
     } finally {
       setLoading(false);
     }

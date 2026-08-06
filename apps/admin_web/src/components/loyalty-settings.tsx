@@ -5,6 +5,12 @@ import { Gift, Loader2 } from "lucide-react";
 
 import { formatCurrency } from "@/lib/utils";
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
+
 type LoyaltyConfig = {
   enabled: boolean;
   points_per_hundred: number;
@@ -46,8 +52,8 @@ export function LoyaltySettings() {
       const res = await fetch("/api/loyalty");
       if (!res.ok) throw new Error(`Could not load loyalty settings (${res.status})`);
       apply(await res.json());
-    } catch (err: any) {
-      setError(err?.message || "Something went wrong.");
+    } catch (err) {
+      setError(errorMessage(err, "Something went wrong."));
     } finally {
       setLoading(false);
     }
@@ -83,8 +89,8 @@ export function LoyaltySettings() {
       apply(await res.json());
       setSaved(true);
       window.setTimeout(() => setSaved(false), 2500);
-    } catch (err: any) {
-      setError(err?.message || "Could not save.");
+    } catch (err) {
+      setError(errorMessage(err, "Could not save."));
       // Put the inputs back to what is actually stored, so the screen never
       // shows a rate the shop is not honouring.
       await load();

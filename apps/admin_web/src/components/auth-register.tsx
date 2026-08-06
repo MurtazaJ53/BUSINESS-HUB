@@ -12,7 +12,6 @@ import {
   Building,
   CheckCircle2,
   ArrowRight,
-  Sparkles,
 } from "lucide-react";
 
 export function AuthRegister() {

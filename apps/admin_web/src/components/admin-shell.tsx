@@ -15,25 +15,19 @@ import {
   TrendingDown,
   TrendingUp,
   Clock,
-  BarChart3,
   Settings,
   Shield,
   Truck,
-  MessageSquare,
   LogOut,
   Store,
   CreditCard,
   Layers,
   Bell,
-  Sparkles,
-  ExternalLink,
-  ChevronRight,
   ShieldCheck,
 } from "lucide-react";
 
 import { formatRole } from "@/lib/formatters";
-import { canAccessAttendance, canAccessExpenses, formatPlanTier } from "@/lib/plans";
-import { canAccessPaymentsWorkspace, canManageWorkspace } from "@/lib/roles";
+import { formatPlanTier } from "@/lib/plans";
 import type { SessionPayload, ShopMembership } from "@/lib/types";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 

@@ -5,6 +5,12 @@ import { ArrowDownRight, ArrowUpRight, Package, RefreshCw, TrendingUp } from "lu
 
 import { formatCurrency } from "@/lib/utils";
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
+
 type CashFlow = {
   days: number;
   sales_collected: string;
@@ -72,8 +78,8 @@ export function BusinessPulse() {
       }
       const body = await sellersRes.json();
       setSellers(Array.isArray(body.items) ? body.items : []);
-    } catch (err: any) {
-      setError(err?.message || "Something went wrong loading the report.");
+    } catch (err) {
+      setError(errorMessage(err, "Something went wrong loading the report."));
     } finally {
       setLoading(false);
     }

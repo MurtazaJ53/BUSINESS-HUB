@@ -3,6 +3,12 @@ import { AdminShell } from "@/components/admin-shell";
 import { getSession, resolveActiveShop, getWorkspaceTeamMembers, getAttendanceSessions, getAttendanceSummary } from "@/lib/admin-api";
 import type { WorkspaceTeamMemberPayload, AttendanceSession, AttendanceSummaryPayload } from "@/lib/types";
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
+
 export const metadata = {
   title: "Team & Staff Management | Business Hub",
   description: "Manage staff roles, cashier permissions, shift rosters, and attendance",
@@ -33,8 +39,8 @@ export default async function TeamPage() {
       team = resTeam;
       sessions = resSessions;
       summary = resSummary;
-    } catch (err: any) {
-      errorMsg = err.message || "Failed to load team data from backend";
+    } catch (err) {
+      errorMsg = errorMessage(err, "Failed to load team data from backend");
       console.error("TeamPage fetch error:", err);
     }
   }

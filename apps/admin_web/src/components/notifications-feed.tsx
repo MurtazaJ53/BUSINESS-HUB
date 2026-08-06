@@ -5,13 +5,15 @@ import {
   Bell,
   CheckCircle2,
   AlertTriangle,
-  Receipt,
-  Users,
   CheckCheck,
-  Sliders,
-  Sparkles,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
 
 export interface NotificationItem {
   id: string;
@@ -38,8 +40,8 @@ export function NotificationsFeed() {
       if (!res.ok) throw new Error(`Could not load notifications (${res.status})`);
       const body = await res.json();
       setNotifications(Array.isArray(body) ? body : []);
-    } catch (err: any) {
-      setError(err?.message || "Something went wrong loading notifications.");
+    } catch (err) {
+      setError(errorMessage(err, "Something went wrong loading notifications."));
     } finally {
       setIsLoading(false);
     }
@@ -57,8 +59,8 @@ export function NotificationsFeed() {
     try {
       const res = await fetch("/api/notifications/read-all", { method: "POST" });
       if (!res.ok) throw new Error(`Could not mark all read (${res.status})`);
-    } catch (err: any) {
-      setError(err?.message || "Could not mark all as read.");
+    } catch (err) {
+      setError(errorMessage(err, "Could not mark all as read."));
     } finally {
       await load();
     }
@@ -76,8 +78,8 @@ export function NotificationsFeed() {
     try {
       const res = await fetch(`/api/notifications/${id}/read`, { method: "POST" });
       if (!res.ok) throw new Error(`Could not mark as read (${res.status})`);
-    } catch (err: any) {
-      setError(err?.message || "Could not mark as read.");
+    } catch (err) {
+      setError(errorMessage(err, "Could not mark as read."));
       await load();
     }
   };

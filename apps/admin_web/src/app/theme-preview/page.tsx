@@ -6,10 +6,7 @@ import {
   Info, 
   XOctagon, 
   Search, 
-  Plus, 
-  User, 
   Eye, 
-  Layers 
 } from "lucide-react";
 
 export const metadata = {

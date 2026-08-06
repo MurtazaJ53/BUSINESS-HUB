@@ -2,21 +2,22 @@
 
 import React, { useState, useMemo } from "react";
 import {
-  Users,
-  Clock,
   Plus,
   Shield,
-  CheckCircle2,
   Calendar,
   LogIn,
   LogOut,
-  Mail,
   X,
   Loader2,
-  AlertCircle
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import type { AttendanceSession, AttendanceSummaryPayload, WorkspaceTeamMemberPayload } from "@/lib/types";
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
 
 interface TeamAttendanceProps {
   initialTeam: WorkspaceTeamMemberPayload[];
@@ -25,7 +26,7 @@ interface TeamAttendanceProps {
   shopId: string;
 }
 
-export function TeamAttendance({ initialTeam, initialSessions, initialSummary, shopId }: TeamAttendanceProps) {
+export function TeamAttendance({ initialTeam, initialSessions, initialSummary }: TeamAttendanceProps) {
   const [staff, setStaff] = useState<WorkspaceTeamMemberPayload[]>(initialTeam ?? []);
   const [attendance, setAttendance] = useState<AttendanceSession[]>(initialSessions ?? []);
   const [summary, setSummary] = useState<AttendanceSummaryPayload>(initialSummary ?? { total_sessions: 0, present_count: 0, leave_count: 0, active_workers_today: 0 });
@@ -100,8 +101,8 @@ export function TeamAttendance({ initialTeam, initialSessions, initialSummary, s
       setInviteEmail("");
       setInviteName("");
       await refreshData();
-    } catch (err: any) {
-      setSubmitError(err.message || "Failed to send invitation.");
+    } catch (err) {
+      setSubmitError(errorMessage(err, "Failed to send invitation."));
     } finally {
       setIsSubmitting(false);
     }
@@ -137,8 +138,8 @@ export function TeamAttendance({ initialTeam, initialSessions, initialSummary, s
         if (!res.ok) throw new Error("Failed to clock in");
       }
       await refreshData();
-    } catch (err: any) {
-      alert(err.message || "Failed to record attendance shift.");
+    } catch (err) {
+      alert(errorMessage(err, "Failed to record attendance shift."));
     } finally {
       setIsSubmitting(false);
     }
@@ -173,8 +174,8 @@ export function TeamAttendance({ initialTeam, initialSessions, initialSummary, s
       setSelectedMemberId("");
       setAttendanceNote("");
       await refreshData();
-    } catch (err: any) {
-      setSubmitError(err.message || "Failed to save attendance.");
+    } catch (err) {
+      setSubmitError(errorMessage(err, "Failed to save attendance."));
     } finally {
       setIsSubmitting(false);
     }

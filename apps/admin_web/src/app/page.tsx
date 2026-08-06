@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ShoppingCart, Package, AlertCircle, CircleEllipsis, TrendingUp, TrendingDown, Receipt } from "lucide-react";
+import { ShoppingCart, Package, AlertCircle, TrendingUp, TrendingDown, Receipt } from "lucide-react";
 import { AdminShell } from "@/components/admin-shell";
 import { EmptyState } from "@/components/empty-state";
 import { getDashboardSnapshot, getSession, getSales, resolveActiveShop } from "@/lib/admin-api";

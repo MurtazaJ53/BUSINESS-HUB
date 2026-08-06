@@ -5,6 +5,12 @@ import { RefreshCw, Users } from "lucide-react";
 
 import { formatCurrency } from "@/lib/utils";
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
+
 type StaffRow = {
   name: string;
   sale_count: number;
@@ -57,9 +63,9 @@ export function StaffPerformance() {
       }
       if (!res.ok) throw new Error(`Could not load performance (${res.status})`);
       setRows(unwrap(await res.json()));
-    } catch (err: any) {
+    } catch (err) {
       setRows([]);
-      setError(err?.message || "Something went wrong loading the report.");
+      setError(errorMessage(err, "Something went wrong loading the report."));
     } finally {
       setLoading(false);
     }

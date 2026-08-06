@@ -1,23 +1,25 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+
   Store,
   Mail,
   Lock,
   ArrowRight,
-  ShieldCheck,
   AlertCircle,
   KeyRound,
   CheckCircle2,
-  Building2,
-  Phone,
   User,
-  QrCode,
   Delete,
   Globe,
 } from "lucide-react";
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 
 type AuthPanelMode = "login" | "register" | "join" | "pin";
 
@@ -28,7 +30,7 @@ export function AuthLogin() {
   // Cloud login state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(true);
+  const [_rememberMe, _setRememberMe] = useState(true);
 
   // PIN unlock state
   const [pin, setPin] = useState("");
@@ -78,8 +80,8 @@ export function AuthLogin() {
         router.push(data.defaultRoute || "/");
         router.refresh();
       }, 500);
-    } catch (err: any) {
-      setError(err.message || "Failed to sign in. Please verify your connection.");
+    } catch (err) {
+      setError(errorMessage(err, "Failed to sign in. Please verify your connection."));
     } finally {
       setIsLoading(false);
     }
@@ -109,8 +111,8 @@ export function AuthLogin() {
         router.push("/pos");
         router.refresh();
       }, 400);
-    } catch (err: any) {
-      setError(err.message || "Failed to unlock terminal.");
+    } catch (err) {
+      setError(errorMessage(err, "Failed to unlock terminal."));
       setPin("");
     } finally {
       setIsLoading(false);
@@ -164,8 +166,8 @@ export function AuthLogin() {
         router.push("/");
         router.refresh();
       }, 500);
-    } catch (err: any) {
-      setError(err.message || "Failed to create shop.");
+    } catch (err) {
+      setError(errorMessage(err, "Failed to create shop."));
     } finally {
       setIsLoading(false);
     }
@@ -199,14 +201,17 @@ export function AuthLogin() {
         router.push(data.defaultRoute || "/");
         router.refresh();
       }, 500);
-    } catch (err: any) {
-      setError(err.message || "Failed to join shop.");
+    } catch (err) {
+      setError(errorMessage(err, "Failed to join shop."));
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Quick 1-click Test Login
+  // Quick sign-in for the seeded demo accounts. Unlike before, a failed
+  // attempt stays on the login screen: the old version called router.push in
+  // both the failure and catch branches, so clicking "Admin" landed on
+  // /platform whether or not authentication succeeded.
   const handleQuickLogin = async (testEmail: string, testRole: string) => {
     setEmail(testEmail);
     setPassword("DemoPass123!");
@@ -221,17 +226,17 @@ export function AuthLogin() {
       });
 
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         router.push(data.defaultRoute || (testRole === "cashier" ? "/pos" : "/"));
         router.refresh();
       } else {
-        if (testRole === "cashier") router.push("/pos");
-        else if (testRole === "admin") router.push("/platform");
-        else router.push("/");
+        setError(
+          data?.error ||
+            "That demo account does not exist on this backend. Sign in with a real account."
+        );
       }
     } catch {
-      if (testRole === "cashier") router.push("/pos");
-      else router.push("/");
+      setError("Cannot reach the server. Check your connection and try again.");
     } finally {
       setIsLoading(false);
     }

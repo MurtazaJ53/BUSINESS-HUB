@@ -14,6 +14,12 @@ import { buildDataHealthReport, type DataHealthReport, type DuplicateGroup } fro
 import type { Customer, InventoryItem } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
+
 const EMPTY_REPORT: DataHealthReport = {
   duplicateGroups: [],
   negativeStock: [],
@@ -69,8 +75,8 @@ export function DataHealth() {
       setItems(loadedItems);
       setCustomers(loadedCustomers);
       setReport(buildDataHealthReport(loadedItems, loadedCustomers));
-    } catch (err: any) {
-      setError(err?.message || "Something went wrong running the scan.");
+    } catch (err) {
+      setError(errorMessage(err, "Something went wrong running the scan."));
     } finally {
       setLoading(false);
     }
@@ -155,9 +161,9 @@ export function DataHealth() {
         try {
           await mergeGroup(group);
           merged += 1;
-        } catch (err: any) {
+        } catch (err) {
           // One bad group shouldn't abandon the rest; report honestly at the end.
-          failure = err?.message || "A merge failed.";
+          failure = errorMessage(err, "A merge failed.");
           break;
         }
       }

@@ -43,7 +43,7 @@ export default function InvitePage() {
 
         const data = await res.json();
         setInvite(data);
-      } catch (err) {
+      } catch {
         setError("Failed to load invitation details. Please try again.");
       } finally {
         setLoading(false);
@@ -90,7 +90,7 @@ export default function InvitePage() {
       }
 
       setSuccess(true);
-    } catch (err) {
+    } catch {
       setFormError("An unexpected error occurred. Please try again.");
     } finally {
       setSubmitting(false);
@@ -134,7 +134,7 @@ export default function InvitePage() {
             <div>
               <h1 className="text-2xl font-medium text-[var(--text-primary)] mb-2">Welcome aboard!</h1>
               <p className="text-[var(--text-secondary)]">
-                You've joined <strong className="text-[var(--text-primary)] font-medium">{invite.shop_name}</strong> as <strong className="text-[var(--text-primary)] font-medium">{invite.role_label}</strong>!
+                You&apos;ve joined <strong className="text-[var(--text-primary)] font-medium">{invite.shop_name}</strong> as <strong className="text-[var(--text-primary)] font-medium">{invite.role_label}</strong>!
               </p>
             </div>
             <div className="pt-4">
@@ -149,7 +149,7 @@ export default function InvitePage() {
         ) : invite ? (
           <div>
             <div className="text-center mb-8">
-              <div className="eyebrow mb-2">You've been invited</div>
+              <div className="eyebrow mb-2">You&apos;ve been invited</div>
               <h1 className="text-2xl font-medium text-[var(--text-primary)] mb-2">Join {invite.shop_name}</h1>
               <p className="text-[var(--text-secondary)] text-sm">
                 Accept your invitation to join as <strong className="text-[var(--text-primary)] font-medium">{invite.role_label}</strong>.

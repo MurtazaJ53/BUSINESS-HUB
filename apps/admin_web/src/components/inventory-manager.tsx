@@ -1,22 +1,23 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Package,
   Search,
   Plus,
-  Filter,
-  ArrowUpDown,
   Edit2,
   AlertTriangle,
   Download,
-  Upload,
-  Layers,
-  CheckCircle2,
   X,
   History,
 } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
 
 export interface ProductItem {
   id: string;
@@ -42,7 +43,7 @@ interface InventoryManagerProps {
   shopId: string;
 }
 
-export function InventoryManager({ initialInventory, initialSummary, shopId }: InventoryManagerProps) {
+export function InventoryManager({ initialInventory }: InventoryManagerProps) {
   const mappedInitial = React.useMemo(() => {
     return (initialInventory ?? []).map((item: any) => ({
       id: item.id,
@@ -63,8 +64,8 @@ export function InventoryManager({ initialInventory, initialSummary, shopId }: I
   }, [initialInventory]);
 
   const [items, setItems] = useState<ProductItem[]>(mappedInitial);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [_isLoading, setIsLoading] = useState(false);
+  const [_error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -114,8 +115,8 @@ export function InventoryManager({ initialInventory, initialSummary, shopId }: I
         updated_at: item.updated_at || new Date().toISOString(),
       }));
       setItems(mapped);
-    } catch (err: any) {
-      setError(err.message || "Failed to load inventory");
+    } catch (err) {
+      setError(errorMessage(err, "Failed to load inventory"));
     } finally {
       setIsLoading(false);
     }
@@ -175,7 +176,7 @@ export function InventoryManager({ initialInventory, initialSummary, shopId }: I
     const cost = parseFloat(formCostPrice) || 0;
     const selling = parseFloat(formSellingPrice) || 0;
     const stock = parseInt(formStock) || 0;
-    const reorder = parseInt(formReorderLevel) || 10;
+    const _reorder = parseInt(formReorderLevel) || 10;
     const tax = parseFloat(formTaxRate) || 0;
 
     const payload = {
@@ -223,8 +224,8 @@ export function InventoryManager({ initialInventory, initialSummary, shopId }: I
       }
       setIsProductModalOpen(false);
       await fetchItems();
-    } catch (err: any) {
-      alert(err.message || "An error occurred while saving the product");
+    } catch (err) {
+      alert(errorMessage(err, "An error occurred while saving the product"));
     }
   };
 
@@ -252,8 +253,8 @@ export function InventoryManager({ initialInventory, initialSummary, shopId }: I
       setAdjustQty("");
       setAdjustReason("");
       await fetchItems();
-    } catch (err: any) {
-      alert(err.message || "An error occurred while adjusting the stock level.");
+    } catch (err) {
+      alert(errorMessage(err, "An error occurred while adjusting the stock level."));
     }
   };
 

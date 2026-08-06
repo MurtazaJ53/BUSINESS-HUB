@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
+
 const API_BASE_URL = process.env.BUSINESS_HUB_API_BASE_URL || "http://127.0.0.1:8000/api/v1";
 
 export async function GET() {
@@ -27,9 +33,9 @@ export async function GET() {
     }
 
     return NextResponse.json(await res.json());
-  } catch (error: any) {
+  } catch (error) {
     return NextResponse.json(
-      { error: error.message || "Internal server error" },
+      { error: errorMessage(error, "Internal server error") },
       { status: 500 }
     );
   }

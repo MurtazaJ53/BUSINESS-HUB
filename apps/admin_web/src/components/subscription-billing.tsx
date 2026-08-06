@@ -5,6 +5,12 @@ import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, Receipt } from "luc
 
 import { formatCurrency } from "@/lib/utils";
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
+
 type PlanOption = {
   period: string;
   label: string;
@@ -83,8 +89,8 @@ export function SubscriptionBilling() {
         const body = await invRes.json();
         setInvoices(Array.isArray(body) ? body : (body?.results ?? []));
       }
-    } catch (err: any) {
-      setError(err?.message || "Something went wrong.");
+    } catch (err) {
+      setError(errorMessage(err, "Something went wrong."));
     } finally {
       setLoading(false);
     }
@@ -119,11 +125,11 @@ export function SubscriptionBilling() {
       }
       // Same tab: a payment page lost behind a pop-up blocker looks like a
       // failed charge and invites a second attempt.
-      // eslint-disable-next-line react-hooks/immutability -- a deliberate
-      // navigation away from the app, not component state.
+      // A deliberate navigation away from the app, not component state.
+      // eslint-disable-next-line react-hooks/immutability
       window.location.href = body.payment_url;
-    } catch (err: any) {
-      setError(err?.message || "Could not start the payment.");
+    } catch (err) {
+      setError(errorMessage(err, "Could not start the payment."));
       setCheckingOut(null);
     }
   };

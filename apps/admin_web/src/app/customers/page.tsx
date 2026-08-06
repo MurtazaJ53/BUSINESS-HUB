@@ -3,6 +3,12 @@ import { AdminShell } from "@/components/admin-shell";
 import { getSession, resolveActiveShop, getCustomers, getCustomerSummary } from "@/lib/admin-api";
 import type { Customer, CustomerSummaryPayload } from "@/lib/types";
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
+
 export const metadata = {
   title: "Customers & Khata Ledger | Business Hub",
   description: "Manage customer profiles, store credit, receivables, and payment reminders",
@@ -30,8 +36,8 @@ export default async function CustomersPage() {
       ]);
       customers = resCustomers;
       summary = resSummary;
-    } catch (err: any) {
-      errorMsg = err.message || "Failed to load customers data from backend";
+    } catch (err) {
+      errorMsg = errorMessage(err, "Failed to load customers data from backend");
       console.error("CustomersPage fetch error:", err);
     }
   }

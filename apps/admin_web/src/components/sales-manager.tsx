@@ -1,23 +1,21 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Receipt,
   Search,
-  Filter,
-  Calendar,
-  Eye,
   RotateCcw,
-  Download,
-  DollarSign,
-  TrendingUp,
-  CheckCircle2,
   Lock,
-  ArrowRight,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { ThermalReceiptModal } from "@/components/thermal-receipt-modal";
 import type { CartItem, SplitPaymentTender } from "@/lib/types";
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
 
 export interface SaleOrder {
   id: string;
@@ -43,7 +41,7 @@ interface SalesManagerProps {
   shopId: string;
 }
 
-export function SalesManager({ initialSales, initialSummary, shopId }: SalesManagerProps) {
+export function SalesManager({ initialSales }: SalesManagerProps) {
   const mappedInitial = React.useMemo(() => {
     return (initialSales ?? []).map((item: any) => {
       const payments = item.payments || [];
@@ -74,7 +72,7 @@ export function SalesManager({ initialSales, initialSummary, shopId }: SalesMana
 
   const [sales, setSales] = useState<SaleOrder[]>(mappedInitial);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [_error, setError] = useState<string | null>(null);
   
   const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("all");
@@ -122,8 +120,8 @@ export function SalesManager({ initialSales, initialSummary, shopId }: SalesMana
         };
       });
       setSales(mappedSales);
-    } catch (err: any) {
-      setError(err.message || "Failed to load sales");
+    } catch (err) {
+      setError(errorMessage(err, "Failed to load sales"));
     } finally {
       setIsLoading(false);
     }
@@ -138,8 +136,8 @@ export function SalesManager({ initialSales, initialSummary, shopId }: SalesMana
         throw new Error(text || "Failed to void transaction");
       }
       await fetchSales();
-    } catch (err: any) {
-      alert(err.message || "An error occurred while voiding sale.");
+    } catch (err) {
+      alert(errorMessage(err, "An error occurred while voiding sale."));
     }
   };
 

@@ -2,18 +2,19 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Settings,
   Building2,
   Receipt,
   Printer,
-  Shield,
   CreditCard,
   CheckCircle2,
   Save,
-  QrCode,
-  Sliders,
 } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
 
 export function StoreSettings({
   currentShopName = "Business Hub Supermarket",
@@ -66,8 +67,8 @@ export function StoreSettings({
       setGstin(data.gstin ?? "");
       setInvoicePrefix(data.invoice_prefix ?? "");
       setFooterNotes(data.footer ?? "");
-    } catch (err: any) {
-      setError(err?.message || "Something went wrong loading settings.");
+    } catch (err) {
+      setError(errorMessage(err, "Something went wrong loading settings."));
     } finally {
       setIsLoading(false);
     }
@@ -112,8 +113,8 @@ export function StoreSettings({
       await load();
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
-    } catch (err: any) {
-      setError(err?.message || "Could not save settings.");
+    } catch (err) {
+      setError(errorMessage(err, "Could not save settings."));
     } finally {
       setIsSaving(false);
     }

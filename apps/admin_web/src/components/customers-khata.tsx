@@ -2,20 +2,23 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import {
-  Users,
   Search,
   Plus,
   Phone,
   Mail,
-  CreditCard,
   ArrowUpRight,
   ArrowDownLeft,
   X,
   Loader2,
-  AlertCircle
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Customer, CustomerSummaryPayload } from "@/lib/types";
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
 
 interface CustomersKhataProps {
   initialCustomers: Customer[];
@@ -37,7 +40,7 @@ function readTimelineEntries(payload: unknown): any[] {
   return Array.isArray(entries) ? entries : [];
 }
 
-export function CustomersKhata({ initialCustomers, initialSummary, shopId }: CustomersKhataProps) {
+export function CustomersKhata({ initialCustomers, initialSummary }: CustomersKhataProps) {
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers ?? []);
   const [summary, setSummary] = useState<CustomerSummaryPayload>(initialSummary ?? { total_customers: 0, active_credit_customers: 0, total_outstanding_balance: "0.00", total_lifetime_spend: null });
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(
@@ -165,8 +168,8 @@ export function CustomersKhata({ initialCustomers, initialSummary, shopId }: Cus
       setCustomers(updatedList);
       setSummary(updatedSummary);
       setSelectedCustomerId(newCust.id);
-    } catch (err: any) {
-      setSubmitError(err.message || "An error occurred while creating customer.");
+    } catch (err) {
+      setSubmitError(errorMessage(err, "An error occurred while creating customer."));
     } finally {
       setIsSubmitting(false);
     }
@@ -220,8 +223,8 @@ export function CustomersKhata({ initialCustomers, initialSummary, shopId }: Cus
       setCustomers(updatedList);
       setSummary(updatedSummary);
       setTimeline(readTimelineEntries(updatedTimeline));
-    } catch (err: any) {
-      setSubmitError(err.message || "An error occurred while saving ledger entry.");
+    } catch (err) {
+      setSubmitError(errorMessage(err, "An error occurred while saving ledger entry."));
     } finally {
       setIsSubmitting(false);
     }

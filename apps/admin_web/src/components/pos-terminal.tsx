@@ -9,16 +9,8 @@ import {
   Trash2,
   ShoppingCart,
   User,
-  Tag,
-  Receipt,
-  Sparkles,
-  AlertCircle,
-  Percent,
-  CheckCircle2,
   X,
   CreditCard,
-  Layers,
-  ArrowRight,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { PosCheckoutModal } from "@/components/pos-checkout-modal";
@@ -29,6 +21,12 @@ import type {
   SplitPaymentTender,
 } from "@/lib/types";
 import type { ProductItem } from "@/components/inventory-manager";
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
 
 type PosTerminalProps = {
   shopName?: string;
@@ -49,7 +47,6 @@ export function PosTerminal({
   cashierName = "Rashi (Cashier #1)",
   initialInventory,
   initialCustomers,
-  shopId,
 }: PosTerminalProps) {
   const mappedInitialProducts = React.useMemo(() => {
     return (initialInventory ?? []).map((item: any) => ({
@@ -70,8 +67,8 @@ export function PosTerminal({
 
   const [products, setProducts] = useState<ProductItem[]>(mappedInitialProducts);
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers ?? []);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [_isLoading, _setIsLoading] = useState(false);
+  const [_error, setError] = useState<string | null>(null);
   
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -81,7 +78,7 @@ export function PosTerminal({
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
 
   useEffect(() => {
-    async function loadData() {
+    async function _loadData() {
       try {
         // Load inventory
         const invRes = await fetch("/api/inventory");
@@ -110,8 +107,8 @@ export function PosTerminal({
         if (!custRes.ok) throw new Error("Failed to load customers");
         const custData = await custRes.json();
         setCustomers(custData);
-      } catch (err: any) {
-        setError(err.message || "Failed to load POS data");
+      } catch (err) {
+        setError(errorMessage(err, "Failed to load POS data"));
       }
     }
     // We already loaded initial data server-side, but keep this to pull fresh updates if needed
@@ -366,8 +363,8 @@ export function PosTerminal({
         }));
         setProducts(mappedProducts);
       }
-    } catch (err: any) {
-      alert(`Error submitting sale: ${err.message}`);
+    } catch (err) {
+      alert(`Error submitting sale: ${errorMessage(err, "Unknown error")}`);
     }
   };
 

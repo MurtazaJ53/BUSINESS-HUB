@@ -2,7 +2,7 @@
 
 import React, { useRef } from "react";
 import { Printer, X, CheckCircle2 } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import type { CartItem, SplitPaymentTender } from "@/lib/types";
 
 type ThermalReceiptModalProps = {

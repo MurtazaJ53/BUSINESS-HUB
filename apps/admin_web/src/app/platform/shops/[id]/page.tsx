@@ -25,7 +25,7 @@ export default async function PlatformShopDetailPage({
     ]);
     shopPayload = results[0];
     session = results[1];
-  } catch (err) {
+  } catch {
     notFound();
   }
 

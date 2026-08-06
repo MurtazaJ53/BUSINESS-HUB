@@ -12,13 +12,19 @@ import {
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Expense, ExpenseSummaryPayload } from "@/lib/types";
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
+
 interface ExpensesManagerProps {
   initialExpenses: Expense[];
   initialSummary: ExpenseSummaryPayload;
   shopId: string;
 }
 
-export function ExpensesManager({ initialExpenses, initialSummary, shopId }: ExpensesManagerProps) {
+export function ExpensesManager({ initialExpenses, initialSummary }: ExpensesManagerProps) {
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses ?? []);
   const [summary, setSummary] = useState<ExpenseSummaryPayload>(initialSummary ?? { total_expenses: 0, total_amount: "0.00", categories: {} });
   const [search, setSearch] = useState("");
@@ -132,8 +138,8 @@ export function ExpensesManager({ initialExpenses, initialSummary, shopId }: Exp
       const updatedSummary = await fetch("/api/expenses/summary").then((r) => r.json());
       setExpenses(updatedList);
       setSummary(updatedSummary);
-    } catch (err: any) {
-      setSubmitError(err.message || "An error occurred while saving the expense.");
+    } catch (err) {
+      setSubmitError(errorMessage(err, "An error occurred while saving the expense."));
     } finally {
       setIsSubmitting(false);
     }

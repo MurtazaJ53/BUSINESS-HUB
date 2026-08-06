@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -30,9 +36,9 @@ export async function POST(req: NextRequest) {
       shopId: activeShop,
       defaultRoute: "/pos",
     });
-  } catch (err: any) {
+  } catch (err) {
     return NextResponse.json(
-      { error: err.message || "Failed to authenticate PIN" },
+      { error: errorMessage(err, "Failed to authenticate PIN") },
       { status: 500 }
     );
   }

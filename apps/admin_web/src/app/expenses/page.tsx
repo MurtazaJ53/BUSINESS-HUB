@@ -3,6 +3,12 @@ import { AdminShell } from "@/components/admin-shell";
 import { getSession, resolveActiveShop, getExpenses, getExpenseSummary } from "@/lib/admin-api";
 import type { Expense, ExpenseSummaryPayload } from "@/lib/types";
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
+
 export const metadata = {
   title: "Shop Expenses Manager | Business Hub",
   description: "Track store expenses, utility bills, inventory costs, and miscellaneous cash outflows",
@@ -30,8 +36,8 @@ export default async function ExpensesPage() {
       ]);
       expenses = resExpenses;
       summary = resSummary;
-    } catch (err: any) {
-      errorMsg = err.message || "Failed to load expenses data from backend";
+    } catch (err) {
+      errorMsg = errorMessage(err, "Failed to load expenses data from backend");
       console.error("ExpensesPage fetch error:", err);
     }
   }

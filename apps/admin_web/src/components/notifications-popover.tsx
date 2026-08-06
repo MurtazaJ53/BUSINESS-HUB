@@ -4,13 +4,11 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Bell,
-  AlertTriangle,
   Package,
   CreditCard,
   ShieldCheck,
   CheckCircle2,
   ExternalLink,
-  X,
 } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 

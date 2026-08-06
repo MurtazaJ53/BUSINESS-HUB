@@ -3,6 +3,12 @@
 import { useState } from "react";
 import { Download, FileSpreadsheet, Loader2 } from "lucide-react";
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
+
 function isoDaysAgo(days: number): string {
   return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
 }
@@ -54,8 +60,8 @@ export function TallyExport() {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
-    } catch (err: any) {
-      setError(err?.message || "Could not build the export.");
+    } catch (err) {
+      setError(errorMessage(err, "Could not build the export."));
     } finally {
       setBusy(false);
     }

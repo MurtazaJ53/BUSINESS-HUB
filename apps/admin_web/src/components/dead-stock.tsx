@@ -5,6 +5,12 @@ import { CheckCircle2, RefreshCw } from "lucide-react";
 
 import { formatCurrency } from "@/lib/utils";
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
+
 type DeadStockItem = {
   id: string;
   name: string;
@@ -75,9 +81,9 @@ export function DeadStock() {
       }
       if (!res.ok) throw new Error(`Could not load dead stock (${res.status})`);
       setData(await res.json());
-    } catch (err: any) {
+    } catch (err) {
       setData(null);
-      setError(err?.message || "Something went wrong loading the report.");
+      setError(errorMessage(err, "Something went wrong loading the report."));
     } finally {
       setLoading(false);
     }

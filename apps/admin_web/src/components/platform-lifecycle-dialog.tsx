@@ -28,7 +28,7 @@ export function PlatformLifecycleDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const router = useRouter();
+  const _router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

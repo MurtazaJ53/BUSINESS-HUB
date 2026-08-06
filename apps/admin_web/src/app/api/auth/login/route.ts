@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
+
 const API_BASE_URL = process.env.BUSINESS_HUB_API_BASE_URL || "http://127.0.0.1:8000/api/v1";
 
 export async function POST(req: NextRequest) {
@@ -23,22 +29,13 @@ export async function POST(req: NextRequest) {
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({ email: email.trim(), password }),
       });
-    } catch (networkErr: any) {
-      // If backend is unreachable, fallback gracefully for demo accounts
-      if (email.includes("demo") || email.includes("owner") || email.includes("admin")) {
-        const isPlatformAdmin = email.includes("admin");
-        const role = isPlatformAdmin ? "platform_admin" : email.includes("cashier") ? "cashier" : "owner";
-        const cookieStore = await cookies();
-        cookieStore.set("bh_user_email", email, { path: "/", maxAge: 60 * 60 * 24 * 7 });
-        cookieStore.set("bh_user_role", role, { path: "/", maxAge: 60 * 60 * 24 * 7 });
-        return NextResponse.json({
-          success: true,
-          offlineMode: true,
-          user: { email, full_name: email.split("@")[0], is_platform_admin: isPlatformAdmin },
-          role,
-          defaultRoute: role === "cashier" ? "/pos" : "/",
-        });
-      }
+    } catch {
+      // No offline fallback. This used to grant a session with NO password
+      // check to any address containing "demo", "owner" or "admin" whenever
+      // the backend was unreachable — and "admin" got platform_admin. Anyone
+      // able to disrupt the network path (public wifi, DNS) could walk into
+      // the admin UI. An unreachable backend means we cannot authenticate,
+      // so say so.
       return NextResponse.json(
         { error: "Cannot reach backend server. Please check your connection." },
         { status: 503 }
@@ -115,9 +112,9 @@ export async function POST(req: NextRequest) {
       role: sessionUser.is_platform_admin ? "platform_admin" : userRole,
       defaultRoute: userRole === "cashier" ? "/pos" : "/",
     });
-  } catch (err: any) {
+  } catch (err) {
     return NextResponse.json(
-      { error: err.message || "An unexpected error occurred during sign in" },
+      { error: errorMessage(err, "An unexpected error occurred during sign in") },
       { status: 500 }
     );
   }

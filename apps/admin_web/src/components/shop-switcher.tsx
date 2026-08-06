@@ -8,8 +8,6 @@ import {
   ChevronsUpDown,
   Plus,
   KeyRound,
-  ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 import type { ShopMembership, BusinessHubPlanTier } from "@/lib/types";
 

@@ -5,6 +5,12 @@ import { BarChart3, Download, FileSpreadsheet, Loader2, PieChart } from "lucide-
 
 import { formatCurrency } from "@/lib/utils";
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
+
 /**
  * Real P&L and GST figures from the backend.
  *
@@ -132,8 +138,8 @@ export function ReportsAnalytics() {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
-    } catch (err: any) {
-      setGstError(err?.message || "Could not build the export.");
+    } catch (err) {
+      setGstError(errorMessage(err, "Could not build the export."));
     } finally {
       setDownloading(false);
     }

@@ -3,6 +3,12 @@ import { AdminShell } from "@/components/admin-shell";
 import { getSession, resolveActiveShop, getInventory, getCustomers } from "@/lib/admin-api";
 import type { InventoryItem, Customer } from "@/lib/types";
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
+
 export const metadata = {
   title: "POS Terminal | Business Hub",
   description: "High-speed retail point of sale and billing terminal",
@@ -25,8 +31,8 @@ export default async function PosPage() {
       ]);
       inventory = resInventory;
       customers = resCustomers;
-    } catch (err: any) {
-      errorMsg = err.message || "Failed to load POS data from backend";
+    } catch (err) {
+      errorMsg = errorMessage(err, "Failed to load POS data from backend");
       console.error("PosPage fetch error:", err);
     }
   }

@@ -75,6 +75,13 @@ type MutationOptions = {
 };
 
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
 
 const API_BASE_URL =
   process.env.BUSINESS_HUB_API_BASE_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:8000/api/v1";
@@ -179,10 +186,9 @@ export async function apiMutation<T>(path: string, options: MutationOptions = {}
 export const getSession = cache(async (): Promise<SessionPayload> => {
   try {
     return await apiFetch<SessionPayload>("/session/");
-  } catch (error: any) {
-    const errMsg = error?.message || "";
+  } catch (error) {
+    const errMsg = errorMessage(error, "");
     if (errMsg.includes("(401)") || errMsg.toLowerCase().includes("unauthorized") || errMsg.toLowerCase().includes("expired")) {
-      const { redirect } = require("next/navigation");
       redirect("/login");
     }
     throw error;

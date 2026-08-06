@@ -5,12 +5,6 @@ import {
   MessageSquare,
   Hash,
   Send,
-  Paperclip,
-  Smile,
-  User,
-  Users,
-  Search,
-  CheckCheck,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 

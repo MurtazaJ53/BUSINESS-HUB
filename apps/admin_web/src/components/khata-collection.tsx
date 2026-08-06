@@ -6,6 +6,12 @@ import { CheckCircle2, MessageCircle, PhoneOff, RefreshCw } from "lucide-react";
 import { buildKhataReminder, whatsAppLink } from "@/lib/khata-reminder";
 import { formatCurrency } from "@/lib/utils";
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
+
 type Debtor = {
   id: string;
   name: string;
@@ -60,8 +66,8 @@ export function KhataCollection({
       const res = await fetch("/api/khata/debtors");
       if (!res.ok) throw new Error(`Could not load the khata list (${res.status})`);
       setData(await res.json());
-    } catch (err: any) {
-      setError(err?.message || "Something went wrong loading the list.");
+    } catch (err) {
+      setError(errorMessage(err, "Something went wrong loading the list."));
     } finally {
       setLoading(false);
     }
@@ -108,12 +114,12 @@ export function KhataCollection({
       const res = await fetch(`/api/khata/remind/${debtor.id}`, { method: "POST" });
       if (!res.ok) throw new Error(`Could not record the reminder (${res.status})`);
       await load();
-    } catch (err: any) {
+    } catch (err) {
       // The message did go out, so say exactly that rather than implying it
       // failed — otherwise the owner sends it twice.
       setError(
         `WhatsApp opened for ${debtor.name}, but recording the reminder failed. ` +
-          `They may show as un-chased. (${err?.message || "unknown error"})`
+          `They may show as un-chased. (${errorMessage(err, "unknown error")})`
       );
     } finally {
       setMarking(null);
