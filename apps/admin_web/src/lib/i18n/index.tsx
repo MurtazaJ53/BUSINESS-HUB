@@ -3,19 +3,30 @@
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 import { MESSAGES, type Locale, type MessageKey } from "@/lib/i18n/messages.generated";
+import { WEB_MESSAGES, type WebMessageKey } from "@/lib/i18n/web-messages";
 import { LOCALE_COOKIE } from "@/lib/i18n/shared";
 
-export type { Locale, MessageKey };
+export type { Locale, MessageKey, WebMessageKey };
+
+/** Any key from either table: the app's reviewed strings or the web-only ones. */
+export type AnyMessageKey = MessageKey | WebMessageKey;
+
+/** The app's translations win on a key collision: they are the reviewed ones. */
+const TABLES: Record<Locale, Record<string, string>> = {
+  en: { ...WEB_MESSAGES.en, ...MESSAGES.en },
+  hi: { ...WEB_MESSAGES.hi, ...MESSAGES.hi },
+  gu: { ...WEB_MESSAGES.gu, ...MESSAGES.gu },
+};
 // Re-exported for convenience; the definitions live in shared.ts so server
 // components can use them too.
 export { LOCALE_COOKIE, LOCALES, isLocale } from "@/lib/i18n/shared";
 
-type Translate = (key: MessageKey, fallback?: string) => string;
+type Translate = (key: AnyMessageKey, fallback?: string) => string;
 
 const LocaleContext = createContext<{ locale: Locale; setLocale: (l: Locale) => void; t: Translate }>({
   locale: "en",
   setLocale: () => {},
-  t: (key, fallback) => fallback ?? MESSAGES.en[key] ?? String(key),
+  t: (key, fallback) => fallback ?? TABLES.en[key] ?? String(key),
 });
 
 export function LocaleProvider({
@@ -35,11 +46,11 @@ export function LocaleProvider({
   }, []);
 
   const value = useMemo(() => {
-    const table = MESSAGES[locale] ?? MESSAGES.en;
+    const table = TABLES[locale] ?? TABLES.en;
     const t: Translate = (key, fallback) =>
       // Fall back to English, then to the caller's text, so an untranslated
       // string shows real words rather than a key name.
-      table[key] ?? MESSAGES.en[key] ?? fallback ?? String(key);
+      table[key] ?? TABLES.en[key] ?? fallback ?? String(key);
     return { locale, setLocale, t };
   }, [locale, setLocale]);
 

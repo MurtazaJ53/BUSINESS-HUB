@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+
+import { useT } from "@/lib/i18n";
 import {
 
   Store,
@@ -25,6 +27,7 @@ type AuthPanelMode = "login" | "register" | "join" | "pin";
 
 export function AuthLogin() {
   const router = useRouter();
+  const t = useT();
   const [panelMode, setPanelMode] = useState<AuthPanelMode>("login");
 
   // Cloud login state
@@ -325,14 +328,14 @@ export function AuthLogin() {
                   onClick={() => setPanelMode("register")}
                   className="font-bold text-[var(--primary)] hover:underline"
                 >
-                  Create a shop
+                  {t("webCreateShop")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setPanelMode("join")}
                   className="font-bold text-[var(--primary)] hover:underline"
                 >
-                  Join with a code
+                  {t("webJoinWithCode")}
                 </button>
               </div>
 
@@ -342,7 +345,7 @@ export function AuthLogin() {
                   onClick={() => setPanelMode("pin")}
                   className="text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors"
                 >
-                  Switch to Staff PIN Login
+                  {t("webStaffPinLogin")}
                 </button>
               </div>
             </form>
@@ -473,7 +476,7 @@ export function AuthLogin() {
           {panelMode === "join" && (
             <form onSubmit={handleJoin} className="space-y-4">
               <p className="text-xs font-medium text-[var(--text-secondary)] text-center -mt-1 mb-2 leading-relaxed">
-                Enter the invite code from your email to join your team.
+                {t("webInviteHint")}
               </p>
 
               <div>
@@ -517,7 +520,7 @@ export function AuthLogin() {
                 {isLoading ? (
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  <span>JOIN SHOP</span>
+                  <span>{t("webJoinShop")}</span>
                 )}
               </button>
 
@@ -527,7 +530,7 @@ export function AuthLogin() {
                   onClick={() => setPanelMode("login")}
                   className="text-xs font-bold text-[var(--primary)] hover:underline"
                 >
-                  Back to sign in
+                  {t("webBackToSignIn")}
                 </button>
               </div>
             </form>
@@ -537,7 +540,7 @@ export function AuthLogin() {
           {panelMode === "pin" && (
             <div className="space-y-5">
               <p className="text-xs font-medium text-[var(--text-secondary)] text-center -mt-1 mb-2 leading-relaxed">
-                Enter your PIN to unlock the POS terminal.
+                {t("webPinHint")}
               </p>
 
               {/* 4-digit PIN dots */}
@@ -611,7 +614,7 @@ export function AuthLogin() {
                   onClick={() => setPanelMode("login")}
                   className="text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors"
                 >
-                  Sign in with Cloud Account
+                  {t("webSignInCloud")}
                 </button>
               </div>
             </div>
