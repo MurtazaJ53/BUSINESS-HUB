@@ -31,6 +31,8 @@ import { formatRole } from "@/lib/formatters";
 import { formatPlanTier } from "@/lib/plans";
 import type { SessionPayload, ShopMembership } from "@/lib/types";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { useT } from "@/lib/i18n";
 
 type AdminShellProps = {
   session: SessionPayload;
@@ -80,6 +82,7 @@ export function AdminShell({
   children,
 }: AdminShellProps) {
   const router = useRouter();
+  const t = useT();
   const workspaceRole = activeShop?.role ?? null;
   const workspaceRoleLabel =
     activeShop?.role_label ?? (workspaceRole ? formatRole(workspaceRole) : "Staff");
@@ -98,25 +101,25 @@ export function AdminShell({
 
   // APK Core navigation items
   const mainNav = [
-    { key: "overview", label: "Home", href: "/", icon: LayoutDashboard },
-    { key: "inventory", label: "Stock", href: "/inventory", icon: Package },
-    { key: "customers", label: "Clients", href: "/customers", icon: Users },
-    { key: "sales", label: "History", href: "/sales", icon: Receipt },
-    { key: "pos", label: "POS", href: "/pos", icon: ShoppingCart, highlight: true },
+    { key: "overview", label: t("navHome"), href: "/", icon: LayoutDashboard },
+    { key: "inventory", label: t("navStock"), href: "/inventory", icon: Package },
+    { key: "customers", label: t("navClients"), href: "/customers", icon: Users },
+    { key: "sales", label: t("navHistory"), href: "/sales", icon: Receipt },
+    { key: "pos", label: t("navPos"), href: "/pos", icon: ShoppingCart, highlight: true },
   ];
 
   const adminNav = [
     { key: "insights", label: "Business pulse", href: "/insights", icon: TrendingUp },
-    { key: "settings", label: "Business details", href: "/settings", icon: Settings },
-    { key: "team", label: "Staff & PINs", href: "/team", icon: Users },
-    { key: "attendance", label: "Attendance", href: "/attendance", icon: Clock },
-    { key: "expenses", label: "Expenses", href: "/expenses", icon: TrendingDown },
-    { key: "suppliers", label: "Suppliers & purchases", href: "/suppliers", icon: Truck },
-    { key: "import", label: "Import spreadsheet", href: "/import", icon: Upload },
-    { key: "data-health", label: "Data health", href: "/data-health", icon: Stethoscope },
+    { key: "settings", label: t("settingsBusiness"), href: "/settings", icon: Settings },
+    { key: "team", label: t("settingsStaff"), href: "/team", icon: Users },
+    { key: "attendance", label: t("settingsAttendance"), href: "/attendance", icon: Clock },
+    { key: "expenses", label: t("settingsExpenses"), href: "/expenses", icon: TrendingDown },
+    { key: "suppliers", label: t("settingsPurchases"), href: "/suppliers", icon: Truck },
+    { key: "import", label: t("settingsImport"), href: "/import", icon: Upload },
+    { key: "data-health", label: t("healthTitle"), href: "/data-health", icon: Stethoscope },
     { key: "tally", label: "Accountant export", href: "/tally", icon: FileSpreadsheet },
-    { key: "billing", label: "Subscription", href: "/billing", icon: CreditCard },
-    { key: "security", label: "Security", href: "/security", icon: ShieldCheck },
+    { key: "billing", label: t("settingsPlanBilling"), href: "/billing", icon: CreditCard },
+    { key: "security", label: t("settingsSecurity"), href: "/security", icon: ShieldCheck },
   ];
 
   const advancedNav = [
@@ -183,6 +186,7 @@ export function AdminShell({
               <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[var(--primary)]" />
             </Link>
 
+            <LanguageSwitcher />
             <ThemeSwitcher />
 
 
@@ -249,7 +253,7 @@ export function AdminShell({
           {/* Shop Administration Panel (Manage) */}
           <div className="bg-surface border border-border-soft rounded-[24px] p-3.5 shadow-sm space-y-1 transition-colors duration-200">
             <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-text-tertiary">
-              Manage
+              {t("settingsManage")}
             </div>
             {adminNav.map((item) => {
               const Icon = item.icon;
