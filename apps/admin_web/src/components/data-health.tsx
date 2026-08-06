@@ -10,8 +10,7 @@ import {
   WalletMinimal,
 } from "lucide-react";
 
-import { buildDataHealthReport, type DataHealthReport, type DuplicateGroup } from "@/lib/data-health";
-import type { Customer, InventoryItem } from "@/lib/types";
+import type { DataHealthReport, DuplicateGroup } from "@/lib/data-health";
 import { formatCurrency } from "@/lib/utils";
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -40,17 +39,34 @@ function formatQty(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
 }
 
-/** The API may return a bare array or a paginated envelope. */
-function unwrap<T>(body: unknown): T[] {
-  if (Array.isArray(body)) return body as T[];
-  const results = (body as { results?: unknown })?.results;
-  return Array.isArray(results) ? (results as T[]) : [];
+/** The API speaks snake_case and returns only what the UI needs; map it onto
+ *  the shape this component and the merge routine already use. */
+function toReport(body: any): DataHealthReport {
+  const groups = (body?.duplicate_groups ?? []).map((g: any) => ({
+    key: g.key,
+    copies: g.copies,
+    combinedStock: num(g.combined_stock),
+    keeper: { id: g.keeper.id, name: g.keeper.name, stock_on_hand: num(g.keeper.stock) },
+    duplicates: (g.duplicates ?? []).map((d: any) => ({
+      id: d.id,
+      name: d.name,
+      stock_on_hand: num(d.stock),
+    })),
+  }));
+  return {
+    duplicateGroups: groups,
+    negativeStock: body?.negative_stock ?? [],
+    missingPrice: body?.missing_price ?? [],
+    customersWithoutPhone: body?.customers_without_phone ?? [],
+    duplicateRowCount: body?.duplicate_row_count ?? 0,
+    totalIssues: body?.total_issues ?? 0,
+    isHealthy: Boolean(body?.is_healthy),
+  } as unknown as DataHealthReport;
 }
 
 export function DataHealth() {
-  const [items, setItems] = useState<InventoryItem[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
   const [report, setReport] = useState<DataHealthReport>(EMPTY_REPORT);
+  const [scanned, setScanned] = useState({ items: 0, customers: 0 });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,21 +76,17 @@ export function DataHealth() {
     setLoading(true);
     setError(null);
     try {
-      const [itemsRes, customersRes] = await Promise.all([
-        // Both list endpoints have pagination disabled and return the full
-        // catalog, which is what this scan needs — a duplicate two screens down
-        // is exactly the kind of thing nobody finds by browsing.
-        fetch("/api/inventory"),
-        fetch("/api/customers"),
-      ]);
-      if (!itemsRes.ok) throw new Error(`Could not load stock (${itemsRes.status})`);
-      if (!customersRes.ok) throw new Error(`Could not load clients (${customersRes.status})`);
-
-      const loadedItems = unwrap<InventoryItem>(await itemsRes.json());
-      const loadedCustomers = unwrap<Customer>(await customersRes.json());
-      setItems(loadedItems);
-      setCustomers(loadedCustomers);
-      setReport(buildDataHealthReport(loadedItems, loadedCustomers));
+      // Scanned server-side. The browser version read /inventory/ and
+      // /customers/, which slice to 200 rows, so a larger catalog was
+      // half-scanned while this page claimed a full sweep.
+      const res = await fetch("/api/reports/data-health");
+      if (!res.ok) throw new Error(`Could not run the scan (${res.status})`);
+      const body = await res.json();
+      setReport(toReport(body));
+      setScanned({
+        items: body?.scanned_items ?? 0,
+        customers: body?.scanned_customers ?? 0,
+      });
     } catch (err) {
       setError(errorMessage(err, "Something went wrong running the scan."));
     } finally {
@@ -199,8 +211,8 @@ export function DataHealth() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs font-semibold text-text-secondary max-w-2xl">
-          Scanned {items.length} product{items.length === 1 ? "" : "s"} and{" "}
-          {customers.length} client{customers.length === 1 ? "" : "s"}.
+          Scanned {scanned.items} product{scanned.items === 1 ? "" : "s"} and{" "}
+          {scanned.customers} client{scanned.customers === 1 ? "" : "s"}.
         </p>
         <button
           type="button"

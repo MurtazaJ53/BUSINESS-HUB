@@ -110,7 +110,6 @@ export function AdminShell({
     { key: "attendance", label: "Attendance", href: "/attendance", icon: Clock },
     { key: "expenses", label: "Expenses", href: "/expenses", icon: TrendingDown },
     { key: "suppliers", label: "Suppliers & purchases", href: "/suppliers", icon: Truck },
-    { key: "migration", label: "Import & migration", href: "/migration", icon: Layers },
     { key: "data-health", label: "Data health", href: "/data-health", icon: Stethoscope },
     { key: "tally", label: "Accountant export", href: "/tally", icon: FileSpreadsheet },
     { key: "billing", label: "Subscription", href: "/billing", icon: CreditCard },
@@ -119,7 +118,10 @@ export function AdminShell({
 
   const advancedNav = [
     ...(isPlatformAdmin
-      ? [{ key: "platform", label: "Admin tools", href: "/platform/shops", icon: Shield }]
+      ? [
+          { key: "migration", label: "Import & migration", href: "/migration", icon: Layers },
+          { key: "platform", label: "Admin tools", href: "/platform/shops", icon: Shield },
+        ]
       : []),
   ];
 

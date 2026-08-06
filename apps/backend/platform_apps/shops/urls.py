@@ -29,6 +29,7 @@ from platform_apps.billing.views import (
     SubscriptionView,
 )
 from platform_apps.expenses.views import ExpenseDetailView, ExpenseListCreateView, ExpenseSummaryView
+from platform_apps.inventory.health_views import DataHealthView
 from platform_apps.inventory.report_views import DeadStockView, ReorderListView
 from platform_apps.inventory.views import (
     InventoryItemAdjustmentView,
@@ -207,6 +208,11 @@ urlpatterns = [
         name="projection-pulse-signal-detail",
     ),
     path("<uuid:shop_id>/sales/", SaleListCreateView.as_view(), name="sale-list"),
+    path(
+        "<uuid:shop_id>/reports/data-health/",
+        DataHealthView.as_view(),
+        name="report-data-health",
+    ),
     path(
         "<uuid:shop_id>/reports/dead-stock/",
         DeadStockView.as_view(),
