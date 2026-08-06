@@ -23,6 +23,20 @@ interface CustomersKhataProps {
   shopId: string;
 }
 
+
+/** Pull the timeline rows out of the API payload.
+ *
+ * Guarded because `setTimeline(payload.entries || [])` is a trap: when the
+ * payload is an array, `.entries` is Array.prototype.entries — a truthy
+ * FUNCTION — and React runs a function passed to a setter as a state updater,
+ * which throws "Cannot convert undefined or null to object".
+ */
+function readTimelineEntries(payload: unknown): any[] {
+  if (Array.isArray(payload)) return payload;
+  const entries = (payload as { entries?: unknown })?.entries;
+  return Array.isArray(entries) ? entries : [];
+}
+
 export function CustomersKhata({ initialCustomers, initialSummary, shopId }: CustomersKhataProps) {
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers ?? []);
   const [summary, setSummary] = useState<CustomerSummaryPayload>(initialSummary ?? { total_customers: 0, active_credit_customers: 0, total_outstanding_balance: "0.00", total_lifetime_spend: null });
@@ -68,7 +82,7 @@ export function CustomersKhata({ initialCustomers, initialSummary, shopId }: Cus
         if (!res.ok) throw new Error("Failed to load ledger history");
         const data = await res.json();
         if (active) {
-          setTimeline(data.entries || []);
+          setTimeline(readTimelineEntries(data));
         }
       } catch (err) {
         console.error(err);
@@ -205,7 +219,7 @@ export function CustomersKhata({ initialCustomers, initialSummary, shopId }: Cus
 
       setCustomers(updatedList);
       setSummary(updatedSummary);
-      setTimeline(updatedTimeline.entries || []);
+      setTimeline(readTimelineEntries(updatedTimeline));
     } catch (err: any) {
       setSubmitError(err.message || "An error occurred while saving ledger entry.");
     } finally {
@@ -246,14 +260,14 @@ export function CustomersKhata({ initialCustomers, initialSummary, shopId }: Cus
 
         <div className="p-4 bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl">
           <div className="text-xs text-[var(--text-tertiary)] font-medium">Active Udhaar Accounts</div>
-          <div className="text-2xl font-black text-amber-500 font-mono mt-1">
+          <div className="text-2xl font-black text-[var(--warning-strong)] font-mono mt-1">
             {summary.active_credit_customers}
           </div>
         </div>
 
         <div className="p-4 bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl">
           <div className="text-xs text-[var(--text-tertiary)] font-medium">Total Outstanding Credits</div>
-          <div className="text-2xl font-black text-red-500 font-mono mt-1">
+          <div className="text-2xl font-black text-[var(--error-strong)] font-mono mt-1">
             {formatCurrency(parseFloat(summary.total_outstanding_balance || "0"))}
           </div>
         </div>
@@ -300,7 +314,7 @@ export function CustomersKhata({ initialCustomers, initialSummary, shopId }: Cus
                     </div>
 
                     {outstanding > 0 && (
-                      <span className="text-[10px] font-bold text-red-500 font-mono whitespace-nowrap bg-red-500/5 px-2 py-0.5 rounded-full border border-red-500/10">
+                      <span className="text-[10px] font-bold text-[var(--error-strong)] font-mono whitespace-nowrap bg-[var(--error)]/5 px-2 py-0.5 rounded-full border border-[var(--error)]/10">
                         ₹{outstanding.toLocaleString("en-IN")}
                       </span>
                     )}
@@ -339,7 +353,7 @@ export function CustomersKhata({ initialCustomers, initialSummary, shopId }: Cus
                       setTxnType("debit");
                       setIsTxnModalOpen(true);
                     }}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-semibold transition-all"
+                    className="flex items-center gap-1 px-3 py-1.5 bg-[var(--error)]/10 hover:bg-[var(--error)]/20 text-[var(--error-strong)] rounded-xl text-xs font-semibold transition-all"
                   >
                     <ArrowUpRight className="w-3.5 h-3.5" />
                     <span>Give Credit (Udhaar)</span>
@@ -350,7 +364,7 @@ export function CustomersKhata({ initialCustomers, initialSummary, shopId }: Cus
                       setTxnType("credit");
                       setIsTxnModalOpen(true);
                     }}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold transition-all shadow-md"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-[var(--success-dark)] hover:bg-[var(--success)] text-white rounded-xl text-xs font-semibold transition-all shadow-md"
                   >
                     <ArrowDownLeft className="w-3.5 h-3.5" />
                     <span>Record Repayment</span>
@@ -364,7 +378,7 @@ export function CustomersKhata({ initialCustomers, initialSummary, shopId }: Cus
                   <div className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">
                     Total Outstanding Due
                   </div>
-                  <div className="text-base font-black font-mono text-red-500 mt-0.5">
+                  <div className="text-base font-black font-mono text-[var(--error-strong)] mt-0.5">
                     {formatCurrency(parseFloat(selectedCustomer.balance || "0"))}
                   </div>
                 </div>
@@ -401,7 +415,7 @@ export function CustomersKhata({ initialCustomers, initialSummary, shopId }: Cus
                           {/* Dot indicator */}
                           <span
                             className={`absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full border-2 border-[var(--surface)] ${
-                              isCredit ? "bg-emerald-500" : "bg-red-500"
+                              isCredit ? "bg-[var(--success)]" : "bg-[var(--error)]"
                             }`}
                           />
                           <div className="flex items-start justify-between gap-4">
@@ -422,7 +436,7 @@ export function CustomersKhata({ initialCustomers, initialSummary, shopId }: Cus
                             <div className="text-right">
                               <span
                                 className={`font-mono font-bold text-xs ${
-                                  isCredit ? "text-emerald-500" : "text-red-500"
+                                  isCredit ? "text-[var(--success-strong)]" : "text-[var(--error-strong)]"
                                 }`}
                               >
                                 {isCredit ? "-" : "+"} ₹{amtAbs.toLocaleString("en-IN")}
@@ -473,7 +487,7 @@ export function CustomersKhata({ initialCustomers, initialSummary, shopId }: Cus
 
             <form onSubmit={handleRecordKhataTxn} className="p-6 space-y-4">
               {submitError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-xl font-bold">
+                <div className="p-3 bg-[var(--error)]/10 border border-[var(--error)]/20 text-[var(--error-strong)] text-xs rounded-xl font-bold">
                   {submitError}
                 </div>
               )}
@@ -525,8 +539,8 @@ export function CustomersKhata({ initialCustomers, initialSummary, shopId }: Cus
                   disabled={isSubmitting}
                   className={`px-5 py-2 text-xs font-semibold text-white rounded-xl shadow-md flex items-center gap-1.5 disabled:opacity-50 ${
                     txnType === "credit"
-                      ? "bg-emerald-600 hover:bg-emerald-500"
-                      : "bg-red-500 hover:bg-red-600"
+                      ? "bg-[var(--success-dark)] hover:bg-[var(--success)]"
+                      : "bg-[var(--error-dark)] hover:bg-[var(--error)]"
                   }`}
                 >
                   {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
@@ -562,7 +576,7 @@ export function CustomersKhata({ initialCustomers, initialSummary, shopId }: Cus
 
             <form onSubmit={handleAddCustomer} className="p-6 space-y-4">
               {submitError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-xl font-bold">
+                <div className="p-3 bg-[var(--error)]/10 border border-[var(--error)]/20 text-[var(--error-strong)] text-xs rounded-xl font-bold">
                   {submitError}
                 </div>
               )}

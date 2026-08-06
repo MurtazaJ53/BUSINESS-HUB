@@ -12,7 +12,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased" data-theme="light">
+    // suppressHydrationWarning: the inline script below deliberately rewrites
+    // data-theme before React hydrates, so the server's "light" and the
+    // client's resolved theme legitimately differ. Without this, every page
+    // load logs a hydration error. It suppresses the warning for this element's
+    // attributes only, not for the tree inside it.
+    <html
+      lang="en"
+      className="h-full antialiased"
+      data-theme="light"
+      suppressHydrationWarning
+    >
       <head>
         <script
           dangerouslySetInnerHTML={{

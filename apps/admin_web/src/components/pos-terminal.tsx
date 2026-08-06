@@ -376,7 +376,7 @@ export function PosTerminal({
       {/* ========================================================= */}
       {/* LEFT COLUMN: Product Catalog & Search                      */}
       {/* ========================================================= */}
-      <div className="flex-1 flex flex-col min-w-0 bg-white border border-[var(--border-soft)] rounded-[28px] overflow-hidden shadow-sm">
+      <div className="flex-1 flex flex-col min-w-0 bg-[var(--surface)] border border-[var(--border-soft)] rounded-[28px] overflow-hidden shadow-sm">
         {/* Search Bar & Barcode Scanner */}
         <div className="p-4 border-b border-[var(--bg-soft)] bg-[var(--bg-base)] flex items-center gap-3">
           <div className="relative flex-1">
@@ -388,7 +388,7 @@ export function PosTerminal({
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleSearchKeyDown}
               placeholder="Scan barcode or search product / SKU... (Press / to focus)"
-              className="w-full pl-10 pr-10 py-3 bg-white border border-[var(--border-soft)] focus:border-[var(--primary)] rounded-2xl text-xs font-semibold text-[var(--text-primary)] placeholder-[var(--text-tertiary)] outline-none shadow-sm transition-all"
+              className="w-full pl-10 pr-10 py-3 bg-[var(--surface)] border border-[var(--border-soft)] focus:border-[var(--primary)] rounded-2xl text-xs font-semibold text-[var(--text-primary)] placeholder-[var(--text-tertiary)] outline-none shadow-sm transition-all"
             />
             {searchQuery && (
               <button
@@ -399,14 +399,14 @@ export function PosTerminal({
               </button>
             )}
           </div>
-          <div className="hidden sm:flex items-center gap-2 px-4 py-3 bg-white rounded-2xl border border-[var(--border-soft)] text-xs font-bold text-[var(--primary-hover)] shadow-sm">
+          <div className="hidden sm:flex items-center gap-2 px-4 py-3 bg-[var(--surface)] rounded-2xl border border-[var(--border-soft)] text-xs font-bold text-[var(--primary-hover)] shadow-sm">
             <Barcode className="w-4 h-4" />
             <span>Scanner Ready</span>
           </div>
         </div>
 
         {/* Category Pills Bar */}
-        <div className="flex items-center gap-2 p-3 overflow-x-auto border-b border-[var(--bg-soft)] bg-white no-scrollbar">
+        <div className="flex items-center gap-2 p-3 overflow-x-auto border-b border-[var(--bg-soft)] bg-[var(--surface)] no-scrollbar">
           {categories.map((cat) => (
             <button
               key={cat}
@@ -433,7 +433,7 @@ export function PosTerminal({
               <button
                 key={prod.id}
                 onClick={() => addToCart(prod)}
-                className="group relative flex flex-col justify-between p-4 rounded-2xl bg-[var(--bg-base)] hover:bg-white border border-[var(--border-soft)] hover:border-[var(--primary)] hover:shadow-md text-left transition-all active:scale-98"
+                className="group relative flex flex-col justify-between p-4 rounded-2xl bg-[var(--bg-base)] hover:bg-[var(--surface)] border border-[var(--border-soft)] hover:border-[var(--primary)] hover:shadow-md text-left transition-all active:scale-98"
               >
                 <div>
                   <div className="flex items-start justify-between gap-1 mb-1.5">
@@ -445,7 +445,7 @@ export function PosTerminal({
                         GST {prod.tax_rate ?? 0}%
                       </span>
                     ) : (
-                      <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700">
+                      <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-md bg-[var(--success)]/10 text-[var(--success-strong)]">
                         0% Tax
                       </span>
                     )}
@@ -462,7 +462,7 @@ export function PosTerminal({
                   <span
                     className={`text-[10px] font-bold ${
                       prod.is_low_stock
-                        ? "text-rose-600 font-extrabold"
+                        ? "text-[var(--error-strong)] font-extrabold"
                         : "text-[var(--text-secondary)]"
                     }`}
                   >
@@ -478,7 +478,7 @@ export function PosTerminal({
       {/* ========================================================= */}
       {/* RIGHT COLUMN: Interactive Cart & Tender Total              */}
       {/* ========================================================= */}
-      <div className="w-full lg:w-[420px] flex flex-col bg-white border border-[var(--border-soft)] rounded-[28px] overflow-hidden shadow-sm shrink-0">
+      <div className="w-full lg:w-[420px] flex flex-col bg-[var(--surface)] border border-[var(--border-soft)] rounded-[28px] overflow-hidden shadow-sm shrink-0">
         {/* Cart Header */}
         <div className="p-4 border-b border-[var(--bg-soft)] bg-[var(--bg-base)] flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -496,7 +496,7 @@ export function PosTerminal({
           {cart.length > 0 && (
             <button
               onClick={clearCart}
-              className="text-xs text-rose-600 hover:text-rose-700 hover:underline font-bold"
+              className="text-xs text-[var(--error-strong)] hover:text-[var(--error-strong)] hover:underline font-bold"
             >
               Clear Cart
             </button>
@@ -504,7 +504,7 @@ export function PosTerminal({
         </div>
 
         {/* Customer Selector Bar */}
-        <div className="p-3 border-b border-[var(--bg-soft)] bg-white relative">
+        <div className="p-3 border-b border-[var(--bg-soft)] bg-[var(--surface)] relative">
           {selectedCustomer ? (
             <div className="flex items-center justify-between p-2.5 rounded-2xl bg-[var(--primary)]/10 border border-[var(--primary)]/30">
               <div className="flex items-center gap-2.5 min-w-0">
@@ -546,7 +546,7 @@ export function PosTerminal({
 
               {/* Customer Dropdown */}
               {showCustomerDropdown && (
-                <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-[var(--border-soft)] rounded-2xl shadow-xl z-20 max-h-52 overflow-y-auto p-1.5">
+                <div className="absolute left-0 right-0 top-full mt-2 bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl shadow-xl z-20 max-h-52 overflow-y-auto p-1.5">
                   {customers
                     .filter(
                       (c) =>
@@ -568,7 +568,7 @@ export function PosTerminal({
                           <div className="text-[10px] text-[var(--text-secondary)]">{c.phone}</div>
                         </div>
                         <div className="text-right">
-                          <div className="text-[10px] font-bold text-amber-600">
+                          <div className="text-[10px] font-bold text-[var(--warning-strong)]">
                             Due: {formatCurrency(c.balance_amount ?? 0)}
                           </div>
                         </div>
@@ -629,7 +629,7 @@ export function PosTerminal({
 
                     <button
                       onClick={() => removeFromCart(item.id)}
-                      className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors"
+                      className="p-1.5 text-[var(--error-strong)] hover:text-[var(--error-strong)] hover:bg-[var(--error)]/10 rounded-lg transition-colors"
                       title="Remove item"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -657,7 +657,7 @@ export function PosTerminal({
               </span>
             </div>
             {cartDiscounts > 0 && (
-              <div className="flex justify-between text-emerald-600">
+              <div className="flex justify-between text-[var(--success-strong)]">
                 <span>Total Discount:</span>
                 <span className="font-bold">-{formatCurrency(cartDiscounts)}</span>
               </div>

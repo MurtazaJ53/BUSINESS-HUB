@@ -34,13 +34,13 @@ export default async function HomePage() {
         <div className="space-y-6">
           {/* Today's takings hero matching HeroMetricCard */}
           <div className="bg-gradient-to-br from-[var(--primary-light)] to-[var(--primary-hover)] text-white rounded-[24px] p-6 sm:p-8 shadow-md animate-fade-in-up">
-            <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-sky-100">
+            <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[var(--info)]">
               Today&apos;s Sales
             </span>
             <h2 className="text-3xl sm:text-4xl font-[900] tracking-tight mt-1">
               {formatCurrency(grossRevenue, currencyCode)}
             </h2>
-            <div className="flex items-center gap-3 mt-4 text-xs font-bold text-sky-50">
+            <div className="flex items-center gap-3 mt-4 text-xs font-bold text-[var(--info)]">
               <span>{dashboardSnapshot?.sales_count ?? 0} sales today</span>
               {totalOutstanding > 0 && (
                 <>
@@ -58,7 +58,7 @@ export default async function HomePage() {
             {/* Stat: Items */}
             <Link
               href="/inventory"
-              className="bg-white border border-[var(--border-soft)] hover:border-[var(--primary)] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-1 hover-lift"
+              className="bg-[var(--surface)] border border-[var(--border-soft)] hover:border-[var(--primary)] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-1 hover-lift"
             >
               <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/10 text-[var(--primary-hover)] flex items-center justify-center transition-colors group-hover:bg-[var(--primary)]/20">
                 <Package className="w-5 h-5" />
@@ -77,12 +77,12 @@ export default async function HomePage() {
             {/* Stat: Low Stock */}
             <Link
               href="/inventory"
-              className="bg-white border border-[var(--border-soft)] hover:border-[var(--primary)] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-2 hover-lift"
+              className="bg-[var(--surface)] border border-[var(--border-soft)] hover:border-[var(--primary)] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-2 hover-lift"
             >
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
                 (dashboardSnapshot?.low_stock_items_count ?? 0) > 0
-                  ? "bg-rose-50 text-rose-600 group-hover:bg-rose-100"
-                  : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100"
+                  ? "bg-[var(--error)]/10 text-[var(--error-strong)] group-hover:bg-[var(--error)]/15"
+                  : "bg-[var(--success)]/10 text-[var(--success-strong)] group-hover:bg-[var(--success)]/15"
               }`}>
                 <AlertCircle className="w-5 h-5" />
               </div>
@@ -93,7 +93,7 @@ export default async function HomePage() {
                 {dashboardSnapshot?.low_stock_items_count ?? 0}
               </h3>
               <span className={`block text-[11px] font-semibold mt-0.5 ${
-                (dashboardSnapshot?.low_stock_items_count ?? 0) > 0 ? "text-rose-600" : "text-emerald-600"
+                (dashboardSnapshot?.low_stock_items_count ?? 0) > 0 ? "text-[var(--error-strong)]" : "text-[var(--success-strong)]"
               }`}>
                 {(dashboardSnapshot?.low_stock_items_count ?? 0) > 0 ? "Needs restock" : "All good"}
               </span>
@@ -102,7 +102,7 @@ export default async function HomePage() {
             {/* Stat: Total Sales */}
             <Link
               href="/sales"
-              className="bg-white border border-[var(--border-soft)] hover:border-[var(--primary)] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-3 hover-lift"
+              className="bg-[var(--surface)] border border-[var(--border-soft)] hover:border-[var(--primary)] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-3 hover-lift"
             >
               <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center transition-colors group-hover:bg-violet-100">
                 <TrendingUp className="w-5 h-5" />
@@ -121,9 +121,9 @@ export default async function HomePage() {
             {/* Stat: Stock Value */}
             <Link
               href="/inventory"
-              className="bg-white border border-[var(--border-soft)] hover:border-[var(--primary)] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-4 hover-lift"
+              className="bg-[var(--surface)] border border-[var(--border-soft)] hover:border-[var(--primary)] hover:shadow-md rounded-[20px] p-5 text-left transition-all group animate-fade-in-up delay-4 hover-lift"
             >
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center transition-colors group-hover:bg-emerald-100">
+              <div className="w-10 h-10 rounded-xl bg-[var(--success)]/10 text-[var(--success-strong)] flex items-center justify-center transition-colors group-hover:bg-[var(--success)]/15">
                 <TrendingDown className="w-5 h-5" />
               </div>
               <span className="block text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-tertiary)] mt-3.5">
@@ -151,7 +151,7 @@ export default async function HomePage() {
           <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
             
             {/* Column 1: Recent Sales */}
-            <div className="bg-white border border-[var(--border-soft)] rounded-[24px] p-5 sm:p-6 shadow-sm animate-fade-in-up delay-6">
+            <div className="bg-[var(--surface)] border border-[var(--border-soft)] rounded-[24px] p-5 sm:p-6 shadow-sm animate-fade-in-up delay-6">
               <div className="flex items-center justify-between gap-4 mb-4">
                 <h3 className="text-base font-extrabold text-[var(--text-primary)]">
                   Recent sales
@@ -196,7 +196,7 @@ export default async function HomePage() {
                           {formatCurrency(Number(sale.total_amount), currencyCode)}
                         </span>
                         {Number(sale.amount_due) > 0 && (
-                          <span className="block text-[10px] font-extrabold text-amber-600 mt-0.5">
+                          <span className="block text-[10px] font-extrabold text-[var(--warning-strong)] mt-0.5">
                             Due {formatCurrency(Number(sale.amount_due), currencyCode)}
                           </span>
                         )}
@@ -208,7 +208,7 @@ export default async function HomePage() {
             </div>
 
             {/* Column 2: Low Stock */}
-            <div className="bg-white border border-[var(--border-soft)] rounded-[24px] p-5 sm:p-6 shadow-sm animate-fade-in-up delay-7">
+            <div className="bg-[var(--surface)] border border-[var(--border-soft)] rounded-[24px] p-5 sm:p-6 shadow-sm animate-fade-in-up delay-7">
               <div className="flex items-center justify-between gap-4 mb-4">
                 <h3 className="text-base font-extrabold text-[var(--text-primary)]">
                   Low stock watch
@@ -235,7 +235,7 @@ export default async function HomePage() {
                           {item.category || "Uncategorized"}
                         </span>
                       </div>
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-50 text-rose-600 border border-rose-100">
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-[var(--error)]/10 text-[var(--error-strong)] border border-[var(--error)]/30">
                         {item.stock_on_hand} left
                       </span>
                     </div>

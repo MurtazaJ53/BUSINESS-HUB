@@ -21,12 +21,12 @@ type MetricCardProps = {
 const accentMap: Record<MetricAccent, { bg: string; text: string; border: string }> = {
   primary: { bg: "bg-[var(--primary)]/10", text: "text-[var(--primary-hover)]", border: "border-[var(--primary)]/20" },
   blue: { bg: "bg-[var(--primary)]/10", text: "text-[var(--primary-hover)]", border: "border-[var(--primary)]/20" },
-  success: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
-  green: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
-  warning: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" },
-  error: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" },
-  rose: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" },
-  info: { bg: "bg-sky-50", text: "text-sky-700", border: "border-sky-200" },
+  success: { bg: "bg-[var(--success)]/10", text: "text-[var(--success-strong)]", border: "border-[var(--success)]/30" },
+  green: { bg: "bg-[var(--success)]/10", text: "text-[var(--success-strong)]", border: "border-[var(--success)]/30" },
+  warning: { bg: "bg-[var(--warning)]/10", text: "text-[var(--warning-strong)]", border: "border-[var(--warning)]/30" },
+  error: { bg: "bg-[var(--error)]/10", text: "text-[var(--error-strong)]", border: "border-[var(--error)]/30" },
+  rose: { bg: "bg-[var(--error)]/10", text: "text-[var(--error-strong)]", border: "border-[var(--error)]/30" },
+  info: { bg: "bg-[var(--info)]/10", text: "text-[var(--info-strong)]", border: "border-[var(--info)]/30" },
 };
 
 export function MetricCard({
@@ -39,7 +39,7 @@ export function MetricCard({
   const styles = accentMap[accent] || accentMap.primary;
 
   return (
-    <div className="bg-white border border-[var(--border-soft)] rounded-[24px] p-5 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+    <div className="bg-[var(--surface)] border border-[var(--border-soft)] rounded-[24px] p-5 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
           <p className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--text-tertiary)] mb-1">

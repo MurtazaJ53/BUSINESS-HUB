@@ -66,13 +66,13 @@ export function ThermalReceiptModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-white border border-[var(--border-soft)] rounded-[28px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        className="w-full max-w-md bg-[var(--surface)] border border-[var(--border-soft)] rounded-[28px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="p-5 border-b border-[var(--bg-soft)] flex items-center justify-between bg-[var(--bg-base)]">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-[var(--success)]/10 text-[var(--success-strong)] flex items-center justify-center">
               <CheckCircle2 className="w-5 h-5" />
             </div>
             <span className="font-[900] text-sm text-[var(--text-primary)]">
@@ -199,7 +199,7 @@ export function ThermalReceiptModal({
                 </div>
               )}
               {changeDue > 0 && (
-                <div className="flex justify-between font-semibold text-emerald-800 pt-0.5">
+                <div className="flex justify-between font-semibold text-[var(--success-strong)] pt-0.5">
                   <span>Change Returned:</span>
                   <span>₹{changeDue.toFixed(2)}</span>
                 </div>
@@ -230,7 +230,7 @@ export function ThermalReceiptModal({
           </button>
           <button
             onClick={onClose}
-            className="py-3 px-5 bg-white hover:bg-[var(--bg-soft)] border border-[var(--border-soft)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-2xl font-bold text-xs transition-colors"
+            className="py-3 px-5 bg-[var(--surface)] hover:bg-[var(--bg-soft)] border border-[var(--border-soft)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-2xl font-bold text-xs transition-colors"
           >
             Done
           </button>

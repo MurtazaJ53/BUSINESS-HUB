@@ -300,7 +300,7 @@ export function InventoryManager({ initialInventory, initialSummary, shopId }: I
 
           <button
             onClick={openAddModal}
-            className="flex items-center gap-1.5 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-text-primary text-xs font-semibold rounded-xl shadow-md shadow-blue-500/20 transition-all active:scale-95"
+            className="flex items-center gap-1.5 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-semibold rounded-xl shadow-md shadow-blue-500/20 transition-all active:scale-95"
           >
             <Plus className="w-4 h-4" />
             <span>Add Product</span>
@@ -338,7 +338,7 @@ export function InventoryManager({ initialInventory, initialSummary, shopId }: I
             onClick={() => setOnlyLowStock(!onlyLowStock)}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-colors shrink-0 ${
               onlyLowStock
-                ? "bg-red-500/20 text-red-300 border-red-500/30"
+                ? "bg-[var(--error)]/20 text-[var(--error)] border-[var(--error)]/30"
                 : "bg-bg-soft text-[var(--text-secondary)] border-[var(--border-soft)] hover:text-text-primary"
             }`}
           >
@@ -400,13 +400,13 @@ export function InventoryManager({ initialInventory, initialSummary, shopId }: I
                       <div className="inline-flex items-center gap-1.5">
                         <span
                           className={`font-mono font-bold ${
-                            item.is_low_stock ? "text-red-400" : "text-emerald-400"
+                            item.is_low_stock ? "text-[var(--error)]" : "text-[var(--success)]"
                           }`}
                         >
                           {item.current_stock}
                         </span>
                         {item.is_low_stock && (
-                          <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-red-500/20 text-red-300">
+                          <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-[var(--error)]/20 text-[var(--error)]">
                             Low
                           </span>
                         )}

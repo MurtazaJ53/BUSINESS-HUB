@@ -154,7 +154,7 @@ export function AdminShell({
             {activeShop && (
               <div className="hidden md:flex items-center gap-2 ml-4 pl-4 border-l border-border-soft">
                 <div className="px-3 py-1.5 bg-bg-base border border-border-soft rounded-xl flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse" />
                   <span className="text-xs font-bold text-text-primary">{activeShop.shop.name}</span>
                   <span className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-[var(--primary)]/10 text-primary uppercase">
                     {workspacePlanLabel}
@@ -204,7 +204,7 @@ export function AdminShell({
               <button
                 type="button"
                 onClick={handleLogout}
-                className="p-1.5 text-text-tertiary hover:text-red-500 rounded-lg hover:bg-red-50/10 transition-colors ml-1"
+                className="p-1.5 text-text-tertiary hover:text-[var(--error-strong)] rounded-lg hover:bg-[var(--error)]/10 transition-colors ml-1"
                 title="Sign Out"
               >
                 <LogOut className="w-4 h-4" />

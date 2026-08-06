@@ -17,7 +17,13 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const res = await fetch(`${API_BASE_URL}/shops/${shopId}/customers/${id}/ledger/`, {
+    // /timeline/ (not /ledger/): the caller wants {entries: [...]} with a
+    // running balance for display. /ledger/ is the unpaginated raw list and
+    // returns a bare array, so `data.entries` there resolves to
+    // Array.prototype.entries — a function, which React then runs as a state
+    // updater and throws "Cannot convert undefined or null to object".
+    // The POST below stays on /ledger/, which is the create endpoint.
+    const res = await fetch(`${API_BASE_URL}/shops/${shopId}/customers/${id}/timeline/`, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/json",

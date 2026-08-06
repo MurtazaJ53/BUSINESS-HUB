@@ -139,7 +139,7 @@ export function PosCheckoutModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl bg-white border border-[var(--border-soft)] rounded-[28px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        className="w-full max-w-2xl bg-[var(--surface)] border border-[var(--border-soft)] rounded-[28px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -178,7 +178,7 @@ export function PosCheckoutModal({
                   : "border-[var(--border-soft)] bg-[var(--bg-base)] text-[var(--text-secondary)] hover:border-[var(--border)]"
               }`}
             >
-              <Banknote className="w-5 h-5 text-emerald-600" />
+              <Banknote className="w-5 h-5 text-[var(--success-strong)]" />
               <span className="text-xs font-bold">100% Cash</span>
             </button>
 
@@ -220,7 +220,7 @@ export function PosCheckoutModal({
                   : "border-[var(--border-soft)] bg-[var(--bg-base)] text-[var(--text-secondary)] hover:border-[var(--border)]"
               }`}
             >
-              <Users className="w-5 h-5 text-amber-600" />
+              <Users className="w-5 h-5 text-[var(--warning-strong)]" />
               <span className="text-xs font-bold">100% Khata Due</span>
             </button>
           </div>
@@ -234,7 +234,7 @@ export function PosCheckoutModal({
             {/* Cash Input */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-1">
               <div className="w-32 flex items-center gap-2 text-xs font-bold text-[var(--text-primary)]">
-                <Banknote className="w-4 h-4 text-emerald-600" />
+                <Banknote className="w-4 h-4 text-[var(--success-strong)]" />
                 <span>Cash:</span>
               </div>
               <div className="flex-1 flex gap-2">
@@ -250,7 +250,7 @@ export function PosCheckoutModal({
                     }
                   }}
                   placeholder="₹0.00"
-                  className="flex-1 px-3.5 py-2.5 bg-white border border-[var(--border-soft)] rounded-xl text-xs font-bold text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)]"
+                  className="flex-1 px-3.5 py-2.5 bg-[var(--surface)] border border-[var(--border-soft)] rounded-xl text-xs font-bold text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)]"
                 />
                 {numCash > 0 && (
                   <input
@@ -261,7 +261,7 @@ export function PosCheckoutModal({
                     onChange={(e) => setCashReceived(e.target.value)}
                     placeholder="Tendered"
                     title="Physical cash received from customer"
-                    className="w-32 px-3.5 py-2.5 bg-white border border-emerald-400 rounded-xl text-xs font-bold text-emerald-700 focus:outline-none"
+                    className="w-32 px-3.5 py-2.5 bg-[var(--surface)] border border-[var(--success)]/30 rounded-xl text-xs font-bold text-[var(--success-strong)] focus:outline-none"
                   />
                 )}
               </div>
@@ -269,7 +269,7 @@ export function PosCheckoutModal({
 
             {/* Change Due Indicator */}
             {changeDue > 0 && (
-              <div className="sm:ml-34 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-700 flex justify-between items-center">
+              <div className="sm:ml-34 p-3 rounded-xl bg-[var(--success)]/10 border border-[var(--success)]/30 text-xs font-bold text-[var(--success-strong)] flex justify-between items-center">
                 <span>Return Change to Customer:</span>
                 <strong className="text-base font-black">{formatCurrency(changeDue)}</strong>
               </div>
@@ -289,14 +289,14 @@ export function PosCheckoutModal({
                   value={cardAmount}
                   onChange={(e) => setCardAmount(e.target.value)}
                   placeholder="₹0.00"
-                  className="flex-1 px-3.5 py-2.5 bg-white border border-[var(--border-soft)] rounded-xl text-xs font-bold text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)]"
+                  className="flex-1 px-3.5 py-2.5 bg-[var(--surface)] border border-[var(--border-soft)] rounded-xl text-xs font-bold text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)]"
                 />
                 <input
                   type="text"
                   value={cardRef}
                   onChange={(e) => setCardRef(e.target.value)}
                   placeholder="Auth/Ref # (optional)"
-                  className="w-36 px-3.5 py-2.5 bg-white border border-[var(--border-soft)] rounded-xl text-xs font-medium text-[var(--text-primary)] focus:outline-none"
+                  className="w-36 px-3.5 py-2.5 bg-[var(--surface)] border border-[var(--border-soft)] rounded-xl text-xs font-medium text-[var(--text-primary)] focus:outline-none"
                 />
               </div>
             </div>
@@ -316,19 +316,19 @@ export function PosCheckoutModal({
                     value={upiAmount}
                     onChange={(e) => setUpiAmount(e.target.value)}
                     placeholder="₹0.00"
-                    className="flex-1 px-3.5 py-2.5 bg-white border border-[var(--border-soft)] rounded-xl text-xs font-bold text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)]"
+                    className="flex-1 px-3.5 py-2.5 bg-[var(--surface)] border border-[var(--border-soft)] rounded-xl text-xs font-bold text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)]"
                   />
                   <input
                     type="text"
                     value={upiRef}
                     onChange={(e) => setUpiRef(e.target.value)}
                     placeholder="UTR/Txn # (optional)"
-                    className="w-36 px-3.5 py-2.5 bg-white border border-[var(--border-soft)] rounded-xl text-xs font-medium text-[var(--text-primary)] focus:outline-none"
+                    className="w-36 px-3.5 py-2.5 bg-[var(--surface)] border border-[var(--border-soft)] rounded-xl text-xs font-medium text-[var(--text-primary)] focus:outline-none"
                   />
                 </div>
 
                 {numUpi > 0 && (
-                  <div className="p-4 bg-white border border-[#BAE6FD] rounded-2xl flex items-center gap-4 shadow-sm">
+                  <div className="p-4 bg-[var(--surface)] border border-[#BAE6FD] rounded-2xl flex items-center gap-4 shadow-sm">
                     <div className="w-20 h-20 bg-[var(--text-primary)] p-2 rounded-xl flex flex-col items-center justify-center text-white text-[8px] text-center font-mono">
                       <QrCode className="w-8 h-8 text-[var(--primary-light)] mb-0.5" />
                       <span>UPI SCAN</span>
@@ -346,7 +346,7 @@ export function PosCheckoutModal({
                         className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--primary-hover)] hover:underline"
                       >
                         {copiedUpi ? (
-                          <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                          <CheckCircle className="w-3.5 h-3.5 text-[var(--success-strong)]" />
                         ) : (
                           <Copy className="w-3.5 h-3.5" />
                         )}
@@ -361,7 +361,7 @@ export function PosCheckoutModal({
             {/* Khata Credit Due Input */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
               <div className="w-32 flex items-center gap-2 text-xs font-bold text-[var(--text-primary)]">
-                <Users className="w-4 h-4 text-amber-600" />
+                <Users className="w-4 h-4 text-[var(--warning-strong)]" />
                 <span>Khata Due:</span>
               </div>
               <div className="flex-1">
@@ -375,7 +375,7 @@ export function PosCheckoutModal({
                   placeholder={
                     selectedCustomer ? "₹0.00" : "Select a customer to allow Khata credit"
                   }
-                  className="w-full px-3.5 py-2.5 bg-white border border-[var(--border-soft)] rounded-xl text-xs font-bold text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-3.5 py-2.5 bg-[var(--surface)] border border-[var(--border-soft)] rounded-xl text-xs font-bold text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 {selectedCustomer && (
                   <div className="text-[10px] font-bold text-[var(--text-secondary)] mt-1">
@@ -397,17 +397,17 @@ export function PosCheckoutModal({
             </div>
             {remaining > 0 ? (
               <div className="text-right">
-                <div className="text-xs text-amber-600 font-bold">Remaining to allocate:</div>
-                <div className="text-sm font-black text-amber-700">
+                <div className="text-xs text-[var(--warning-strong)] font-bold">Remaining to allocate:</div>
+                <div className="text-sm font-black text-[var(--warning-strong)]">
                   {formatCurrency(remaining)}
                 </div>
               </div>
             ) : totalAllocated > totalAmount ? (
-              <div className="text-right text-xs text-rose-600 font-bold">
+              <div className="text-right text-xs text-[var(--error-strong)] font-bold">
                 Exceeds total by {formatCurrency(totalAllocated - totalAmount)}
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-extrabold">
+              <div className="flex items-center gap-1.5 text-xs text-[var(--success-strong)] font-extrabold">
                 <CheckCircle className="w-4 h-4" />
                 <span>Ready to Charge</span>
               </div>
@@ -420,7 +420,7 @@ export function PosCheckoutModal({
           <button
             type="button"
             onClick={onClose}
-            className="py-3 px-5 bg-white hover:bg-[var(--bg-soft)] border border-[var(--border-soft)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-2xl font-bold text-xs transition-colors"
+            className="py-3 px-5 bg-[var(--surface)] hover:bg-[var(--bg-soft)] border border-[var(--border-soft)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-2xl font-bold text-xs transition-colors"
           >
             Cancel
           </button>

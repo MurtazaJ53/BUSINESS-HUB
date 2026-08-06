@@ -267,7 +267,7 @@ export function SalesManager({ initialSales, initialSummary, shopId }: SalesMana
               <div className="text-xs text-[var(--text-tertiary)] font-medium">
                 UPI vs Cash Collection
               </div>
-              <div className="text-lg font-bold text-sky-600 font-mono mt-1">
+              <div className="text-lg font-bold text-[var(--info-strong)] font-mono mt-1">
                 UPI: {formatCurrency(metrics.upiTotal)} | Cash: {formatCurrency(metrics.cashTotal)}
               </div>
               <div className="text-[11px] text-[var(--text-tertiary)] mt-1">
@@ -323,7 +323,7 @@ export function SalesManager({ initialSales, initialSummary, shopId }: SalesMana
                     <tr>
                       <td colSpan={8} className="py-12 text-center text-[var(--text-tertiary)]">
                         <div className="flex flex-col items-center gap-2">
-                          <div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+                          <div className="w-6 h-6 border-2 border-[var(--info)]/30 border-t-transparent rounded-full animate-spin"></div>
                           <span>Loading transaction ledger...</span>
                         </div>
                       </td>
@@ -358,9 +358,9 @@ export function SalesManager({ initialSales, initialSummary, shopId }: SalesMana
                           <span
                             className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                               sale.payment_mode === "upi"
-                                ? "bg-sky-100 text-sky-800 border border-sky-200"
+                                ? "bg-[var(--info)]/15 text-[var(--info-strong)] border border-[var(--info)]/30"
                                 : sale.payment_mode === "cash"
-                                ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                ? "bg-[var(--success)]/15 text-[var(--success-strong)] border border-[var(--success)]/30"
                                 : "bg-purple-100 text-purple-800 border border-purple-200"
                             }`}
                           >
@@ -384,13 +384,13 @@ export function SalesManager({ initialSales, initialSummary, shopId }: SalesMana
                             </button>
 
                             {sale.status === "voided" ? (
-                              <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-red-500/20 text-red-300 border border-red-500/30">
+                              <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-[var(--error)]/20 text-[var(--error)] border border-[var(--error)]/30">
                                 Voided
                               </span>
                             ) : (
                               <button
                                 onClick={() => handleVoidSale(sale.id)}
-                                className="inline-flex items-center gap-1 px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-lg text-[11px] transition-colors border border-red-500/20"
+                                className="inline-flex items-center gap-1 px-2 py-1 bg-[var(--error)]/10 hover:bg-[var(--error)]/20 text-[var(--error)] hover:text-[var(--error)] rounded-lg text-[11px] transition-colors border border-[var(--error)]/20"
                               >
                                 <RotateCcw className="w-3 h-3" />
                                 <span>Void</span>
@@ -413,7 +413,7 @@ export function SalesManager({ initialSales, initialSummary, shopId }: SalesMana
         <div className="max-w-2xl mx-auto bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl p-6 shadow-2xl space-y-6">
           <div className="flex items-center justify-between pb-4 border-b border-[var(--border-soft)]">
             <div className="flex items-center gap-2">
-              <Lock className="w-5 h-5 text-amber-500" />
+              <Lock className="w-5 h-5 text-[var(--warning-strong)]" />
               <div>
                 <h3 className="font-bold text-sm text-[var(--text-primary)]">End of Day Register Close</h3>
                 <div className="text-[11px] text-[var(--text-tertiary)]">
@@ -422,7 +422,7 @@ export function SalesManager({ initialSales, initialSummary, shopId }: SalesMana
               </div>
             </div>
             {isDayClosed && (
-              <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-full text-xs font-bold">
+              <span className="px-2.5 py-1 bg-[var(--success)]/15 text-[var(--success-strong)] border border-[var(--success)]/30 rounded-full text-xs font-bold">
                 Day Closed & Locked
               </span>
             )}
@@ -437,13 +437,13 @@ export function SalesManager({ initialSales, initialSummary, shopId }: SalesMana
             </div>
             <div className="flex justify-between py-1 border-t border-[var(--border-soft)]">
               <span className="text-[var(--text-tertiary)]">+ Cash Sales Received:</span>
-              <span className="font-mono font-semibold text-emerald-600">
+              <span className="font-mono font-semibold text-[var(--success-strong)]">
                 +{formatCurrency(metrics.cashTotal)}
               </span>
             </div>
             <div className="flex justify-between py-1 border-t border-[var(--border-soft)]">
               <span className="text-[var(--text-tertiary)]">Digital UPI / QR Collections:</span>
-              <span className="font-mono font-semibold text-sky-600">
+              <span className="font-mono font-semibold text-[var(--info-strong)]">
                 {formatCurrency(metrics.upiTotal)}
               </span>
             </div>
@@ -477,10 +477,10 @@ export function SalesManager({ initialSales, initialSummary, shopId }: SalesMana
             <div
               className={`p-3 rounded-xl border flex items-center justify-between text-xs ${
                 cashDifference === 0
-                  ? "bg-emerald-100 border-emerald-200 text-emerald-800"
+                  ? "bg-[var(--success)]/15 border-[var(--success)]/30 text-[var(--success-strong)]"
                   : cashDifference > 0
-                  ? "bg-sky-100 border-sky-200 text-sky-800"
-                  : "bg-red-100 border-red-200 text-red-800"
+                  ? "bg-[var(--info)]/15 border-[var(--info)]/30 text-[var(--info-strong)]"
+                  : "bg-[var(--error)]/15 border-[var(--error)]/30 text-[var(--error-strong)]"
               }`}
             >
               <span>Cash Discrepancy (Over / Short):</span>
@@ -510,7 +510,7 @@ export function SalesManager({ initialSales, initialSummary, shopId }: SalesMana
             {!isDayClosed && (
               <button
                 onClick={() => setIsDayClosed(true)}
-                className="w-full py-3 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-text-primary font-bold text-xs rounded-xl shadow-lg shadow-blue-500/25 transition-all active:scale-98"
+                className="w-full py-3 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-500/25 transition-all active:scale-98"
               >
                 Submit & Lock Day Close Register
               </button>

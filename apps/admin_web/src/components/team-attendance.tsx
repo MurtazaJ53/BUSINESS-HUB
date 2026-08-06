@@ -199,15 +199,15 @@ export function TeamAttendance({ initialTeam, initialSessions, initialSummary, s
             disabled={isSubmitting}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold border transition-all ${
               myActiveSession
-                ? "bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20"
-                : "bg-emerald-600 hover:bg-emerald-500 text-white"
+                ? "bg-[var(--warning)]/10 border-[var(--warning)]/30 text-[var(--warning)] hover:bg-[var(--warning)]/20"
+                : "bg-[var(--success-dark)] hover:bg-[var(--success)] text-white"
             } disabled:opacity-50`}
           >
             {isSubmitting ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : myActiveSession ? (
               <>
-                <LogOut className="w-4 h-4 text-amber-400" />
+                <LogOut className="w-4 h-4 text-[var(--warning)]" />
                 <span>Clock Out of Shift</span>
               </>
             ) : (
@@ -250,7 +250,7 @@ export function TeamAttendance({ initialTeam, initialSessions, initialSummary, s
 
         <div className="p-4 bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl">
           <div className="text-xs text-[var(--text-tertiary)] font-medium">Present Workers Today</div>
-          <div className="text-2xl font-black text-emerald-500 font-mono mt-1">
+          <div className="text-2xl font-black text-[var(--success-strong)] font-mono mt-1">
             {summary.active_workers_today}
           </div>
         </div>
@@ -335,8 +335,8 @@ export function TeamAttendance({ initialTeam, initialSessions, initialSummary, s
                       <td className="py-3 px-4">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                           member.status === "active"
-                            ? "bg-emerald-500/10 text-emerald-400"
-                            : "bg-amber-500/10 text-amber-400"
+                            ? "bg-[var(--success)]/10 text-[var(--success)]"
+                            : "bg-[var(--warning)]/10 text-[var(--warning)]"
                         }`}>
                           {member.status}
                         </span>
@@ -399,10 +399,10 @@ export function TeamAttendance({ initialTeam, initialSessions, initialSummary, s
                       <td className="py-3 px-4 text-center">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                           record.status === "PRESENT"
-                            ? "bg-emerald-500/10 text-emerald-400"
+                            ? "bg-[var(--success)]/10 text-[var(--success)]"
                             : record.status === "HALF_DAY"
-                            ? "bg-amber-500/10 text-amber-400"
-                            : "bg-red-500/10 text-red-400"
+                            ? "bg-[var(--warning)]/10 text-[var(--warning)]"
+                            : "bg-[var(--error)]/10 text-[var(--error)]"
                         }`}>
                           {record.status}
                         </span>
@@ -443,7 +443,7 @@ export function TeamAttendance({ initialTeam, initialSessions, initialSummary, s
 
             <form onSubmit={handleInviteStaff} className="p-6 space-y-4">
               {submitError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-xl font-bold">
+                <div className="p-3 bg-[var(--error)]/10 border border-[var(--error)]/20 text-[var(--error-strong)] text-xs rounded-xl font-bold">
                   {submitError}
                 </div>
               )}
@@ -538,7 +538,7 @@ export function TeamAttendance({ initialTeam, initialSessions, initialSummary, s
 
             <form onSubmit={handleManualAttendance} className="p-6 space-y-4">
               {submitError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-xl font-bold">
+                <div className="p-3 bg-[var(--error)]/10 border border-[var(--error)]/20 text-[var(--error-strong)] text-xs rounded-xl font-bold">
                   {submitError}
                 </div>
               )}

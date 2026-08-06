@@ -175,14 +175,14 @@ export function ExpensesManager({ initialExpenses, initialSummary, shopId }: Exp
             <div className="text-xs text-[var(--text-tertiary)] font-medium">
               Till Cash Outflows
             </div>
-            <div className="text-2xl font-black text-amber-500 font-mono mt-1">
+            <div className="text-2xl font-black text-[var(--warning-strong)] font-mono mt-1">
               {formatCurrency(metrics.cashOutflow)}
             </div>
             <div className="text-[10px] text-[var(--text-tertiary)] mt-0.5">
               Deducted automatically from daily cash float
             </div>
           </div>
-          <Wallet className="w-8 h-8 text-amber-400/40" />
+          <Wallet className="w-8 h-8 text-[var(--warning)]/40" />
         </div>
 
         <div className="p-4 bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl flex items-center justify-between">
@@ -272,7 +272,7 @@ export function ExpensesManager({ initialExpenses, initialSummary, shopId }: Exp
                       <span
                         className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                           exp.payment_method === "CASH"
-                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                            ? "bg-[var(--warning)]/10 text-[var(--warning-strong)] dark:text-[var(--warning)]"
                             : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
                         }`}
                       >
@@ -282,7 +282,7 @@ export function ExpensesManager({ initialExpenses, initialSummary, shopId }: Exp
                     <td className="py-3 px-4 font-mono text-[var(--text-tertiary)]">
                       {exp.payment_reference || "—"}
                     </td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-red-500">
+                    <td className="py-3 px-4 text-right font-mono font-bold text-[var(--error-strong)]">
                       {formatCurrency(parseFloat(exp.amount || "0"))}
                     </td>
                   </tr>
@@ -320,7 +320,7 @@ export function ExpensesManager({ initialExpenses, initialSummary, shopId }: Exp
 
             <form onSubmit={handleAddExpense} className="p-6 space-y-4">
               {submitError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-xl font-bold">
+                <div className="p-3 bg-[var(--error)]/10 border border-[var(--error)]/20 text-[var(--error-strong)] text-xs rounded-xl font-bold">
                   {submitError}
                 </div>
               )}

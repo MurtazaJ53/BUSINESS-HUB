@@ -65,7 +65,7 @@ export function ShopSwitcher({
         );
       default:
         return (
-          <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+          <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-[var(--success)]/20 text-[var(--success)] border border-[var(--success)]/30">
             STARTER
           </span>
         );
