@@ -105,6 +105,96 @@ class Purchase(SourceTrackedModel):
         return f"Purchase {self.invoice_number or self.id} ({self.shop.name})"
 
 
+class PurchaseOrder(SourceTrackedModel):
+    """What was ordered from a supplier but has not arrived yet.
+
+    A Purchase is already the goods-received event: creating one posts stock
+    and payables. What was missing was the stage before it — the gap between
+    ordered and received. Without it, an order placed and never delivered
+    looked exactly like an order never placed, so nobody chased it, and the
+    reorder list kept saying "buy this" for something already on the way.
+
+    A purchase order therefore touches NO stock and NO money. Receiving one
+    creates an ordinary Purchase through the existing serializer, so stock,
+    cost price and the supplier's payables all behave exactly as they do for a
+    purchase entered by hand. Nothing about that path is reimplemented here.
+    """
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        ORDERED = "ordered", "Ordered"
+        PARTIALLY_RECEIVED = "partially_received", "Partially received"
+        RECEIVED = "received", "Received"
+        CANCELLED = "cancelled", "Cancelled"
+
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="purchase_orders")
+    supplier = models.ForeignKey(
+        Supplier,
+        on_delete=models.PROTECT,
+        related_name="purchase_orders",
+        blank=True,
+        null=True,
+    )
+    supplier_name_snapshot = models.CharField(max_length=255, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="purchase_orders_created",
+        blank=True,
+        null=True,
+    )
+    reference = models.CharField(max_length=32, blank=True)
+    status = models.CharField(max_length=24, choices=Status.choices, default=Status.DRAFT)
+    #: When the shop was told to expect it. Drives the "overdue" flag; null
+    #: means nobody promised a date, which is not the same as "not late".
+    expected_date = models.DateField(blank=True, null=True)
+    note = models.TextField(blank=True)
+    ordered_at = models.DateTimeField(blank=True, null=True)
+    closed_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["shop", "status"]),
+            models.Index(fields=["shop", "expected_date"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.reference or self.pk} ({self.get_status_display()})"
+
+
+class PurchaseOrderLine(SourceTrackedModel):
+    """One product on an order, and how much of it has actually turned up."""
+
+    order = models.ForeignKey(
+        PurchaseOrder, on_delete=models.CASCADE, related_name="lines"
+    )
+    inventory_item = models.ForeignKey(
+        "inventory.InventoryItem",
+        on_delete=models.SET_NULL,
+        related_name="purchase_order_lines",
+        blank=True,
+        null=True,
+    )
+    name_snapshot = models.CharField(max_length=255)
+    sku_snapshot = models.CharField(max_length=128, blank=True)
+    quantity_ordered = models.DecimalField(max_digits=12, decimal_places=3)
+    #: Cumulative across every receipt against this line, so a delivery
+    #: arriving in three vans still adds up to one order.
+    quantity_received = models.DecimalField(
+        max_digits=12, decimal_places=3, default=Decimal("0")
+    )
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+
+    def __str__(self) -> str:
+        return f"{self.name_snapshot}: {self.quantity_received}/{self.quantity_ordered}"
+
+    @property
+    def quantity_outstanding(self) -> Decimal:
+        remaining = self.quantity_ordered - self.quantity_received
+        return remaining if remaining > Decimal("0") else Decimal("0")
+
+
 class PurchaseItem(SourceTrackedModel):
     purchase = models.ForeignKey(Purchase, on_delete=models.CASCADE, related_name="items")
     inventory_item = models.ForeignKey(

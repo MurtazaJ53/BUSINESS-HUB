@@ -55,6 +55,11 @@ from platform_apps.purchases.views import (
     SupplierListCreateView,
     SupplierSummaryView,
 )
+from platform_apps.purchases.order_views import (
+    PurchaseOrderDetailView,
+    PurchaseOrderListCreateView,
+    PurchaseOrderReceiveView,
+)
 from platform_apps.projections.reports import ProfitAndLossView
 from platform_apps.projections.views import (
     ShopDashboardSnapshotView,
@@ -167,6 +172,21 @@ urlpatterns = [
         "<uuid:shop_id>/attendance/<uuid:attendance_id>/",
         AttendanceSessionDetailView.as_view(),
         name="attendance-detail",
+    ),
+    path(
+        "<uuid:shop_id>/purchase-orders/",
+        PurchaseOrderListCreateView.as_view(),
+        name="purchase-order-list",
+    ),
+    path(
+        "<uuid:shop_id>/purchase-orders/<uuid:order_id>/",
+        PurchaseOrderDetailView.as_view(),
+        name="purchase-order-detail",
+    ),
+    path(
+        "<uuid:shop_id>/purchase-orders/<uuid:order_id>/receive/",
+        PurchaseOrderReceiveView.as_view(),
+        name="purchase-order-receive",
     ),
     path("<uuid:shop_id>/suppliers/", SupplierListCreateView.as_view(), name="supplier-list"),
     path("<uuid:shop_id>/suppliers/summary/", SupplierSummaryView.as_view(), name="supplier-summary"),
