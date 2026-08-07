@@ -89,25 +89,51 @@ export function KhataCollection({
    * owner they had chased someone they hadn't.
    */
   const remind = async (debtor: Debtor) => {
-    const message = buildKhataReminder({
-      shopName,
-      customerName: debtor.name,
-      balance: num(debtor.balance),
-      upiVpa,
-    });
-    const link = whatsAppLink(debtor.phone, message);
-    if (!link) {
+    if (!whatsAppLink(debtor.phone, "probe")) {
       setError(`${debtor.name} has no usable mobile number.`);
       return;
     }
 
-    const opened = window.open(link, "_blank", "noopener,noreferrer");
+    // Open the window NOW, while we are still inside the click. The statement
+    // link has to be fetched before the message can be composed, and a
+    // window.open after an await has lost the user gesture — every browser
+    // blocks it. So: claim the window synchronously, then navigate it.
+    const opened = window.open("", "_blank", "noopener,noreferrer");
     if (!opened) {
       setError(
         "Your browser blocked the WhatsApp window. Allow pop-ups for this site, then try again."
       );
       return;
     }
+
+    let statementUrl = "";
+    try {
+      const res = await fetch(`/api/customers/${debtor.id}/statement-link`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        const body = await res.json();
+        if (body.path) statementUrl = `${window.location.origin}${body.path}`;
+      }
+    } catch {
+      // Send the reminder without the statement rather than not chasing the
+      // money at all — the same call the UPI link makes when a VPA is broken.
+    }
+
+    const message = buildKhataReminder({
+      shopName,
+      customerName: debtor.name,
+      balance: num(debtor.balance),
+      upiVpa,
+      statementUrl,
+    });
+    const link = whatsAppLink(debtor.phone, message);
+    if (!link) {
+      opened.close();
+      setError(`${debtor.name} has no usable mobile number.`);
+      return;
+    }
+    opened.location.href = link;
 
     setMarking(debtor.id);
     try {

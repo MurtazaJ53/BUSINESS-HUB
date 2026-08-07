@@ -70,12 +70,19 @@ export function buildKhataReminder({
   balance,
   upiVpa = "",
   note = "Khata payment",
+  statementUrl = "",
 }: {
   shopName: string;
   customerName: string;
   balance: number;
   upiVpa?: string;
   note?: string;
+  /**
+   * Absolute URL of the customer's own statement page. Included so the
+   * customer can check the figure rather than taking it on trust, which is
+   * the usual reason a khata reminder turns into an argument.
+   */
+  statementUrl?: string;
 }): string {
   const shop = shopName.trim() || "our shop";
   const name = customerName.trim() || "there";
@@ -102,6 +109,11 @@ export function buildKhataReminder({
       // Misconfigured VPA — send the reminder without a pay link rather than
       // failing to chase the money at all.
     }
+  }
+
+  const statement = statementUrl.trim();
+  if (statement) {
+    message += `\n\nSee your full khata:\n${statement}`;
   }
 
   return `${message}\n\nThank you!`;

@@ -29,6 +29,7 @@ from platform_apps.billing.views import (
     SubscriptionView,
 )
 from platform_apps.expenses.views import ExpenseDetailView, ExpenseListCreateView, ExpenseSummaryView
+from platform_apps.customers.statement_views import CustomerStatementLinkView
 from platform_apps.inventory.health_views import DataHealthView
 from platform_apps.inventory.report_views import DeadStockView, ReorderListView
 from platform_apps.inventory.transfer_views import (
@@ -142,6 +143,11 @@ urlpatterns = [
         "<uuid:shop_id>/customers/<uuid:customer_id>/remind/",
         CustomerRemindView.as_view(),
         name="customer-remind",
+    ),
+    path(
+        "<uuid:shop_id>/customers/<uuid:customer_id>/statement-link/",
+        CustomerStatementLinkView.as_view(),
+        name="customer-statement-link",
     ),
     path("<uuid:shop_id>/customers/summary/", CustomerSummaryView.as_view(), name="customer-summary"),
     path("<uuid:shop_id>/customers/<uuid:customer_id>/", CustomerDetailView.as_view(), name="customer-detail"),

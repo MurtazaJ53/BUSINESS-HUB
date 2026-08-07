@@ -230,7 +230,11 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/hour",
-        "user": "1000/hour"
+        "user": "1000/hour",
+        # Public khata statements get their own bucket. On the shared "anon"
+        # rate a busy shop's customers checking balances would exhaust the
+        # 100/hour that also covers login and registration.
+        "khata_statement": "60/hour",
     },
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": int(os.getenv("API_PAGE_SIZE", "50")),

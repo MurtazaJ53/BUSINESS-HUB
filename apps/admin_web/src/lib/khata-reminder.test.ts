@@ -132,3 +132,36 @@ describe("normalizeWhatsAppNumber", () => {
     expect(link).toContain(encodeURIComponent("₹450.00"));
   });
 });
+
+describe("statement link in the reminder", () => {
+  it("is included when one was minted", () => {
+    const message = buildKhataReminder({
+      shopName: "Kirana Corner",
+      customerName: "Ramesh",
+      balance: 4200,
+      statementUrl: "https://shop.example.com/khata/abc123",
+    });
+    expect(message).toContain("https://shop.example.com/khata/abc123");
+    expect(message).toContain("See your full khata");
+  });
+
+  it("is omitted when minting failed, so the chase still goes out", () => {
+    const message = buildKhataReminder({
+      shopName: "Kirana Corner",
+      customerName: "Ramesh",
+      balance: 4200,
+    });
+    expect(message).not.toContain("See your full khata");
+    expect(message).toContain("4200.00");
+  });
+
+  it("is left out of a nothing-owed message", () => {
+    const message = buildKhataReminder({
+      shopName: "Kirana Corner",
+      customerName: "Ramesh",
+      balance: 0,
+      statementUrl: "https://shop.example.com/khata/abc123",
+    });
+    expect(message).not.toContain("khata/abc123");
+  });
+});
