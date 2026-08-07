@@ -7,6 +7,7 @@ import {
   Printer,
   CreditCard,
   CheckCircle2,
+  Download,
   Save,
 } from "lucide-react";
 
@@ -431,6 +432,28 @@ export function StoreSettings({
           </button>
         </div>
       </form>
+
+      {/* The counter app backs its local database up to a file; the website
+          holds no local data, so the equivalent is a server-side export. It is
+          also the honest answer to "what happens to my data if I leave". */}
+      <div className="mt-6 rounded-[20px] border border-[var(--border-soft)] bg-[var(--surface)] p-5">
+        <h3 className="text-sm font-extrabold text-[var(--text-primary)]">
+          Export your data
+        </h3>
+        <p className="mt-1.5 max-w-prose text-xs font-semibold text-[var(--text-secondary)]">
+          Downloads every product, customer, sale, purchase and expense for this
+          shop as one JSON file, including the stock ledger behind your current
+          stock. Owners only.
+        </p>
+        <a
+          href="/api/export"
+          download
+          className="mt-3.5 inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-5 py-2.5 text-xs font-extrabold text-[var(--text-secondary)] hover:border-[var(--primary)] hover:text-[var(--text-primary)]"
+        >
+          <Download className="w-4 h-4" />
+          Download everything
+        </a>
+      </div>
     </div>
   );
 }

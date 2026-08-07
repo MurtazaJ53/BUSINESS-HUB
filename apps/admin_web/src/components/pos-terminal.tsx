@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { PosCheckoutModal } from "@/components/pos-checkout-modal";
+import { CameraScanButton } from "@/components/camera-scanner";
 import { ThermalReceiptModal } from "@/components/thermal-receipt-modal";
 import type {
   CartItem,
@@ -199,6 +200,28 @@ export function PosTerminal({
   }, [products, selectedCategory, searchQuery]);
 
   // Cart operations
+  /**
+   * A code read from the camera.
+   *
+   * An exact barcode or SKU match goes straight into the cart — that is the
+   * whole point of scanning, and making the cashier tap again would be slower
+   * than typing. Anything unrecognised is dropped into the search box instead
+   * of failing silently, so a mis-read is visible and correctable.
+   */
+  const handleScannedCode = (code: string) => {
+    const scanned = code.trim().toLowerCase();
+    const match = products.find(
+      (p) =>
+        (p.barcode ?? "").trim().toLowerCase() === scanned ||
+        p.sku.trim().toLowerCase() === scanned,
+    );
+    if (match) {
+      addToCart(match);
+      return;
+    }
+    setSearchQuery(code.trim());
+  };
+
   const addToCart = (product: ProductItem) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.product_id === product.id);
@@ -415,6 +438,7 @@ export function PosTerminal({
               </button>
             )}
           </div>
+          <CameraScanButton onDetected={handleScannedCode} />
           <div className="hidden sm:flex items-center gap-2 px-4 py-3 bg-[var(--surface)] rounded-2xl border border-[var(--border-soft)] text-xs font-bold text-[var(--primary-hover)] shadow-sm">
             <Barcode className="w-4 h-4" />
             <span>Scanner Ready</span>
