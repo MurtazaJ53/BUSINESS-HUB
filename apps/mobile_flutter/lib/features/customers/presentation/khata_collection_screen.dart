@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import '../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/backend/backend_api_client.dart';
 import '../../../core/database/mobile_repository.dart';
 import '../../../core/khata/khata_reminder.dart';
 import '../../../core/models/mobile_models.dart';
 import '../../../core/providers/mobile_data_providers.dart';
+import '../../../core/runtime/mobile_runtime_config.dart';
+import '../../../core/session/mobile_session_controller.dart';
 import '../../../core/sync/mobile_sync_coordinator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -42,12 +45,43 @@ class _KhataCollectionScreenState extends ConsumerState<KhataCollectionScreen> {
     return list.where((d) => d.isOverdue).toList();
   }
 
+  /// Mint the customer's private statement link, or return empty on failure.
+  ///
+  /// A failure here must not stop the chase: sending a reminder without the
+  /// statement is far better than not chasing the money at all. Same call the
+  /// UPI link makes when a shop's VPA is misconfigured.
+  Future<String> _statementUrl(KhataDebtor debtor) async {
+    // Check the origin BEFORE calling the server. Minting a link we cannot
+    // build a URL for would retire the customer's previous link and hand back
+    // a token nobody can open — worse than doing nothing.
+    final origin = MobileRuntimeConfig.webAppBaseUrl.trim();
+    if (origin.isEmpty) return '';
+
+    final session = ref.read(mobileSessionProvider).asData?.value;
+    if (session == null || !session.hasShop) return '';
+    try {
+      final result =
+          await ref.read(backendApiClientProvider).createCustomerStatementLink(
+                user: session.user,
+                shopId: session.shopId!,
+                customerId: debtor.id,
+              );
+      final path = (result['path'] ?? '').toString();
+      if (path.isEmpty) return '';
+      return '${origin.replaceAll(RegExp(r"/$"), "")}$path';
+    } catch (_) {
+      return '';
+    }
+  }
+
   Future<bool> _remind(KhataDebtor debtor) async {
     final shop = ref.read(shopInfoProvider).asData?.value;
+    final statementUrl = await _statementUrl(debtor);
     final message = buildKhataReminder(
       shopName: shop?.name ?? 'our shop',
       customerName: debtor.name,
       balance: debtor.balance,
+      statementUrl: statementUrl,
       // The shop's SAVED UPI id, so the pay link actually appears. This used
       // to read a compile-time String.fromEnvironment, which is empty in every
       // normal build — the pay link silently never rendered.

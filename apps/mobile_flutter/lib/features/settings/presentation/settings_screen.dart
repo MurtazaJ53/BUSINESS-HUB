@@ -131,6 +131,20 @@ class SettingsScreen extends ConsumerWidget {
             leadingIcon: Icons.local_shipping_rounded,
             onTap: () => context.push('/settings/purchases'),
           ),
+          // Both of these are for the person at the back door with cartons in
+          // their hands, which is why they belong on the phone at all.
+          MobileListTile(
+            title: 'Purchase orders',
+            subtitle: 'What you ordered, and what actually arrived',
+            leadingIcon: Icons.receipt_long_rounded,
+            onTap: () => context.push('/settings/purchase-orders'),
+          ),
+          MobileListTile(
+            title: 'Stock transfers',
+            subtitle: 'Move stock between your shops',
+            leadingIcon: Icons.swap_horiz_rounded,
+            onTap: () => context.push('/settings/transfers'),
+          ),
           // The plan screen and its route already existed but nothing linked to
           // it, so owners had no way to see or change their plan in the app.
           if (owner)

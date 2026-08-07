@@ -18,7 +18,9 @@ import '../../features/settings/presentation/settings_attendance_screen.dart';
 import '../../features/settings/presentation/settings_expenses_screen.dart';
 import '../../features/settings/presentation/settings_billing_screen.dart';
 import '../../features/customers/presentation/khata_collection_screen.dart';
+import '../../features/inventory/presentation/purchase_orders_screen.dart';
 import '../../features/inventory/presentation/reorder_list_screen.dart';
+import '../../features/inventory/presentation/stock_transfers_screen.dart';
 import '../../features/onboarding/presentation/setup_wizard_screen.dart';
 import '../../features/reports/presentation/business_pulse_screen.dart';
 import '../../features/reports/presentation/dead_stock_screen.dart';
@@ -157,6 +159,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: 'data-health',
             pageBuilder: (context, state) =>
                 const NoTransitionPage<void>(child: DataHealthScreen()),
+          ),
+          GoRoute(
+            parentNavigatorKey: appRootNavigatorKey,
+            path: 'transfers',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage<void>(child: StockTransfersScreen()),
+          ),
+          GoRoute(
+            parentNavigatorKey: appRootNavigatorKey,
+            path: 'purchase-orders',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage<void>(child: PurchaseOrdersScreen()),
           ),
           GoRoute(
             parentNavigatorKey: appRootNavigatorKey,

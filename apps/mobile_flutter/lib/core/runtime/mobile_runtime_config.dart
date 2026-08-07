@@ -31,6 +31,20 @@ final class MobileRuntimeConfig {
     defaultValue: 'Business Hub Pro',
   );
 
+  /// Public origin of the admin website, e.g. `https://shop.example.com`.
+  ///
+  /// Used to build the khata statement link a customer opens from a WhatsApp
+  /// reminder. Deliberately empty by default: the site has no public domain
+  /// yet, and a wrong guess would send customers a link that goes nowhere.
+  /// While this is empty the app sends reminders without a statement link and
+  /// does not mint one, rather than burning a token nobody can use.
+  ///
+  /// Set it at build time once a domain exists:
+  ///   --dart-define=BUSINESS_HUB_WEB_APP_BASE_URL=https://shop.example.com
+  static const String webAppBaseUrl = String.fromEnvironment(
+    'BUSINESS_HUB_WEB_APP_BASE_URL',
+  );
+
   // 2s was far too short for a hosted backend over a mobile network (and a
   // free-tier host that can cold-start). 30s is a sane general default;
   // override with BUSINESS_HUB_BACKEND_TIMEOUT_MS for slower/faster hosts.

@@ -10,6 +10,10 @@ String buildKhataReminder({
   required double balance,
   String upiVpa = '',
   String note = 'Khata payment',
+  /// Absolute URL of the customer's own statement page. Included so they can
+  /// check the figure instead of taking it on trust, which is the usual
+  /// reason a khata reminder turns into an argument.
+  String statementUrl = '',
 }) {
   final shop = shopName.trim().isEmpty ? 'our shop' : shopName.trim();
   final name = customerName.trim().isEmpty ? 'there' : customerName.trim();
@@ -36,6 +40,11 @@ String buildKhataReminder({
     } on UpiRequestError {
       // Misconfigured VPA — send the reminder without a pay link.
     }
+  }
+
+  final statement = statementUrl.trim();
+  if (statement.isNotEmpty) {
+    buffer.write('\n\nSee your full khata:\n$statement');
   }
 
   buffer.write('\n\nThank you!');

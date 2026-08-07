@@ -1305,6 +1305,170 @@ class BackendApiClient {
     );
   }
 
+  // ---------------------------------------------------------------------
+  //  Stock transfers between the owner's shops
+  // ---------------------------------------------------------------------
+
+  /// Transfers touching this shop, in either direction.
+  ///
+  /// Returns the raw payload rather than a typed record because the counter
+  /// screen needs the incoming/outgoing pending counts that sit alongside the
+  /// list, and inventing a wrapper class for two integers earns nothing.
+  Future<Map<String, dynamic>> fetchStockTransfers({
+    required User user,
+    required String shopId,
+  }) async {
+    return _request(
+      user: user,
+      method: 'GET',
+      path: '/shops/$shopId/inventory/transfers/',
+    );
+  }
+
+  /// Send stock to another shop. The stock leaves immediately; it only
+  /// arrives once the destination confirms.
+  Future<Map<String, dynamic>> dispatchStockTransfer({
+    required User user,
+    required String shopId,
+    required String destinationShopId,
+    required List<Map<String, dynamic>> lines,
+    String note = '',
+  }) async {
+    return _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/inventory/transfers/',
+      body: <String, dynamic>{
+        'destination_shop_id': destinationShopId,
+        'lines': lines,
+        if (note.trim().isNotEmpty) 'note': note.trim(),
+      },
+    );
+  }
+
+  /// Confirm a delivery arrived. [shopId] must be the destination.
+  Future<Map<String, dynamic>> receiveStockTransfer({
+    required User user,
+    required String shopId,
+    required String transferId,
+  }) async {
+    return _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/inventory/transfers/$transferId/receive/',
+    );
+  }
+
+  /// Call off a transfer that never left. [shopId] must be the source.
+  Future<Map<String, dynamic>> cancelStockTransfer({
+    required User user,
+    required String shopId,
+    required String transferId,
+  }) async {
+    return _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/inventory/transfers/$transferId/cancel/',
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  //  Purchase orders
+  // ---------------------------------------------------------------------
+
+  Future<Map<String, dynamic>> fetchPurchaseOrders({
+    required User user,
+    required String shopId,
+    bool openOnly = false,
+  }) async {
+    return _request(
+      user: user,
+      method: 'GET',
+      path: '/shops/$shopId/purchase-orders/${openOnly ? '?open=1' : ''}',
+    );
+  }
+
+  Future<Map<String, dynamic>> createPurchaseOrder({
+    required User user,
+    required String shopId,
+    required List<Map<String, dynamic>> lines,
+    String? supplierId,
+    String? expectedDate,
+    String note = '',
+  }) async {
+    return _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/purchase-orders/',
+      body: <String, dynamic>{
+        'lines': lines,
+        if (supplierId != null && supplierId.isNotEmpty)
+          'supplier_id': supplierId,
+        if (expectedDate != null && expectedDate.isNotEmpty)
+          'expected_date': expectedDate,
+        if (note.trim().isNotEmpty) 'note': note.trim(),
+      },
+    );
+  }
+
+  /// Book in what actually arrived. Partial is the normal case.
+  Future<Map<String, dynamic>> receivePurchaseOrder({
+    required User user,
+    required String shopId,
+    required String orderId,
+    required List<Map<String, dynamic>> lines,
+  }) async {
+    return _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/purchase-orders/$orderId/receive/',
+      body: <String, dynamic>{'lines': lines},
+    );
+  }
+
+  Future<Map<String, dynamic>> cancelPurchaseOrder({
+    required User user,
+    required String shopId,
+    required String orderId,
+  }) async {
+    return _request(
+      user: user,
+      method: 'DELETE',
+      path: '/shops/$shopId/purchase-orders/$orderId/',
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> fetchSuppliers({
+    required User user,
+    required String shopId,
+  }) async {
+    return _requestList(
+      user: user,
+      method: 'GET',
+      path: '/shops/$shopId/suppliers/',
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  //  Customer khata statement links
+  // ---------------------------------------------------------------------
+
+  /// Mint a private statement link for one customer, retiring any earlier one.
+  ///
+  /// The plaintext token comes back exactly once and is never stored, so the
+  /// caller must use it immediately or ask for a new one.
+  Future<Map<String, dynamic>> createCustomerStatementLink({
+    required User user,
+    required String shopId,
+    required String customerId,
+  }) async {
+    return _request(
+      user: user,
+      method: 'POST',
+      path: '/shops/$shopId/customers/$customerId/statement-link/',
+    );
+  }
+
   /// Gateway/unavailable statuses that mean "the server is waking up or
   /// redeploying" on a free-tier host — worth waiting for and retrying rather
   /// than surfacing as a failure (which used to make writes silently fall back
