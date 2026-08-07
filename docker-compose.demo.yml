@@ -23,7 +23,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-business_hub}
     volumes:
       - bhub_db:/var/lib/postgresql/data
-    mem_limit: 512m
+    mem_limit: 384m
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bhub}"]
@@ -65,16 +65,16 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    mem_limit: 900m
+    mem_limit: 600m
     restart: unless-stopped
 
   # Admin website. Published on 127.0.0.1:3001 only, like the API — put it
   # behind the existing Nginx with SSL.
   #
-  # MEMORY: this droplet is 2 GB and already runs another site alongside
-  # db (512m) + api (900m). The standalone Next.js server needs roughly
-  # 150-250 MB. Check `free -m` before starting this, and see DEPLOY.md for
-  # the alternative if the box is already tight.
+  # MEMORY: measured at ~40 MB idle, so the 300m limit is headroom rather
+  # than a target. Total across db (384m) + api (600m) + web (300m) is
+  # 1.28 GB of the droplet's 2 GB, leaving room for the OS, Nginx and the
+  # other site on the box.
   web:
     build:
       context: ./apps/admin_web
@@ -89,7 +89,7 @@ services:
       - "127.0.0.1:3001:3000"
     depends_on:
       - api
-    mem_limit: 400m
+    mem_limit: 300m
     restart: unless-stopped
 
 
