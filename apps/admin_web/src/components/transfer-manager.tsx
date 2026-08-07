@@ -1,0 +1,543 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ArrowRight,
+  Check,
+  Package,
+  Plus,
+  RefreshCw,
+  Trash2,
+  TruckIcon,
+  X,
+} from "lucide-react";
+
+import type { ShopMembership } from "@/lib/types";
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+type TransferLine = {
+  id: string;
+  source_item_id: string;
+  destination_item_id: string | null;
+  name: string;
+  sku: string;
+  size: string;
+  unit: string;
+  quantity: string;
+  unit_cost: string | null;
+};
+
+type Transfer = {
+  id: string;
+  reference: string;
+  status: "in_transit" | "received" | "cancelled";
+  note: string;
+  source_shop: { id: string; name: string };
+  destination_shop: { id: string; name: string };
+  dispatched_at: string;
+  received_at: string | null;
+  cancelled_at: string | null;
+  lines: TransferLine[];
+};
+
+type TransferPayload = {
+  shop_id: string;
+  incoming_in_transit: number;
+  outgoing_in_transit: number;
+  transfers: Transfer[];
+};
+
+type StockItem = {
+  id: string;
+  name: string;
+  sku: string;
+  size: string;
+  unit: string;
+  stock_on_hand: number;
+};
+
+/** A row in the "what am I sending" builder. */
+type DraftLine = { itemId: string; quantity: string };
+
+function formatQty(value: string | number): string {
+  const n = typeof value === "number" ? value : parseFloat(String(value ?? "0"));
+  if (!Number.isFinite(n)) return "0";
+  return Number.isInteger(n) ? String(n) : String(n);
+}
+
+function formatWhen(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleString();
+}
+
+const STATUS_STYLES: Record<Transfer["status"], string> = {
+  in_transit:
+    "bg-[var(--warning)]/10 text-[var(--warning-strong)] border-[var(--warning)]/30",
+  received:
+    "bg-[var(--success)]/10 text-[var(--success-strong)] border-[var(--success)]/30",
+  cancelled:
+    "bg-[var(--text-tertiary)]/10 text-[var(--text-tertiary)] border-[var(--border)]",
+};
+
+const STATUS_LABELS: Record<Transfer["status"], string> = {
+  in_transit: "IN TRANSIT",
+  received: "RECEIVED",
+  cancelled: "CANCELLED",
+};
+
+export function TransferManager({
+  activeShopId,
+  memberships,
+  canMove,
+}: {
+  activeShopId: string;
+  memberships: ShopMembership[];
+  canMove: boolean;
+}) {
+  const [data, setData] = useState<TransferPayload | null>(null);
+  const [items, setItems] = useState<StockItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const [composing, setComposing] = useState(false);
+  const [destinationId, setDestinationId] = useState("");
+  const [note, setNote] = useState("");
+  const [draftLines, setDraftLines] = useState<DraftLine[]>([{ itemId: "", quantity: "" }]);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Every other shop this user belongs to. A transfer needs somewhere to go,
+  // so with only one shop the whole feature is meaningless and we say so
+  // rather than showing an empty dropdown.
+  const otherShops = useMemo(
+    () => memberships.filter((m) => m.shop.id !== activeShopId),
+    [memberships, activeShopId],
+  );
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/transfers");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Could not load transfers (${res.status})`);
+      }
+      setData(await res.json());
+    } catch (err) {
+      setData(null);
+      setError(errorMessage(err, "Something went wrong loading transfers."));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadItems = useCallback(async () => {
+    try {
+      const res = await fetch("/api/inventory");
+      if (!res.ok) return;
+      const payload = await res.json();
+      const rows: StockItem[] = (payload.items ?? payload ?? []).map(
+        (raw: Record<string, unknown>) => ({
+          id: String(raw.id),
+          name: String(raw.name ?? ""),
+          sku: String(raw.sku ?? ""),
+          size: String(raw.size ?? ""),
+          unit: String(raw.unit ?? ""),
+          stock_on_hand: Number(raw.stock_on_hand ?? 0),
+        }),
+      );
+      // Nothing on the shelf cannot be sent, so keep it out of the picker
+      // instead of letting the server reject it after the fact.
+      setItems(rows.filter((r) => r.stock_on_hand > 0));
+    } catch {
+      // The picker degrades to empty; the list above still works.
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    if (composing) void loadItems();
+  }, [composing, loadItems]);
+
+  const act = async (transfer: Transfer, verb: "receive" | "cancel") => {
+    setBusyId(transfer.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/transfers/${transfer.id}/${verb}`, { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Could not ${verb} this transfer.`);
+      }
+      await load();
+    } catch (err) {
+      setError(errorMessage(err, `Could not ${verb} this transfer.`));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const submit = async () => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const lines = draftLines
+        .filter((l) => l.itemId && l.quantity.trim())
+        .map((l) => ({ item_id: l.itemId, quantity: l.quantity.trim() }));
+      if (!destinationId) throw new Error("Choose which shop the stock is going to.");
+      if (lines.length === 0) throw new Error("Add at least one item to send.");
+
+      const res = await fetch("/api/transfers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          destination_shop_id: destinationId,
+          note: note.trim(),
+          lines,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Could not send the stock (${res.status}).`);
+      }
+
+      setComposing(false);
+      setDestinationId("");
+      setNote("");
+      setDraftLines([{ itemId: "", quantity: "" }]);
+      await load();
+    } catch (err) {
+      setError(errorMessage(err, "Could not send the stock."));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const transfers = data?.transfers ?? [];
+
+  return (
+    <div className="space-y-6">
+      {/* Pending counts: the whole reason the feature exists is that stock in
+          transit used to be invisible. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-3">
+          <PendingBadge
+            label="Waiting for you to receive"
+            count={data?.incoming_in_transit ?? 0}
+            tone="warning"
+          />
+          <PendingBadge
+            label="Sent, not yet confirmed"
+            count={data?.outgoing_in_transit ?? 0}
+            tone="muted"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] px-4 py-2 text-xs font-extrabold text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+          {canMove && otherShops.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setComposing((v) => !v)}
+              className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2 text-xs font-extrabold text-white hover:bg-[var(--primary-hover)]"
+            >
+              {composing ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+              {composing ? "Cancel" : "Send stock"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {error && (
+        <div className="rounded-2xl border border-[var(--error)]/30 bg-[var(--error)]/10 px-5 py-4 text-sm font-semibold text-[var(--error-strong)]">
+          {error}
+        </div>
+      )}
+
+      {otherShops.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-[var(--border-soft)] bg-[var(--bg-base)] px-5 py-6 text-center text-xs font-bold text-[var(--text-tertiary)]">
+          Transfers move stock between your shops. You currently have one shop,
+          so there is nowhere to send it yet.
+        </div>
+      )}
+
+      {composing && (
+        <div className="rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface)] p-5 sm:p-6 shadow-sm space-y-4">
+          <h3 className="text-base font-extrabold text-[var(--text-primary)]">
+            Send stock to another shop
+          </h3>
+
+          <div>
+            <label
+              htmlFor="transfer-destination"
+              className="block text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-tertiary)] mb-1.5"
+            >
+              Send to
+            </label>
+            <select
+              id="transfer-destination"
+              value={destinationId}
+              onChange={(e) => setDestinationId(e.target.value)}
+              className="w-full rounded-2xl border border-[var(--border)] bg-[var(--bg-base)] px-4 py-3 text-sm font-bold text-[var(--text-primary)]"
+            >
+              <option value="">Choose a shop…</option>
+              {otherShops.map((m) => (
+                <option key={m.shop.id} value={m.shop.id}>
+                  {m.shop.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2.5">
+            <span className="block text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-tertiary)]">
+              Items
+            </span>
+            {draftLines.map((line, index) => {
+              const chosen = items.find((i) => i.id === line.itemId);
+              return (
+                <div key={index} className="flex flex-wrap items-center gap-2">
+                  <select
+                    aria-label="Item"
+                    value={line.itemId}
+                    onChange={(e) =>
+                      setDraftLines((prev) =>
+                        prev.map((l, i) =>
+                          i === index ? { ...l, itemId: e.target.value } : l,
+                        ),
+                      )
+                    }
+                    className="flex-1 min-w-[180px] rounded-2xl border border-[var(--border)] bg-[var(--bg-base)] px-4 py-2.5 text-sm font-semibold text-[var(--text-primary)]"
+                  >
+                    <option value="">Choose an item…</option>
+                    {items.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                        {item.size ? ` (${item.size})` : ""} — {formatQty(item.stock_on_hand)}
+                        {item.unit ? ` ${item.unit}` : ""} in stock
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    aria-label="Quantity"
+                    type="number"
+                    min="0"
+                    step="any"
+                    inputMode="decimal"
+                    placeholder="Qty"
+                    value={line.quantity}
+                    onChange={(e) =>
+                      setDraftLines((prev) =>
+                        prev.map((l, i) =>
+                          i === index ? { ...l, quantity: e.target.value } : l,
+                        ),
+                      )
+                    }
+                    className="w-24 rounded-2xl border border-[var(--border)] bg-[var(--bg-base)] px-3 py-2.5 text-sm font-bold text-[var(--text-primary)]"
+                  />
+                  {chosen && (
+                    <span className="text-[10px] font-bold text-[var(--text-tertiary)]">
+                      max {formatQty(chosen.stock_on_hand)}
+                    </span>
+                  )}
+                  {draftLines.length > 1 && (
+                    <button
+                      type="button"
+                      aria-label="Remove item"
+                      onClick={() =>
+                        setDraftLines((prev) => prev.filter((_, i) => i !== index))
+                      }
+                      className="p-2 rounded-xl text-[var(--text-tertiary)] hover:text-[var(--error-strong)]"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() =>
+                setDraftLines((prev) => [...prev, { itemId: "", quantity: "" }])
+              }
+              className="inline-flex items-center gap-1.5 text-xs font-extrabold text-[var(--primary)] hover:underline"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add another item
+            </button>
+          </div>
+
+          <div>
+            <label
+              htmlFor="transfer-note"
+              className="block text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-tertiary)] mb-1.5"
+            >
+              Note (optional)
+            </label>
+            <input
+              id="transfer-note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Sent with the afternoon van"
+              className="w-full rounded-2xl border border-[var(--border)] bg-[var(--bg-base)] px-4 py-3 text-sm font-semibold text-[var(--text-primary)]"
+            />
+          </div>
+
+          <p className="text-[11px] font-semibold text-[var(--text-secondary)]">
+            The stock leaves this shop now. It only appears at the other shop
+            once someone there confirms it arrived.
+          </p>
+
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={submitting}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-[var(--primary)] px-6 py-3.5 text-sm font-extrabold text-white hover:bg-[var(--primary-hover)] disabled:opacity-50"
+          >
+            <TruckIcon className="w-4 h-4" />
+            {submitting ? "Sending…" : "Send stock"}
+          </button>
+        </div>
+      )}
+
+      {loading && !data ? (
+        <div className="py-12 text-center text-xs font-bold text-[var(--text-tertiary)]">
+          Loading transfers…
+        </div>
+      ) : transfers.length === 0 ? (
+        <div className="py-12 text-center text-xs font-bold text-[var(--text-tertiary)] border border-dashed border-[var(--border-soft)] rounded-2xl bg-[var(--bg-base)]">
+          No transfers yet.
+        </div>
+      ) : (
+        <div className="space-y-3.5">
+          {transfers.map((transfer) => {
+            const isIncoming = transfer.destination_shop.id === activeShopId;
+            const pending = transfer.status === "in_transit";
+            return (
+              <div
+                key={transfer.id}
+                className="rounded-[20px] border border-[var(--border-soft)] bg-[var(--surface)] p-4 sm:p-5 shadow-sm"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-xs font-extrabold text-[var(--text-primary)]">
+                        {transfer.reference}
+                      </span>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold ${STATUS_STYLES[transfer.status]}`}
+                      >
+                        {STATUS_LABELS[transfer.status]}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1.5 text-xs font-bold text-[var(--text-secondary)]">
+                      <span>{transfer.source_shop.name}</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-[var(--text-tertiary)]" />
+                      <span>{transfer.destination_shop.name}</span>
+                    </div>
+                    <span className="block text-[10px] font-semibold text-[var(--text-tertiary)] mt-1">
+                      Sent {formatWhen(transfer.dispatched_at)}
+                      {transfer.received_at && ` · Received ${formatWhen(transfer.received_at)}`}
+                    </span>
+                  </div>
+
+                  {pending && canMove && (
+                    <div className="flex items-center gap-2">
+                      {isIncoming ? (
+                        <button
+                          type="button"
+                          onClick={() => void act(transfer, "receive")}
+                          disabled={busyId === transfer.id}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--success)] px-4 py-2 text-xs font-extrabold text-white hover:opacity-90 disabled:opacity-50"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          {busyId === transfer.id ? "Receiving…" : "Receive"}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void act(transfer, "cancel")}
+                          disabled={busyId === transfer.id}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border)] px-4 py-2 text-xs font-extrabold text-[var(--text-secondary)] hover:border-[var(--error)] hover:text-[var(--error-strong)] disabled:opacity-50"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          {busyId === transfer.id ? "Cancelling…" : "Cancel"}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-3.5 pt-3.5 border-t border-[var(--border-soft)] space-y-2">
+                  {transfer.lines.map((line) => (
+                    <div
+                      key={line.id}
+                      className="flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Package className="w-3.5 h-3.5 text-[var(--text-tertiary)] shrink-0" />
+                        <span className="font-bold text-[var(--text-primary)] truncate">
+                          {line.name}
+                          {line.size && (
+                            <span className="text-[var(--text-tertiary)]"> ({line.size})</span>
+                          )}
+                        </span>
+                      </div>
+                      <span className="font-extrabold text-[var(--text-primary)] shrink-0">
+                        {formatQty(line.quantity)}
+                        {line.unit ? ` ${line.unit}` : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {transfer.note && (
+                  <p className="mt-3 text-[11px] font-semibold text-[var(--text-secondary)]">
+                    {transfer.note}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PendingBadge({
+  label,
+  count,
+  tone,
+}: {
+  label: string;
+  count: number;
+  tone: "warning" | "muted";
+}) {
+  const active = count > 0;
+  const classes =
+    active && tone === "warning"
+      ? "border-[var(--warning)]/30 bg-[var(--warning)]/10 text-[var(--warning-strong)]"
+      : "border-[var(--border-soft)] bg-[var(--surface)] text-[var(--text-secondary)]";
+  return (
+    <div className={`rounded-2xl border px-4 py-2.5 ${classes}`}>
+      <span className="text-lg font-black">{count}</span>
+      <span className="ml-2 text-[11px] font-extrabold uppercase tracking-wide">
+        {label}
+      </span>
+    </div>
+  );
+}
