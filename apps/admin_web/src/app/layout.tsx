@@ -1,9 +1,26 @@
 import type { Metadata } from "next";
+import { Outfit, JetBrains_Mono } from "next/font/google";
 import { cookies } from "next/headers";
 
 import "./globals.css";
 import { LocaleProvider } from "@/lib/i18n";
 import { LOCALE_COOKIE, isLocale } from "@/lib/i18n/shared";
+
+// Downloaded at build time and served from our own origin, so the strict
+// Content-Security-Policy in next.config.ts needs no third-party allowance.
+const outfit = Outfit({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800", "900"],
+  variable: "--font-outfit",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Business Hub - Smart POS & Cloud Ledger",
@@ -29,7 +46,7 @@ export default async function RootLayout({
     // attributes only, not for the tree inside it.
     <html
       lang={locale}
-      className="h-full antialiased"
+      className={`${outfit.variable} ${jetbrainsMono.variable} h-full antialiased`}
       data-theme="light"
       suppressHydrationWarning
     >

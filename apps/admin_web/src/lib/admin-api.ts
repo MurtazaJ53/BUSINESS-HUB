@@ -77,8 +77,24 @@ type MutationOptions = {
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
+/**
+ * An upstream (Django) response that was not ok, carrying the status as a
+ * number.
+ *
+ * Callers used to recognise an expired session by searching the message text
+ * for "(401)". That silently failed for every other rejection the API can
+ * return — 403, and 429 from DRF's AnonRateThrottle, which a signed-out
+ * browser reaches after 100 requests in an hour. The page then threw instead
+ * of redirecting, and the visitor got a bare "This page couldn't load".
+ */
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
 }
 
 
@@ -145,7 +161,10 @@ export async function apiFetch<T>(path: string, options: FetchOptions = {}): Pro
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`Business Hub API request failed (${response.status}) for ${path}: ${body}`);
+    throw new ApiError(
+      response.status,
+      `Business Hub API request failed (${response.status}) for ${path}: ${body}`,
+    );
   }
 
   return response.json() as Promise<T>;
@@ -169,7 +188,10 @@ export async function apiMutation<T>(path: string, options: MutationOptions = {}
   const bodyText = await response.text();
 
   if (!response.ok) {
-    throw new Error(`Business Hub API mutation failed (${response.status}) for ${path}: ${bodyText}`);
+    throw new ApiError(
+      response.status,
+      `Business Hub API mutation failed (${response.status}) for ${path}: ${bodyText}`,
+    );
   }
 
   if (!bodyText) {
@@ -183,15 +205,42 @@ export async function apiMutation<T>(path: string, options: MutationOptions = {}
 /*  Session & auth                                                     */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Map a failed session probe to the reason shown on /login.
+ *
+ * Every authenticated page awaits getSession() first, so whatever happens
+ * here decides what the visitor sees. Anything other than a redirect is a
+ * blank "This page couldn't load" with the cause hidden in a container log,
+ * which is what the droplet was serving. So: no session, no page — go to
+ * /login and say why.
+ */
+/**
+ * redirect() and notFound() signal by throwing an error whose `digest` names
+ * the action. Checking the digest avoids importing Next's internal
+ * isRedirectError, which is not part of the public API.
+ */
+function isControlFlowError(error: unknown): boolean {
+  const digest = (error as { digest?: unknown } | null)?.digest;
+  return typeof digest === "string" && /^NEXT_(REDIRECT|NOT_FOUND|HTTP_ERROR)/.test(digest);
+}
+
+function loginReasonFor(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.status === 401 || error.status === 403) return "expired";
+    if (error.status === 429) return "throttled";
+    return "upstream";
+  }
+  // fetch() itself threw: the API is unreachable from this server.
+  return "offline";
+}
+
 export const getSession = cache(async (): Promise<SessionPayload> => {
   try {
     return await apiFetch<SessionPayload>("/session/");
   } catch (error) {
-    const errMsg = errorMessage(error, "");
-    if (errMsg.includes("(401)") || errMsg.toLowerCase().includes("unauthorized") || errMsg.toLowerCase().includes("expired")) {
-      redirect("/login");
-    }
-    throw error;
+    // redirect() signals by throwing; never swallow or reclassify it.
+    if (isControlFlowError(error)) throw error;
+    redirect(`/login?reason=${loginReasonFor(error)}`);
   }
 });
 
