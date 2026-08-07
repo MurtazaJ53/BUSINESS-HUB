@@ -78,6 +78,11 @@ class InventoryStockLedger(SourceTrackedModel):
         PURCHASE = "purchase", "Purchase"
         IMPORT = "import", "Import"
         SYNC = "sync", "Sync"
+        # Two halves of a StockTransfer. Kept distinct from ADJUSTMENT so a
+        # report can tell "stock left this shop because it moved" from "stock
+        # left this shop because someone corrected a count".
+        TRANSFER_OUT = "transfer_out", "Transfer out"
+        TRANSFER_IN = "transfer_in", "Transfer in"
 
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="inventory_stock_ledger")
     item = models.ForeignKey(InventoryItem, on_delete=models.CASCADE, related_name="ledger_entries")
@@ -109,3 +114,99 @@ class InventoryStockLedger(SourceTrackedModel):
 
     def __str__(self) -> str:
         return f"{self.item.name}: {self.quantity_delta}"
+
+
+class StockTransfer(SourceTrackedModel):
+    """Goods moving from one of the owner's shops to another.
+
+    Before this existed, moving stock between shops meant adjusting it down in
+    one and up in the other, with nothing connecting the two. If the second
+    half was forgotten — or done twice, or for a different quantity — the
+    totals were quietly wrong and no screen could tell. There was no record
+    that a movement had even been intended.
+
+    So a transfer is deliberately two steps, not one. Dispatch removes the
+    stock from the source and leaves the transfer IN_TRANSIT; receiving adds it
+    at the destination. Anything sitting in IN_TRANSIT is stock that has left
+    one shop and not arrived at the other, which is exactly the state that used
+    to be invisible.
+    """
+
+    class Status(models.TextChoices):
+        IN_TRANSIT = "in_transit", "In transit"
+        RECEIVED = "received", "Received"
+        CANCELLED = "cancelled", "Cancelled"
+
+    source_shop = models.ForeignKey(
+        Shop, on_delete=models.CASCADE, related_name="transfers_sent"
+    )
+    destination_shop = models.ForeignKey(
+        Shop, on_delete=models.CASCADE, related_name="transfers_received"
+    )
+    # Human-facing handle for the paperwork that travels with the goods
+    # ("TR-7K2M"). Not unique across shops on purpose: it is a label, not a key.
+    reference = models.CharField(max_length=32, blank=True)
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.IN_TRANSIT
+    )
+    note = models.TextField(blank=True)
+
+    dispatched_at = models.DateTimeField()
+    received_at = models.DateTimeField(blank=True, null=True)
+    cancelled_at = models.DateTimeField(blank=True, null=True)
+
+    dispatched_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="transfers_dispatched",
+        blank=True,
+        null=True,
+    )
+    received_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="transfers_received",
+        blank=True,
+        null=True,
+    )
+
+    class Meta:
+        ordering = ["-dispatched_at", "-created_at"]
+        indexes = [
+            models.Index(fields=["source_shop", "status"]),
+            models.Index(fields=["destination_shop", "status"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.reference or self.pk}: {self.source_shop_id} -> {self.destination_shop_id}"
+
+
+class StockTransferLine(SourceTrackedModel):
+    """One item on a transfer.
+
+    `source_item` and `destination_item` are different rows even for the same
+    product, because InventoryItem is scoped to a shop. The destination row is
+    resolved (or created) at receive time rather than at dispatch, so a
+    transfer can be sent to a shop that does not stock the item yet.
+    """
+
+    transfer = models.ForeignKey(
+        StockTransfer, on_delete=models.CASCADE, related_name="lines"
+    )
+    source_item = models.ForeignKey(
+        InventoryItem, on_delete=models.PROTECT, related_name="transfer_lines_out"
+    )
+    destination_item = models.ForeignKey(
+        InventoryItem,
+        on_delete=models.SET_NULL,
+        related_name="transfer_lines_in",
+        blank=True,
+        null=True,
+    )
+    quantity = models.DecimalField(max_digits=12, decimal_places=3)
+    # Carried across so the destination shop's stock valuation is not reset to
+    # zero by the move. Null when the source never recorded a cost.
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+
+    def __str__(self) -> str:
+        return f"{self.source_item.name} x{self.quantity}"

@@ -31,6 +31,11 @@ from platform_apps.billing.views import (
 from platform_apps.expenses.views import ExpenseDetailView, ExpenseListCreateView, ExpenseSummaryView
 from platform_apps.inventory.health_views import DataHealthView
 from platform_apps.inventory.report_views import DeadStockView, ReorderListView
+from platform_apps.inventory.transfer_views import (
+    StockTransferCancelView,
+    StockTransferListCreateView,
+    StockTransferReceiveView,
+)
 from platform_apps.inventory.views import (
     InventoryItemAdjustmentView,
     InventoryItemBulkCreateView,
@@ -256,5 +261,24 @@ urlpatterns = [
         "<uuid:shop_id>/inventory/<uuid:item_id>/adjust-stock/",
         InventoryItemAdjustmentView.as_view(),
         name="inventory-adjust-stock",
+    ),
+    # shop_id is the shop ACTING, which differs by verb: the destination
+    # receives, the source cancels. Each view checks the transfer really has
+    # that shop on that side, so a valid id from the wrong shop is rejected
+    # rather than quietly accepted.
+    path(
+        "<uuid:shop_id>/inventory/transfers/",
+        StockTransferListCreateView.as_view(),
+        name="stock-transfer-list",
+    ),
+    path(
+        "<uuid:shop_id>/inventory/transfers/<uuid:transfer_id>/receive/",
+        StockTransferReceiveView.as_view(),
+        name="stock-transfer-receive",
+    ),
+    path(
+        "<uuid:shop_id>/inventory/transfers/<uuid:transfer_id>/cancel/",
+        StockTransferCancelView.as_view(),
+        name="stock-transfer-cancel",
     ),
 ]
