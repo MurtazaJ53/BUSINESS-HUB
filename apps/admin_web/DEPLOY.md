@@ -1,61 +1,119 @@
 # Deploying the admin website
 
-The backend is already deployed on the DigitalOcean droplet. This is about the
-Next.js admin site, which so far has only ever run on a laptop.
+The backend already runs on the DigitalOcean droplet under Docker Compose. This
+is about the Next.js admin site, which so far has only ever run on a laptop.
 
-## What it needs
+## Read this first: the droplet is small
+
+`docker-compose.demo.yml` was written for a **2 GB droplet that already runs
+another site alongside it**. The current allocation is:
+
+| Container | Limit |
+|---|---|
+| `db` (Postgres) | 512 MB |
+| `api` (Django) | 900 MB |
+| **`web` (Next.js)** | **400 MB** |
+| | **1.8 GB of 2 GB** |
+
+That leaves under 200 MB for the OS, Nginx and the other site on the box.
+**Check before you start it:**
+
+```bash
+free -m
+```
+
+If available memory is under ~600 MB, adding the web container will make both
+sites unstable. Two honest options in that case:
+
+- **Resize the droplet to 4 GB.** Simplest, and the box is doing real work now.
+- **Host the website on Vercel's free tier instead.** It is a Next.js app; that
+  is what the tier is for, and it costs nothing. `vercel.json` is committed and
+  pins pnpm. Set Root Directory to `apps/admin_web` and add the one variable
+  below.
+
+Neither is wrong. The droplet keeps everything on one machine and one domain;
+Vercel keeps the droplet's memory for the backend.
+
+## Configuration
 
 One environment variable:
 
-| Variable | Value | Why |
-|---|---|---|
-| `BUSINESS_HUB_API_BASE_URL` | `https://api.indianwasteportal.com/api/v1` | The live backend |
+| Variable | Value |
+|---|---|
+| `BUSINESS_HUB_API_BASE_URL` | `http://api:8000/api/v1` (same compose network) |
 
 That is the whole configuration. Every API call is made **server-side** by the
 proxy routes in `src/app/api`, which attach the session token from an HTTP-only
 cookie. Browser code never holds a credential.
 
-**Do not rename this to `NEXT_PUBLIC_API_BASE_URL`.** A `NEXT_PUBLIC_` variable
-is inlined into the JavaScript bundle and served to every visitor. The earlier
-`render.yaml` declared `NEXT_PUBLIC_API_URL`, which nothing in the codebase
-read — deploying it as written would have left the site falling back to
-`http://127.0.0.1:8000/api/v1` and failing every request.
+**Never rename this to `NEXT_PUBLIC_…`.** A `NEXT_PUBLIC_` variable is inlined
+into the JavaScript bundle and served to every visitor.
 
-## Vercel
+> The deleted `render.yaml` declared `NEXT_PUBLIC_API_URL`, which nothing in the
+> codebase reads. A deployment using it would have started, passed its health
+> check, and silently fallen back to `http://127.0.0.1:8000/api/v1` — failing
+> every request. Render was never used for this project; the file is gone.
 
-1. New Project → import `MurtazaJ53/BUSINESS-HUB`
-2. **Root Directory: `apps/admin_web`** — this is a monorepo; without this the
-   build will not find the app
-3. Framework preset: Next.js (detected)
-4. Environment Variables → add `BUSINESS_HUB_API_BASE_URL`
-5. Deploy
+## Deploying on the droplet
 
-`vercel.json` already pins pnpm. `npm install` fails against `pnpm-lock.yaml`.
+```bash
+cd /opt/bhub
+git pull
+free -m                       # confirm headroom first
 
-## Render
+docker compose -f docker-compose.demo.yml build web
+docker compose -f docker-compose.demo.yml up -d web
+docker compose -f docker-compose.demo.yml logs -f --tail=50 web
+```
 
-`render.yaml` is committed and sets the root directory, pnpm and a health check
-on `/login`. Create a Blueprint from the repo and supply
-`BUSINESS_HUB_API_BASE_URL` when prompted.
+The site binds to `127.0.0.1:3001`, not the public internet — same as the API.
 
-## Before you point customers at it
+### Nginx
 
-**CORS is not a concern** — the browser only ever talks to the Next.js server,
-never directly to Django. But two things on the backend do need attention:
+Add a server block alongside the existing API one:
 
-1. **`DJANGO_ALLOWED_HOSTS`** currently contains `*`. Once the web host is
-   known, replace it with the real hostnames.
-2. **`DJANGO_CSRF_TRUSTED_ORIGINS`** lists only `localhost`. Add the deployed
-   origin.
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name shop.example.com;          # your domain
+
+    ssl_certificate     /etc/letsencrypt/live/shop.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/shop.example.com/privkey.pem;
+
+    location / {
+        proxy_pass         http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   Upgrade           $http_upgrade;
+        proxy_set_header   Connection        "upgrade";
+    }
+}
+```
+
+Then `nginx -t && systemctl reload nginx`.
+
+### Backend settings to update
+
+Once the web hostname exists, on the droplet's `.env`:
+
+- **`DJANGO_ALLOWED_HOSTS`** is currently `*`. Replace it with the real
+  hostnames.
+- **`DJANGO_CSRF_TRUSTED_ORIGINS`** lists only localhost. Add the deployed
+  origin.
+
+Restart the API afterwards.
 
 ## After deploying
 
 ```bash
-pnpm smoke https://your-deployed-url
+pnpm smoke https://shop.example.com
 ```
 
-That requests every page and API route and fails on any 5xx. It exists because
-a build that compiles is not a page that works: the Hindi/Gujarati change
+Requests every page and API route and fails on any 5xx. It exists because a
+build that compiles is not a page that works: the Hindi/Gujarati change
 compiled cleanly and then returned 500 on every page, because `"use client"`
 marks every export of a module client-only and the server layout was calling
 one of them. Only a real request caught it.
@@ -65,7 +123,7 @@ routes. Anything `5xx` is a genuine failure.
 
 ## Known limitation
 
-The site has no custom domain and the backend is served from
-`api.indianwasteportal.com`, a domain belonging to an unrelated project. That
-works, but it is visible in the address bar during payment flows and should be
-replaced with a Business Hub domain before customers use it.
+The backend is served from `api.indianwasteportal.com`, a domain belonging to
+an unrelated project. It works, but it is visible in the address bar during
+payment flows and should be replaced with a Business Hub domain before
+customers use it.

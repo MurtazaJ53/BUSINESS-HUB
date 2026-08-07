@@ -68,5 +68,30 @@ services:
     mem_limit: 900m
     restart: unless-stopped
 
+  # Admin website. Published on 127.0.0.1:3001 only, like the API — put it
+  # behind the existing Nginx with SSL.
+  #
+  # MEMORY: this droplet is 2 GB and already runs another site alongside
+  # db (512m) + api (900m). The standalone Next.js server needs roughly
+  # 150-250 MB. Check `free -m` before starting this, and see DEPLOY.md for
+  # the alternative if the box is already tight.
+  web:
+    build:
+      context: ./apps/admin_web
+      dockerfile: Dockerfile
+    environment:
+      # Server-side only. Every browser request goes to this Next.js server,
+      # which calls Django itself and attaches the session token from an
+      # HTTP-only cookie — the browser never holds a credential.
+      BUSINESS_HUB_API_BASE_URL: ${BUSINESS_HUB_API_BASE_URL:-http://api:8000/api/v1}
+      NODE_ENV: production
+    ports:
+      - "127.0.0.1:3001:3000"
+    depends_on:
+      - api
+    mem_limit: 400m
+    restart: unless-stopped
+
+
 volumes:
   bhub_db:

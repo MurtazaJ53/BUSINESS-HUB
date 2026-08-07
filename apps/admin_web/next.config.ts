@@ -3,6 +3,10 @@ import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Emit .next/standalone: a self-contained server with only the modules
+  // actually used. The Dockerfile copies it, and it keeps the runtime
+  // image small enough to sit on a shared 2 GB droplet.
+  output: "standalone",
   turbopack: {
     root: path.resolve(__dirname),
   },
