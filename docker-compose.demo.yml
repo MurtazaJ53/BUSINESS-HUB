@@ -43,7 +43,13 @@ services:
       DJANGO_SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env.demo}
       DJANGO_ENV: ${DJANGO_ENV:-development}
       DJANGO_DEBUG: "False"
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
+      # `api` is this file's own service name, so requests from the web
+      # container arrive with `Host: api:8000`. Django answers 400 Bad Request
+      # for any host not listed, which made every signed-out page on the
+      # website fail. Appending it here rather than asking the operator to put
+      # a Docker-internal name in their .env, where it does not belong.
+      # env_list() drops empty entries, so an unset variable is harmless.
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS},api
       # One container, no external broker: Celery runs eagerly, channels/cache
       # stay in-memory, so no Redis is needed for the demo.
       USE_INMEMORY_CHANNELS: "1"
