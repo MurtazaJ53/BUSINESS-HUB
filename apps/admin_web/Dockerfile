@@ -8,7 +8,10 @@
 #   - it ran `npm ci`, but there is no package-lock.json; the project uses pnpm
 #   - it copied .next/standalone, which is only produced when next.config.ts
 #     sets output: "standalone"
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
+# corepack resolves the version pinned in package.json's packageManager
+# field. Without that pin it fetched the latest pnpm, which required a
+# newer Node than the image and failed with ERR_UNKNOWN_BUILTIN_MODULE.
 RUN corepack enable
 ENV NEXT_TELEMETRY_DISABLED=1
 
