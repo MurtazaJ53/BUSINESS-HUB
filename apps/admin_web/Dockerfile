@@ -27,7 +27,10 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN pnpm build
+# git does not track empty directories, so a fresh clone may have no
+# public/ at all. Create it before the build so the runner's COPY always
+# has a source, and any real assets added later still ship.
+RUN mkdir -p public && pnpm build
 
 # --- runtime --------------------------------------------------------------
 # The standalone bundle is ~20 MB and carries only the modules actually used,
