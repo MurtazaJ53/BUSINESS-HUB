@@ -14,7 +14,9 @@ export const metadata = {
  * log.
  */
 const REASONS: Record<string, string> = {
-  expired: "Your session has ended. Please sign in again.",
+  // Fires both for a session that ran out and for a visitor who never had
+  // one, so the wording must be true of both.
+  expired: "Please sign in to continue.",
   throttled:
     "Too many requests from this server in the last hour. Wait a few minutes, then sign in again.",
   upstream:
