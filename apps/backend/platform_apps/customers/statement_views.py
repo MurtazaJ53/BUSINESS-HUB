@@ -25,6 +25,7 @@ from datetime import timedelta
 from decimal import Decimal
 from urllib.parse import quote
 
+from django.db import transaction
 from django.db.models import F
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -119,6 +120,94 @@ class CustomerStatementLinkView(APIView):
             customer=customer, revoked_at__isnull=True
         ).update(revoked_at=timezone.now())
         return Response({"revoked": revoked})
+
+
+#: A collection round covers a shop's debtors, not its whole customer list.
+#: Also bounds the write amplification: each mint retires the previous link.
+MAX_BULK_LINKS = 200
+
+
+class CustomerStatementLinkBulkView(APIView):
+    """Mint statement links for many customers in one request.
+
+    Chasing khata is a weekly ritual over a whole debtor list, and doing it one
+    customer at a time meant a server round-trip between every message. Worse,
+    that round-trip sat inside the click handler that opens WhatsApp, so the
+    browser saw an await before window.open and blocked it as a pop-up.
+
+    Minting the whole round up front removes both problems: the walk through
+    customers afterwards is pure client-side work.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, shop_id):
+        membership = get_membership_or_403(
+            request.user, shop_id, ShopMembership.Role.STAFF
+        )
+
+        raw_ids = request.data.get("customer_ids")
+        if not isinstance(raw_ids, list) or not raw_ids:
+            raise exceptions.ValidationError(
+                {"customer_ids": "Give at least one customer."}
+            )
+        # De-duplicated so `missing` cannot report the same unknown id twice
+        # and so the cap counts customers rather than list entries. The token
+        # itself is already safe without this: filter(id__in=...) returns each
+        # customer once however many times its id was sent.
+        ids = list(dict.fromkeys(str(value) for value in raw_ids))
+        if len(ids) > MAX_BULK_LINKS:
+            raise exceptions.ValidationError(
+                {"customer_ids": f"At most {MAX_BULK_LINKS} customers at a time."}
+            )
+
+        customers = list(
+            Customer.objects.filter(
+                id__in=ids, shop=membership.shop, tombstone=False
+            )
+        )
+
+        try:
+            days = int(request.data.get("valid_days", DEFAULT_VALID_DAYS))
+        except (TypeError, ValueError):
+            days = DEFAULT_VALID_DAYS
+        days = max(1, min(days, MAX_VALID_DAYS))
+        expires_at = timezone.now() + timedelta(days=days)
+
+        links = {}
+        with transaction.atomic():
+            CustomerStatementLink.objects.filter(
+                customer__in=customers, revoked_at__isnull=True
+            ).update(revoked_at=timezone.now())
+
+            fresh = []
+            for customer in customers:
+                token = secrets.token_urlsafe(32)
+                fresh.append(
+                    CustomerStatementLink(
+                        customer=customer,
+                        token_hash=_hash(token),
+                        created_by=request.user,
+                        expires_at=expires_at,
+                    )
+                )
+                links[str(customer.id)] = {
+                    "token": token,
+                    "path": f"/khata/{token}",
+                }
+            CustomerStatementLink.objects.bulk_create(fresh)
+
+        return Response(
+            {
+                "links": links,
+                # Ids that matched no customer in this shop are reported rather
+                # than silently dropped, so a caller can tell "skipped" from
+                # "failed".
+                "missing": [i for i in ids if i not in links],
+                "expires_at": expires_at.isoformat(),
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 def _upi_link(shop, amount: Decimal, note: str) -> str | None:

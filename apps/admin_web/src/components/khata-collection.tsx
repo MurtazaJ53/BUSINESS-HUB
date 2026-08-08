@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, MessageCircle, PhoneOff, RefreshCw } from "lucide-react";
+import { CheckCircle2, MessageCircle, PhoneOff, RefreshCw, Send } from "lucide-react";
 
 import { buildKhataReminder, whatsAppLink } from "@/lib/khata-reminder";
 import { formatCurrency } from "@/lib/utils";
@@ -80,6 +80,94 @@ export function KhataCollection({
   const all = useMemo(() => data?.items ?? [], [data]);
   const shown = onlyOverdue ? all.filter((d) => d.is_overdue) : all;
   const chaseable = all.filter((d) => d.has_phone && !d.reminded_today).length;
+
+  /**
+   * A collection round: statement links minted up front, then one customer at
+   * a time.
+   *
+   * WhatsApp cannot be sent programmatically — every message needs the owner
+   * to press send — so "remind all" can only ever be a guided walk. What it
+   * removes is the waiting: all the links are minted in a single request
+   * before the walk starts, so each step is pure client-side work and the
+   * pop-up is opened directly inside the click.
+   */
+  const [round, setRound] = useState<{
+    queue: Debtor[];
+    at: number;
+    links: Record<string, string>;
+  } | null>(null);
+
+  const startRound = async () => {
+    const queue = shown.filter((d) => d.has_phone && !d.reminded_today);
+    if (queue.length === 0) {
+      setError("Everyone here has already been reminded today.");
+      return;
+    }
+
+    setError(null);
+    let links: Record<string, string> = {};
+    try {
+      const res = await fetch("/api/customers/statement-links/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customer_ids: queue.map((d) => d.id) }),
+      });
+      if (res.ok) {
+        const body = await res.json();
+        for (const [id, link] of Object.entries(body.links ?? {})) {
+          const path = (link as { path?: string }).path;
+          if (path) links[id] = `${window.location.origin}${path}`;
+        }
+      }
+    } catch {
+      // The round still runs; the messages simply carry no statement link.
+      links = {};
+    }
+
+    setRound({ queue, at: 0, links });
+  };
+
+  /** Send the current customer's message, then advance. */
+  const sendCurrent = async () => {
+    if (!round) return;
+    const debtor = round.queue[round.at];
+    if (!debtor) return;
+
+    const message = buildKhataReminder({
+      shopName,
+      customerName: debtor.name,
+      balance: num(debtor.balance),
+      upiVpa,
+      statementUrl: round.links[debtor.id] ?? "",
+    });
+    const link = whatsAppLink(debtor.phone, message);
+    // Opened synchronously — no await between the click and window.open.
+    const opened = link
+      ? window.open(link, "_blank", "noopener,noreferrer")
+      : null;
+
+    if (!opened) {
+      setError(
+        `Could not open WhatsApp for ${debtor.name}. Allow pop-ups for this site.`
+      );
+      return;
+    }
+
+    try {
+      await fetch(`/api/khata/remind/${debtor.id}`, { method: "POST" });
+    } catch {
+      // The message did go out; a failed mark only means they may show as
+      // un-chased. Not worth stopping the round for.
+    }
+
+    const next = round.at + 1;
+    if (next >= round.queue.length) {
+      setRound(null);
+      await load();
+    } else {
+      setRound({ ...round, at: next });
+    }
+  };
 
   /**
    * Open WhatsApp, then record the reminder.
@@ -195,6 +283,70 @@ export function KhataCollection({
             {data.unreachable_count > 0 &&
               ` · ${data.unreachable_count} with no mobile number`}
           </p>
+
+          {chaseable > 0 && !round && (
+            <button
+              type="button"
+              onClick={() => void startRound()}
+              className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-[var(--primary)] px-5 py-2.5 text-xs font-extrabold text-white hover:bg-[var(--primary-hover)]"
+            >
+              <Send className="w-3.5 h-3.5" />
+              Remind everyone ({chaseable})
+            </button>
+          )}
+
+          {round && (
+            <div className="mt-4 rounded-2xl border border-[var(--primary)]/30 bg-[var(--primary)]/10 p-4">
+              <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-tertiary)]">
+                Collection round · {round.at + 1} of {round.queue.length}
+              </p>
+              <p className="mt-1 text-sm font-extrabold text-[var(--text-primary)]">
+                {round.queue[round.at]?.name}
+                <span className="ml-2 font-bold text-[var(--warning-strong)]">
+                  {formatCurrency(num(round.queue[round.at]?.balance ?? 0))}
+                </span>
+              </p>
+              <p className="mt-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                WhatsApp opens with the message ready. Press send there, then
+                come back for the next one.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void sendCurrent()}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2 text-xs font-extrabold text-white hover:bg-[var(--primary-hover)]"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  Open WhatsApp
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setRound((r) =>
+                      !r
+                        ? null
+                        : r.at + 1 >= r.queue.length
+                          ? null
+                          : { ...r, at: r.at + 1 }
+                    )
+                  }
+                  className="rounded-xl border border-[var(--border)] px-4 py-2 text-xs font-extrabold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                >
+                  Skip
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRound(null);
+                    void load();
+                  }}
+                  className="text-xs font-extrabold text-[var(--text-tertiary)] hover:underline"
+                >
+                  Stop
+                </button>
+              </div>
+            </div>
+          )}
           {!upiVpa.trim() && (
             <p className="mt-3 text-xs font-semibold text-text-tertiary">
               Add your UPI ID in Business details to include a one-tap pay link in

@@ -235,3 +235,123 @@ class CustomerStatementTests(TestCase):
         link = CustomerStatementLink.objects.get()
         self.assertEqual(link.view_count, 2)
         self.assertIsNotNone(link.last_viewed_at)
+
+
+class BulkStatementLinkTests(TestCase):
+    """Minting a whole collection round in one request."""
+
+    def setUp(self):
+        self.owner = PlatformUser.objects.create_user(
+            email="bulk@example.com", password="secret", full_name="Owner"
+        )
+        self.shop = Shop.objects.create(name="Bulk Shop", slug="bulk-shop")
+        ShopMembership.objects.create(
+            user=self.owner,
+            shop=self.shop,
+            role=ShopMembership.Role.OWNER,
+            status=ShopMembership.Status.ACTIVE,
+        )
+        self.a = Customer.objects.create(
+            shop=self.shop, name="Ramesh", phone="9876543210", balance=Decimal("100")
+        )
+        self.b = Customer.objects.create(
+            shop=self.shop, name="Suresh", phone="9876543211", balance=Decimal("200")
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.owner)
+        self.url = reverse("customer-statement-links-bulk", args=[self.shop.id])
+
+    def _mint(self, ids, **extra):
+        return self.client.post(
+            self.url, {"customer_ids": ids, **extra}, format="json"
+        )
+
+    def _view(self, token):
+        return APIClient().get(reverse("public-khata-statement", args=[token]))
+
+    def test_mints_one_working_link_per_customer(self):
+        response = self._mint([str(self.a.id), str(self.b.id)])
+
+        self.assertEqual(response.status_code, 201)
+        links = response.data["links"]
+        self.assertEqual(set(links), {str(self.a.id), str(self.b.id)})
+        for customer_id, link in links.items():
+            self.assertEqual(self._view(link["token"]).status_code, 200)
+
+    def test_each_link_opens_its_own_customer(self):
+        """A crossed wire here shows one customer another's balance."""
+        links = self._mint([str(self.a.id), str(self.b.id)]).data["links"]
+
+        first = self._view(links[str(self.a.id)]["token"]).data
+        second = self._view(links[str(self.b.id)]["token"]).data
+
+        self.assertEqual(first["customer_name"], "Ramesh")
+        self.assertEqual(second["customer_name"], "Suresh")
+
+    def test_previous_links_are_retired(self):
+        old = self._mint([str(self.a.id)]).data["links"][str(self.a.id)]["token"]
+
+        new = self._mint([str(self.a.id)]).data["links"][str(self.a.id)]["token"]
+
+        self.assertEqual(self._view(old).status_code, 404)
+        self.assertEqual(self._view(new).status_code, 200)
+
+    def test_a_duplicate_id_yields_one_working_link(self):
+        response = self._mint([str(self.a.id), str(self.a.id)])
+
+        links = response.data["links"]
+        self.assertEqual(len(links), 1)
+        self.assertEqual(self._view(links[str(self.a.id)]["token"]).status_code, 200)
+        self.assertEqual(CustomerStatementLink.objects.filter(revoked_at__isnull=True).count(), 1)
+
+    def test_a_repeated_unknown_id_is_reported_once(self):
+        """`missing` is a list the caller may show; duplicates would read as
+        two different failures."""
+        ghost = "11111111-1111-1111-1111-111111111111"
+
+        response = self._mint([str(self.a.id), ghost, ghost])
+
+        self.assertEqual(response.data["missing"], [ghost])
+
+    def test_unknown_ids_are_reported_not_silently_dropped(self):
+        response = self._mint([str(self.a.id), "11111111-1111-1111-1111-111111111111"])
+
+        self.assertEqual(len(response.data["links"]), 1)
+        self.assertEqual(len(response.data["missing"]), 1)
+
+    def test_another_shops_customer_is_not_minted(self):
+        other_shop = Shop.objects.create(name="Other", slug="other-bulk")
+        stranger = Customer.objects.create(
+            shop=other_shop, name="Not Mine", balance=Decimal("50")
+        )
+
+        response = self._mint([str(stranger.id)])
+
+        self.assertEqual(response.data["links"], {})
+        self.assertEqual(response.data["missing"], [str(stranger.id)])
+
+    def test_empty_list_is_rejected(self):
+        self.assertEqual(self._mint([]).status_code, 400)
+
+    def test_too_many_at_once_is_rejected(self):
+        ids = [str(self.a.id)] + [
+            "11111111-1111-1111-1111-%012d" % n for n in range(250)
+        ]
+
+        response = self._mint(ids)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(CustomerStatementLink.objects.count(), 0)
+
+    def test_signed_out_requests_are_rejected(self):
+        self.client.force_authenticate(user=None)
+
+        self.assertEqual(self._mint([str(self.a.id)]).status_code, 401)
+
+    def test_a_stranger_cannot_mint_for_this_shop(self):
+        stranger = PlatformUser.objects.create_user(
+            email="nope@example.com", password="secret", full_name="Nope"
+        )
+        self.client.force_authenticate(user=stranger)
+
+        self.assertEqual(self._mint([str(self.a.id)]).status_code, 403)
