@@ -26,13 +26,14 @@ If available memory is under ~600 MB, adding the web container will make both
 sites unstable. Two honest options in that case:
 
 - **Resize the droplet to 4 GB.** Simplest, and the box is doing real work now.
-- **Host the website on Vercel's free tier instead.** It is a Next.js app; that
-  is what the tier is for, and it costs nothing. `vercel.json` is committed and
-  pins pnpm. Set Root Directory to `apps/admin_web` and add the one variable
-  below.
+- **Host the website on a Next.js host instead**, leaving the droplet's memory
+  to the backend. Nothing in the repo is configured for one; `vercel.json` was
+  removed along with `render.yaml`, because carrying config for platforms this
+  project has never deployed to invites someone to trust it. The Dockerfile is
+  the supported path.
 
-Neither is wrong. The droplet keeps everything on one machine and one domain;
-Vercel keeps the droplet's memory for the backend.
+In practice the measured web container idles around 40 MB, so the 300 MB limit
+is headroom rather than a target and resizing is rarely needed.
 
 ## Configuration
 
