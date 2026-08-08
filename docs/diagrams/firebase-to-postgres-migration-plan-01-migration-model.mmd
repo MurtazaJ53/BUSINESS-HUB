@@ -1,0 +1,16 @@
+```mermaid
+flowchart LR
+  OldClients["Legacy Clients\nFirebase writers"]
+  NewClients["New Clients\nPostgres/API writers"]
+  Firebase["Firebase"]
+  Bridge["Migration Bridge"]
+  Postgres["PostgreSQL"]
+  Verify["Shadow Verification"]
+
+  OldClients --> Firebase
+  Firebase --> Bridge
+  Bridge --> Postgres
+  Postgres --> Verify
+  Firebase --> Verify
+  NewClients --> Postgres
+```

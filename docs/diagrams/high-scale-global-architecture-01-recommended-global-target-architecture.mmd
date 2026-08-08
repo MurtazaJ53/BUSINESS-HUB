@@ -1,0 +1,64 @@
+```mermaid
+flowchart TD
+  subgraph Users["Global Users"]
+    Mobile["Flutter Mobile"]
+    Admin["Admin Web"]
+    Public["Public Web"]
+    Desktop["Tauri Desktop"]
+  end
+
+  subgraph Edge["Edge Layer"]
+    CDN["Cloudflare / Global CDN"]
+    WAF["WAF + Bot Protection"]
+    EdgeAuth["Edge Validation\nToken, Rate Limit, Geo Rules"]
+  end
+
+  subgraph App["Application Plane"]
+    Gateway["API Gateway / Load Balancer"]
+    API["Stateless Backend API\nNestJS Modular Monolith"]
+    Realtime["Realtime Gateway\nSupabase Realtime / WebSockets / SSE"]
+  end
+
+  subgraph Compute["Async Compute Plane"]
+    Queue["Kafka / SQS / Durable Queue"]
+    Workers["Workers / Job Processors"]
+    Scheduler["Cron / Scheduled Jobs"]
+  end
+
+  subgraph Data["Data Plane"]
+    Redis["Redis Cluster"]
+    Pooler["Supavisor / PgBouncer"]
+    Primary["PostgreSQL Primary"]
+    Replicas["Global Read Replicas"]
+    Storage["Object Storage + CDN"]
+    Warehouse["Analytics Store\nBigQuery / ClickHouse later"]
+  end
+
+  Mobile --> CDN
+  Admin --> CDN
+  Public --> CDN
+  Desktop --> CDN
+
+  CDN --> WAF
+  WAF --> EdgeAuth
+  EdgeAuth --> Gateway
+
+  Gateway --> API
+  API --> Redis
+  API --> Pooler
+  Pooler --> Primary
+  Primary --> Replicas
+  API --> Storage
+  API --> Queue
+
+  Queue --> Workers
+  Scheduler --> Workers
+  Workers --> Pooler
+  Workers --> Redis
+  Workers --> Storage
+  Workers --> Warehouse
+  Primary --> Realtime
+  Realtime --> Mobile
+  Realtime --> Admin
+  Realtime --> Desktop
+```

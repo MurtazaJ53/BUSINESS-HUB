@@ -1,0 +1,16 @@
+[project]
+name = "business-hub-backend"
+version = "0.1.0"
+description = "Phase 1 Django backend foundation for Business Hub."
+requires-python = ">=3.13"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["tests.py", "test_*.py", "tests_*.py", "*_tests.py"]

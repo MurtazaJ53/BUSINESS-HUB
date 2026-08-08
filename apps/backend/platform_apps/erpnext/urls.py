@@ -1,0 +1,115 @@
+from django.urls import path
+
+from platform_apps.erpnext.views import (
+    ERPNextEnqueueCycleView,
+    ERPNextDocumentLinkListView,
+    ERPNextCustomerSyncView,
+    ERPNextHealthCheckView,
+    ERPNextItemSyncView,
+    ERPNextMetaView,
+    ERPNextPaymentsPushView,
+    ERPNextPurchaseMirrorListView,
+    ERPNextPurchaseSyncView,
+    ERPNextRunCycleView,
+    ERPNextSalesPushView,
+    ERPNextShopBindingDetailView,
+    ERPNextShopPocSummaryView,
+    ERPNextShopSyncStateView,
+    ERPNextStockSyncView,
+    ERPNextSupplierPaymentMirrorListView,
+    ERPNextSupplierPaymentSyncView,
+    ERPNextSupplierMirrorListView,
+    ERPNextSupplierSyncView,
+    ERPNextShopVerifyConnectionView,
+)
+
+urlpatterns = [
+    path("erpnext/meta/", ERPNextMetaView.as_view(), name="erpnext-meta"),
+    path("erpnext/health/", ERPNextHealthCheckView.as_view(), name="erpnext-health"),
+    path("shops/<uuid:shop_id>/erpnext/binding/", ERPNextShopBindingDetailView.as_view(), name="erpnext-binding"),
+    path(
+        "shops/<uuid:shop_id>/erpnext/verify-connection/",
+        ERPNextShopVerifyConnectionView.as_view(),
+        name="erpnext-verify-connection",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/sync-state/",
+        ERPNextShopSyncStateView.as_view(),
+        name="erpnext-sync-state",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/poc-summary/",
+        ERPNextShopPocSummaryView.as_view(),
+        name="erpnext-poc-summary",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/sync-items/",
+        ERPNextItemSyncView.as_view(),
+        name="erpnext-sync-items",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/sync-customers/",
+        ERPNextCustomerSyncView.as_view(),
+        name="erpnext-sync-customers",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/sync-stock/",
+        ERPNextStockSyncView.as_view(),
+        name="erpnext-sync-stock",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/sync-suppliers/",
+        ERPNextSupplierSyncView.as_view(),
+        name="erpnext-sync-suppliers",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/sync-purchases/",
+        ERPNextPurchaseSyncView.as_view(),
+        name="erpnext-sync-purchases",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/sync-supplier-payments/",
+        ERPNextSupplierPaymentSyncView.as_view(),
+        name="erpnext-sync-supplier-payments",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/push-sales/",
+        ERPNextSalesPushView.as_view(),
+        name="erpnext-push-sales",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/push-payments/",
+        ERPNextPaymentsPushView.as_view(),
+        name="erpnext-push-payments",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/run-cycle/",
+        ERPNextRunCycleView.as_view(),
+        name="erpnext-run-cycle",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/enqueue-cycle/",
+        ERPNextEnqueueCycleView.as_view(),
+        name="erpnext-enqueue-cycle",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/suppliers/",
+        ERPNextSupplierMirrorListView.as_view(),
+        name="erpnext-suppliers",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/purchases/",
+        ERPNextPurchaseMirrorListView.as_view(),
+        name="erpnext-purchases",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/supplier-payments/",
+        ERPNextSupplierPaymentMirrorListView.as_view(),
+        name="erpnext-supplier-payments",
+    ),
+    path(
+        "shops/<uuid:shop_id>/erpnext/document-links/",
+        ERPNextDocumentLinkListView.as_view(),
+        name="erpnext-document-links",
+    ),
+]

@@ -1,0 +1,22 @@
+```mermaid
+flowchart LR
+  Client["Flutter / Web / Desktop"]
+  Edge["Edge Routing"]
+  API["Ingestion / Business APIs"]
+  Stream["Kafka / PubSub"]
+  Workers["Validation + Commit Workers"]
+  Ledger["Spanner / CockroachDB"]
+  Fanout["Realtime Fanout"]
+
+  Control["Production Control Plane"]
+
+  Client --> Edge --> API --> Stream --> Workers --> Ledger --> Fanout --> Client
+
+  Control -. Traces / Metrics / Logs .-> Client
+  Control -. Traces / Metrics / Logs .-> Edge
+  Control -. Traces / Metrics / Logs .-> API
+  Control -. Traces / Metrics / Logs .-> Stream
+  Control -. Traces / Metrics / Logs .-> Workers
+  Control -. Traces / Metrics / Logs .-> Ledger
+  Control -. Traces / Metrics / Logs .-> Fanout
+```

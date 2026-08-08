@@ -1,0 +1,307 @@
+name: Continuous Build Factory
+
+on:
+  # Auto-run disabled: this legacy "Build Web + Android" factory builds the
+  # archived web app and duplicates build-apk.yml. Run manually if ever needed.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-web-android:
+    name: Build Web + Android
+    runs-on: ubuntu-latest
+    env:
+      VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+      VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+      VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+      VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+      VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+      VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+      VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
+      VITE_RECAPTCHA_SITE_KEY: ${{ secrets.VITE_RECAPTCHA_SITE_KEY }}
+      ANDROID_GOOGLE_SERVICES_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - name: Install Dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Build Web Project
+        run: npm run build
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Restore Android Firebase Config
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${ANDROID_GOOGLE_SERVICES_JSON:-}" ]; then
+            printf '%s' "${ANDROID_GOOGLE_SERVICES_JSON}" > android/app/google-services.json
+            if [ ! -s android/app/google-services.json ]; then
+              echo "google-services.json was not restored"
+              exit 1
+            fi
+          else
+            echo "ANDROID_GOOGLE_SERVICES_JSON is not set. Continuing without Google Services config."
+          fi
+
+      - name: Verify Android Build Secrets
+        run: |
+          missing=0
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then echo "ANDROID_KEYSTORE_BASE64 is missing"; missing=1; fi
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ]; then echo "ANDROID_KEYSTORE_PASSWORD is missing"; missing=1; fi
+          if [ -z "${{ secrets.ANDROID_KEY_ALIAS }}" ]; then echo "ANDROID_KEY_ALIAS is missing"; missing=1; fi
+          if [ -z "${{ secrets.ANDROID_KEY_PASSWORD }}" ]; then echo "ANDROID_KEY_PASSWORD is missing"; missing=1; fi
+          if [ "$missing" -eq 1 ]; then exit 1; fi
+
+      - name: Decode Keystore
+        run: |
+
+      - name: Verify Android Build Secrets
+        run: |
+          missing=0
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then echo "ANDROID_KEYSTORE_BASE64 is missing"; missing=1; fi
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ]; then echo "ANDROID_KEYSTORE_PASSWORD is missing"; missing=1; fi
+          if [ -z "${{ secrets.ANDROID_KEY_ALIAS }}" ]; then echo "ANDROID_KEY_ALIAS is missing"; missing=1; fi
+          if [ -z "${{ secrets.ANDROID_KEY_PASSWORD }}" ]; then echo "ANDROID_KEY_PASSWORD is missing"; missing=1; fi
+          if [ "$missing" -eq 1 ]; then exit 1; fi
+
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | tr -d '\r\n ' | base64 --decode > android/app/business-hub.jks
+          if [ ! -s android/app/business-hub.jks ]; then
+            echo "Keystore decoding failed"
+            exit 1
+          fi
+
+      - name: Keystore Doctor
+        env:
+          STOREPASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEYALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          KEYSTORE_VALID=true
+          if ! keytool -list -keystore android/app/business-hub.jks -storepass "$STOREPASS" > /dev/null 2>&1; then
+            echo "::warning::ANDROID_KEYSTORE_PASSWORD is incorrect. Falling back to unsigned/debug APK."
+            KEYSTORE_VALID=false
+          elif ! keytool -list -keystore android/app/business-hub.jks -storepass "$STOREPASS" -alias "$KEYALIAS" > /dev/null 2>&1; then
+            echo "::warning::ANDROID_KEY_ALIAS was not found. Falling back to unsigned/debug APK."
+            KEYSTORE_VALID=false
+          fi
+          echo "KEYSTORE_VALID=$KEYSTORE_VALID" >> $GITHUB_ENV
+
+      - name: Configure Signing Fallback
+        run: |
+          if [ "$KEYSTORE_VALID" != "true" ]; then
+            sed -i 's/signingConfig signingConfigs.release/signingConfig signingConfigs.debug/' android/app/build.gradle
+          fi
+
+      - name: Build Android APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Collect Web + Android Release Assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          (
+            cd dist
+            zip -r "../release-assets/BusinessHub-Web-latest.zip" .
+          )
+          cp \
+            android/app/build/outputs/apk/release/app-release.apk \
+            "release-assets/BusinessHub-Android-APK-latest.apk"
+          ls -la release-assets
+
+      - name: Upload Web + Android Release Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: BusinessHub-Web-Android-latest
+          path: release-assets
+          if-no-files-found: error
+
+  build-desktop:
+    name: Build Desktop (${{ matrix.label }})
+    runs-on: ${{ matrix.platform }}
+    env:
+      VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+      VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+      VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+      VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+      VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+      VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+      VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
+      VITE_RECAPTCHA_SITE_KEY: ${{ secrets.VITE_RECAPTCHA_SITE_KEY }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Windows
+            platform: windows-latest
+            bundle_args: --bundles msi,nsis
+            artifact_name: BusinessHub-Desktop-Windows
+          - label: Linux
+            platform: ubuntu-22.04
+            bundle_args: --bundles deb,appimage
+            artifact_name: BusinessHub-Desktop-Linux
+          - label: macOS
+            platform: macos-latest
+            bundle_args: --bundles dmg,app
+            artifact_name: BusinessHub-Desktop-macOS
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux System Dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Install Root Dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Install Desktop Dependencies
+        working-directory: apps/desktop
+        run: npm install
+
+      - name: Build Frontend
+        run: npm run build
+
+      - name: Build Desktop Bundles
+        working-directory: apps/desktop
+        run: npm run tauri -- build ${{ matrix.bundle_args }}
+
+      - name: Upload Desktop Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact_name }}-latest
+          path: apps/desktop/src-tauri/target/release/bundle
+          if-no-files-found: error
+
+  publish-latest-release:
+    name: Publish Latest Release
+    runs-on: ubuntu-latest
+    needs:
+      - build-web-android
+      - build-desktop
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: release-artifacts
+
+      - name: List Release Files
+        run: find release-artifacts -type f | sort
+
+      - name: Move latest tag to the current commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          repo="${{ github.repository }}"
+          if gh api "repos/$repo/git/ref/tags/latest" >/dev/null 2>&1; then
+            gh api --method PATCH "repos/$repo/git/refs/tags/latest" \
+              -f sha="${GITHUB_SHA}" \
+              -F force=true >/dev/null
+          else
+            gh api --method POST "repos/$repo/git/refs" \
+              -f ref="refs/tags/latest" \
+              -f sha="${GITHUB_SHA}" >/dev/null
+          fi
+
+      - name: Publish Latest GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          repo="${GH_REPO}"
+          notes_file="$(mktemp)"
+          cat <<EOF > "$notes_file"
+          Automated build from the main branch.
+
+          Commit: ${GITHUB_SHA}
+
+          Included artifacts:
+          - Web production build zip
+          - Signed Android APK
+          - Windows desktop installers
+          - Linux desktop bundles
+          - macOS desktop bundles
+          EOF
+
+          mapfile -t files < <(
+            find release-artifacts -type f \
+              \( \
+                -name '*.zip' -o \
+                -name '*.apk' -o \
+                -name '*.msi' -o \
+                -name '*.exe' -o \
+                -name '*.deb' -o \
+                -name '*.AppImage' -o \
+                -name '*.dmg' -o \
+                -name '*.app.tar.gz' -o \
+                -name '*.sig' \
+              \) | sort
+          )
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No release files found"
+            exit 1
+          fi
+
+          if gh release view latest --repo "$repo" >/dev/null 2>&1; then
+            gh release delete latest --repo "$repo" --yes
+          fi
+
+          gh release create latest \
+            --repo "$repo" \
+            --title "Latest Automated Build" \
+            --notes-file "$notes_file" \
+            "${files[@]}"

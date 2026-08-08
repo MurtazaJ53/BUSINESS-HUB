@@ -1,0 +1,2251 @@
+from __future__ import annotations
+
+from django.test import TestCase
+from django.utils import timezone
+from rest_framework.test import APIClient
+
+from platform_apps.audit.models import MigrationReconciliationEvent
+from platform_apps.common.migration import (
+    MigrationBridgeMode,
+    MigrationControlEventType,
+    MigrationCutoverStatus,
+    MigrationDomain,
+    MigrationGoLiveCheckpointDecision,
+    MigrationJobStatus,
+    MigrationJobType,
+    MigrationLaunchCheckpointDecision,
+    MigrationRolloutCheckpointDecision,
+    MigrationSteadyStateCheckpointDecision,
+    MigrationShopCheckpointDecision,
+    MigrationWriteMaster,
+)
+from platform_apps.customers.models import Customer
+from platform_apps.inventory.models import InventoryItem
+from platform_apps.jobs.models import (
+    MigrationBridgeReceipt,
+    MigrationControlEvent,
+    MigrationDomainControl,
+    MigrationGoLiveCheckpointEvent,
+    MigrationLaunchCheckpointEvent,
+    MigrationPhaseCheckpointEvent,
+    MigrationJobRun,
+    MigrationRolloutCheckpointEvent,
+    MigrationSteadyStateCheckpointEvent,
+    MigrationShopCheckpointEvent,
+)
+from platform_apps.jobs.services import execute_migration_job
+from platform_apps.projections.models import ShopDashboardSnapshot
+from platform_apps.shops.models import Shop
+from platform_apps.users.models import PlatformUser
+
+
+class MigrationControlApiTests(TestCase):
+    def setUp(self):
+        self.user = PlatformUser.objects.create_user(
+            email="platform@example.com",
+            password="secret",
+            full_name="Platform Admin",
+            is_platform_admin=True,
+        )
+        self.shop = Shop.objects.create(name="Demo Shop", slug="demo-shop")
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_create_domain_control(self):
+        response = self.client.post(
+            "/api/v1/migration/domains/",
+            {
+                "shop": str(self.shop.id),
+                "domain": MigrationDomain.INVENTORY,
+                "write_master": MigrationWriteMaster.FIREBASE,
+                "bridge_mode": MigrationBridgeMode.COMPARE_ONLY,
+                "cutover_status": MigrationCutoverStatus.LEGACY,
+                "current_epoch": 1,
+                "shadow_reads_enabled": True,
+                "metadata_json": {"owner": "phase-2"},
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        control = MigrationDomainControl.objects.get()
+        self.assertEqual(control.domain, MigrationDomain.INVENTORY)
+        self.assertTrue(control.shadow_reads_enabled)
+
+    def test_create_job_run(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.COMPARE_ONLY,
+            cutover_status=MigrationCutoverStatus.LEGACY,
+        )
+        self.assertIsNotNone(control)
+
+        response = self.client.post(
+            "/api/v1/migration/jobs/",
+            {
+                "shop": str(self.shop.id),
+                "domain": MigrationDomain.CUSTOMERS,
+                "job_type": MigrationJobType.BACKFILL,
+                "status": MigrationJobStatus.QUEUED,
+                "rows_scanned": 0,
+                "rows_written": 0,
+                "rows_skipped": 0,
+                "mismatch_count": 0,
+                "payload_json": {"phase": 2},
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(MigrationJobRun.objects.count(), 1)
+
+    def test_list_bridge_receipts(self):
+        MigrationBridgeReceipt.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            origin_system="firebase",
+            origin_event_id="evt_list_001",
+            command_type="upsert",
+            entity_type="inventory_item",
+            entity_id="inv_list_001",
+            base_domain_epoch=1,
+            payload_json={"name": "Bridge Tee"},
+            applied_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/bridge-receipts/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["origin_event_id"], "evt_list_001")
+
+    def test_list_control_activity_events(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.COMPARE_ONLY,
+            cutover_status=MigrationCutoverStatus.PILOT,
+        )
+        MigrationControlEvent.objects.create(
+            control=control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type="prepare_pilot",
+            actor_user=self.user,
+            result="monitoring",
+            summary="Pilot prep executed for inventory.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/activity/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["event_type"], "prepare_pilot")
+        self.assertEqual(response.data[0]["result"], "monitoring")
+
+    def test_list_shadow_summaries(self):
+        MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            current_epoch=4,
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=2,
+            trace_id="trace-shadow-001",
+        )
+        MigrationReconciliationEvent.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            severity="critical",
+            status="open",
+            issue_code="field_drift",
+            entity_type="inventory_item",
+            entity_id="inv_001",
+            expected_master="firebase",
+            observed_source="postgres",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/shadow-summaries/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["domain"], MigrationDomain.INVENTORY)
+        self.assertEqual(response.data[0]["current_epoch"], 4)
+        self.assertEqual(response.data[0]["latest_compare_mismatches"], 2)
+        self.assertEqual(response.data[0]["open_critical_events"], 1)
+
+    def test_pilot_readiness_reports_blockers(self):
+        MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.DISABLED,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            current_epoch=2,
+            shadow_reads_enabled=False,
+        )
+
+        response = self.client.get("/api/v1/migration/pilot-readiness/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertFalse(response.data[0]["ready_for_pilot"])
+        self.assertGreaterEqual(len(response.data[0]["blocking_reasons"]), 3)
+
+    def test_promote_ready_requires_clean_phase2_posture(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            current_epoch=3,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=0,
+            trace_id="trace-ready-001",
+            finished_at=timezone.now(),
+        )
+
+        response = self.client.post(f"/api/v1/migration/domains/{control.id}/promote-ready/")
+
+        self.assertEqual(response.status_code, 200)
+        control.refresh_from_db()
+        self.assertEqual(control.cutover_status, MigrationCutoverStatus.READY)
+        self.assertTrue(response.data["ready_for_pilot"])
+        self.assertEqual(response.data["recommended_next_status"], MigrationCutoverStatus.POSTGRES_PRIMARY)
+        self.assertTrue(
+            MigrationControlEvent.objects.filter(
+                control=control,
+                event_type="promote_ready",
+                result="succeeded",
+            ).exists()
+        )
+
+    def test_prepare_pilot_runs_backfill_and_compare_inline(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            current_epoch=3,
+            shadow_reads_enabled=True,
+        )
+
+        response = self.client.post(
+            f"/api/v1/migration/domains/{control.id}/prepare-pilot/?run_inline=1",
+            {
+                "payloads": {
+                    "backfill": {
+                        "source_snapshot": [
+                            {
+                                "id": "inv_prepare_001",
+                                "name": "Pilot Tee",
+                                "sku": "PILOT-TEE",
+                                "sell_price": "399.00",
+                            }
+                        ]
+                    },
+                    "shadow_compare": {
+                        "source_snapshot": [
+                            {
+                                "id": "inv_prepare_001",
+                                "name": "Pilot Tee",
+                                "sku": "PILOT-TEE",
+                                "sell_price": "399.00",
+                            }
+                        ]
+                    },
+                }
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["jobs"]), 2)
+        self.assertEqual(response.data["jobs"][0]["job_type"], MigrationJobType.BACKFILL)
+        self.assertEqual(response.data["jobs"][0]["status"], MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(response.data["jobs"][1]["job_type"], MigrationJobType.SHADOW_COMPARE)
+        self.assertEqual(response.data["jobs"][1]["status"], MigrationJobStatus.SUCCEEDED)
+        self.assertTrue(response.data["readiness"]["ready_for_pilot"])
+        self.assertEqual(response.data["readiness"]["recommended_next_status"], MigrationCutoverStatus.READY)
+
+    def test_promote_primary_flips_write_master_and_bumps_epoch(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.READY,
+            current_epoch=5,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=0,
+            trace_id="trace-primary-001",
+            finished_at=timezone.now(),
+        )
+
+        response = self.client.post(f"/api/v1/migration/domains/{control.id}/promote-primary/")
+
+        self.assertEqual(response.status_code, 200)
+        control.refresh_from_db()
+        self.assertEqual(control.write_master, MigrationWriteMaster.POSTGRES)
+        self.assertEqual(control.cutover_status, MigrationCutoverStatus.POSTGRES_PRIMARY)
+        self.assertEqual(control.current_epoch, 6)
+        self.assertEqual(response.data["recommended_next_status"], MigrationCutoverStatus.POSTGRES_PRIMARY)
+
+    def test_verify_pilot_reports_healthy_postgres_primary_domain(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=8,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        InventoryItem.objects.create(
+            shop=self.shop,
+            source_system="firebase",
+            source_id="inv_verify_001",
+            source_shop_id="shop_001",
+            source_path="shops/shop_001/inventory/inv_verify_001",
+            name="Verify Tee",
+            sku="VERIFY-TEE",
+            sell_price="299.00",
+        )
+
+        response = self.client.post(
+            f"/api/v1/migration/domains/{control.id}/verify-pilot/?run_inline=1",
+            {
+                "payloads": {
+                    "shadow_compare": {
+                        "source_snapshot": [
+                            {
+                                "id": "inv_verify_001",
+                                "name": "Verify Tee",
+                                "sku": "VERIFY-TEE",
+                                "sell_price": "299.00",
+                            }
+                        ]
+                    }
+                }
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["healthy"])
+        self.assertFalse(response.data["requires_rollback"])
+        self.assertEqual(response.data["operational_verdict"], "production_safe")
+        self.assertEqual(response.data["verification_job"]["status"], MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(response.data["latest_compare_mismatches"], 0)
+        self.assertTrue(
+            MigrationControlEvent.objects.filter(
+                control=control,
+                event_type="verify_pilot",
+                result="production_safe",
+            ).exists()
+        )
+
+    def test_verify_pilot_reports_monitoring_for_ready_domain(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.READY,
+            current_epoch=7,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        InventoryItem.objects.create(
+            shop=self.shop,
+            source_system="firebase",
+            source_id="inv_verify_003",
+            source_shop_id="shop_001",
+            source_path="shops/shop_001/inventory/inv_verify_003",
+            name="Monitor Tee",
+            sku="MONITOR-TEE",
+            sell_price="399.00",
+        )
+
+        response = self.client.post(
+            f"/api/v1/migration/domains/{control.id}/verify-pilot/?run_inline=1",
+            {
+                "payloads": {
+                    "shadow_compare": {
+                        "source_snapshot": [
+                            {
+                                "id": "inv_verify_003",
+                                "name": "Monitor Tee",
+                                "sku": "MONITOR-TEE",
+                                "sell_price": "399.00",
+                            }
+                        ]
+                    }
+                }
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["healthy"])
+        self.assertFalse(response.data["requires_rollback"])
+        self.assertEqual(response.data["operational_verdict"], "monitoring")
+
+    def test_verify_pilot_flags_rollback_when_primary_domain_drifts(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=9,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        InventoryItem.objects.create(
+            shop=self.shop,
+            source_system="firebase",
+            source_id="inv_verify_002",
+            source_shop_id="shop_001",
+            source_path="shops/shop_001/inventory/inv_verify_002",
+            name="Verify Jeans",
+            sku="VERIFY-JEANS",
+            sell_price="699.00",
+        )
+
+        response = self.client.post(
+            f"/api/v1/migration/domains/{control.id}/verify-pilot/?run_inline=1",
+            {
+                "payloads": {
+                    "shadow_compare": {
+                        "source_snapshot": [
+                            {
+                                "id": "inv_verify_002",
+                                "name": "Verify Jeans",
+                                "sku": "VERIFY-JEANS",
+                                "sell_price": "749.00",
+                            }
+                        ]
+                    }
+                }
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["healthy"])
+        self.assertTrue(response.data["requires_rollback"])
+        self.assertEqual(response.data["operational_verdict"], "rollback_recommended")
+        self.assertGreater(response.data["latest_compare_mismatches"], 0)
+
+    def test_rollback_returns_domain_to_firebase_pilot_and_bumps_epoch(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=9,
+            shadow_reads_enabled=True,
+        )
+
+        response = self.client.post(f"/api/v1/migration/domains/{control.id}/rollback/")
+
+        self.assertEqual(response.status_code, 200)
+        control.refresh_from_db()
+        self.assertEqual(control.write_master, MigrationWriteMaster.FIREBASE)
+        self.assertEqual(control.cutover_status, MigrationCutoverStatus.PILOT)
+        self.assertEqual(control.bridge_mode, MigrationBridgeMode.COMPARE_ONLY)
+        self.assertEqual(control.current_epoch, 10)
+
+    def test_list_pilot_signoff_reports_ready_for_cutover(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.READY,
+            current_epoch=4,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=0,
+            trace_id="trace-signoff-ready-001",
+            finished_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="monitoring",
+            summary="Ready-stage verification is clean.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/pilot-signoff/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["signoff_status"], "ready_for_cutover")
+        self.assertEqual(
+            response.data[0]["recommended_action"],
+            "Promote PostgreSQL primary during the planned pilot window.",
+        )
+
+    def test_list_pilot_signoff_reports_production_safe(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=5,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=0,
+            trace_id="trace-signoff-safe-001",
+            finished_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="production_safe",
+            summary="Primary pilot is clean.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/pilot-signoff/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]["signoff_status"], "production_safe")
+        self.assertEqual(
+            response.data[0]["recommended_action"],
+            "Keep monitoring drift, bridge receipts, and operator activity.",
+        )
+
+    def test_list_pilot_signoff_reports_rollback_recommended(self):
+        control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=6,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=2,
+            trace_id="trace-signoff-rollback-001",
+            finished_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="rollback_recommended",
+            summary="Primary pilot drift detected.",
+            metadata_json={"healthy": False, "requires_rollback": True},
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/pilot-signoff/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]["signoff_status"], "rollback_recommended")
+        self.assertEqual(
+            response.data[0]["recommended_action"],
+            "Rollback the pilot and triage reconciliation before retrying.",
+        )
+
+    def test_list_pilot_shop_scorecards_reports_ready_for_cutover(self):
+        inventory_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.READY,
+            current_epoch=4,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        customer_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=5,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=0,
+            trace_id="trace-shop-scorecard-inventory-001",
+            finished_at=timezone.now(),
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=0,
+            trace_id="trace-shop-scorecard-customers-001",
+            finished_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=inventory_control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="monitoring",
+            summary="Inventory is ready-stage clean.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=customer_control,
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="production_safe",
+            summary="Customers are clean on PostgreSQL primary.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/pilot-shop-scorecards/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["overall_status"], "ready_for_cutover")
+        self.assertEqual(response.data[0]["ready_for_cutover_domains"], 1)
+        self.assertEqual(response.data[0]["production_safe_domains"], 1)
+        self.assertEqual(response.data[0]["missing_domains"], [])
+
+    def test_list_pilot_shop_scorecards_reports_missing_domain_as_blocked(self):
+        inventory_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            current_epoch=2,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=0,
+            trace_id="trace-shop-scorecard-missing-001",
+            finished_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=inventory_control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="monitoring",
+            summary="Inventory is clean, but customers are not onboarded yet.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/pilot-shop-scorecards/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]["overall_status"], "blocked")
+        self.assertIn(MigrationDomain.CUSTOMERS, response.data[0]["missing_domains"])
+        self.assertEqual(response.data[0]["blocked_domains"], 0)
+
+    def test_create_shop_checkpoint_event_records_current_scorecard_snapshot(self):
+        inventory_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.READY,
+            current_epoch=4,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        customer_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=5,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=0,
+            trace_id="trace-shop-checkpoint-inventory-001",
+            finished_at=timezone.now(),
+        )
+        MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            status=MigrationJobStatus.SUCCEEDED,
+            actor_user=self.user,
+            mismatch_count=0,
+            trace_id="trace-shop-checkpoint-customers-001",
+            finished_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=inventory_control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="monitoring",
+            summary="Inventory is clean and waiting for promotion.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=customer_control,
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="production_safe",
+            summary="Customers are already stable on PostgreSQL.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.post(
+            "/api/v1/migration/pilot-shop-checkpoints/",
+            {
+                "shop": str(self.shop.id),
+                "decision": MigrationShopCheckpointDecision.APPROVED_FOR_CUTOVER,
+                "note": "Operator approved this shop for the next cutover window.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(MigrationShopCheckpointEvent.objects.count(), 1)
+        event = MigrationShopCheckpointEvent.objects.get()
+        self.assertEqual(event.decision, MigrationShopCheckpointDecision.APPROVED_FOR_CUTOVER)
+        self.assertEqual(event.overall_status_snapshot, "ready_for_cutover")
+        self.assertEqual(response.data["shop_name"], self.shop.name)
+        self.assertEqual(response.data["decision"], MigrationShopCheckpointDecision.APPROVED_FOR_CUTOVER)
+
+    def test_create_shop_checkpoint_event_requires_existing_pilot_controls(self):
+        response = self.client.post(
+            "/api/v1/migration/pilot-shop-checkpoints/",
+            {
+                "shop": str(self.shop.id),
+                "decision": MigrationShopCheckpointDecision.HOLD_FOR_MONITORING,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(MigrationShopCheckpointEvent.objects.count(), 0)
+
+    def test_phase_readiness_reports_ready_for_phase_exit(self):
+        inventory_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.READY,
+            current_epoch=4,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        customer_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=5,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        for domain in (MigrationDomain.INVENTORY, MigrationDomain.CUSTOMERS):
+            MigrationJobRun.objects.create(
+                shop=self.shop,
+                domain=domain,
+                job_type=MigrationJobType.SHADOW_COMPARE,
+                status=MigrationJobStatus.SUCCEEDED,
+                actor_user=self.user,
+                mismatch_count=0,
+                trace_id=f"trace-phase-readiness-{domain}",
+                finished_at=timezone.now(),
+            )
+        MigrationControlEvent.objects.create(
+            control=inventory_control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="monitoring",
+            summary="Inventory is clean and ready for the next promotion window.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=customer_control,
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="production_safe",
+            summary="Customers are stable on PostgreSQL.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+        MigrationShopCheckpointEvent.objects.create(
+            shop=self.shop,
+            actor_user=self.user,
+            decision=MigrationShopCheckpointDecision.APPROVED_FOR_CUTOVER,
+            overall_status_snapshot="ready_for_cutover",
+            summary="Operator approved the shop for the next cutover window.",
+            recommended_action_snapshot="Prepare the next rollout step.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/phase-readiness/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["overall_status"], "ready_for_phase_exit")
+        self.assertEqual(response.data["pilot_shop_count"], 1)
+        self.assertEqual(response.data["approved_for_cutover_count"], 1)
+        self.assertEqual(response.data["shops_without_checkpoint"], 0)
+        self.assertEqual(response.data["shops"][0]["latest_checkpoint_decision"], "approved_for_cutover")
+
+    def test_phase_readiness_reports_rollback_recommended(self):
+        inventory_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=6,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        customer_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=6,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        for domain in (MigrationDomain.INVENTORY, MigrationDomain.CUSTOMERS):
+            MigrationJobRun.objects.create(
+                shop=self.shop,
+                domain=domain,
+                job_type=MigrationJobType.SHADOW_COMPARE,
+                status=MigrationJobStatus.SUCCEEDED,
+                actor_user=self.user,
+                mismatch_count=0,
+                trace_id=f"trace-phase-rollback-{domain}",
+                finished_at=timezone.now(),
+            )
+        MigrationControlEvent.objects.create(
+            control=inventory_control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="rollback_recommended",
+            summary="Inventory drift requires rollback.",
+            metadata_json={"healthy": False, "requires_rollback": True},
+            occurred_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=customer_control,
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="production_safe",
+            summary="Customers are stable on PostgreSQL.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+        MigrationShopCheckpointEvent.objects.create(
+            shop=self.shop,
+            actor_user=self.user,
+            decision=MigrationShopCheckpointDecision.ROLLBACK_ESCALATED,
+            overall_status_snapshot="rollback_recommended",
+            summary="Operator escalated rollback for this shop.",
+            recommended_action_snapshot="Rollback inventory before the next attempt.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/phase-readiness/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["overall_status"], "rollback_recommended")
+        self.assertEqual(response.data["rollback_escalated_count"], 1)
+        self.assertEqual(response.data["rollback_recommended_shop_count"], 1)
+        self.assertEqual(response.data["shops"][0]["latest_checkpoint_decision"], "rollback_escalated")
+
+    def test_create_phase_checkpoint_event_records_current_phase_snapshot(self):
+        inventory_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.READY,
+            current_epoch=4,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        customer_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+            current_epoch=5,
+            shadow_reads_enabled=True,
+            last_backfill_at=timezone.now(),
+            last_shadow_verified_at=timezone.now(),
+        )
+        for domain in (MigrationDomain.INVENTORY, MigrationDomain.CUSTOMERS):
+            MigrationJobRun.objects.create(
+                shop=self.shop,
+                domain=domain,
+                job_type=MigrationJobType.SHADOW_COMPARE,
+                status=MigrationJobStatus.SUCCEEDED,
+                actor_user=self.user,
+                mismatch_count=0,
+                trace_id=f"trace-phase-checkpoint-{domain}",
+                finished_at=timezone.now(),
+            )
+        MigrationControlEvent.objects.create(
+            control=inventory_control,
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="monitoring",
+            summary="Inventory is ready for the next cutover window.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+        MigrationControlEvent.objects.create(
+            control=customer_control,
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            event_type=MigrationControlEventType.VERIFY_PILOT,
+            actor_user=self.user,
+            result="production_safe",
+            summary="Customers are stable on PostgreSQL.",
+            metadata_json={"healthy": True, "requires_rollback": False},
+            occurred_at=timezone.now(),
+        )
+        MigrationShopCheckpointEvent.objects.create(
+            shop=self.shop,
+            actor_user=self.user,
+            decision=MigrationShopCheckpointDecision.APPROVED_FOR_CUTOVER,
+            overall_status_snapshot="ready_for_cutover",
+            summary="Shop approved for cutover.",
+            recommended_action_snapshot="Proceed to the next phase review.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.post(
+            "/api/v1/migration/phase-checkpoints/",
+            {
+                "phase": "phase_3",
+                "decision": "approved_for_next_phase",
+                "note": "Program signoff recorded after clean pilot review.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(MigrationPhaseCheckpointEvent.objects.count(), 1)
+        event = MigrationPhaseCheckpointEvent.objects.get()
+        self.assertEqual(event.phase, "phase_3")
+        self.assertEqual(event.decision, "approved_for_next_phase")
+        self.assertEqual(event.overall_status_snapshot, "ready_for_phase_exit")
+        self.assertEqual(response.data["decision"], "approved_for_next_phase")
+
+    def test_create_phase_checkpoint_event_requires_pilot_shops(self):
+        response = self.client.post(
+            "/api/v1/migration/phase-checkpoints/",
+            {
+                "phase": "phase_3",
+                "decision": "hold_for_monitoring",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(MigrationPhaseCheckpointEvent.objects.count(), 0)
+
+    def test_create_phase_checkpoint_event_blocks_premature_approval(self):
+        inventory_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            current_epoch=2,
+            shadow_reads_enabled=True,
+        )
+        customer_control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            current_epoch=2,
+            shadow_reads_enabled=True,
+        )
+        self.assertIsNotNone(inventory_control)
+        self.assertIsNotNone(customer_control)
+
+        response = self.client.post(
+            "/api/v1/migration/phase-checkpoints/",
+            {
+                "phase": "phase_3",
+                "decision": "approved_for_next_phase",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data["overall_status"], "blocked")
+        self.assertEqual(MigrationPhaseCheckpointEvent.objects.count(), 0)
+
+    def test_retirement_readiness_reports_ready_for_launch(self):
+        required_domains = [
+            MigrationDomain.INVENTORY,
+            MigrationDomain.CUSTOMERS,
+            MigrationDomain.CUSTOMER_LEDGER,
+            MigrationDomain.EXPENSES,
+            MigrationDomain.ATTENDANCE,
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+            MigrationDomain.REPORTING,
+        ]
+        for domain in required_domains:
+            MigrationDomainControl.objects.create(
+                shop=self.shop,
+                domain=domain,
+                write_master=MigrationWriteMaster.POSTGRES,
+                bridge_mode=MigrationBridgeMode.DISABLED,
+                cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+                current_epoch=8,
+                shadow_reads_enabled=True,
+            )
+
+        response = self.client.get("/api/v1/migration/retirement-readiness/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["overall_status"], "ready_for_launch")
+        self.assertEqual(response.data["shop_count"], 1)
+        self.assertEqual(response.data["ready_for_launch_shop_count"], 1)
+        self.assertEqual(response.data["blocked_shop_count"], 0)
+
+    def test_create_launch_checkpoint_records_retirement_snapshot(self):
+        required_domains = [
+            MigrationDomain.INVENTORY,
+            MigrationDomain.CUSTOMERS,
+            MigrationDomain.CUSTOMER_LEDGER,
+            MigrationDomain.EXPENSES,
+            MigrationDomain.ATTENDANCE,
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+            MigrationDomain.REPORTING,
+        ]
+        for domain in required_domains:
+            MigrationDomainControl.objects.create(
+                shop=self.shop,
+                domain=domain,
+                write_master=MigrationWriteMaster.POSTGRES,
+                bridge_mode=MigrationBridgeMode.DISABLED,
+                cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+                current_epoch=8,
+                shadow_reads_enabled=True,
+            )
+
+        response = self.client.post(
+            "/api/v1/migration/launch-checkpoints/",
+            {
+                "phase": "phase_5",
+                "decision": MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH,
+                "note": "Legacy retirement is signed off for launch.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(MigrationLaunchCheckpointEvent.objects.count(), 1)
+        event = MigrationLaunchCheckpointEvent.objects.get()
+        self.assertEqual(event.phase, "phase_5")
+        self.assertEqual(event.decision, MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH)
+        self.assertEqual(event.overall_status_snapshot, "ready_for_launch")
+
+    def test_create_launch_checkpoint_blocks_premature_approval(self):
+        MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.FIREBASE_TO_POSTGRES,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            current_epoch=3,
+            shadow_reads_enabled=True,
+        )
+
+        response = self.client.post(
+            "/api/v1/migration/launch-checkpoints/",
+            {
+                "phase": "phase_5",
+                "decision": MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data["overall_status"], "blocked")
+        self.assertEqual(MigrationLaunchCheckpointEvent.objects.count(), 0)
+
+    def test_go_live_readiness_reports_ready_for_go_live_after_launch_approval(self):
+        required_domains = [
+            MigrationDomain.INVENTORY,
+            MigrationDomain.CUSTOMERS,
+            MigrationDomain.CUSTOMER_LEDGER,
+            MigrationDomain.EXPENSES,
+            MigrationDomain.ATTENDANCE,
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+            MigrationDomain.REPORTING,
+        ]
+        for domain in required_domains:
+            MigrationDomainControl.objects.create(
+                shop=self.shop,
+                domain=domain,
+                write_master=MigrationWriteMaster.POSTGRES,
+                bridge_mode=MigrationBridgeMode.DISABLED,
+                cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+                current_epoch=8,
+                shadow_reads_enabled=True,
+            )
+        MigrationLaunchCheckpointEvent.objects.create(
+            phase="phase_5",
+            actor_user=self.user,
+            decision=MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH,
+            overall_status_snapshot="ready_for_launch",
+            summary="Launch is approved.",
+            recommended_action_snapshot="Execute go-live.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/go-live-readiness/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["overall_status"], "ready_for_go_live")
+        self.assertEqual(response.data["shop_count"], 1)
+        self.assertEqual(response.data["latest_launch_decision"], "approved_for_launch")
+
+    def test_create_go_live_checkpoint_records_hypercare_entry(self):
+        required_domains = [
+            MigrationDomain.INVENTORY,
+            MigrationDomain.CUSTOMERS,
+            MigrationDomain.CUSTOMER_LEDGER,
+            MigrationDomain.EXPENSES,
+            MigrationDomain.ATTENDANCE,
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+            MigrationDomain.REPORTING,
+        ]
+        for domain in required_domains:
+            MigrationDomainControl.objects.create(
+                shop=self.shop,
+                domain=domain,
+                write_master=MigrationWriteMaster.POSTGRES,
+                bridge_mode=MigrationBridgeMode.DISABLED,
+                cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+                current_epoch=8,
+                shadow_reads_enabled=True,
+            )
+        MigrationLaunchCheckpointEvent.objects.create(
+            phase="phase_5",
+            actor_user=self.user,
+            decision=MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH,
+            overall_status_snapshot="ready_for_launch",
+            summary="Launch is approved.",
+            recommended_action_snapshot="Execute go-live.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.post(
+            "/api/v1/migration/go-live-checkpoints/",
+            {
+                "phase": "phase_6",
+                "decision": MigrationGoLiveCheckpointDecision.EXECUTE_GO_LIVE,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(MigrationGoLiveCheckpointEvent.objects.count(), 1)
+        event = MigrationGoLiveCheckpointEvent.objects.get()
+        self.assertEqual(event.phase, "phase_6")
+        self.assertEqual(event.decision, MigrationGoLiveCheckpointDecision.EXECUTE_GO_LIVE)
+        self.assertEqual(event.overall_status_snapshot, "ready_for_go_live")
+
+    def test_create_go_live_checkpoint_blocks_premature_execution(self):
+        required_domains = [
+            MigrationDomain.INVENTORY,
+            MigrationDomain.CUSTOMERS,
+            MigrationDomain.CUSTOMER_LEDGER,
+            MigrationDomain.EXPENSES,
+            MigrationDomain.ATTENDANCE,
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+            MigrationDomain.REPORTING,
+        ]
+        for domain in required_domains:
+            MigrationDomainControl.objects.create(
+                shop=self.shop,
+                domain=domain,
+                write_master=MigrationWriteMaster.POSTGRES,
+                bridge_mode=MigrationBridgeMode.DISABLED,
+                cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+                current_epoch=8,
+                shadow_reads_enabled=True,
+            )
+
+        response = self.client.post(
+            "/api/v1/migration/go-live-checkpoints/",
+            {
+                "phase": "phase_6",
+                "decision": MigrationGoLiveCheckpointDecision.EXECUTE_GO_LIVE,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data["overall_status"], "blocked")
+        self.assertEqual(MigrationGoLiveCheckpointEvent.objects.count(), 0)
+
+    def test_rollout_readiness_reports_wave_ready_after_steady_state_handoff(self):
+        required_domains = [
+            MigrationDomain.INVENTORY,
+            MigrationDomain.CUSTOMERS,
+            MigrationDomain.CUSTOMER_LEDGER,
+            MigrationDomain.EXPENSES,
+            MigrationDomain.ATTENDANCE,
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+            MigrationDomain.REPORTING,
+        ]
+        for domain in required_domains:
+            MigrationDomainControl.objects.create(
+                shop=self.shop,
+                domain=domain,
+                write_master=MigrationWriteMaster.POSTGRES,
+                bridge_mode=MigrationBridgeMode.DISABLED,
+                cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+                current_epoch=8,
+                shadow_reads_enabled=True,
+            )
+        MigrationLaunchCheckpointEvent.objects.create(
+            phase="phase_5",
+            actor_user=self.user,
+            decision=MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH,
+            overall_status_snapshot="ready_for_launch",
+            summary="Launch is approved.",
+            recommended_action_snapshot="Execute go-live.",
+            occurred_at=timezone.now(),
+        )
+        MigrationGoLiveCheckpointEvent.objects.create(
+            phase="phase_6",
+            actor_user=self.user,
+            decision=MigrationGoLiveCheckpointDecision.HANDOFF_TO_STEADY_STATE,
+            overall_status_snapshot="hypercare_active",
+            summary="Hypercare closed cleanly.",
+            recommended_action_snapshot="Operate as steady state.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/rollout-readiness/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["overall_status"], "wave_ready")
+        self.assertEqual(response.data["latest_rollout_decision"], None)
+
+    def test_create_rollout_checkpoint_records_wave_advance(self):
+        required_domains = [
+            MigrationDomain.INVENTORY,
+            MigrationDomain.CUSTOMERS,
+            MigrationDomain.CUSTOMER_LEDGER,
+            MigrationDomain.EXPENSES,
+            MigrationDomain.ATTENDANCE,
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+            MigrationDomain.REPORTING,
+        ]
+        for domain in required_domains:
+            MigrationDomainControl.objects.create(
+                shop=self.shop,
+                domain=domain,
+                write_master=MigrationWriteMaster.POSTGRES,
+                bridge_mode=MigrationBridgeMode.DISABLED,
+                cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+                current_epoch=8,
+                shadow_reads_enabled=True,
+            )
+        MigrationLaunchCheckpointEvent.objects.create(
+            phase="phase_5",
+            actor_user=self.user,
+            decision=MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH,
+            overall_status_snapshot="ready_for_launch",
+            summary="Launch is approved.",
+            recommended_action_snapshot="Execute go-live.",
+            occurred_at=timezone.now(),
+        )
+        MigrationGoLiveCheckpointEvent.objects.create(
+            phase="phase_6",
+            actor_user=self.user,
+            decision=MigrationGoLiveCheckpointDecision.HANDOFF_TO_STEADY_STATE,
+            overall_status_snapshot="hypercare_active",
+            summary="Hypercare closed cleanly.",
+            recommended_action_snapshot="Operate as steady state.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.post(
+            "/api/v1/migration/rollout-checkpoints/",
+            {
+                "phase": "phase_7",
+                "decision": MigrationRolloutCheckpointDecision.ADVANCE_ROLLOUT_WAVE,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(MigrationRolloutCheckpointEvent.objects.count(), 1)
+        event = MigrationRolloutCheckpointEvent.objects.get()
+        self.assertEqual(event.phase, "phase_7")
+        self.assertEqual(event.decision, MigrationRolloutCheckpointDecision.ADVANCE_ROLLOUT_WAVE)
+        self.assertEqual(event.overall_status_snapshot, "wave_ready")
+
+    def test_create_rollout_checkpoint_blocks_before_steady_state(self):
+        required_domains = [
+            MigrationDomain.INVENTORY,
+            MigrationDomain.CUSTOMERS,
+            MigrationDomain.CUSTOMER_LEDGER,
+            MigrationDomain.EXPENSES,
+            MigrationDomain.ATTENDANCE,
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+            MigrationDomain.REPORTING,
+        ]
+        for domain in required_domains:
+            MigrationDomainControl.objects.create(
+                shop=self.shop,
+                domain=domain,
+                write_master=MigrationWriteMaster.POSTGRES,
+                bridge_mode=MigrationBridgeMode.DISABLED,
+                cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+                current_epoch=8,
+                shadow_reads_enabled=True,
+            )
+        MigrationLaunchCheckpointEvent.objects.create(
+            phase="phase_5",
+            actor_user=self.user,
+            decision=MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH,
+            overall_status_snapshot="ready_for_launch",
+            summary="Launch is approved.",
+            recommended_action_snapshot="Execute go-live.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.post(
+            "/api/v1/migration/rollout-checkpoints/",
+            {
+                "phase": "phase_7",
+                "decision": MigrationRolloutCheckpointDecision.ADVANCE_ROLLOUT_WAVE,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data["overall_status"], "blocked")
+        self.assertEqual(MigrationRolloutCheckpointEvent.objects.count(), 0)
+
+    def test_steady_state_readiness_reports_ready_after_rollout_completion(self):
+        required_domains = [
+            MigrationDomain.INVENTORY,
+            MigrationDomain.CUSTOMERS,
+            MigrationDomain.CUSTOMER_LEDGER,
+            MigrationDomain.EXPENSES,
+            MigrationDomain.ATTENDANCE,
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+            MigrationDomain.REPORTING,
+        ]
+        for domain in required_domains:
+            MigrationDomainControl.objects.create(
+                shop=self.shop,
+                domain=domain,
+                write_master=MigrationWriteMaster.POSTGRES,
+                bridge_mode=MigrationBridgeMode.DISABLED,
+                cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+                current_epoch=8,
+                shadow_reads_enabled=True,
+            )
+        MigrationLaunchCheckpointEvent.objects.create(
+            phase="phase_5",
+            actor_user=self.user,
+            decision=MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH,
+            overall_status_snapshot="ready_for_launch",
+            summary="Launch is approved.",
+            recommended_action_snapshot="Execute go-live.",
+            occurred_at=timezone.now(),
+        )
+        MigrationGoLiveCheckpointEvent.objects.create(
+            phase="phase_6",
+            actor_user=self.user,
+            decision=MigrationGoLiveCheckpointDecision.HANDOFF_TO_STEADY_STATE,
+            overall_status_snapshot="hypercare_active",
+            summary="Hypercare closed cleanly.",
+            recommended_action_snapshot="Operate as steady state.",
+            occurred_at=timezone.now(),
+        )
+        MigrationRolloutCheckpointEvent.objects.create(
+            phase="phase_7",
+            actor_user=self.user,
+            decision=MigrationRolloutCheckpointDecision.COMPLETE_ROLLOUT,
+            overall_status_snapshot="scale_tuning",
+            summary="Rollout completed cleanly.",
+            recommended_action_snapshot="Move to steady-state governance.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/v1/migration/steady-state-readiness/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["overall_status"], "steady_state_ready")
+        self.assertTrue(response.data["rollout_completed"])
+        self.assertEqual(response.data["latest_steady_state_decision"], None)
+
+    def test_create_steady_state_checkpoint_records_acceptance(self):
+        required_domains = [
+            MigrationDomain.INVENTORY,
+            MigrationDomain.CUSTOMERS,
+            MigrationDomain.CUSTOMER_LEDGER,
+            MigrationDomain.EXPENSES,
+            MigrationDomain.ATTENDANCE,
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+            MigrationDomain.REPORTING,
+        ]
+        for domain in required_domains:
+            MigrationDomainControl.objects.create(
+                shop=self.shop,
+                domain=domain,
+                write_master=MigrationWriteMaster.POSTGRES,
+                bridge_mode=MigrationBridgeMode.DISABLED,
+                cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+                current_epoch=8,
+                shadow_reads_enabled=True,
+            )
+        MigrationLaunchCheckpointEvent.objects.create(
+            phase="phase_5",
+            actor_user=self.user,
+            decision=MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH,
+            overall_status_snapshot="ready_for_launch",
+            summary="Launch is approved.",
+            recommended_action_snapshot="Execute go-live.",
+            occurred_at=timezone.now(),
+        )
+        MigrationGoLiveCheckpointEvent.objects.create(
+            phase="phase_6",
+            actor_user=self.user,
+            decision=MigrationGoLiveCheckpointDecision.HANDOFF_TO_STEADY_STATE,
+            overall_status_snapshot="hypercare_active",
+            summary="Hypercare closed cleanly.",
+            recommended_action_snapshot="Operate as steady state.",
+            occurred_at=timezone.now(),
+        )
+        MigrationRolloutCheckpointEvent.objects.create(
+            phase="phase_7",
+            actor_user=self.user,
+            decision=MigrationRolloutCheckpointDecision.COMPLETE_ROLLOUT,
+            overall_status_snapshot="scale_tuning",
+            summary="Rollout completed cleanly.",
+            recommended_action_snapshot="Move to steady-state governance.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.post(
+            "/api/v1/migration/steady-state-checkpoints/",
+            {
+                "phase": "phase_8",
+                "decision": MigrationSteadyStateCheckpointDecision.ACCEPT_STEADY_STATE,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(MigrationSteadyStateCheckpointEvent.objects.count(), 1)
+        event = MigrationSteadyStateCheckpointEvent.objects.get()
+        self.assertEqual(event.phase, "phase_8")
+        self.assertEqual(
+            event.decision,
+            MigrationSteadyStateCheckpointDecision.ACCEPT_STEADY_STATE,
+        )
+        self.assertEqual(event.overall_status_snapshot, "steady_state_ready")
+
+    def test_create_steady_state_checkpoint_blocks_before_rollout_completion(self):
+        required_domains = [
+            MigrationDomain.INVENTORY,
+            MigrationDomain.CUSTOMERS,
+            MigrationDomain.CUSTOMER_LEDGER,
+            MigrationDomain.EXPENSES,
+            MigrationDomain.ATTENDANCE,
+            MigrationDomain.SALES,
+            MigrationDomain.PAYMENTS,
+            MigrationDomain.STOCK_LEDGER,
+            MigrationDomain.REPORTING,
+        ]
+        for domain in required_domains:
+            MigrationDomainControl.objects.create(
+                shop=self.shop,
+                domain=domain,
+                write_master=MigrationWriteMaster.POSTGRES,
+                bridge_mode=MigrationBridgeMode.DISABLED,
+                cutover_status=MigrationCutoverStatus.POSTGRES_PRIMARY,
+                current_epoch=8,
+                shadow_reads_enabled=True,
+            )
+        MigrationLaunchCheckpointEvent.objects.create(
+            phase="phase_5",
+            actor_user=self.user,
+            decision=MigrationLaunchCheckpointDecision.APPROVED_FOR_LAUNCH,
+            overall_status_snapshot="ready_for_launch",
+            summary="Launch is approved.",
+            recommended_action_snapshot="Execute go-live.",
+            occurred_at=timezone.now(),
+        )
+        MigrationGoLiveCheckpointEvent.objects.create(
+            phase="phase_6",
+            actor_user=self.user,
+            decision=MigrationGoLiveCheckpointDecision.HANDOFF_TO_STEADY_STATE,
+            overall_status_snapshot="hypercare_active",
+            summary="Hypercare closed cleanly.",
+            recommended_action_snapshot="Operate as steady state.",
+            occurred_at=timezone.now(),
+        )
+
+        response = self.client.post(
+            "/api/v1/migration/steady-state-checkpoints/",
+            {
+                "phase": "phase_8",
+                "decision": MigrationSteadyStateCheckpointDecision.ACCEPT_STEADY_STATE,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data["overall_status"], "blocked")
+        self.assertEqual(MigrationSteadyStateCheckpointEvent.objects.count(), 0)
+
+    def test_non_platform_admin_is_blocked(self):
+        non_admin = PlatformUser.objects.create_user(email="staff@example.com", password="secret", full_name="Staff")
+        self.client.force_authenticate(user=non_admin)
+
+        response = self.client.get("/api/v1/migration/domains/")
+
+        self.assertEqual(response.status_code, 403)
+
+
+class MigrationExecutionTests(TestCase):
+    def setUp(self):
+        self.user = PlatformUser.objects.create_user(
+            email="platform@example.com",
+            password="secret",
+            full_name="Platform Admin",
+            is_platform_admin=True,
+        )
+        self.shop = Shop.objects.create(
+            name="Demo Shop",
+            slug="demo-shop",
+            source_system="firebase",
+            source_id="shop_001",
+            source_shop_id="shop_001",
+            source_path="shops/shop_001",
+        )
+        self.control = MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.COMPARE_ONLY,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            shadow_reads_enabled=True,
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def _create_customer_control(self) -> MigrationDomainControl:
+        return MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            write_master=MigrationWriteMaster.FIREBASE,
+            bridge_mode=MigrationBridgeMode.COMPARE_ONLY,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            shadow_reads_enabled=True,
+        )
+
+    def _create_reporting_control(self) -> MigrationDomainControl:
+        return MigrationDomainControl.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.REPORTING,
+            write_master=MigrationWriteMaster.POSTGRES,
+            bridge_mode=MigrationBridgeMode.DISABLED,
+            cutover_status=MigrationCutoverStatus.PILOT,
+            shadow_reads_enabled=False,
+        )
+
+    def test_inventory_backfill_creates_and_updates_source_tracked_items(self):
+        job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.BACKFILL,
+            actor_user=self.user,
+            payload_json={
+                "source_snapshot": [
+                    {
+                        "id": "inv_001",
+                        "name": "Blue Shirt",
+                        "sku": "SKU-001",
+                        "price": "499.50",
+                        "category": "Clothing",
+                    },
+                    {
+                        "id": "inv_002",
+                        "name": "Black Jeans",
+                        "sell_price": "899.00",
+                        "status": "active",
+                    },
+                ]
+            },
+        )
+
+        execute_migration_job(str(job.id))
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(job.rows_scanned, 2)
+        self.assertEqual(job.rows_written, 2)
+        self.assertEqual(job.rows_skipped, 0)
+
+        item = InventoryItem.objects.get(shop=self.shop, source_system="firebase", source_id="inv_001")
+        self.assertEqual(item.name, "Blue Shirt")
+        self.assertEqual(str(item.sell_price), "499.50")
+        self.assertEqual(item.source_shop_id, "shop_001")
+        self.assertEqual(item.source_path, "shops/shop_001/inventory/inv_001")
+        self.assertIsNotNone(item.migrated_at)
+
+        update_job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.BACKFILL,
+            actor_user=self.user,
+            payload_json={
+                "source_snapshot": [
+                    {
+                        "id": "inv_001",
+                        "name": "Blue Shirt Premium",
+                        "sell_price": "549.00",
+                        "sku": "SKU-001",
+                    }
+                ]
+            },
+        )
+
+        execute_migration_job(str(update_job.id))
+
+        update_job.refresh_from_db()
+        item.refresh_from_db()
+        self.assertEqual(update_job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(update_job.rows_written, 1)
+        self.assertEqual(item.name, "Blue Shirt Premium")
+        self.assertEqual(str(item.sell_price), "549.00")
+
+    def test_inventory_shadow_compare_records_and_auto_resolves_reconciliation_events(self):
+        InventoryItem.objects.create(
+            shop=self.shop,
+            source_system="firebase",
+            source_id="inv_001",
+            source_shop_id="shop_001",
+            source_path="shops/shop_001/inventory/inv_001",
+            name="Blue Shirt",
+            sku="SKU-001",
+            sell_price="100.00",
+        )
+        InventoryItem.objects.create(
+            shop=self.shop,
+            source_system="firebase",
+            source_id="inv_extra",
+            source_shop_id="shop_001",
+            source_path="shops/shop_001/inventory/inv_extra",
+            name="Ghost Item",
+            sku="GHOST",
+            sell_price="50.00",
+        )
+
+        job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            actor_user=self.user,
+            payload_json={
+                "source_snapshot": [
+                    {
+                        "id": "inv_001",
+                        "name": "Blue Shirt",
+                        "sku": "SKU-001",
+                        "sell_price": "125.00",
+                    },
+                    {
+                        "id": "inv_002",
+                        "name": "Black Jeans",
+                        "sell_price": "899.00",
+                    },
+                ]
+            },
+        )
+
+        execute_migration_job(str(job.id))
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(job.rows_scanned, 2)
+        self.assertEqual(job.mismatch_count, 3)
+        self.assertEqual(MigrationReconciliationEvent.objects.filter(shop=self.shop).count(), 3)
+
+        drift_event = MigrationReconciliationEvent.objects.get(shop=self.shop, issue_code="field_drift")
+        self.assertEqual(drift_event.status, "open")
+
+        second_job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            actor_user=self.user,
+            payload_json={
+                "source_snapshot": [
+                    {
+                        "id": "inv_001",
+                        "name": "Blue Shirt",
+                        "sku": "SKU-001",
+                        "sell_price": "100.00",
+                    },
+                    {
+                        "id": "inv_extra",
+                        "name": "Ghost Item",
+                        "sku": "GHOST",
+                        "sell_price": "50.00",
+                    },
+                ]
+            },
+        )
+
+        execute_migration_job(str(second_job.id))
+
+        second_job.refresh_from_db()
+        drift_event.refresh_from_db()
+        self.assertEqual(second_job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(second_job.mismatch_count, 0)
+        self.assertEqual(drift_event.status, "resolved")
+        self.assertIsNotNone(drift_event.resolved_at)
+
+    def test_run_inline_query_executes_job_immediately(self):
+        response = self.client.post(
+            "/api/v1/migration/jobs/?run_inline=1",
+            {
+                "shop": str(self.shop.id),
+                "domain": MigrationDomain.INVENTORY,
+                "job_type": MigrationJobType.BACKFILL,
+                "payload_json": {
+                    "source_snapshot": [
+                        {
+                            "id": "inv_003",
+                            "name": "Inline Trigger Tee",
+                            "sell_price": "299.00",
+                        }
+                    ]
+                },
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["status"], MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(response.data["rows_written"], 1)
+        self.assertTrue(
+            InventoryItem.objects.filter(
+                shop=self.shop,
+                source_system="firebase",
+                source_id="inv_003",
+            ).exists()
+        )
+
+    def test_customer_backfill_creates_and_updates_source_tracked_customers(self):
+        self._create_customer_control()
+        job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            job_type=MigrationJobType.BACKFILL,
+            actor_user=self.user,
+            payload_json={
+                "source_snapshot": [
+                    {
+                        "id": "cust_001",
+                        "name": "Amina Patel",
+                        "phone": "9999999999",
+                        "email": "amina@example.com",
+                        "totalSpent": "1225.50",
+                        "dueBalance": "150.00",
+                    },
+                    {
+                        "id": "cust_002",
+                        "name": "Bharat Shah",
+                        "mobile": "8888888888",
+                        "balance": "0.00",
+                    },
+                ]
+            },
+        )
+
+        execute_migration_job(str(job.id))
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(job.rows_scanned, 2)
+        self.assertEqual(job.rows_written, 2)
+
+        customer = Customer.objects.get(shop=self.shop, source_system="firebase", source_id="cust_001")
+        self.assertEqual(customer.name, "Amina Patel")
+        self.assertEqual(customer.phone, "9999999999")
+        self.assertEqual(str(customer.total_spent), "1225.50")
+        self.assertEqual(str(customer.balance), "150.00")
+        self.assertEqual(customer.source_path, "shops/shop_001/customers/cust_001")
+        self.assertIsNotNone(customer.migrated_at)
+
+        update_job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            job_type=MigrationJobType.BACKFILL,
+            actor_user=self.user,
+            payload_json={
+                "source_snapshot": [
+                    {
+                        "id": "cust_001",
+                        "name": "Amina Patel VIP",
+                        "phone": "9999999999",
+                        "balance": "90.00",
+                    }
+                ]
+            },
+        )
+
+        execute_migration_job(str(update_job.id))
+
+        update_job.refresh_from_db()
+        customer.refresh_from_db()
+        self.assertEqual(update_job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(update_job.rows_written, 1)
+        self.assertEqual(customer.name, "Amina Patel VIP")
+        self.assertEqual(str(customer.balance), "90.00")
+
+    def test_customer_shadow_compare_records_and_auto_resolves_reconciliation_events(self):
+        self._create_customer_control()
+        Customer.objects.create(
+            shop=self.shop,
+            source_system="firebase",
+            source_id="cust_001",
+            source_shop_id="shop_001",
+            source_path="shops/shop_001/customers/cust_001",
+            name="Amina Patel",
+            phone="9999999999",
+            balance="120.00",
+            total_spent="500.00",
+        )
+        Customer.objects.create(
+            shop=self.shop,
+            source_system="firebase",
+            source_id="cust_extra",
+            source_shop_id="shop_001",
+            source_path="shops/shop_001/customers/cust_extra",
+            name="Ghost Customer",
+            phone="7777777777",
+            balance="0.00",
+            total_spent="0.00",
+        )
+
+        job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            actor_user=self.user,
+            payload_json={
+                "source_snapshot": [
+                    {
+                        "id": "cust_001",
+                        "name": "Amina Patel",
+                        "phone": "9999999999",
+                        "balance": "150.00",
+                        "totalSpent": "500.00",
+                    },
+                    {
+                        "id": "cust_002",
+                        "name": "Bharat Shah",
+                        "mobile": "8888888888",
+                    },
+                ]
+            },
+        )
+
+        execute_migration_job(str(job.id))
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(job.rows_scanned, 2)
+        self.assertEqual(job.mismatch_count, 3)
+        self.assertEqual(
+            MigrationReconciliationEvent.objects.filter(shop=self.shop, domain=MigrationDomain.CUSTOMERS).count(),
+            3,
+        )
+
+        drift_event = MigrationReconciliationEvent.objects.get(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            issue_code="field_drift",
+            entity_type="customer",
+        )
+        self.assertEqual(drift_event.status, "open")
+
+        second_job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            job_type=MigrationJobType.SHADOW_COMPARE,
+            actor_user=self.user,
+            payload_json={
+                "source_snapshot": [
+                    {
+                        "id": "cust_001",
+                        "name": "Amina Patel",
+                        "phone": "9999999999",
+                        "balance": "120.00",
+                        "totalSpent": "500.00",
+                    },
+                    {
+                        "id": "cust_extra",
+                        "name": "Ghost Customer",
+                        "mobile": "7777777777",
+                        "balance": "0.00",
+                        "totalSpent": "0.00",
+                    },
+                ]
+            },
+        )
+
+        execute_migration_job(str(second_job.id))
+
+        second_job.refresh_from_db()
+        drift_event.refresh_from_db()
+        self.assertEqual(second_job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(second_job.mismatch_count, 0)
+        self.assertEqual(drift_event.status, "resolved")
+        self.assertIsNotNone(drift_event.resolved_at)
+
+    def test_reporting_projection_refresh_job_builds_dashboard_snapshot(self):
+        self._create_reporting_control()
+        item = InventoryItem.objects.create(
+            shop=self.shop,
+            name="Projection Tee",
+            sku="PROJ-TEE",
+            category="Tees",
+            sell_price="399.00",
+        )
+        customer = Customer.objects.create(
+            shop=self.shop,
+            name="Projection Customer",
+            phone="9000000000",
+            total_spent="550.00",
+            balance="60.00",
+        )
+        # Reuse the existing stock-adjust path assumptions by seeding a backfill row into the ledger model indirectly
+        from platform_apps.inventory.models import InventoryStockLedger
+        from platform_apps.payments.models import SalePayment
+        from platform_apps.sales.models import Sale
+
+        InventoryStockLedger.objects.create(
+            shop=self.shop,
+            item=item,
+            event_type=InventoryStockLedger.EventType.OPENING_BALANCE,
+            quantity_delta=2,
+            unit_price=item.sell_price,
+            occurred_at="2026-04-30T09:00:00+05:30",
+        )
+        sale = Sale.objects.create(
+            shop=self.shop,
+            actor_user=self.user,
+            customer=customer,
+            receipt_number="S-PROJ-001",
+            subtotal_amount="550.00",
+            total_amount="550.00",
+            amount_received="500.00",
+            amount_due="50.00",
+            payment_mode=Sale.PaymentMode.UPI,
+            customer_name_snapshot="Projection Customer",
+            customer_phone_snapshot="9000000000",
+            sale_date="2026-04-30",
+            occurred_at="2026-04-30T10:00:00+05:30",
+            status=Sale.Status.COMPLETED,
+        )
+        SalePayment.objects.create(
+            sale=sale,
+            shop=self.shop,
+            actor_user=self.user,
+            payment_method=SalePayment.PaymentMethod.UPI,
+            amount="500.00",
+            occurred_at="2026-04-30T10:00:00+05:30",
+        )
+
+        job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.REPORTING,
+            job_type=MigrationJobType.PROJECTION_REFRESH,
+            actor_user=self.user,
+            payload_json={"phase": 2},
+        )
+
+        execute_migration_job(str(job.id))
+
+        job.refresh_from_db()
+        snapshot = ShopDashboardSnapshot.objects.get(shop=self.shop)
+        self.assertEqual(job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertGreaterEqual(job.rows_scanned, 4)
+        self.assertEqual(snapshot.inventory_items_count, 1)
+        self.assertEqual(snapshot.customer_count, 1)
+        self.assertEqual(snapshot.sales_count, 1)
+        self.assertEqual(snapshot.payment_count, 1)
+
+    def test_inventory_bridge_replay_applies_once_and_skips_duplicates(self):
+        self.control.bridge_mode = MigrationBridgeMode.FIREBASE_TO_POSTGRES
+        self.control.save(update_fields=["bridge_mode", "updated_at"])
+
+        job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.BRIDGE_REPLAY,
+            actor_user=self.user,
+            payload_json={
+                "bridge_event": {
+                    "origin_system": "firebase",
+                    "origin_event_id": "evt_inventory_001",
+                    "command_type": "upsert",
+                    "entity_type": "inventory_item",
+                    "entity_id": "inv_bridge_001",
+                    "base_domain_epoch": self.control.current_epoch,
+                    "record": {
+                        "name": "Bridge Tee",
+                        "sku": "BRG-TEE",
+                        "sell_price": "345.00",
+                    },
+                }
+            },
+        )
+
+        execute_migration_job(str(job.id))
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(job.rows_written, 1)
+        self.assertTrue(
+            InventoryItem.objects.filter(
+                shop=self.shop,
+                source_system="firebase",
+                source_id="inv_bridge_001",
+                name="Bridge Tee",
+            ).exists()
+        )
+        self.assertEqual(MigrationBridgeReceipt.objects.filter(shop=self.shop, domain=MigrationDomain.INVENTORY).count(), 1)
+
+        duplicate_job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.INVENTORY,
+            job_type=MigrationJobType.BRIDGE_REPLAY,
+            actor_user=self.user,
+            payload_json=job.payload_json,
+        )
+
+        execute_migration_job(str(duplicate_job.id))
+
+        duplicate_job.refresh_from_db()
+        self.assertEqual(duplicate_job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(duplicate_job.rows_written, 0)
+        self.assertEqual(duplicate_job.rows_skipped, 1)
+        self.assertEqual(MigrationBridgeReceipt.objects.filter(shop=self.shop, domain=MigrationDomain.INVENTORY).count(), 1)
+
+    def test_customer_bridge_replay_rejects_stale_epoch_with_reconciliation_event(self):
+        customer_control = self._create_customer_control()
+        customer_control.bridge_mode = MigrationBridgeMode.FIREBASE_TO_POSTGRES
+        customer_control.current_epoch = 3
+        customer_control.save(update_fields=["bridge_mode", "current_epoch", "updated_at"])
+
+        job = MigrationJobRun.objects.create(
+            shop=self.shop,
+            domain=MigrationDomain.CUSTOMERS,
+            job_type=MigrationJobType.BRIDGE_REPLAY,
+            actor_user=self.user,
+            payload_json={
+                "bridge_event": {
+                    "origin_system": "firebase",
+                    "origin_event_id": "evt_customer_001",
+                    "command_type": "upsert",
+                    "entity_type": "customer",
+                    "entity_id": "cust_bridge_001",
+                    "base_domain_epoch": 2,
+                    "record": {
+                        "name": "Bridge Customer",
+                        "phone": "9090909090",
+                        "balance": "50.00",
+                    },
+                }
+            },
+        )
+
+        execute_migration_job(str(job.id))
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, MigrationJobStatus.SUCCEEDED)
+        self.assertEqual(job.rows_written, 0)
+        self.assertEqual(job.rows_skipped, 1)
+        self.assertEqual(job.mismatch_count, 1)
+        self.assertFalse(Customer.objects.filter(shop=self.shop, source_id="cust_bridge_001").exists())
+        self.assertTrue(
+            MigrationReconciliationEvent.objects.filter(
+                shop=self.shop,
+                domain=MigrationDomain.CUSTOMERS,
+                issue_code="stale_bridge_epoch",
+                entity_type="customer",
+                entity_id="cust_bridge_001",
+            ).exists()
+        )

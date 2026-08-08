@@ -1,0 +1,12 @@
+```mermaid
+sequenceDiagram
+  participant System as Validation System
+  participant Queue as migration_reconciliation_events
+  participant Admin as Review Dashboard
+  participant PG as PostgreSQL
+
+  System->>Queue: Insert review item
+  Admin->>Queue: Open pending item
+  Admin->>PG: Approve or reject resolution action
+  PG-->>Queue: Mark resolved
+```

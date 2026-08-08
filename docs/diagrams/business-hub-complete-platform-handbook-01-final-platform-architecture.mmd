@@ -1,0 +1,72 @@
+```mermaid
+flowchart TD
+  subgraph Clients["Client Products"]
+    Mobile["Flutter Mobile"]
+    AdminWeb["Next.js Admin Web"]
+    PublicWeb["Next.js Public Web"]
+    Desktop["Tauri Desktop Shell"]
+  end
+
+  subgraph Edge["Edge and Delivery"]
+    CDN["CDN / WAF / Edge Cache"]
+    Routing["Regional Routing"]
+  end
+
+  subgraph App["Application Platform"]
+    API["Django + DRF API"]
+    Realtime["Selective Realtime Layer"]
+    Queue["Redis / Durable Queue"]
+    Workers["Celery Workers"]
+  end
+
+  subgraph Data["Core Data Platform"]
+    Redis["Redis"]
+    Pooler["pgBouncer / Supavisor"]
+    Postgres["PostgreSQL"]
+    Storage["Object Storage + CDN"]
+    Analytics["Analytics / Warehouse later"]
+  end
+
+  subgraph Control["Control Plane"]
+    OTel["OpenTelemetry + Collector"]
+    Ops["Grafana / Sentry / Alerts"]
+    IaC["Terraform / Pulumi"]
+    Workflow["Temporal when needed"]
+    Testing["k6 / Artillery / Chaos"]
+  end
+
+  Mobile --> CDN
+  AdminWeb --> CDN
+  PublicWeb --> CDN
+  Desktop --> CDN
+  CDN --> Routing
+  Routing --> API
+  API --> Redis
+  API --> Pooler
+  Pooler --> Postgres
+  API --> Queue
+  Queue --> Workers
+  API --> Storage
+  Workers --> Pooler
+  Workers --> Storage
+  Workers --> Analytics
+  Postgres --> Realtime
+  Realtime --> Mobile
+  Realtime --> AdminWeb
+  Realtime --> Desktop
+
+  Mobile -. telemetry .-> OTel
+  AdminWeb -. telemetry .-> OTel
+  Desktop -. telemetry .-> OTel
+  API -. telemetry .-> OTel
+  Workers -. telemetry .-> OTel
+  Postgres -. telemetry .-> OTel
+  Realtime -. telemetry .-> OTel
+  OTel --> Ops
+  IaC --> API
+  IaC --> Workers
+  IaC --> Postgres
+  Testing --> API
+  Testing --> Workers
+  Workflow --> Workers
+```

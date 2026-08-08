@@ -1,0 +1,34 @@
+```mermaid
+sequenceDiagram
+  participant User as User
+  participant Edge as CDN / Edge
+  participant API as Backend API
+  participant Cache as Redis
+  participant DB as PostgreSQL
+  participant Queue as Queue
+  participant Worker as Worker
+  participant RT as Realtime
+
+  User->>Edge: Request screen / action
+  Edge-->>User: Static assets if cacheable
+  Edge->>API: Forward dynamic request
+  API->>Cache: Check hot cache
+  alt Cache hit
+    Cache-->>API: Cached payload
+    API-->>User: Fast response
+  else Cache miss
+    API->>DB: Query primary or replica
+    DB-->>API: Data
+    API->>Cache: Fill cache
+    API-->>User: Response
+  end
+
+  User->>API: Write action
+  API->>DB: Transactional write
+  API->>Queue: Enqueue heavy follow-up
+  API-->>User: Immediate success
+  DB->>RT: Change event
+  RT-->>User: Confirmation / update
+  Queue->>Worker: Process async job
+  Worker->>DB: Summary / export / side effects
+```

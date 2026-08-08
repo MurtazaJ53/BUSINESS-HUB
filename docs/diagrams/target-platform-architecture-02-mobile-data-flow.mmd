@@ -1,0 +1,22 @@
+```mermaid
+sequenceDiagram
+  participant UI as Flutter UI
+  participant Local as SQLite / Drift
+  participant Outbox as Local Outbox
+  participant API as Backend API
+  participant Jobs as Workers
+  participant DB as PostgreSQL
+  participant RT as Realtime
+
+  UI->>Local: Write immediately
+  UI->>Outbox: Queue mutation
+  Local-->>UI: Update screen instantly
+  Outbox->>API: Sync mutation
+  API->>DB: Transactional write
+  API-->>Outbox: Ack / version
+  DB->>RT: Change event
+  RT-->>UI: Confirmation / refresh signal
+  API->>Jobs: Heavy work if needed
+  Jobs->>DB: Background updates
+  DB->>RT: Job completion events
+```

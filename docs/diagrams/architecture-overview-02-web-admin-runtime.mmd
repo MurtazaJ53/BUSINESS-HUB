@@ -1,0 +1,12 @@
+```mermaid
+flowchart TD
+  UI["React UI"] --> AuthStore["useAuthStore"]
+  UI --> BizStore["useBusinessStore"]
+  BizStore --> LocalRepos["Repository layer"]
+  LocalRepos --> WebSQLite["Local SQLite schema"]
+  BizStore --> Outbox["sync_queue"]
+  SyncWorker["SyncWorker"] --> Outbox
+  SyncWorker --> Firestore["Cloud Firestore"]
+  Firestore --> SyncWorker
+  AuthStore --> FirebaseAuth["Firebase Auth"]
+```

@@ -1,0 +1,12 @@
+```mermaid
+flowchart TD
+  MobileUI["Flutter screens"] --> Session["mobileSessionProvider"]
+  MobileUI --> Repos["mobile_repository.dart"]
+  Repos --> Drift["Drift / SQLite"]
+  Session --> Recovery["Workspace recovery"]
+  Recovery --> Auth["Firebase Auth"]
+  Recovery --> Firestore["Cloud Firestore"]
+  Sync["MobileSyncCoordinator"] --> Firestore
+  Sync --> Drift
+  MobileUI --> Sync
+```

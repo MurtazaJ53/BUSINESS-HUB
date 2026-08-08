@@ -1,0 +1,124 @@
+# Mobile Release Readiness Checklist
+
+## Purpose
+
+This checklist is the final gate before shipping a Flutter APK outside the internal dev loop.
+
+## Versioning
+
+1. Update [D:/business-hub/apps/mobile_flutter/pubspec.yaml](D:/business-hub/apps/mobile_flutter/pubspec.yaml) `version: x.y.z+build`.
+   - or prepare it first with [D:/business-hub/scripts/mobile_flutter_release_prep.ps1](D:/business-hub/scripts/mobile_flutter_release_prep.ps1)
+2. Write the exact user-facing changes in [D:/business-hub/docs/mobile-release-notes-template.md](D:/business-hub/docs/mobile-release-notes-template.md).
+3. Confirm the release target:
+   - internal beta
+   - pilot shop build
+   - wider production rollout
+
+## CI and build gate
+
+1. Confirm `.github/workflows/flutter_mobile_validate.yml` is green.
+2. Run locally:
+   - `flutter analyze`
+   - `flutter test`
+   - `flutter build apk --debug`
+   - or [D:/business-hub/scripts/mobile_flutter_validate.ps1](D:/business-hub/scripts/mobile_flutter_validate.ps1)
+3. Build release APK:
+   - `flutter build apk --release`
+   - or [D:/business-hub/scripts/mobile_flutter_release.ps1](D:/business-hub/scripts/mobile_flutter_release.ps1)
+   - preferably run `-PreflightOnly` first for signing and tag verification
+4. If using the dedicated mobile release lane, confirm:
+   - `.github/workflows/flutter_mobile_release.yml`
+   - release channel is chosen correctly
+   - tag matches the intended APK release
+   - checksum and manifest artifacts will be published
+5. Confirm release signing is available:
+   - GitHub secrets are present, or
+   - local `android/key.properties` is configured from [D:/business-hub/apps/mobile_flutter/android/key.properties.example](D:/business-hub/apps/mobile_flutter/android/key.properties.example)
+6. If packaging locally, archive the generated preflight reports:
+   - `BusinessHub-Mobile-<release-tag>.preflight.txt`
+   - `BusinessHub-Mobile-<release-tag>.preflight.json`
+7. If using local release prep, archive the generated prep pack:
+   - `BusinessHub-Mobile-<release-tag>.prep.txt`
+   - `BusinessHub-Mobile-<release-tag>.prep.json`
+   - `BusinessHub-Mobile-<release-tag>.release-notes.md`
+   - `BusinessHub-Mobile-<release-tag>.changelog.md`
+8. If consolidating the release handoff locally, archive the generated bundle pack:
+   - `BusinessHub-Mobile-<release-tag>.bundle-summary.txt`
+   - `BusinessHub-Mobile-<release-tag>.bundle-summary.json`
+   - `BusinessHub-Mobile-<release-tag>.bundle-handoff.md`
+9. Regenerate the local release registry so the current tag appears in the shared mobile release index:
+   - `release-artifacts/mobile-release-registry.json`
+   - `release-artifacts/mobile-release-registry.md`
+10. Run the local release tag gate before creating the final `mobile-v*` tag:
+   - `BusinessHub-Mobile-<release-tag>.tag-summary.txt`
+   - `BusinessHub-Mobile-<release-tag>.tag-summary.json`
+11. Build the final local handoff pack when you want one portable release folder:
+   - `BusinessHub-Mobile-<release-tag>.handoff-summary.txt`
+   - `BusinessHub-Mobile-<release-tag>.handoff-summary.json`
+   - `BusinessHub-Mobile-<release-tag>.handoff-readme.md`
+12. If you want one final release-lane verdict, run the local pipeline runner and archive:
+   - `BusinessHub-Mobile-<release-tag>.pipeline-summary.txt`
+   - `BusinessHub-Mobile-<release-tag>.pipeline-summary.json`
+
+## Mobile smoke gate
+
+Reference sheet:
+- [D:/business-hub/docs/mobile-pilot-readiness-signoff.md](D:/business-hub/docs/mobile-pilot-readiness-signoff.md)
+- [D:/business-hub/docs/mobile-pilot-smoke-sheet.md](D:/business-hub/docs/mobile-pilot-smoke-sheet.md)
+- [D:/business-hub/docs/mobile-pilot-recovery-playbook.md](D:/business-hub/docs/mobile-pilot-recovery-playbook.md)
+
+1. Owner login works.
+2. Staff login works.
+3. Inventory search/add works.
+4. Scanner flow works on device camera.
+5. POS checkout works for:
+   - cash
+   - UPI
+   - split payment
+   - credit / partial due
+6. Customer attach works in checkout.
+7. Existing-due customer triggers credit exposure confirmation.
+8. Customer ledger payment/adjustment works.
+9. History feed shows:
+   - filtered report pulse
+   - payment mix
+   - receipt detail
+10. Settings edit works for admin account.
+11. Settings shows the expected:
+    - version + build number
+    - release channel
+    - release SHA when provided
+12. Use `Copy pilot snapshot` and archive it in the release record.
+13. Installed APK is from the intended signed release lane.
+
+## Sync and recovery gate
+
+1. Sale saves locally when backend is unavailable.
+2. Outbox replay succeeds after connectivity returns.
+3. Failed receipt retry works from History and Settings.
+4. Domain-state posture still matches the backend migration state.
+5. Recovery report can be copied from Settings if a replay issue is forced during testing.
+
+## Release packaging
+
+1. Archive the final APK path:
+   - `apps/mobile_flutter/build/app/outputs/flutter-apk/app-release.apk`
+2. Archive the checksum file generated by the release lane.
+3. Archive the release manifest generated by the release lane.
+4. Archive the JSON manifest and generated handoff markdown from the release lane.
+5. For local release packaging, archive the files generated under `release-artifacts/mobile-local/<release-tag>/`.
+6. Copy the final pilot snapshot into the release record.
+7. Copy the readiness signoff into the release record.
+8. Copy the full handoff pack into the release record.
+9. Copy it into the release artifact location used by the team.
+10. Attach release notes.
+11. Record the version and commit hash.
+
+## Go / no-go rule
+
+Release only if:
+- CI is green
+- smoke flows are green
+- sync recovery is green
+- release notes are written
+- rollback APK is available

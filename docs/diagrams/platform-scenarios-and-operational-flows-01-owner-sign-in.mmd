@@ -1,0 +1,21 @@
+```mermaid
+sequenceDiagram
+  participant User as Owner
+  participant Auth as Auth Provider
+  participant API as Backend API
+  participant PG as PostgreSQL
+  participant Bridge as Bridge
+
+  User->>Auth: Sign in
+  Auth-->>API: Identity token
+  API->>PG: Resolve user + shop membership
+  alt Membership exists in PostgreSQL
+    PG-->>API: Membership found
+    API-->>User: Session ready
+  else Membership missing during migration
+    API->>Bridge: Recover from Firebase-era membership data
+    Bridge->>PG: Materialize membership
+    PG-->>API: Membership ready
+    API-->>User: Session ready
+  end
+```

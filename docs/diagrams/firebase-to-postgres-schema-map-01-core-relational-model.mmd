@@ -1,0 +1,32 @@
+```mermaid
+erDiagram
+  USERS ||--o{ SHOP_MEMBERSHIPS : belongs_to
+  SHOPS ||--o{ SHOP_MEMBERSHIPS : has
+  SHOP_MEMBERSHIPS ||--o| MEMBERSHIP_PRIVATE : has
+
+  SHOPS ||--o{ INVENTORY_ITEMS : owns
+  INVENTORY_ITEMS ||--o| INVENTORY_ITEM_PRIVATE : has
+  INVENTORY_ITEMS ||--o{ INVENTORY_STOCK_LEDGER : produces
+
+  SHOPS ||--o{ CUSTOMERS : owns
+  CUSTOMERS ||--o{ CUSTOMER_LEDGER_ENTRIES : produces
+  CUSTOMERS ||--o{ CUSTOMER_PAYMENTS : receives
+
+  SHOPS ||--o{ SALES : owns
+  SALES ||--o{ SALE_ITEMS : contains
+  SALES ||--o{ SALE_PAYMENTS : contains
+  SALES }o--|| CUSTOMERS : references
+  SALES }o--|| SHOP_MEMBERSHIPS : performed_by
+
+  SHOPS ||--o{ EXPENSES : owns
+  SHOPS ||--o{ ATTENDANCE_SESSIONS : owns
+
+  SHOPS ||--o{ JOBS : owns
+  JOBS ||--o{ JOB_EVENTS : emits
+  SHOPS ||--o{ IMPORTS : owns
+  IMPORTS ||--o{ IMPORT_ERRORS : emits
+
+  SHOPS ||--o{ AUDIT_EVENTS : owns
+  SHOPS ||--o{ DASHBOARD_SNAPSHOT_CURRENT : has
+  SHOPS ||--o{ SHOP_DAILY_METRICS : has
+```

@@ -1,0 +1,629 @@
+/* Outfit and JetBrains Mono are loaded by next/font/google in layout.tsx,
+   which downloads them at build time and serves them from /_next. The old
+   `@import url('https://fonts.googleapis.com/...')` here was blocked by our
+   own Content-Security-Policy (style-src 'self'), so the site rendered in the
+   fallback system font. Self-hosting fixes it without loosening the policy. */
+@import "tailwindcss";
+
+:root,
+[data-theme="light"] {
+  /* APK Light Theme Palette (AppPalette from mobile_flutter/lib/core/theme/app_theme.dart) */
+  --bg-app: #EEF2F6;
+  --bg-base: #F8FAFC;
+  --bg-soft: #F1F5F9;
+  --surface: #FFFFFF;
+  --surface-strong: #F4F4F5;
+  --surface-muted: #F8FAFC;
+  --border-soft: #E4E4E7;
+  --border: #D4D4D8;
+  --border-strong: #A1A1AA;
+
+  /* Text Hierarchy (Slate / Zinc ink) */
+  --text-primary: #0F172A;
+  --text-secondary: #3F3F46;
+  --text-tertiary: #71717A;
+  --text-disabled: #A1A1AA;
+
+  /* Brand Colors - Sky Blue */
+  --primary: #0EA5E9;
+  --primary-hover: #0284C7;
+  --primary-light: #38BDF8;
+  --primary-dark: #0369A1;
+
+  --accent: #0284C7;
+  --accent-hover: #0369A1;
+  --accent-light: #38BDF8;
+
+  /* Semantic Colors */
+  --success: #10B981;
+  --success-light: #34D399;
+  --success-dark: #059669;
+
+  --warning: #F59E0B;
+  --warning-light: #FBBF24;
+  --warning-dark: #D97706;
+
+  --error: #EF4444;
+  --error-light: #F87171;
+  --error-dark: #DC2626;
+
+  --info: #3B82F6;
+  --info-light: #60A5FA;
+  --info-dark: #2563EB;
+
+  /* Status text that has to stay readable on a tinted panel. Light theme wants
+     the deep shade; dark theme overrides these with the light shade. */
+  --success-strong: #059669;
+  --warning-strong: #D97706;
+  --error-strong: #DC2626;
+  --info-strong: #2563EB;
+
+  /* Domain Colors */
+  --revenue: #10B981;
+  --expense: #EF4444;
+  --inventory: #0EA5E9;
+  --customer: #0284C7;
+  --alert: #F59E0B;
+
+  /* Panel Background Soft with opacity */
+  --bg-panel-soft: rgba(255, 255, 255, 0.85);
+
+  /* Shadows (Soft APK elevated card shadows) */
+  --shadow-1: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-2: 0 4px 12px rgba(14, 165, 233, 0.06), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-3: 0 10px 25px -5px rgba(14, 165, 233, 0.08), 0 8px 16px -6px rgba(0, 0, 0, 0.04);
+  --shadow-4: 0 20px 35px -8px rgba(14, 165, 233, 0.12), 0 10px 20px -5px rgba(0, 0, 0, 0.05);
+  --shadow-glow: 0 0 0 1px rgba(14, 165, 233, 0.25), 0 8px 24px rgba(14, 165, 233, 0.20);
+
+  /* Typography */
+  /* --font-outfit / --font-jetbrains-mono are set on <html> by next/font. */
+  --font-sans: var(--font-outfit), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), Consolas, monospace;
+}
+
+[data-theme="dark"] {
+  /* Premium Dark Mode Palette */
+  --bg-app: #0B0F19;         /* Dark background */
+  --bg-base: #0B0F19;
+  --bg-soft: #151B2C;        /* Dark soft surface */
+  --surface: #1E293B;        /* Card surface */
+  --surface-strong: #0F172A; /* Deeper slate surface */
+  --surface-muted: #1E293B;
+  --border-soft: #2E3A52;    /* Dark border soft */
+  --border: #3F4E6B;         /* Dark border normal */
+  --border-strong: #64748B;
+
+  /* Text Hierarchy */
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-tertiary: #94A3B8;
+  --text-disabled: #475569;
+
+  /* Brand Colors - Sky Blue */
+  --primary: #38BDF8;
+  --primary-hover: #7DD3FC;
+  --primary-light: #93C5FD;
+  --primary-dark: #0EA5E9;
+
+  --accent: #38BDF8;
+  --accent-hover: #7DD3FC;
+  --accent-light: #BAE6FD;
+
+  /* Semantic Colors */
+  --success: #10B981;
+  --success-light: #34D399;
+  --success-dark: #059669;
+
+  --warning: #F59E0B;
+  --warning-light: #FBBF24;
+  --warning-dark: #D97706;
+
+  --error: #EF4444;
+  --error-light: #F87171;
+  --error-dark: #DC2626;
+
+  --info: #3B82F6;
+  --info-light: #60A5FA;
+  --info-dark: #2563EB;
+
+  /* See the light-theme note: the deep shades go muddy on a dark panel. */
+  --success-strong: #34D399;
+  --warning-strong: #FBBF24;
+  --error-strong: #F87171;
+  --info-strong: #60A5FA;
+
+  /* Domain Colors */
+  --revenue: #10B981;
+  --expense: #EF4444;
+  --inventory: #38BDF8;
+  --customer: #38BDF8;
+  --alert: #F59E0B;
+
+  /* Panel Background Soft with opacity */
+  --bg-panel-soft: rgba(30, 41, 59, 0.85);
+
+  /* Shadows (Tuned dark mode shadows) */
+  --shadow-1: 0 1px 3px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.15);
+  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-3: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 16px -6px rgba(0, 0, 0, 0.3);
+  --shadow-4: 0 20px 35px -8px rgba(0, 0, 0, 0.5), 0 10px 20px -5px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 0 1px rgba(56, 189, 248, 0.25), 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+@theme inline {
+  --color-bg-app: var(--bg-app);
+  --color-bg-base: var(--bg-base);
+  --color-bg-soft: var(--bg-soft);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-border-soft: var(--border-soft);
+  --color-border: var(--border);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-text-disabled: var(--text-disabled);
+  
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-light: var(--primary-light);
+  --color-primary-dark: var(--primary-dark);
+  
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+  
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--bg-app);
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(14, 165, 233, 0.04) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(56, 189, 248, 0.04) 0%, transparent 40%);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: rgba(14, 165, 233, 0.25);
+  color: #0369A1;
+}
+
+/* Flutter Mobile APK Card & Panel Components */
+
+.panel, .mobile-panel {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-2);
+  border-radius: 24px;
+}
+
+.panel-soft {
+  background: var(--bg-panel-soft);
+  border: 1px solid var(--border-soft);
+  backdrop-filter: blur(12px);
+  border-radius: 20px;
+}
+
+.panel-strong {
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-3);
+  border-radius: 24px;
+}
+
+.eyebrow {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--text-tertiary);
+}
+
+.metric-value {
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-family: var(--font-sans);
+}
+
+.gridlines {
+  background-image: linear-gradient(var(--border-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-soft) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.nav-pill-active {
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
+  font-weight: 700;
+  border-radius: 14px;
+}
+
+.nav-pill-idle {
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 600;
+  border-radius: 14px;
+  transition: all 150ms ease;
+}
+
+.nav-pill-idle:hover {
+  background: var(--bg-soft);
+  color: var(--primary-dark);
+}
+
+.surface-muted {
+  background: var(--bg-soft);
+  border: 1px solid var(--border-soft);
+}
+
+/* Button Styles - Sky Blue Glow */
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+  color: #ffffff;
+  padding: 12px 22px;
+  border-radius: 16px;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(14, 165, 233, 0.3);
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--primary-hover), var(--primary-dark));
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  background: var(--border-soft);
+  color: var(--text-tertiary);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--surface);
+  color: var(--text-primary);
+  padding: 12px 20px;
+  border-radius: 16px;
+  font-weight: 600;
+  font-size: 14px;
+  border: 1px solid var(--border-soft);
+  cursor: pointer;
+  transition: all 180ms ease;
+  box-shadow: var(--shadow-1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-secondary:hover {
+  background: var(--bg-soft);
+  border-color: var(--border);
+  color: var(--primary-dark);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 10px 16px;
+  border-radius: 14px;
+  font-weight: 600;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  transition: all 180ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn-ghost:hover {
+  background: var(--bg-soft);
+  color: var(--text-primary);
+}
+
+/* Input Styles - Modern Soft Corners */
+
+.input {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  color: var(--text-primary);
+  padding: 13px 16px;
+  border-radius: 16px;
+  font-size: 15px;
+  font-family: var(--font-sans);
+  transition: all 180ms ease;
+  width: 100%;
+}
+
+.input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+}
+
+.input:disabled {
+  background: var(--bg-soft);
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+/* Badges & Tags (MobileTag in Flutter) */
+
+.badge, .mobile-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.badge-primary {
+  background: rgba(14, 165, 233, 0.12);
+  color: var(--primary);
+  border: 1px solid rgba(14, 165, 233, 0.20);
+}
+
+.badge-success {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.20);
+}
+
+.badge-warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.20);
+}
+
+.badge-error {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--error);
+  border: 1px solid rgba(239, 68, 68, 0.20);
+}
+
+.badge-neutral {
+  background: var(--bg-soft);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-soft);
+}
+
+/* Clean Tables */
+
+.table-container {
+  overflow-x: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table thead {
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.table th {
+  padding: 14px 18px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.table td {
+  padding: 16px 18px;
+  font-size: 14px;
+  color: var(--text-primary);
+  border-top: 1px solid var(--border-soft);
+}
+
+.table tbody tr:hover {
+  background: var(--bg-soft);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-soft);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+}
+
+/* Thermal POS Receipt Printing */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  body * {
+    visibility: hidden !important;
+  }
+  #thermal-receipt-print-area,
+  #thermal-receipt-print-area *,
+  #barcode-label-print-area,
+  #barcode-label-print-area * {
+    visibility: visible !important;
+  }
+
+  /* Barcode label sheets. Sizes are set in millimetres on the elements
+     themselves so a label is its physical size; all this has to do is put the
+     grid at the top-left of the page and keep a label from being split across
+     a page break, which would make it unscannable. */
+  #barcode-label-print-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    margin: 0 !important;
+    background: white !important;
+    color: black !important;
+  }
+  #barcode-label-print-area > * {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  /* Bars must stay pure black: a printer's "economy" colour management can
+     otherwise render them grey enough to defeat a scanner. */
+  #barcode-label-print-area svg rect {
+    fill: #000 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  #thermal-receipt-print-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 76mm !important;
+    margin: 0 !important;
+    padding: 4mm !important;
+    background: white !important;
+    color: black !important;
+    font-family: var(--font-mono) !important;
+    font-size: 11px !important;
+    line-height: 1.3 !important;
+  }
+}
+
+/* Premium Animations & Motions */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulseGlow {
+  0% {
+    opacity: 0.6;
+    box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.4);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 0 6px rgba(14, 165, 233, 0.2);
+  }
+  100% {
+    opacity: 0.6;
+    box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.4);
+  }
+}
+
+@keyframes scaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out both;
+}
+
+.animate-scale-up {
+  animation: scaleUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.pulse-glow {
+  animation: pulseGlow 2s infinite ease-in-out;
+}
+
+.hover-lift {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-3);
+  border-color: rgba(14, 165, 233, 0.4);
+}
+
+.delay-1 { animation-delay: 40ms; }
+.delay-2 { animation-delay: 80ms; }
+.delay-3 { animation-delay: 120ms; }
+.delay-4 { animation-delay: 160ms; }
+.delay-5 { animation-delay: 200ms; }
+.delay-6 { animation-delay: 240ms; }
+.delay-7 { animation-delay: 280ms; }
+.delay-8 { animation-delay: 320ms; }

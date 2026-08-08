@@ -1,0 +1,53 @@
+```mermaid
+erDiagram
+  SHOP_SETTINGS {
+    string key PK
+    string value
+    number updatedAt
+  }
+
+  INVENTORY {
+    string id PK
+    string name
+    number price
+    string sku
+    string category
+    string subcategory
+    string size
+    string description
+    number stock
+    string sourceMeta
+    number createdAt
+    number updatedAt
+    boolean tombstone
+  }
+
+  INVENTORY_PRIVATE {
+    string id PK
+    number costPrice
+    string supplierId
+    string lastPurchaseDate
+    number updatedAt
+    boolean tombstone
+  }
+
+  SALES {
+    string id PK
+    number total
+    number discount
+    string discountType
+    string paymentMode
+    string date
+    number createdAt
+    number updatedAt
+    string customerName
+    string customerPhone
+    string customerId
+    string footerNote
+    string itemsJson
+    string paymentsJson
+    boolean tombstone
+  }
+
+  INVENTORY ||--|| INVENTORY_PRIVATE : "cost extension"
+```

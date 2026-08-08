@@ -1,0 +1,317 @@
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+import dj_database_url
+from dotenv import load_dotenv
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
+
+
+def env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_list(name: str, default: list[str] | None = None) -> list[str]:
+    raw = os.getenv(name)
+    if not raw:
+        return default or []
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+DEBUG = env_bool("DJANGO_DEBUG", False)
+ENVIRONMENT = os.getenv("DJANGO_ENV", "development")
+
+if ENVIRONMENT == "production":
+    if not os.getenv("DATABASE_URL"):
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured("FATAL: DATABASE_URL is not set in production.")
+    if not os.getenv("RESEND_API_KEY"):
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured("FATAL: RESEND_API_KEY is not set in production.")
+
+# SECRET_KEY: Refuse to boot without a real key so a forgotten env var 
+# can't ship an instance whose JWTs anyone could forge.
+_SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+if _SECRET_KEY:
+    SECRET_KEY = _SECRET_KEY
+else:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "FATAL: DJANGO_SECRET_KEY is not set. Refusing to boot."
+    )
+
+# Pepper for blind-index hashing of searchable PII (customer phone). Falls back
+# to SECRET_KEY so it always has a strong value; set a *separate*
+# BLIND_INDEX_PEPPER in prod for key separation. NEVER change it once data
+# exists, or existing phone hashes stop matching.
+BLIND_INDEX_PEPPER = os.getenv("BLIND_INDEX_PEPPER", SECRET_KEY)
+
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", ["localhost", "127.0.0.1", "testserver"])
+CORS_ALLOWED_ORIGINS = env_list("DJANGO_CORS_ALLOWED_ORIGINS")
+CORS_ALLOW_ALL_ORIGINS = False
+CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
+BUSINESS_HUB_WEBAUTHN_RP_ID = os.getenv("BUSINESS_HUB_WEBAUTHN_RP_ID", "").strip()
+BUSINESS_HUB_WEBAUTHN_RP_NAME = os.getenv(
+    "BUSINESS_HUB_WEBAUTHN_RP_NAME",
+    "Business Hub",
+).strip()
+BUSINESS_HUB_WEBAUTHN_ALLOWED_ORIGINS = env_list(
+    "BUSINESS_HUB_WEBAUTHN_ALLOWED_ORIGINS",
+    CORS_ALLOWED_ORIGINS or ["http://localhost:3000", "http://127.0.0.1:3000"],
+)
+
+INSTALLED_APPS = [
+    "channels",
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "corsheaders",
+    "rest_framework",
+    "platform_apps.common.apps.CommonConfig",
+    "platform_apps.health.apps.HealthConfig",
+    "platform_apps.users.apps.UsersConfig",
+    "platform_apps.shops.apps.ShopsConfig",
+    "platform_apps.platform_admin.apps.PlatformAdminConfig",
+    "platform_apps.inventory.apps.InventoryConfig",
+    "platform_apps.customers.apps.CustomersConfig",
+    "platform_apps.sales.apps.SalesConfig",
+    "platform_apps.payments.apps.PaymentsConfig",
+    "platform_apps.expenses.apps.ExpensesConfig",
+    "platform_apps.purchases.apps.PurchasesConfig",
+    "platform_apps.attendance.apps.AttendanceConfig",
+    "platform_apps.projections.apps.ProjectionsConfig",
+    "platform_apps.jobs.apps.JobsConfig",
+    "platform_apps.audit.apps.AuditConfig",
+    "platform_apps.erpnext.apps.ERPNextConfig",
+    "platform_apps.notifications.apps.NotificationsConfig",
+    "platform_apps.billing.apps.BillingConfig",
+]
+
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    # WhiteNoise serves static files (admin, DRF browsable API) without a
+    # separate web server - required when deploying to Render/Heroku-style hosts.
+    # Must sit immediately after SecurityMiddleware.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "platform_apps.common.middleware.CSPMiddleware",
+]
+
+ROOT_URLCONF = "config.urls"
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = "config.wsgi.application"
+ASGI_APPLICATION = "config.asgi.application"
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.parse(
+            DATABASE_URL,
+            # 0 = release the connection after each request. Required behind
+            # PgBouncer in *transaction* pooling mode (the prod setup); keeping
+            # Django connections alive there defeats the pooler and exhausts
+            # Postgres. Set DATABASE_CONN_MAX_AGE>0 only if you point Django at
+            # Postgres directly (no transaction-pooling PgBouncer).
+            conn_max_age=int(os.getenv("DATABASE_CONN_MAX_AGE", "0")),
+            ssl_require=True if ENVIRONMENT == "production" else env_bool("DATABASE_SSL_REQUIRED", False),
+        )
+    }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "dev.sqlite3",
+        }
+    }
+
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
+]
+
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
+SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = "Lax"
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
+SECURE_HSTS_SECONDS = 31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+
+LANGUAGE_CODE = "en-in"
+TIME_ZONE = os.getenv("DJANGO_TIME_ZONE", "Asia/Kolkata")
+USE_I18N = True
+USE_TZ = True
+
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+# WhiteNoise compressed storage. CompressedStaticFilesStorage (not the Manifest
+# variant) is deliberate: it will not hard-fail a deploy if a template references
+# a missing asset.
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+AUTH_USER_MODEL = "users.PlatformUser"
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        # JWT first: only claims tokens signed with our SECRET_KEY, otherwise
+        # returns None so the Firebase adapter still handles Firebase ID tokens.
+        "platform_apps.users.jwt_auth.JWTAuthentication",
+        # FirebaseAuthentication deliberately removed from the chain. Nothing
+        # authenticates with Firebase any more (the Flutter app has no Firebase
+        # dependency at all, and no service account ships in the image), but
+        # leaving it registered meant a malformed or expired JWT fell through to
+        # it and returned "Firebase authentication is not configured on this
+        # backend" — a misleading error for a plain auth failure. The module
+        # stays for the historical migration tooling.
+        "platform_apps.users.authentication.DevHeaderAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle"
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/hour",
+        "user": "1000/hour",
+        # Public khata statements get their own bucket. On the shared "anon"
+        # rate a busy shop's customers checking balances would exhaust the
+        # 100/hour that also covers login and registration.
+        "khata_statement": "60/hour",
+    },
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": int(os.getenv("API_PAGE_SIZE", "50")),
+    "EXCEPTION_HANDLER": "platform_apps.common.exceptions.core_exception_handler",
+}
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
+
+# Run cache + realtime + Celery in-process (no Redis server) when explicitly
+# requested, or automatically under the test runner, so the suite is green
+# without external infra.
+import sys as _sys  # noqa: E402
+
+_running_tests = ("pytest" in _sys.modules) or ("test" in _sys.argv)
+_USE_INMEMORY_INFRA = _running_tests or os.getenv(
+    "USE_INMEMORY_CHANNELS", ""
+).lower() in ("1", "true", "yes")
+_redis_cache = (
+    REDIS_URL.startswith("redis://") or REDIS_URL.startswith("rediss://")
+) and not _USE_INMEMORY_INFRA
+CACHES = {
+    "default": {
+        "BACKEND": (
+            "django.core.cache.backends.redis.RedisCache"
+            if _redis_cache
+            else "django.core.cache.backends.locmem.LocMemCache"
+        ),
+        "LOCATION": REDIS_URL if _redis_cache else "business-hub-dev-cache",
+    }
+}
+
+# --- Subscription billing (Razorpay) -------------------------------------
+# Left blank until real keys are issued; the billing module stays inert and the
+# app keeps working, so nothing breaks before the merchant account exists.
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
+
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", REDIS_URL)
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
+# In tests/dev without infra, run tasks in-process so no broker is contacted.
+if _USE_INMEMORY_INFRA:
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = int(os.getenv("CELERY_TASK_TIME_LIMIT", "300"))
+
+# Realtime channel layer. Redis is used in production/dev-with-infra, but tests
+# and lightweight local runs can opt into the in-memory layer so the suite runs
+# green without a Redis server (USE_INMEMORY_CHANNELS=1).
+if _USE_INMEMORY_INFRA:
+    CHANNEL_LAYERS = {
+        "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"},
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [REDIS_URL],
+            },
+        },
+    }
+
+OTEL_SERVICE_NAME = os.getenv("OTEL_SERVICE_NAME", "business-hub-backend")
+
+ERPNEXT_BASE_URL = os.getenv("ERPNEXT_BASE_URL", "").rstrip("/")
+ERPNEXT_API_KEY = os.getenv("ERPNEXT_API_KEY", "")
+ERPNEXT_API_SECRET = os.getenv("ERPNEXT_API_SECRET", "")
+ERPNEXT_SITE_NAME = os.getenv("ERPNEXT_SITE_NAME", "")
+ERPNEXT_VERIFY_SSL = env_bool("ERPNEXT_VERIFY_SSL", True)
+ERPNEXT_TIMEOUT_SECONDS = int(os.getenv("ERPNEXT_TIMEOUT_SECONDS", "15"))
+ERPNEXT_MOCK_MODE = env_bool("ERPNEXT_MOCK_MODE", False)
+ERPNEXT_MOCK_STATE_PATH = os.getenv(
+    "ERPNEXT_MOCK_STATE_PATH",
+    str(BASE_DIR / ".erpnext-mock-state.json"),
+)
+ERPNEXT_CYCLE_BEAT_ENABLED = env_bool("ERPNEXT_CYCLE_BEAT_ENABLED", True)
+ERPNEXT_CYCLE_BEAT_MINUTES = int(os.getenv("ERPNEXT_CYCLE_BEAT_MINUTES", "15"))
+ERPNEXT_CYCLE_BEAT_LIMIT = int(os.getenv("ERPNEXT_CYCLE_BEAT_LIMIT", "100"))

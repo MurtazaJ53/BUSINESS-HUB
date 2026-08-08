@@ -1,0 +1,72 @@
+```mermaid
+flowchart TD
+  subgraph Clients["Client Layer"]
+    Mobile["Flutter Mobile"]
+    Web["Next.js Admin / Public Web"]
+    Desktop["Tauri Desktop"]
+  end
+
+  subgraph Edge["Global Edge Plane"]
+    CDN["Cloudflare / Global CDN"]
+    WAF["WAF + Bot Protection"]
+    Router["Regional Routing + Rate Limiting"]
+    EdgeAuth["Edge Token Screening"]
+  end
+
+  subgraph Ingestion["Write Ingestion Plane"]
+    IngestAPI["Go or Rust Ingestion API"]
+    Idempotency["Idempotency / Replay Guard"]
+    OutboxAck["Fast Ack Service"]
+  end
+
+  subgraph Stream["Streaming Plane"]
+    Topic["Kafka / Pub/Sub Transaction Topics"]
+    DLQ["Dead Letter / Retry Topics"]
+  end
+
+  subgraph Validation["Validation and Commit Plane"]
+    Validator["Validation Workers"]
+    RuleEngine["Business Rules / Risk / Limits"]
+    Committer["Ledger Commit Workers"]
+  end
+
+  subgraph Data["Core Data Plane"]
+    Ledger["Distributed SQL Ledger\nSpanner or CockroachDB"]
+    Redis["Redis / Cache / Fanout Assist"]
+    Storage["Object Storage"]
+    Analytics["Warehouse / OLAP"]
+  end
+
+  subgraph Realtime["Realtime Plane"]
+    Notify["Realtime Fanout / WS / SSE"]
+  end
+
+  Mobile --> CDN
+  Web --> CDN
+  Desktop --> CDN
+
+  CDN --> WAF
+  WAF --> Router
+  Router --> EdgeAuth
+  EdgeAuth --> IngestAPI
+
+  IngestAPI --> Idempotency
+  Idempotency --> Topic
+  IngestAPI --> OutboxAck
+  OutboxAck --> Mobile
+  OutboxAck --> Web
+  OutboxAck --> Desktop
+
+  Topic --> Validator
+  Validator --> RuleEngine
+  RuleEngine --> Committer
+  Committer --> Ledger
+  Validator --> DLQ
+
+  Ledger --> Redis
+  Ledger --> Analytics
+  Ledger --> Notify
+  Notify --> Mobile
+  Notify --> Web
+  Notify --> Desktop
+```
