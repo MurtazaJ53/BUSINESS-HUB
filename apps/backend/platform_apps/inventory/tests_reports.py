@@ -4,8 +4,15 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
+
+from platform_apps.purchases.models import (
+    PurchaseOrder,
+    PurchaseOrderLine,
+    Supplier,
+)
 
 from platform_apps.inventory.models import (
     InventoryItem,
@@ -203,3 +210,146 @@ class StockReportTests(TestCase):
         self.assertEqual(len(body["items"]), 1)
         self.assertIsNone(body["items"][0]["cost_price"])
         self.assertIsNone(body["items"][0]["estimated_cost"])
+
+
+class ReorderListOnOrderTests(TestCase):
+    """The buying list must not demand stock that is already on a van.
+
+    Purchase orders arrived after this report was written. Without accounting
+    for them, a shop reorders the same carton twice and pays for it twice.
+    """
+
+    def setUp(self):
+        self.user = PlatformUser.objects.create_user(
+            email="buyer@example.com", password="secret", full_name="Owner"
+        )
+        self.shop = Shop.objects.create(name="Buy Shop", slug="buy-shop")
+        ShopMembership.objects.create(
+            user=self.user,
+            shop=self.shop,
+            role=ShopMembership.Role.OWNER,
+            status=ShopMembership.Status.ACTIVE,
+        )
+        self.supplier = Supplier.objects.create(shop=self.shop, name="Mills")
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def _item(self, name, *, stock, level):
+        item = InventoryItem.objects.create(
+            shop=self.shop, name=name, sell_price=Decimal("100.00"), reorder_level=level
+        )
+        if stock:
+            InventoryStockLedger.objects.create(
+                shop=self.shop,
+                item=item,
+                event_type=InventoryStockLedger.EventType.OPENING_BALANCE,
+                quantity_delta=Decimal(str(stock)),
+                occurred_at=timezone.now(),
+            )
+        return item
+
+    def _order(self, item, quantity, *, status=PurchaseOrder.Status.ORDERED, received="0"):
+        order = PurchaseOrder.objects.create(
+            shop=self.shop,
+            supplier=self.supplier,
+            reference="PO-TEST",
+            status=status,
+            ordered_at=timezone.now(),
+        )
+        PurchaseOrderLine.objects.create(
+            order=order,
+            inventory_item=item,
+            name_snapshot=item.name,
+            quantity_ordered=Decimal(str(quantity)),
+            quantity_received=Decimal(str(received)),
+            unit_cost=Decimal("50.00"),
+        )
+        return order
+
+    def _fetch(self):
+        return self.client.get(reverse("report-reorder-list", args=[self.shop.id]))
+
+    def test_open_order_reduces_the_suggested_quantity(self):
+        # Level 5, stock 2 -> target 10, so 8 without an order.
+        item = self._item("Kurta", stock=2, level=5)
+        self._order(item, 3)
+
+        row = self._fetch().data["items"][0]
+
+        self.assertEqual(Decimal(str(row["on_order"])), Decimal("3"))
+        self.assertEqual(Decimal(str(row["suggested_qty"])), Decimal("5"))
+
+    def test_item_fully_covered_drops_off_the_list(self):
+        """It does not need buying; it needs chasing."""
+        item = self._item("Saree", stock=2, level=5)
+        self._order(item, 20)
+
+        payload = self._fetch().data
+
+        self.assertEqual(payload["items"], [])
+        self.assertEqual(payload["covered_by_open_orders"], 1)
+
+    def test_a_received_order_no_longer_counts(self):
+        item = self._item("Shirt", stock=2, level=5)
+        self._order(item, 8, status=PurchaseOrder.Status.RECEIVED, received="8")
+
+        row = self._fetch().data["items"][0]
+
+        self.assertEqual(Decimal(str(row["on_order"])), Decimal("0"))
+        self.assertEqual(Decimal(str(row["suggested_qty"])), Decimal("8"))
+
+    def test_a_cancelled_order_no_longer_counts(self):
+        item = self._item("Shirt", stock=2, level=5)
+        self._order(item, 8, status=PurchaseOrder.Status.CANCELLED)
+
+        self.assertEqual(Decimal(str(self._fetch().data["items"][0]["on_order"])), Decimal("0"))
+
+    def test_only_the_outstanding_part_of_a_partial_order_counts(self):
+        """6 ordered, 4 already arrived -> 2 still coming, not 6."""
+        item = self._item("Jeans", stock=2, level=5)
+        self._order(
+            item, 6, status=PurchaseOrder.Status.PARTIALLY_RECEIVED, received="4"
+        )
+
+        row = self._fetch().data["items"][0]
+
+        self.assertEqual(Decimal(str(row["on_order"])), Decimal("2"))
+        self.assertEqual(Decimal(str(row["suggested_qty"])), Decimal("6"))
+
+    def test_another_shops_order_does_not_count(self):
+        other = Shop.objects.create(name="Other", slug="other-buy")
+        item = self._item("Kurta", stock=2, level=5)
+        order = PurchaseOrder.objects.create(
+            shop=other,
+            reference="PO-OTHER",
+            status=PurchaseOrder.Status.ORDERED,
+            ordered_at=timezone.now(),
+        )
+        PurchaseOrderLine.objects.create(
+            order=order,
+            inventory_item=item,
+            name_snapshot=item.name,
+            quantity_ordered=Decimal("50"),
+        )
+
+        self.assertEqual(Decimal(str(self._fetch().data["items"][0]["on_order"])), Decimal("0"))
+
+    def test_out_of_stock_item_on_order_still_leaves_the_list(self):
+        """Zero stock is urgent, but a second order would still be a duplicate."""
+        item = self._item("Rice", stock=0, level=5)
+        self._order(item, 30)
+
+        payload = self._fetch().data
+
+        self.assertEqual(payload["items"], [])
+        self.assertEqual(payload["out_of_stock_count"], 0)
+        self.assertEqual(payload["covered_by_open_orders"], 1)
+
+    def test_nothing_on_order_behaves_exactly_as_before(self):
+        item = self._item("Towel", stock=2, level=5)
+
+        row = self._fetch().data["items"][0]
+
+        self.assertEqual(Decimal(str(row["on_order"])), Decimal("0"))
+        self.assertEqual(Decimal(str(row["suggested_qty"])), Decimal("8"))
+        self.assertEqual(self._fetch().data["covered_by_open_orders"], 0)

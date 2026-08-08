@@ -118,10 +118,60 @@ class DeadStockView(APIView):
         )
 
 
+def _on_order_by_item(shop) -> dict[str, Decimal]:
+    """How much of each item is already ordered and not yet received.
+
+    Purchase orders exist now, which broke an assumption this report was built
+    on: an item can be below its reorder level *because* a delivery is on a van
+    rather than because nobody has acted. Without this, the buying list keeps
+    demanding stock that is already paid for, and a shop ends up ordering the
+    same carton twice.
+
+    Imported here rather than at module scope: inventory reports are the more
+    fundamental app, and a top-level import would make it depend on purchases.
+    """
+    from platform_apps.purchases.models import PurchaseOrder, PurchaseOrderLine
+
+    rows = (
+        PurchaseOrderLine.objects.filter(
+            order__shop=shop,
+            order__status__in=[
+                PurchaseOrder.Status.ORDERED,
+                PurchaseOrder.Status.PARTIALLY_RECEIVED,
+            ],
+            inventory_item__isnull=False,
+        )
+        .values("inventory_item_id")
+        .annotate(
+            ordered=Coalesce(
+                Sum("quantity_ordered"),
+                Value(_ZERO),
+                output_field=DecimalField(max_digits=14, decimal_places=3),
+            ),
+            received=Coalesce(
+                Sum("quantity_received"),
+                Value(_ZERO),
+                output_field=DecimalField(max_digits=14, decimal_places=3),
+            ),
+        )
+    )
+
+    out: dict[str, Decimal] = {}
+    for row in rows:
+        outstanding = (row["ordered"] or _ZERO) - (row["received"] or _ZERO)
+        if outstanding > _ZERO:
+            out[str(row["inventory_item_id"])] = outstanding
+    return out
+
+
 class ReorderListView(APIView):
     """Everything at or below its reorder level — the full buying list.
 
     Not capped: a purchase run needs every item, not a dashboard teaser.
+
+    Quantities already on a live purchase order are subtracted from the
+    suggestion, and an item fully covered by an open order drops off the list
+    entirely: it does not need buying, it needs chasing.
     """
 
     permission_classes = [permissions.IsAuthenticated]
@@ -147,14 +197,25 @@ class ReorderListView(APIView):
             .select_related("private")
         )
 
+        on_order = _on_order_by_item(membership.shop)
+
         items = []
+        fully_covered = 0
         for item in rows:
             level = int(item.effective_reorder_level)
             stock = item.stock or _ZERO
+            incoming = on_order.get(str(item.id), _ZERO)
+
             # Buy up to twice the reorder level so the shop isn't back at the
             # threshold the day after restocking. Always at least 1.
-            suggested = Decimal(level * 2) - stock
+            target = Decimal(level * 2)
+            suggested = target - stock - incoming
             if suggested < 1:
+                # Everything needed is already on its way. Chasing the supplier
+                # is the action here, not raising a second order.
+                if incoming > _ZERO:
+                    fully_covered += 1
+                    continue
                 suggested = Decimal(1)
             suggested = suggested.to_integral_value(rounding="ROUND_CEILING")
 
@@ -173,6 +234,7 @@ class ReorderListView(APIView):
                     "stock": stock,
                     "reorder_level": level,
                     "uses_default_level": item.reorder_level is None,
+                    "on_order": incoming,
                     "suggested_qty": suggested,
                     "cost_price": cost,
                     "estimated_cost": None if cost is None else cost * suggested,
@@ -188,6 +250,9 @@ class ReorderListView(APIView):
             {
                 "default_reorder_level": DEFAULT_REORDER_LEVEL,
                 "out_of_stock_count": sum(1 for row in items if row["out_of_stock"]),
+                # Low, but already ordered. Surfaced as a count so the absence
+                # of these rows is visible rather than looking like a bug.
+                "covered_by_open_orders": fully_covered,
                 # Null rather than a partial sum: a half-counted buying budget
                 # is worse than none.
                 "estimated_total": sum(estimated, _ZERO) if len(estimated) == len(items) else None,
